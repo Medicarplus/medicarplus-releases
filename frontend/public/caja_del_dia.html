@@ -118,6 +118,7 @@
     <span class="pill" id="saldoAnt">Saldo anterior: 0,00 €</span>
     <button class="btn btn-primary" id="btnImport">📥 Importar CSV</button>
     <input type="file" id="fileInput" accept=".csv" style="display:none" />
+    <button class="btn" id="btnDownloadApp" title="Descargar este programa como archivo .html">💾 Descargar app</button>
     <button class="btn" id="btnPrint">🖨️ Imprimir</button>
     <button class="btn" id="btnExport">⬇️ Exportar JSON</button>
     <button class="btn" id="btnImportJson">⬆️ Importar JSON</button>
@@ -669,6 +670,21 @@ $('#btnClearDay').onclick=()=>{
   );
 };
 $('#btnPrint').onclick=()=>window.print();
+$('#btnDownloadApp').onclick=async ()=>{
+  try{
+    const res = await fetch(location.pathname.endsWith('.html')?location.pathname:'/caja_del_dia.html', {cache:'no-store'});
+    const html = await res.text();
+    const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'caja_del_dia.html';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+    toast('Descargando caja_del_dia.html ✅');
+  } catch(e){
+    toast('Error al descargar: ' + e.message);
+  }
+};
 $('#btnExport').onclick=()=>{
   const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
