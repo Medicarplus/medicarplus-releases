@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter
+from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -41,6 +42,17 @@ class StatusCheckCreate(BaseModel):
 @api_router.get("/")
 async def root():
     return {"message": "Hello World"}
+
+@api_router.get("/download-app")
+async def download_app():
+    """Force-download the standalone caja_del_dia.html file."""
+    file_path = Path(__file__).parent.parent / "frontend" / "public" / "caja_del_dia.html"
+    return FileResponse(
+        path=str(file_path),
+        media_type="application/octet-stream",
+        filename="caja_del_dia.html",
+        headers={"Content-Disposition": 'attachment; filename="caja_del_dia.html"'},
+    )
 
 @api_router.post("/status", response_model=StatusCheck)
 async def create_status_check(input: StatusCheckCreate):
