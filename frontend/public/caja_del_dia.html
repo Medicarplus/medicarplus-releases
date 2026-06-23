@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Caja del Día</title>
+<style>
+  :root{
+    --bg:#0f1115;
+    --panel:#171a21;
+    --panel-2:#1d212b;
+    --line:#262b36;
+    --text:#e8ecf2;
+    --muted:#9aa3b2;
+    --accent:#f5b301;
+    --accent-2:#ffd34d;
+    --green:#3ddc97;
+    --red:#ff5d6c;
+    --blue:#5aa9ff;
+    --chip:#2a3040;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:"Inter",-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:14px}
+  header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,#12151c 0%,#0f1115 100%);border-bottom:1px solid var(--line);padding:14px 20px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+  header h1{margin:0;font-size:18px;letter-spacing:.3px}
+  header h1 small{display:block;color:var(--muted);font-weight:400;font-size:12px;margin-top:2px}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .toolbar input[type=date]{background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  button,.btn{cursor:pointer;border:1px solid var(--line);background:var(--panel-2);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px;transition:transform .08s ease, background .15s ease, border-color .15s ease}
+  button:hover,.btn:hover{background:#252b38;border-color:#39414f}
+  button:active{transform:translateY(1px)}
+  .btn-primary{background:var(--accent);color:#1a1a1a;border-color:transparent;font-weight:600}
+  .btn-primary:hover{background:var(--accent-2)}
+  .btn-ghost{background:transparent}
+  .btn-danger{background:#3a1f25;border-color:#5e2a33;color:#ffb8c0}
+  .btn-danger:hover{background:#4d262e}
+  .btn-success{background:#1f3a2e;border-color:#2a5e44;color:#bff0d6}
+  .btn-success:hover{background:#264a3a}
+  main{padding:18px;max-width:1500px;margin:0 auto}
+  .grid{display:grid;grid-template-columns:1fr 360px;gap:18px}
+  @media(max-width:1100px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .panel h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:0;padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .panel .body{padding:14px 16px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{position:sticky;top:0;background:#1a1e26;color:var(--muted);font-weight:600;text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  tbody td{padding:8px;border-bottom:1px solid #20242e;vertical-align:middle}
+  tbody tr:hover{background:#1a1e27}
+  tbody tr.retorno td{color:#ff8a93;text-decoration:line-through}
+  tbody tr.retorno td.act{text-decoration:none}
+  .tag{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--chip);color:#cdd6e3;font-size:11px;border:1px solid #313749}
+  .tag.haber{background:#163422;color:#7ee3aa;border-color:#235e3d}
+  .tag.debe{background:#3a1c22;color:#ff96a0;border-color:#5e2a33}
+  .tag.E{background:#173a2c;color:#7ee3aa;border-color:#235e3d}
+  .tag.T{background:#1f2a4a;color:#86b6ff;border-color:#2c3f6e}
+  .tag.B{background:#3a311c;color:#ffd58a;border-color:#5e4a2a}
+  .tag.X{background:#3a1c33;color:#ff9bd2;border-color:#5e2a4e}
+  .num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+  .right{text-align:right}
+  .summary{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 14px;font-size:13px}
+  .summary .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #262b36}
+  .summary .row.total{font-weight:700;color:var(--accent);font-size:15px;border-bottom:none;padding-top:10px;margin-top:6px;border-top:1px solid var(--line)}
+  .form-row{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:8px}
+  .form-row.dh{grid-template-columns:140px 1fr 130px 110px}
+  input[type=text],input[type=number],select,textarea{background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;font-size:13px}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  label{display:block;color:var(--muted);font-size:11px;margin-bottom:2px;text-transform:uppercase;letter-spacing:.5px}
+  .small{font-size:11px;color:var(--muted)}
+  .chip-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+  .chip{padding:6px 10px;border-radius:999px;background:var(--chip);border:1px solid #313749;cursor:pointer;font-size:12px}
+  .chip.active{background:var(--accent);color:#1a1a1a;border-color:transparent;font-weight:600}
+  .actions{display:flex;gap:4px;justify-content:flex-end}
+  .icon-btn{padding:4px 8px;font-size:12px;border-radius:6px;background:transparent;border:1px solid #2a3040}
+  .icon-btn:hover{background:#252b38}
+  .empty{padding:30px;text-align:center;color:var(--muted)}
+  .tabs{display:flex;gap:4px;padding:0 12px;border-bottom:1px solid var(--line)}
+  .tabs button{border:none;background:transparent;color:var(--muted);padding:10px 14px;border-radius:0;border-bottom:2px solid transparent;font-weight:500}
+  .tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+  details{border-top:1px solid var(--line)}
+  details summary{cursor:pointer;padding:10px 16px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:1px}
+  .history-item{display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-bottom:1px solid #20242e;cursor:pointer}
+  .history-item:hover{background:#1a1e27}
+  .history-item .date{font-weight:600}
+  .history-item .totals{color:var(--muted);font-size:12px}
+  .toast{position:fixed;bottom:20px;right:20px;background:#222a35;border:1px solid var(--line);padding:12px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:99;animation:slide .25s ease}
+  @keyframes slide{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+  hr.sep{border:none;border-top:1px dashed #262b36;margin:14px 0}
+  .pill{padding:2px 8px;border-radius:6px;background:#202531;border:1px solid #2a3040;font-size:11px;color:var(--muted)}
+  @media print {
+    body{background:#fff;color:#000}
+    header,.no-print,.panel h2 button,.actions,.toolbar,form,.tabs,details{display:none !important}
+    .grid{display:block}
+    .panel{border:none;background:#fff}
+    thead th{background:#eee;color:#000;border-color:#999}
+    tbody td{border-color:#ccc;color:#000}
+    .summary{color:#000}
+    .tag{border:1px solid #999;color:#000;background:#fff}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Caja del Día <small>Cierre diario · Importación CSV tráfico · Debe / Haber</small></h1>
+  <div class="toolbar">
+    <label class="small" style="margin:0">FECHA</label>
+    <input type="date" id="fecha" />
+    <button class="btn" id="btnPrevDay" title="Día anterior">←</button>
+    <button class="btn" id="btnNextDay" title="Día siguiente">→</button>
+    <button class="btn" id="btnToday">Hoy</button>
+    <span class="pill" id="saldoAnt">Saldo anterior: 0,00 €</span>
+    <button class="btn btn-primary" id="btnImport">📥 Importar CSV</button>
+    <input type="file" id="fileInput" accept=".csv" style="display:none" />
+    <button class="btn" id="btnPrint">🖨️ Imprimir</button>
+    <button class="btn" id="btnExport">⬇️ Exportar JSON</button>
+    <button class="btn" id="btnImportJson">⬆️ Importar JSON</button>
+    <input type="file" id="jsonInput" accept=".json" style="display:none" />
+  </div>
+</header>
+
+<main>
+  <div class="grid">
+    <!-- IZQUIERDA -->
+    <div>
+      <div class="panel" style="margin-bottom:14px">
+        <div class="tabs">
+          <button class="active" data-tab="tab-traf">Tráfico (Renov/Exped)</button>
+          <button data-tab="tab-priv">Revisiones / Certificados / Otros</button>
+          <button data-tab="tab-dh">Debe / Haber</button>
+        </div>
+
+        <!-- TAB TRAFICO (añadir manual) -->
+        <div class="body tab" id="tab-traf">
+          <div class="form-row">
+            <div><label>Concepto</label>
+              <select id="t-tipo">
+                <option>Renovación</option><option>Expedición</option>
+                <option>Duplicado</option><option>Canje</option><option>Otro</option>
+              </select>
+            </div>
+            <div><label>Grupo</label>
+              <select id="t-grupo">
+                <option>Conducir</option><option>Ciclomotor</option>
+                <option>BTP</option><option>Otro</option>
+              </select>
+            </div>
+            <div><label>Nombre</label><input type="text" id="t-nombre" placeholder="Apellidos, Nombre" /></div>
+            <div><label>Importe (€)</label><input type="number" step="0.01" id="t-importe" /></div>
+            <div><label>Tasa DGT (€)</label><input type="number" step="0.01" id="t-tasa" value="0" /></div>
+            <div><label>F. Pago</label>
+              <select id="t-fp"><option value="E">Efectivo</option><option value="T">Tarjeta</option><option value="B">Bizum</option><option value="X">Transferencia</option></select>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="btnAddTraf">+ Añadir entrada</button>
+        </div>
+
+        <!-- TAB PRIVADAS -->
+        <div class="body tab" id="tab-priv" style="display:none">
+          <div class="chip-row" id="chips-priv">
+            <span class="chip active" data-c="Revisión privada">Revisión privada</span>
+            <span class="chip" data-c="Certificado">Certificado</span>
+            <span class="chip" data-c="Duplicado">Duplicado</span>
+            <span class="chip" data-c="Informe">Informe</span>
+            <span class="chip" data-c="Psicotécnico">Psicotécnico</span>
+            <span class="chip" data-c="Otro">Otro</span>
+          </div>
+          <div class="form-row">
+            <div style="grid-column:span 2"><label>Concepto / Nombre</label><input type="text" id="p-nombre" placeholder="Nombre del cliente / nota" /></div>
+            <div><label>Importe (€)</label><input type="number" step="0.01" id="p-importe" /></div>
+            <div><label>Descuento (€)</label><input type="number" step="0.01" id="p-desc" value="0" /></div>
+            <div><label>Tasa (€)</label><input type="number" step="0.01" id="p-tasa" value="0" /></div>
+            <div><label>F. Pago</label>
+              <select id="p-fp"><option value="E">Efectivo</option><option value="T">Tarjeta</option><option value="B">Bizum</option><option value="X">Transferencia</option></select>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="btnAddPriv">+ Añadir</button>
+        </div>
+
+        <!-- TAB DEBE HABER -->
+        <div class="body tab" id="tab-dh" style="display:none">
+          <div class="form-row dh">
+            <div><label>Tipo</label>
+              <select id="dh-tipo">
+                <option value="HABER">HABER (entra dinero)</option>
+                <option value="DEBE">DEBE (sale dinero)</option>
+              </select>
+            </div>
+            <div><label>Concepto libre</label><input type="text" id="dh-concepto" placeholder="Ej: Pago factura luz, Anticipo a Juan, Ajuste tasa 23/06..." /></div>
+            <div><label>Importe (€)</label><input type="number" step="0.01" id="dh-importe" /></div>
+            <div><label>F. Pago</label>
+              <select id="dh-fp"><option value="E">Efectivo</option><option value="T">Tarjeta</option><option value="B">Bizum</option><option value="X">Transferencia</option></select>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="btnAddDH">+ Añadir Debe/Haber</button>
+          <div class="small" style="margin-top:8px">Sistema libre como el cuaderno: cualquier concepto, marca si es HABER (suma a caja) o DEBE (resta de caja). Útil para retornos, ajustes de tasas DGT de días anteriores, gastos, etc.</div>
+        </div>
+      </div>
+
+      <!-- TABLA ENTRADAS -->
+      <div class="panel">
+        <h2>Entradas del día <span><button class="btn btn-danger no-print" id="btnClearDay">🗑️ Vaciar día</button></span></h2>
+        <div style="max-height:62vh;overflow:auto">
+          <table id="tbl">
+            <thead>
+              <tr>
+                <th>#</th><th>Tipo</th><th>Grupo</th><th>Nombre / Concepto</th>
+                <th class="num">Importe</th><th class="num">Dto</th><th class="num">Tasa</th>
+                <th>FP</th><th>FP Tasa</th><th class="num act">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+          <div class="empty" id="empty">No hay entradas. Importa CSV o añade manualmente arriba.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DERECHA -->
+    <div>
+      <div class="panel" style="margin-bottom:14px">
+        <h2>Cierre del día</h2>
+        <div class="body">
+          <div class="summary" id="sumBox"></div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:14px">
+        <h2>Resumen por concepto</h2>
+        <div class="body" id="byConcept"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Histórico <span class="small" id="histCount"></span></h2>
+        <div id="histList" style="max-height:40vh;overflow:auto"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   Caja del Día – single-file app
+   - localStorage data:  caja.byDate = { "YYYY-MM-DD": [entries...] }
+   - Robust CSV import (tráfico): ; delim, Win-1252 or UTF-8 auto-detect
+   - Free Debe/Haber system
+   ============================================================ */
+const STORE_KEY = 'caja.v1';
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+let state = loadState();
+let currentDate = isoToday();
+let privConcept = 'Revisión privada';
+
+function loadState(){
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {byDate:{}} }
+  catch(e){ return {byDate:{}} }
+}
+function saveState(){ localStorage.setItem(STORE_KEY, JSON.stringify(state)) }
+function isoToday(){ const d=new Date(); return d.toISOString().slice(0,10) }
+function fmt(n){ if(typeof n!=='number'||isNaN(n)) n=0; return n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €' }
+function num(v){
+  if(v==null||v==='') return 0;
+  if(typeof v==='number') return v;
+  let s = String(v).trim().replace(/\s|€/g,'');
+  if(!s) return 0;
+  const hasDot = s.indexOf('.')>=0, hasComma = s.indexOf(',')>=0;
+  if(hasDot && hasComma){
+    // last one is the decimal separator
+    if(s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g,'').replace(',','.');
+    else s = s.replace(/,/g,'');
+  } else if(hasComma){
+    s = s.replace(',','.');
+  } // else only dot or none -> already JS-friendly
+  return parseFloat(s) || 0;
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7) }
+function entriesOf(d){ return state.byDate[d] ||= [] }
+
+function toast(msg, ms=2200){
+  const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+  $('#toast').appendChild(t); setTimeout(()=>t.remove(), ms);
+}
+
+/* ---------- DATE NAV ---------- */
+function setDate(d){ currentDate=d; $('#fecha').value=d; render() }
+function shiftDate(delta){
+  const d=new Date(currentDate); d.setDate(d.getDate()+delta);
+  setDate(d.toISOString().slice(0,10));
+}
+$('#btnPrevDay').onclick=()=>shiftDate(-1);
+$('#btnNextDay').onclick=()=>shiftDate(1);
+$('#btnToday').onclick=()=>setDate(isoToday());
+$('#fecha').onchange=e=>setDate(e.target.value);
+
+/* ---------- TABS ---------- */
+$$('.tabs button').forEach(b=>b.onclick=()=>{
+  $$('.tabs button').forEach(x=>x.classList.remove('active'));
+  $$('.tab').forEach(x=>x.style.display='none');
+  b.classList.add('active');
+  $('#'+b.dataset.tab).style.display='block';
+});
+
+/* ---------- PRIVADAS chips ---------- */
+$$('#chips-priv .chip').forEach(c=>c.onclick=()=>{
+  $$('#chips-priv .chip').forEach(x=>x.classList.remove('active'));
+  c.classList.add('active');
+  privConcept=c.dataset.c;
+});
+
+/* ---------- ADD ENTRIES ---------- */
+$('#btnAddTraf').onclick=()=>{
+  const e = {
+    id: uid(), kind:'TRAF',
+    tipo: $('#t-tipo').value, grupo: $('#t-grupo').value,
+    nombre: $('#t-nombre').value.trim()||'(sin nombre)',
+    importe: num($('#t-importe').value),
+    descuento:0,
+    tasa: num($('#t-tasa').value),
+    fp: $('#t-fp').value, fpTasa: $('#t-fp').value,
+    retorno:false
+  };
+  if(!e.importe && !e.tasa){ toast('Importe o tasa requerido'); return }
+  entriesOf(currentDate).push(e); saveState(); render();
+  $('#t-nombre').value=''; $('#t-importe').value=''; $('#t-tasa').value='0';
+};
+$('#btnAddPriv').onclick=()=>{
+  const e = {
+    id: uid(), kind:'PRIV',
+    tipo: privConcept, grupo:'-',
+    nombre: $('#p-nombre').value.trim()||'(sin nombre)',
+    importe: num($('#p-importe').value),
+    descuento: num($('#p-desc').value),
+    tasa: num($('#p-tasa').value),
+    fp: $('#p-fp').value, fpTasa: $('#p-fp').value,
+    retorno:false
+  };
+  if(!e.importe && !e.tasa){ toast('Importe requerido'); return }
+  entriesOf(currentDate).push(e); saveState(); render();
+  $('#p-nombre').value=''; $('#p-importe').value=''; $('#p-desc').value='0'; $('#p-tasa').value='0';
+};
+$('#btnAddDH').onclick=()=>{
+  const e = {
+    id: uid(), kind:'DH',
+    tipo: $('#dh-tipo').value, // HABER | DEBE
+    grupo:'-',
+    nombre: $('#dh-concepto').value.trim()||'(sin concepto)',
+    importe: num($('#dh-importe').value),
+    descuento:0, tasa:0,
+    fp: $('#dh-fp').value, fpTasa:'',
+    retorno:false
+  };
+  if(!e.importe){ toast('Importe requerido'); return }
+  entriesOf(currentDate).push(e); saveState(); render();
+  $('#dh-concepto').value=''; $('#dh-importe').value='';
+};
+
+/* ---------- CSV IMPORT ---------- */
+$('#btnImport').onclick=()=>$('#fileInput').click();
+$('#fileInput').onchange=async (ev)=>{
+  const f = ev.target.files[0]; if(!f) return;
+  const buf = await f.arrayBuffer();
+  // Try UTF-8 first; if it has replacement chars or unusual bytes, fall back to Windows-1252
+  let text;
+  try {
+    text = new TextDecoder('utf-8', {fatal:true}).decode(buf);
+  } catch(e) {
+    text = new TextDecoder('windows-1252').decode(buf);
+  }
+  // Heuristic: if UTF-8 decoded but text shows mojibake (rare here), still try win1252
+  if(/Ã[©±¡³]/.test(text)){ text = new TextDecoder('windows-1252').decode(buf); }
+  const rows = parseCSV(text);
+  ev.target.value='';
+  importTrafficRows(rows);
+};
+function parseCSV(text){
+  const out=[]; let row=[], cell='', inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){
+        if(text[i+1]==='"'){ cell+='"'; i++; }
+        else inQ=false;
+      } else cell+=c;
+    } else {
+      if(c==='"') inQ=true;
+      else if(c===';'){ row.push(cell); cell=''; }
+      else if(c==='\n'){ row.push(cell); out.push(row); row=[]; cell=''; }
+      else if(c==='\r'){ /* skip */ }
+      else cell+=c;
+    }
+  }
+  if(cell.length||row.length){ row.push(cell); out.push(row); }
+  return out.filter(r=>r.some(x=>x && x.trim()!==''));
+}
+function importTrafficRows(rows){
+  if(!rows.length){ toast('CSV vacío'); return }
+  // Find header
+  const header = rows[0].map(s=>s.trim().toUpperCase());
+  const idx = name => header.findIndex(h => h===name || h.startsWith(name));
+  const iFecha = idx('FECHA'), iNombre = idx('NOMBRE'), iAp1 = idx('APELLIDO1'), iAp2 = idx('APELLIDO2'),
+        iTipo = idx('TIPO'), iGrupo = idx('GRUPO'), iImporte = idx('IMPORTE'),
+        iTasa = idx('TASA');
+  // FP appears twice; find both
+  const fpCols = []; header.forEach((h,i)=>{ if(h==='FP') fpCols.push(i) });
+  const iFp = fpCols[0] ?? -1, iFpTasa = fpCols[1] ?? iFp;
+
+  if(iFecha<0 || iImporte<0){ toast('Cabeceras CSV no reconocidas'); return }
+
+  const data = rows.slice(1);
+  const grouped = {}; // date -> entries
+  let total=0, dates=new Set();
+
+  data.forEach(r=>{
+    const fechaRaw = (r[iFecha]||'').trim();
+    if(!fechaRaw) return;
+    // dd/mm/yyyy -> yyyy-mm-dd
+    const m = fechaRaw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+    if(!m) return;
+    let [_,d,mo,y] = m; if(y.length===2) y='20'+y;
+    const iso = `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
+    const nombre = [(r[iAp1]||'').trim(), (r[iAp2]||'').trim(), (r[iNombre]||'').trim()]
+        .filter(Boolean).join(' ').replace(/\s+/g,' ').trim() || '(sin nombre)';
+    const e = {
+      id: uid(), kind:'TRAF', _csv:true,
+      tipo: (r[iTipo]||'').trim() || 'Otro',
+      grupo: (r[iGrupo]||'').trim() || '-',
+      nombre,
+      importe: num(r[iImporte]),
+      descuento: 0,
+      tasa: iTasa>=0 ? num(r[iTasa]) : 0,
+      fp: ((r[iFp]||'E').trim() || 'E').toUpperCase()[0],
+      fpTasa: ((r[iFpTasa]||'E').trim() || 'E').toUpperCase()[0],
+      retorno: false
+    };
+    if(e.importe===0 && e.tasa===0) return; // skip empty
+    (grouped[iso] ||= []).push(e);
+    total++; dates.add(iso);
+  });
+
+  if(!total){ toast('No se han encontrado filas válidas'); return }
+
+  // Merge into state, avoid duplicates (same date + nombre + importe + tasa already present from CSV)
+  let added=0, skipped=0;
+  for(const [date,arr] of Object.entries(grouped)){
+    const list = entriesOf(date);
+    for(const e of arr){
+      const dup = list.some(x=>x._csv && x.nombre===e.nombre && x.tipo===e.tipo && x.importe===e.importe && x.tasa===e.tasa);
+      if(dup){ skipped++; continue }
+      list.push(e); added++;
+    }
+  }
+  saveState();
+  // Jump to the first date imported
+  const first = [...dates].sort()[0];
+  if(first) setDate(first); else render();
+  toast(`✅ Importado: ${added} entrada(s)${skipped?`, ${skipped} duplicada(s) ignorada(s)`:''}`);
+}
+
+/* ---------- RENDER ---------- */
+function render(){
+  $('#fecha').value=currentDate;
+  const list = entriesOf(currentDate);
+  // Empty
+  $('#empty').style.display = list.length? 'none':'block';
+  // Body
+  const tb = $('#tbody'); tb.innerHTML='';
+  list.forEach((e,i)=>{
+    const tr = document.createElement('tr');
+    if(e.retorno) tr.className='retorno';
+    const tipoTag = e.kind==='DH'
+       ? `<span class="tag ${e.tipo==='HABER'?'haber':'debe'}">${e.tipo}</span>`
+       : `<span class="tag">${e.tipo||'-'}</span>`;
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td>${tipoTag}</td>
+      <td>${e.grupo||'-'}</td>
+      <td>${escapeHtml(e.nombre)}</td>
+      <td class="num">${fmt(e.importe)}</td>
+      <td class="num">${e.descuento?fmt(e.descuento):'—'}</td>
+      <td class="num">${e.tasa?fmt(e.tasa):'—'}</td>
+      <td>${fpTag(e.fp)}</td>
+      <td>${e.tasa?fpTag(e.fpTasa):'—'}</td>
+      <td class="act">
+        <div class="actions no-print">
+          <button class="icon-btn" data-act="edit" data-id="${e.id}" title="Editar">✏️</button>
+          <button class="icon-btn" data-act="ret" data-id="${e.id}" title="Retorno / Reactivar">${e.retorno?'↩︎':'↺'}</button>
+          <button class="icon-btn" data-act="del" data-id="${e.id}" title="Eliminar">🗑️</button>
+        </div>
+      </td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll('button').forEach(b=>b.onclick=()=>actEntry(b.dataset.act, b.dataset.id));
+
+  renderSummary(list);
+  renderByConcept(list);
+  renderHistory();
+  renderSaldoAnterior();
+}
+function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])) }
+function fpTag(fp){
+  if(!fp) return '—';
+  const map={E:'Efectivo',T:'Tarjeta',B:'Bizum',X:'Transf.'};
+  return `<span class="tag ${fp}">${map[fp]||fp}</span>`;
+}
+
+function computeTotals(list){
+  const t = {bruto:0,dto:0,tasas:0,neto:0, byFp:{E:0,T:0,B:0,X:0}, tasasByFp:{E:0,T:0,B:0,X:0}, haber:0, debe:0, cnt:list.length, retornos:0};
+  list.forEach(e=>{
+    if(e.retorno){ t.retornos++; return }
+    if(e.kind==='DH'){
+      const fp = e.fp||'E';
+      if(e.tipo==='HABER'){ t.haber+=e.importe; t.byFp[fp]=(t.byFp[fp]||0)+e.importe; t.neto+=e.importe; }
+      else { t.debe+=e.importe; t.byFp[fp]=(t.byFp[fp]||0)-e.importe; t.neto-=e.importe; }
+      return;
+    }
+    const subt = e.importe - (e.descuento||0);
+    t.bruto += e.importe; t.dto += e.descuento||0;
+    t.tasas += e.tasa||0;
+    const fp=e.fp||'E'; t.byFp[fp]=(t.byFp[fp]||0)+subt;
+    const fpt=e.fpTasa||fp; t.tasasByFp[fpt]=(t.tasasByFp[fpt]||0)+(e.tasa||0);
+    t.neto += subt + (e.tasa||0);
+  });
+  return t;
+}
+function renderSummary(list){
+  const t = computeTotals(list);
+  const sa = saldoAnterior(currentDate);
+  const box = $('#sumBox');
+  box.innerHTML = `
+    <div class="row"><span>Entradas</span><b>${t.cnt} ${t.retornos?`(${t.retornos} retorno)`:''}</b></div>
+    <div class="row"><span>Bruto</span><b class="num">${fmt(t.bruto)}</b></div>
+    <div class="row"><span>Descuentos</span><b class="num">-${fmt(t.dto)}</b></div>
+    <div class="row"><span>Tasas DGT</span><b class="num">${fmt(t.tasas)}</b></div>
+    <hr class="sep" style="grid-column:span 2"/>
+    <div class="row"><span>💵 Efectivo</span><b class="num">${fmt((t.byFp.E||0)+(t.tasasByFp.E||0))}</b></div>
+    <div class="row"><span>💳 Tarjeta</span><b class="num">${fmt((t.byFp.T||0)+(t.tasasByFp.T||0))}</b></div>
+    <div class="row"><span>📱 Bizum</span><b class="num">${fmt((t.byFp.B||0)+(t.tasasByFp.B||0))}</b></div>
+    <div class="row"><span>🏦 Transferencia</span><b class="num">${fmt((t.byFp.X||0)+(t.tasasByFp.X||0))}</b></div>
+    <hr class="sep" style="grid-column:span 2"/>
+    <div class="row"><span style="color:#7ee3aa">HABER libre</span><b class="num" style="color:#7ee3aa">+${fmt(t.haber)}</b></div>
+    <div class="row"><span style="color:#ff96a0">DEBE libre</span><b class="num" style="color:#ff96a0">-${fmt(t.debe)}</b></div>
+    <div class="row"><span>Saldo anterior</span><b class="num">${fmt(sa)}</b></div>
+    <div class="row total"><span>TOTAL CAJA</span><span class="num">${fmt(t.neto + sa)}</span></div>
+  `;
+}
+function renderByConcept(list){
+  const map = {};
+  list.forEach(e=>{
+    if(e.retorno) return;
+    const key = e.kind==='DH' ? `[${e.tipo}] libre` : `${e.tipo}${e.grupo&&e.grupo!=='-'?' · '+e.grupo:''}`;
+    map[key] ||= {n:0, total:0};
+    map[key].n++;
+    const signo = e.kind==='DH' && e.tipo==='DEBE' ? -1 : 1;
+    map[key].total += signo * ((e.importe - (e.descuento||0)) + (e.tasa||0));
+  });
+  const entries = Object.entries(map).sort((a,b)=>b[1].total-a[1].total);
+  $('#byConcept').innerHTML = entries.length
+    ? `<table style="width:100%"><tbody>${entries.map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td class="num">${v.n}×</td><td class="num"><b>${fmt(v.total)}</b></td></tr>`).join('')}</tbody></table>`
+    : `<div class="small">Sin datos</div>`;
+}
+function saldoAnterior(date){
+  const dates = Object.keys(state.byDate).filter(d=>d<date).sort();
+  if(!dates.length) return 0;
+  const prev = dates[dates.length-1];
+  return computeTotals(entriesOf(prev)).neto + saldoAnterior(prev);
+}
+function renderSaldoAnterior(){
+  const sa = saldoAnterior(currentDate);
+  $('#saldoAnt').textContent = `Saldo anterior: ${fmt(sa)}`;
+}
+function renderHistory(){
+  const dates = Object.keys(state.byDate).filter(d=>entriesOf(d).length).sort().reverse();
+  $('#histCount').textContent = `${dates.length} día(s)`;
+  $('#histList').innerHTML = dates.length
+    ? dates.map(d=>{
+        const t=computeTotals(entriesOf(d));
+        const cls = d===currentDate?'style="background:#1a1e27"':'';
+        return `<div class="history-item" ${cls} data-d="${d}">
+           <div><div class="date">${d.split('-').reverse().join('/')}</div>
+                <div class="totals">${t.cnt} entrada(s) · ${fmt(t.neto)}</div></div>
+           <button class="icon-btn" data-delday="${d}" title="Borrar día">🗑️</button>
+         </div>`;
+      }).join('')
+    : '<div class="empty">Sin histórico todavía</div>';
+  $$('#histList .history-item').forEach(el=>el.onclick=e=>{
+    if(e.target.dataset.delday){
+      if(confirm(`¿Borrar TODOS los datos del día ${e.target.dataset.delday}?`)){
+        delete state.byDate[e.target.dataset.delday]; saveState(); render();
+      }
+      e.stopPropagation(); return;
+    }
+    setDate(el.dataset.d);
+  });
+}
+
+/* ---------- ROW ACTIONS ---------- */
+function actEntry(act,id){
+  const list = entriesOf(currentDate); const i = list.findIndex(x=>x.id===id); if(i<0) return;
+  if(act==='del'){
+    if(!confirm('¿Eliminar entrada?')) return;
+    list.splice(i,1); saveState(); render(); return;
+  }
+  if(act==='ret'){ list[i].retorno = !list[i].retorno; saveState(); render(); return; }
+  if(act==='edit'){
+    const e=list[i];
+    const isDh = e.kind==='DH';
+    const nuevoNombre = prompt(isDh?'Concepto:':'Nombre / concepto:', e.nombre);
+    if(nuevoNombre===null) return;
+    const nuevoImp = prompt('Importe (€):', e.importe);
+    if(nuevoImp===null) return;
+    const nuevaTasa = isDh ? '0' : prompt('Tasa DGT (€):', e.tasa);
+    if(nuevaTasa===null) return;
+    const nuevoFp = prompt('Forma de pago (E=Efectivo / T=Tarjeta / B=Bizum / X=Transf.):', e.fp) || e.fp;
+    e.nombre = nuevoNombre.trim()||e.nombre;
+    e.importe = num(nuevoImp);
+    e.tasa = num(nuevaTasa);
+    e.fp = nuevoFp.toUpperCase()[0]; e.fpTasa = e.fp;
+    saveState(); render();
+  }
+}
+
+/* ---------- BUTTONS ---------- */
+$('#btnClearDay').onclick=()=>{
+  if(!entriesOf(currentDate).length) return;
+  if(confirm(`¿Vaciar TODAS las entradas del ${currentDate}?`)){
+    delete state.byDate[currentDate]; saveState(); render();
+  }
+};
+$('#btnPrint').onclick=()=>window.print();
+$('#btnExport').onclick=()=>{
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`caja-backup-${isoToday()}.json`; a.click();
+};
+$('#btnImportJson').onclick=()=>$('#jsonInput').click();
+$('#jsonInput').onchange=async ev=>{
+  const f=ev.target.files[0]; if(!f) return;
+  try{
+    const txt=await f.text(); const obj=JSON.parse(txt);
+    if(!obj.byDate) throw 'formato';
+    if(confirm('¿Sustituir TODOS los datos por el archivo? (Cancelar = fusionar)')){
+      state=obj;
+    } else {
+      for(const [d,arr] of Object.entries(obj.byDate)){
+        const list=entriesOf(d);
+        for(const e of arr){ if(!list.some(x=>x.id===e.id)) list.push(e); }
+      }
+    }
+    saveState(); render(); toast('Importación JSON OK');
+  } catch(e){ toast('JSON no válido'); }
+  ev.target.value='';
+};
+
+/* ---------- INIT ---------- */
+setDate(currentDate);
+</script>
+</body>
+</html>
