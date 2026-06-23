@@ -2,6 +2,9 @@
 <html lang="es">
 <head>
 <meta charset="utf-8" />
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Caja del Día</title>
 <style>
@@ -86,6 +89,11 @@
   @keyframes slide{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
   hr.sep{border:none;border-top:1px dashed #262b36;margin:14px 0}
   .pill{padding:2px 8px;border-radius:6px;background:#202531;border:1px solid #2a3040;font-size:11px;color:var(--muted)}
+  .modal-back{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px)}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .modal h3{margin:0 0 10px 0;font-size:18px}
+  .modal p{color:var(--muted);margin:0 0 18px 0;line-height:1.5}
+  .modal .row{display:flex;gap:8px;justify-content:flex-end}
   @media print {
     body{background:#fff;color:#000}
     header,.no-print,.panel h2 button,.actions,.toolbar,form,.tabs,details{display:none !important}
@@ -321,7 +329,7 @@ $('#btnAddTraf').onclick=()=>{
     fp: $('#t-fp').value, fpTasa: $('#t-fp').value,
     retorno:false
   };
-  if(!e.importe && !e.tasa){ toast('Importe o tasa requerido'); return }
+  if(!e.importe && !e.tasa && !e.nombre){ toast('Añade al menos un nombre/concepto'); return }
   entriesOf(currentDate).push(e); saveState(); render();
   $('#t-nombre').value=''; $('#t-importe').value=''; $('#t-tasa').value='0';
 };
@@ -336,7 +344,7 @@ $('#btnAddPriv').onclick=()=>{
     fp: $('#p-fp').value, fpTasa: $('#p-fp').value,
     retorno:false
   };
-  if(!e.importe && !e.tasa){ toast('Importe requerido'); return }
+  if(!e.importe && !e.tasa && !e.nombre){ toast('Añade un nombre/concepto'); return }
   entriesOf(currentDate).push(e); saveState(); render();
   $('#p-nombre').value=''; $('#p-importe').value=''; $('#p-desc').value='0'; $('#p-tasa').value='0';
 };
@@ -351,7 +359,7 @@ $('#btnAddDH').onclick=()=>{
     fp: $('#dh-fp').value, fpTasa:'',
     retorno:false
   };
-  if(!e.importe){ toast('Importe requerido'); return }
+  if(!e.importe && !e.nombre){ toast('Indica un concepto'); return }
   entriesOf(currentDate).push(e); saveState(); render();
   $('#dh-concepto').value=''; $('#dh-importe').value='';
 };
@@ -434,7 +442,7 @@ function importTrafficRows(rows){
       fpTasa: ((r[iFpTasa]||'E').trim() || 'E').toUpperCase()[0],
       retorno: false
     };
-    if(e.importe===0 && e.tasa===0) return; // skip empty
+    if(e.importe===0 && e.tasa===0 && !nombre) return; // skip totally empty rows only
     (grouped[iso] ||= []).push(e);
     total++; dates.add(iso);
   });
@@ -586,9 +594,10 @@ function renderHistory(){
     : '<div class="empty">Sin histórico todavía</div>';
   $$('#histList .history-item').forEach(el=>el.onclick=e=>{
     if(e.target.dataset.delday){
-      if(confirm(`¿Borrar TODOS los datos del día ${e.target.dataset.delday}?`)){
-        delete state.byDate[e.target.dataset.delday]; saveState(); render();
-      }
+      const day=e.target.dataset.delday;
+      confirmModal('Borrar día', `¿Borrar TODOS los datos del día <b>${day.split('-').reverse().join('/')}</b>?`, ()=>{
+        delete state.byDate[day]; saveState(); render();
+      }, 'Borrar día');
       e.stopPropagation(); return;
     }
     setDate(el.dataset.d);
@@ -599,8 +608,10 @@ function renderHistory(){
 function actEntry(act,id){
   const list = entriesOf(currentDate); const i = list.findIndex(x=>x.id===id); if(i<0) return;
   if(act==='del'){
-    if(!confirm('¿Eliminar entrada?')) return;
-    list.splice(i,1); saveState(); render(); return;
+    confirmModal('Eliminar entrada', `¿Eliminar <b>${escapeHtml(list[i].nombre)}</b>?`, ()=>{
+      list.splice(i,1); saveState(); render();
+    }, 'Eliminar');
+    return;
   }
   if(act==='ret'){ list[i].retorno = !list[i].retorno; saveState(); render(); return; }
   if(act==='edit'){
@@ -622,11 +633,40 @@ function actEntry(act,id){
 }
 
 /* ---------- BUTTONS ---------- */
+function confirmModal(title, message, onYes, yesLabel='Sí, borrar', danger=true){
+  const back=document.createElement('div'); back.className='modal-back';
+  back.innerHTML=`<div class="modal">
+    <h3>${title}</h3>
+    <p>${message}</p>
+    <div class="row">
+      <button class="btn" data-no>Cancelar</button>
+      <button class="btn ${danger?'btn-danger':'btn-primary'}" data-yes>${yesLabel}</button>
+    </div></div>`;
+  document.body.appendChild(back);
+  back.querySelector('[data-no]').focus();
+  back.addEventListener('click', ev=>{
+    if(ev.target===back) back.remove();
+    if(ev.target.matches('[data-no]')) back.remove();
+    if(ev.target.matches('[data-yes]')){ back.remove(); onYes(); }
+  });
+  document.addEventListener('keydown', function esc(e){
+    if(e.key==='Escape'){ back.remove(); document.removeEventListener('keydown',esc); }
+  });
+}
+
+let _clearArm=false, _clearTimer=null;
 $('#btnClearDay').onclick=()=>{
-  if(!entriesOf(currentDate).length) return;
-  if(confirm(`¿Vaciar TODAS las entradas del ${currentDate}?`)){
-    delete state.byDate[currentDate]; saveState(); render();
-  }
+  if(!entriesOf(currentDate).length){ toast('No hay entradas que vaciar'); return; }
+  const cnt = entriesOf(currentDate).length;
+  confirmModal(
+    '🗑️ Vaciar día',
+    `Se borrarán las <b>${cnt} entrada(s)</b> del día <b>${currentDate.split('-').reverse().join('/')}</b>. Esta acción no se puede deshacer.`,
+    ()=>{
+      delete state.byDate[currentDate]; saveState(); render();
+      toast('Día vaciado ✅');
+    },
+    'Sí, vaciar día'
+  );
 };
 $('#btnPrint').onclick=()=>window.print();
 $('#btnExport').onclick=()=>{
