@@ -606,11 +606,14 @@ $('#btnHistory').onclick=()=>openBackupHistory();
 $('#btnLedger').onclick=()=>openLedger();
 
 // ============ LLIBRETA (LIBRO DIARIO CONTABLE) ============
-function generateLedgerEntries(dateFrom,dateTo){
+function generateLedgerEntries(dateFrom,dateTo,company){
   const rows=[];
-  const src=state.byDate||{};
+  const comp=company||currentCompany;
+  const key=KEYS[comp];
+  let src={};
+  try{src=(JSON.parse(localStorage.getItem(key))||{}).byDate||{}}catch(e){src={}}
   const fpToAccount={'E':'570 Caixa','T':'572 Banc BBVA','B':'572 Banc BBVA (Bizum)','X':'572 Banc BBVA (Transf)'};
-  const isCempla=currentCompany==='cempla';
+  const isCempla=comp==='cempla';
   Object.entries(src).sort(([a],[b])=>a.localeCompare(b)).forEach(([date,arr])=>{
     if(date<dateFrom||date>dateTo)return;
     arr.forEach(e=>{
@@ -619,14 +622,11 @@ function generateLedgerEntries(dateFrom,dateTo){
       const acctT=fpToAccount[e.fpTasa||e.fp]||acct;
       if(e.kind==='DH'){
         if(e.tipo==='HABER'){
-          // Ingreso: HABER=Ingressos, DEBE=Caixa/Banc
           rows.push({date,concepto:e.nombre||'Ingrés',debeAcct:acct,debeAmt:e.importe,haberAcct:'705 Ingressos serveis',haberAmt:e.importe});
         }else{
-          // Gasto: DEBE=Gastos, HABER=Caixa/Banc
           rows.push({date,concepto:e.nombre||'Gasto',debeAcct:'629 Despeses',debeAmt:e.importe,haberAcct:acct,haberAmt:e.importe});
         }
       }else{
-        // TRAF/PRIV: Cobro por servicio
         const importeNeto=e.importe-(e.descuento||0);
         if(importeNeto>0){
           rows.push({date,concepto:`${e.tipo||'Servei'} - ${e.nombre||''}`,debeAcct:acct,debeAmt:importeNeto,haberAcct:isCempla?'705 Ingressos serveis mèdics':'705 Ingressos serveis',haberAmt:importeNeto});
@@ -640,55 +640,139 @@ function generateLedgerEntries(dateFrom,dateTo){
   return rows;
 }
 function openLedger(){
-  const isC=currentCompany==='cempla';
+  let ledgerComp=currentCompany;
   const dTo=isoToday();const dt=new Date();dt.setMonth(dt.getMonth()-1);const dFrom=dt.toISOString().slice(0,10);
   const back=document.createElement('div');back.className='modal-back';
-  back.innerHTML=`<div class="modal" style="max-width:1200px;width:97%;max-height:92vh;display:flex;flex-direction:column;padding:16px">
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-      <h3 style="margin:0;color:#e0bff0">📖 Llibreta Diari · ${isC?'CEMPLA ESPORT':'CEMPLA C.B'}</h3>
-      <label class="small" style="margin:0 0 0 12px">DESDE:</label>
-      <input type="date" id="ldFrom" value="${dFrom}" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px" />
-      <label class="small" style="margin:0">HASTA:</label>
-      <input type="date" id="ldTo" value="${dTo}" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px" />
-      <button class="btn" id="ldReload">🔄</button>
-      <div style="display:flex;gap:4px">
-        <button class="btn" data-p="7d" style="padding:6px 10px;font-size:11px">7 dies</button>
-        <button class="btn" data-p="1m" style="padding:6px 10px;font-size:11px">1 mes</button>
-        <button class="btn" data-p="3m" style="padding:6px 10px;font-size:11px">3 mesos</button>
-        <button class="btn" data-p="1y" style="padding:6px 10px;font-size:11px">1 any</button>
+  const headerColor=(c)=>c==='cempla'?'#1e5aa8':'#166534';
+  const headerBg=(c)=>c==='cempla'?'#dbeafe':'#dcfce7';
+  const compName=(c)=>c==='cempla'?'CEMPLA ESPORT':'CEMPLA C.B';
+  back.innerHTML=`<div class="modal" style="max-width:1300px;width:97%;max-height:94vh;display:flex;flex-direction:column;padding:16px;background:#f5efdc;color:#1a1a1a">
+    <div id="ldTitleBar" style="padding:10px 14px;margin:-16px -16px 12px -16px;border-radius:12px 12px 0 0;background:${headerBg(ledgerComp)};border-bottom:3px solid ${headerColor(ledgerComp)};display:flex;align-items:center;gap:14px">
+      <h3 id="ldTitle" style="margin:0;color:${headerColor(ledgerComp)};font-family:Georgia,serif;flex:1">📖 Llibreta · <span id="ldCompName">${compName(ledgerComp)}</span></h3>
+      <div style="display:flex;gap:6px;background:#fff;padding:4px;border-radius:8px;border:1px solid #999">
+        <button class="btn" data-comp="trafic" style="padding:6px 14px;font-size:12px;font-weight:700;background:${ledgerComp==='trafic'?'#166534':'transparent'};color:${ledgerComp==='trafic'?'#fff':'#166534'};border:none;border-radius:6px">CEMPLA C.B</button>
+        <button class="btn" data-comp="cempla" style="padding:6px 14px;font-size:12px;font-weight:700;background:${ledgerComp==='cempla'?'#1e5aa8':'transparent'};color:${ledgerComp==='cempla'?'#fff':'#1e5aa8'};border:none;border-radius:6px">CEMPLA ESPORT</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;padding-bottom:10px;border-bottom:2px solid #8b6f47">
+      <label class="small" style="margin:0;color:#5a3a1a">DES DE:</label>
+      <input type="date" id="ldFrom" value="${dFrom}" style="background:#fff;color:#1a1a1a;border:1px solid #8b6f47;border-radius:4px;padding:6px 10px" />
+      <label class="small" style="margin:0;color:#5a3a1a">FINS:</label>
+      <input type="date" id="ldTo" value="${dTo}" style="background:#fff;color:#1a1a1a;border:1px solid #8b6f47;border-radius:4px;padding:6px 10px" />
+      <button class="btn" id="ldReload" style="background:#8b6f47;color:#fff;border-color:#5a3a1a">🔄</button>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn" data-p="today" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">Avui</button>
+        <button class="btn" data-p="7d" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">7 dies</button>
+        <button class="btn" data-p="thisMonth" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">Aquest mes</button>
+        <button class="btn" data-p="lastMonth" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">Mes anterior</button>
+        <button class="btn" data-p="thisYear" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">Aquest any</button>
+        <button class="btn" data-p="lastYear" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">Any anterior</button>
+        <button class="btn" data-p="all" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">Tot</button>
       </div>
       <div style="flex:1"></div>
-      <button class="btn btn-primary" id="ldPrint">🖨️ Imprimir</button>
-      <button class="btn" data-no>✕ Tancar</button>
+      <button class="btn btn-primary" id="ldPrint" style="background:#5a3a1a;color:#fff;border-color:#5a3a1a">🖨️ Imprimir</button>
+      <button class="btn" data-no style="background:#8b6f47;color:#fff;border-color:#5a3a1a">✕ Tancar</button>
     </div>
-    <div id="ldBody" style="flex:1;overflow:auto;font-family:'Consolas','Menlo',monospace"></div>
-    <div class="small" style="margin-top:8px;color:var(--muted)">💡 Cada operació genera un assentament amb DEBE i HABER equilibrats. La suma total del DEBE ha de ser igual a la suma total del HABER.</div>
+    <div id="ldBody" style="flex:1;overflow:auto;font-family:Georgia,'Times New Roman',serif;background:#faf6e8"></div>
+    <div class="small" style="margin-top:8px;color:#5a3a1a;font-style:italic;text-align:center">La llibreta de tota la vida — DEBE (esquerra) i HABER (dreta). Cada empresa té la seva pròpia llibreta independent.</div>
   </div>`;
   document.body.appendChild(back);
   back.querySelector('[data-no]').onclick=()=>back.remove();
   back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
+  const updateCompanyUI=()=>{
+    const bar=back.querySelector('#ldTitleBar');
+    bar.style.background=headerBg(ledgerComp);
+    bar.style.borderBottomColor=headerColor(ledgerComp);
+    back.querySelector('#ldTitle').style.color=headerColor(ledgerComp);
+    back.querySelector('#ldCompName').textContent=compName(ledgerComp);
+    back.querySelectorAll('[data-comp]').forEach(b=>{
+      const active=b.dataset.comp===ledgerComp;
+      const color=b.dataset.comp==='cempla'?'#1e5aa8':'#166534';
+      b.style.background=active?color:'transparent';
+      b.style.color=active?'#fff':color;
+    });
+  };
   const renderLedger=()=>{
     const from=back.querySelector('#ldFrom').value;
     const to=back.querySelector('#ldTo').value;
-    const rows=generateLedgerEntries(from,to);
+    const rows=generateLedgerEntries(from,to,ledgerComp);
     const body=back.querySelector('#ldBody');
-    if(!rows.length){body.innerHTML='<div class="empty" style="padding:40px">No hi ha moviments en aquest rang.</div>';return}
+    if(!rows.length){body.innerHTML=`<div class="empty" style="padding:40px;color:#5a3a1a">No hi ha moviments a la llibreta de <b>${compName(ledgerComp)}</b> en aquest rang.</div>`;return}
     let totD=0,totH=0;
-    const trs=rows.map(r=>{totD+=r.debeAmt;totH+=r.haberAmt;return `<tr style="border-bottom:1px solid #262b36"><td style="padding:6px 8px;font-size:11px">${r.date.split('-').reverse().join('/')}</td><td style="padding:6px 8px;font-size:12px">${escapeHtml(r.concepto)}</td><td style="padding:6px 8px;font-size:11px;color:#ff96a0">${r.debeAcct}</td><td style="padding:6px 8px;text-align:right;color:#ff96a0;font-weight:600">${fmt(r.debeAmt)}</td><td style="padding:6px 8px;font-size:11px;color:#7ee3aa">${r.haberAcct}</td><td style="padding:6px 8px;text-align:right;color:#7ee3aa;font-weight:600">${fmt(r.haberAmt)}</td></tr>`}).join('');
+    const debeRows=rows.map(r=>{totD+=r.debeAmt;return `<tr style="border-bottom:1px dashed #c9b78c"><td style="padding:6px 8px;font-size:11px;width:75px;color:#5a3a1a">${r.date.split('-').reverse().join('/').slice(0,5)}</td><td style="padding:6px 8px;font-size:12px"><b style="color:#8b1a1a">${r.debeAcct.split(' ')[0]}</b> ${escapeHtml(r.debeAcct.split(' ').slice(1).join(' '))}<br><span style="font-size:11px;color:#666;font-style:italic">${escapeHtml(r.concepto)}</span></td><td style="padding:6px 8px;text-align:right;font-weight:700;color:#8b1a1a;font-size:13px;width:90px;font-family:'Courier New',monospace">${fmt(r.debeAmt)}</td></tr>`}).join('');
+    const haberRows=rows.map(r=>{totH+=r.haberAmt;return `<tr style="border-bottom:1px dashed #c9b78c"><td style="padding:6px 8px;font-size:11px;width:75px;color:#5a3a1a">${r.date.split('-').reverse().join('/').slice(0,5)}</td><td style="padding:6px 8px;font-size:12px"><b style="color:#1a5a2a">${r.haberAcct.split(' ')[0]}</b> ${escapeHtml(r.haberAcct.split(' ').slice(1).join(' '))}<br><span style="font-size:11px;color:#666;font-style:italic">${escapeHtml(r.concepto)}</span></td><td style="padding:6px 8px;text-align:right;font-weight:700;color:#1a5a2a;font-size:13px;width:90px;font-family:'Courier New',monospace">${fmt(r.haberAmt)}</td></tr>`}).join('');
     const cuadra=Math.abs(totD-totH)<0.01;
-    body.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px"><thead style="background:#1a1e26;position:sticky;top:0"><tr><th style="padding:8px;text-align:left">Data</th><th style="padding:8px;text-align:left">Concepte</th><th style="padding:8px;text-align:left;color:#ff96a0">Compte DEBE</th><th style="padding:8px;text-align:right;color:#ff96a0">Import DEBE</th><th style="padding:8px;text-align:left;color:#7ee3aa">Compte HABER</th><th style="padding:8px;text-align:right;color:#7ee3aa">Import HABER</th></tr></thead><tbody>${trs}</tbody><tfoot style="background:#1f2530;position:sticky;bottom:0"><tr><td colspan="3" style="padding:10px 8px;font-weight:700;text-align:right">TOTAL (${rows.length} assentaments)</td><td style="padding:10px 8px;text-align:right;font-weight:700;color:#ff96a0;font-size:14px">${fmt(totD)}</td><td style="padding:10px 8px;text-align:right;font-weight:700;color:${cuadra?'#7ee3aa':'#ff96a0'}">${cuadra?'✓ QUADRA':'⚠ NO CUADRA'}</td><td style="padding:10px 8px;text-align:right;font-weight:700;color:#7ee3aa;font-size:14px">${fmt(totH)}</td></tr></tfoot></table>`;
+    // Balanç per comptes: agrupar tots els comptes que han tingut moviment
+    const balance={};
+    rows.forEach(r=>{
+      if(!balance[r.debeAcct])balance[r.debeAcct]={debe:0,haber:0};
+      balance[r.debeAcct].debe+=r.debeAmt;
+      if(!balance[r.haberAcct])balance[r.haberAcct]={debe:0,haber:0};
+      balance[r.haberAcct].haber+=r.haberAmt;
+    });
+    const balRows=Object.entries(balance).sort(([a],[b])=>a.localeCompare(b)).map(([acct,v])=>{
+      const saldo=v.debe-v.haber;
+      const isDebtor=saldo>0.005;const isCreditor=saldo<-0.005;
+      const nature=acct.startsWith('570')||acct.startsWith('572')||acct.startsWith('629')?'Deutor':(acct.startsWith('705')||acct.startsWith('475')?'Creditor':'');
+      return `<tr style="border-bottom:1px dashed #c9b78c"><td style="padding:6px 10px;font-size:12px"><b style="color:#5a3a1a">${acct.split(' ')[0]}</b> ${escapeHtml(acct.split(' ').slice(1).join(' '))}<br><span style="font-size:10px;color:#888;font-style:italic">Naturalesa: ${nature}</span></td><td style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace;color:#8b1a1a;font-weight:${v.debe>0?700:400}">${fmt(v.debe)}</td><td style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace;color:#1a5a2a;font-weight:${v.haber>0?700:400}">${fmt(v.haber)}</td><td style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:${isDebtor?'#8b1a1a':(isCreditor?'#1a5a2a':'#5a3a1a')}">${isDebtor?'D ':isCreditor?'H ':' '}${fmt(Math.abs(saldo))}</td></tr>`;
+    }).join('');
+    // Totals per naturalesa
+    let saldoCaixa=0,saldoBanc=0;
+    Object.entries(balance).forEach(([acct,v])=>{
+      const s=v.debe-v.haber;
+      if(acct.startsWith('570'))saldoCaixa+=s;
+      if(acct.startsWith('572'))saldoBanc+=s;
+    });
+    body.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;background:#faf6e8;border:2px solid #8b6f47;border-radius:4px">
+      <div style="border-right:2px solid #8b6f47">
+        <div style="background:#8b1a1a;color:#fff;padding:8px 12px;text-align:center;font-weight:700;letter-spacing:3px;font-family:Georgia,serif;font-size:14px">D E B E</div>
+        <table style="width:100%;border-collapse:collapse"><thead style="background:#e8dfc4"><tr><th style="padding:6px;text-align:left;font-size:10px;color:#5a3a1a;border-bottom:1px solid #8b6f47">Data</th><th style="padding:6px;text-align:left;font-size:10px;color:#5a3a1a;border-bottom:1px solid #8b6f47">Compte / Concepte</th><th style="padding:6px;text-align:right;font-size:10px;color:#5a3a1a;border-bottom:1px solid #8b6f47">Import</th></tr></thead><tbody>${debeRows}</tbody></table>
+      </div>
+      <div>
+        <div style="background:#1a5a2a;color:#fff;padding:8px 12px;text-align:center;font-weight:700;letter-spacing:3px;font-family:Georgia,serif;font-size:14px">H A B E R</div>
+        <table style="width:100%;border-collapse:collapse"><thead style="background:#e8dfc4"><tr><th style="padding:6px;text-align:left;font-size:10px;color:#5a3a1a;border-bottom:1px solid #8b6f47">Data</th><th style="padding:6px;text-align:left;font-size:10px;color:#5a3a1a;border-bottom:1px solid #8b6f47">Compte / Concepte</th><th style="padding:6px;text-align:right;font-size:10px;color:#5a3a1a;border-bottom:1px solid #8b6f47">Import</th></tr></thead><tbody>${haberRows}</tbody></table>
+      </div>
+      <div style="background:#5a3a1a;color:#fff;padding:10px 14px;text-align:right;font-weight:700;font-family:'Courier New',monospace;font-size:14px;border-top:2px solid #8b6f47">Total DEBE: ${fmt(totD)}</div>
+      <div style="background:#5a3a1a;color:#fff;padding:10px 14px;text-align:right;font-weight:700;font-family:'Courier New',monospace;font-size:14px;border-top:2px solid #8b6f47">Total HABER: ${fmt(totH)}</div>
+      <div style="grid-column:1/-1;background:${cuadra?'#1a5a2a':'#8b1a1a'};color:#fff;padding:10px 14px;text-align:center;font-weight:700;font-family:Georgia,serif;font-size:14px">${cuadra?`✓ QUADRA · ${rows.length} assentaments · Saldo net: ${fmt(totD-totH)}`:`⚠ NO QUADRA · Diferència: ${fmt(Math.abs(totD-totH))}`}</div>
+      <div style="grid-column:1/-1;background:#e8dfc4;padding:0;border-top:2px solid #8b6f47">
+        <div style="background:#5a3a1a;color:#fff;padding:10px 14px;text-align:center;font-weight:700;letter-spacing:4px;font-family:Georgia,serif;font-size:14px">B A L A N Ç · P E R · C O M P T E S</div>
+        <table style="width:100%;border-collapse:collapse;background:#faf6e8">
+          <thead style="background:#e8dfc4">
+            <tr>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:#5a3a1a;border-bottom:1px solid #8b6f47">Compte</th>
+              <th style="padding:8px 10px;text-align:right;font-size:11px;color:#8b1a1a;border-bottom:1px solid #8b6f47">DEBE</th>
+              <th style="padding:8px 10px;text-align:right;font-size:11px;color:#1a5a2a;border-bottom:1px solid #8b6f47">HABER</th>
+              <th style="padding:8px 10px;text-align:right;font-size:11px;color:#5a3a1a;border-bottom:1px solid #8b6f47">SALDO</th>
+            </tr>
+          </thead>
+          <tbody>${balRows}</tbody>
+        </table>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:2px solid #8b6f47">
+          <div style="background:#8b1a1a;color:#fff;padding:12px 14px;text-align:center;font-weight:700;font-family:Georgia,serif">💵 Caixa (570)<br><span style="font-size:16px;font-family:'Courier New',monospace">${fmt(saldoCaixa)}</span></div>
+          <div style="background:#1e5aa8;color:#fff;padding:12px 14px;text-align:center;font-weight:700;font-family:Georgia,serif">🏦 Bancs (572)<br><span style="font-size:16px;font-family:'Courier New',monospace">${fmt(saldoBanc)}</span></div>
+        </div>
+      </div>
+    </div>`;
   };
-  const applyPreset=p=>{const t=isoToday();const dt=new Date();const map={'7d':0.25,'1m':1,'3m':3,'1y':12};if(p==='7d')dt.setDate(dt.getDate()-7);else dt.setMonth(dt.getMonth()-map[p]);back.querySelector('#ldFrom').value=dt.toISOString().slice(0,10);back.querySelector('#ldTo').value=t;renderLedger()};
+  back.querySelectorAll('[data-comp]').forEach(b=>b.onclick=()=>{ledgerComp=b.dataset.comp;updateCompanyUI();renderLedger()});
+  const applyPreset=p=>{const today=isoToday();const dtF=new Date();if(p==='today'){back.querySelector('#ldFrom').value=today;back.querySelector('#ldTo').value=today}else if(p==='7d'){dtF.setDate(dtF.getDate()-7);back.querySelector('#ldFrom').value=dtF.toISOString().slice(0,10);back.querySelector('#ldTo').value=today}else if(p==='thisMonth'){back.querySelector('#ldFrom').value=today.slice(0,8)+'01';back.querySelector('#ldTo').value=today}else if(p==='lastMonth'){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);const from=d.toISOString().slice(0,10);d.setMonth(d.getMonth()+1);d.setDate(0);back.querySelector('#ldFrom').value=from;back.querySelector('#ldTo').value=d.toISOString().slice(0,10)}else if(p==='thisYear'){back.querySelector('#ldFrom').value=today.slice(0,4)+'-01-01';back.querySelector('#ldTo').value=today}else if(p==='lastYear'){const y=parseInt(today.slice(0,4))-1;back.querySelector('#ldFrom').value=y+'-01-01';back.querySelector('#ldTo').value=y+'-12-31'}else if(p==='all'){back.querySelector('#ldFrom').value='2000-01-01';back.querySelector('#ldTo').value=today}renderLedger()};
   back.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>applyPreset(b.dataset.p));
   back.querySelector('#ldReload').onclick=renderLedger;
   back.querySelector('#ldFrom').onchange=renderLedger;
   back.querySelector('#ldTo').onchange=renderLedger;
   back.querySelector('#ldPrint').onclick=()=>{
     const from=back.querySelector('#ldFrom').value;const to=back.querySelector('#ldTo').value;
-    const rows=generateLedgerEntries(from,to);let totD=0,totH=0;
-    const trs=rows.map(r=>{totD+=r.debeAmt;totH+=r.haberAmt;return `<tr><td>${r.date.split('-').reverse().join('/')}</td><td>${r.concepto}</td><td>${r.debeAcct}</td><td style="text-align:right">${fmt(r.debeAmt)}</td><td>${r.haberAcct}</td><td style="text-align:right">${fmt(r.haberAmt)}</td></tr>`}).join('');
+    const rows=generateLedgerEntries(from,to,ledgerComp);let totD=0,totH=0;
+    const debeTrs=rows.map(r=>{totD+=r.debeAmt;return `<tr><td>${r.date.split('-').reverse().join('/').slice(0,5)}</td><td><b>${r.debeAcct.split(' ')[0]}</b> ${r.debeAcct.split(' ').slice(1).join(' ')}<br><i style="font-size:9px;color:#555">${r.concepto}</i></td><td class="num">${fmt(r.debeAmt)}</td></tr>`}).join('');
+    const haberTrs=rows.map(r=>{totH+=r.haberAmt;return `<tr><td>${r.date.split('-').reverse().join('/').slice(0,5)}</td><td><b>${r.haberAcct.split(' ')[0]}</b> ${r.haberAcct.split(' ').slice(1).join(' ')}<br><i style="font-size:9px;color:#555">${r.concepto}</i></td><td class="num">${fmt(r.haberAmt)}</td></tr>`}).join('');
+    const cuadra=Math.abs(totD-totH)<0.01;
+    // Balanç per comptes per impressió
+    const balP={};rows.forEach(r=>{if(!balP[r.debeAcct])balP[r.debeAcct]={debe:0,haber:0};balP[r.debeAcct].debe+=r.debeAmt;if(!balP[r.haberAcct])balP[r.haberAcct]={debe:0,haber:0};balP[r.haberAcct].haber+=r.haberAmt});
+    let sCaixaP=0,sBancP=0;
+    const balTrs=Object.entries(balP).sort(([a],[b])=>a.localeCompare(b)).map(([acct,v])=>{const s=v.debe-v.haber;if(acct.startsWith('570'))sCaixaP+=s;if(acct.startsWith('572'))sBancP+=s;return `<tr><td><b>${acct.split(' ')[0]}</b> ${acct.split(' ').slice(1).join(' ')}</td><td class="num" style="color:#8b1a1a">${fmt(v.debe)}</td><td class="num" style="color:#1a5a2a">${fmt(v.haber)}</td><td class="num"><b>${s>0.005?'D ':s<-0.005?'H ':''}${fmt(Math.abs(s))}</b></td></tr>`}).join('');
     const w=window.open('','_blank');
-    w.document.write(`<html><head><title>Llibreta Diari</title><style>body{font-family:Arial;padding:15mm;color:#000;font-size:11px}h1{text-align:center}table{width:100%;border-collapse:collapse}th,td{border:1px solid #333;padding:4px 6px}th{background:#333;color:#fff;font-size:10px}tfoot td{background:#eee;font-weight:700}@media print{body{padding:10mm}}</style></head><body><h1>LLIBRETA DIARI · ${isC?'CEMPLA ESPORT':'CEMPLA C.B'}</h1><p style="text-align:center">${from} → ${to}</p><table><thead><tr><th>Data</th><th>Concepte</th><th>Compte DEBE</th><th>DEBE</th><th>Compte HABER</th><th>HABER</th></tr></thead><tbody>${trs}</tbody><tfoot><tr><td colspan="3">TOTAL ${rows.length} assentaments</td><td style="text-align:right">${fmt(totD)}</td><td></td><td style="text-align:right">${fmt(totH)}</td></tr></tfoot></table><script>setTimeout(()=>window.print(),500)<\/script></body></html>`);
+    w.document.write(`<html><head><title>Llibreta ${compName(ledgerComp)}</title><style>body{font-family:Georgia,serif;padding:10mm;color:#000;font-size:10px}h1{text-align:center;font-family:Georgia,serif;margin:4px;color:${headerColor(ledgerComp)}}.sub{text-align:center;font-size:11px;margin-bottom:10px}.book{display:grid;grid-template-columns:1fr 1fr;gap:0;border:2px solid #333}.book>div{border-right:2px solid #333}.book>div:last-child{border-right:none}.hdr-d{background:#8b1a1a;color:#fff;padding:5px;text-align:center;letter-spacing:3px;font-weight:700}.hdr-h{background:#1a5a2a;color:#fff;padding:5px;text-align:center;letter-spacing:3px;font-weight:700}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px dashed #999;padding:3px 5px;font-size:9px;vertical-align:top}th{background:#eee;font-size:9px}td.num{text-align:right;font-family:'Courier New',monospace;font-weight:700;width:70px}.tot{background:#333;color:#fff;padding:6px;text-align:right;font-weight:700;font-family:'Courier New',monospace}.foot{grid-column:1/-1;background:${cuadra?'#1a5a2a':'#8b1a1a'};color:#fff;padding:6px;text-align:center;font-weight:700}.balHdr{grid-column:1/-1;background:#333;color:#fff;padding:5px;text-align:center;letter-spacing:3px;font-weight:700;margin-top:8px}.balSummary{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:0}.balSummary>div{padding:8px;text-align:center;font-weight:700;color:#fff}@media print{body{padding:8mm}}</style></head><body><h1>LLIBRETA · ${compName(ledgerComp)}</h1><div class="sub">Període: ${from.split('-').reverse().join('/')} → ${to.split('-').reverse().join('/')}</div><div class="book"><div><div class="hdr-d">D E B E</div><table><thead><tr><th>Data</th><th>Compte / Concepte</th><th>Import</th></tr></thead><tbody>${debeTrs}</tbody></table></div><div><div class="hdr-h">H A B E R</div><table><thead><tr><th>Data</th><th>Compte / Concepte</th><th>Import</th></tr></thead><tbody>${haberTrs}</tbody></table></div><div class="tot">Total DEBE: ${fmt(totD)}</div><div class="tot">Total HABER: ${fmt(totH)}</div><div class="foot">${cuadra?`✓ QUADRA · ${rows.length} assentaments · Saldo: ${fmt(totD-totH)}`:`⚠ NO QUADRA · Diferència: ${fmt(Math.abs(totD-totH))}`}</div></div><div style="margin-top:12px;border:2px solid #333"><div class="balHdr">B A L A N Ç · P E R · C O M P T E S</div><table><thead><tr><th>Compte</th><th style="text-align:right;color:#8b1a1a">DEBE</th><th style="text-align:right;color:#1a5a2a">HABER</th><th style="text-align:right">SALDO</th></tr></thead><tbody>${balTrs}</tbody></table><div style="display:grid;grid-template-columns:1fr 1fr;gap:0"><div style="background:#8b1a1a;color:#fff;padding:8px;text-align:center;font-weight:700">💵 Caixa (570): ${fmt(sCaixaP)}</div><div style="background:#1e5aa8;color:#fff;padding:8px;text-align:center;font-weight:700">🏦 Bancs (572): ${fmt(sBancP)}</div></div></div><script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
   };
   renderLedger();
 }

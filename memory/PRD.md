@@ -22,6 +22,10 @@ Aplicación standalone (`caja_del_dia.html`) que sustituye una libreta de contab
 - Backup pack: CB + Cempla + Datáfono + Stats en un solo JSON
 - Vinculación de archivo persistente (IndexedDB)
 - Verificación post-escritura (nunca guarda vacío/corrupto)
+- **📖 Llibreta clàssica DEBE/HABER**: Vista de doble columna estil llibre de comptabilitat tradicional (paper de pergamí, fonts serif Georgia, DEBE vermell esquerra / HABER verd dreta) amb filtres per Dia/Setmana/Mes/Any i impressió A4. Cada operació genera un assentament comptable amb comptes PGC (570 Caixa, 572 Bancs, 705 Ingressos, 629 Despeses, 475 Tasa DGT). Verificació de quadrament DEBE=HABER automàtica.
+
+## Changelog reciente
+- 2026-02-01: Llibreta rediseñada como libro Debe/Haber clásico (2 columnas, fondo pergamino, tipografía Georgia serif). Fix "€ €" duplicado.
 
 ## Backend
 - `/api/download-app` - descarga del HTML

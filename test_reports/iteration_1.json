@@ -1,0 +1,42 @@
+{
+  "summary": "E2E frontend testing of Caja del Día (single HTML app). Verified: app loads without console errors on load, bicompany switcher (TRAFIC verd / CEMPLA blau) with independent localStorage keys, Trafic entry addition, DEBE/HABER double-entry, Datàfono manual input (efectiu→BBVA conversion), Llibreta modal (open, DEBE/HABER columns, QUADRA, all date presets, Balanç per comptes, Caixa 570 + Bancs 572 boxes, company switch inside modal with color change verd→blau, Print in new window with balance), Historial with manual snapshot creation, Estadístiques modal opens with table, data persistence after F5 (all keys retained), backend /api/ai-ask endpoint responds correctly with proper payload. BLOCKING BUG: Both '🤖 Asesor IA' and '🔎 Auditoría' modals FAIL to open with a JS error 'Cannot set properties of null (setting onclick)' — no modal visible after click.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/ai-ask", "issue": "Returns 422 when 'data' field is missing (correct Pydantic behavior). Frontend always sends it, so not a real bug. Verified endpoint works with full payload (status 200 with google emergent LLM fallback pathway)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AI Asesor modal (#btnAiAsk)", "issue": "Click throws pageerror 'Cannot set properties of null (setting onclick)' and modal never appears in DOM. Reproduced twice on fresh load with cleared localStorage. Likely a null reference on one of back.querySelector('#aiSaveKey' | '#aiSend' | '[data-no]') — investigate lines 976-983.", "selector": "#btnAiAsk", "priority": "CRITICAL"},
+      {"component": "Auditoría modal (#btnAudit)", "issue": "Same failure pattern: click throws 'Cannot set properties of null (setting onclick)' and modal never opens. Investigate lines 885-893 (data-no / auReload / data-preset handlers).", "selector": "#btnAudit", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [
+      {"flow": "IA chat end-to-end", "issue": "Cannot be exercised through UI because AI modal will not open (see above). Backend /api/ai-ask works when called directly.", "affected_selectors": ["#btnAiAsk", "#aiQ", "#aiSend"]},
+      {"flow": "Guardar copia (Descarregar JSON)", "issue": "In headless Chromium no download event fires. Code uses window.showSaveFilePicker (File System Access API) which is unavailable in the automated test browser — behavior may be correct for real users but not verifiable here. Recommend adding an <a download> fallback that is always triggered so users on non-Chromium/Safari also get the JSON."}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "URGENT: Fix Asesor IA modal not opening (pageerror 'Cannot set properties of null (setting onclick)'). Add null-guards on back.querySelector('#aiSaveKey'), '#aiSend', '[data-no]' or inspect why innerHTML is not producing them. Same fix pattern for Auditoría modal.",
+    "Consider adding an <a download> fallback for Guardar copia so it also works when File System Access API is unavailable (Firefox/Safari/automation).",
+    "Optional: expose data-testid attributes on key buttons (#btnLedger, #btnAiAsk, #btnAudit, #cTrafic, #cCempla) to make future automated tests more robust."
+  ],
+  "critical_code_review_comments": [
+    "AI modal creation (line ~975-983): line 979 assumes back.querySelector('#aiSaveKey') is non-null but does not guard it — this is very likely the source of the null-onclick pageerror. Same on line 976 for [data-no] and line 982 for #aiSend.",
+    "Audit modal (line ~885-928): several .onclick assignments without null checks (auReload, auAskAi, auFrom.onchange). Any missing element will throw.",
+    "openBackupHistory does back.remove() then openBackupHistory() recursively — works but could stack up if called rapidly; consider a single re-render.",
+    "File is 1082 lines single HTML/JS blob. Consider splitting logic into modules (llibreta.js, ai.js, audit.js, stats.js) for maintainability — currently violates the 700-line file-size guideline.",
+    "generateLedgerEntries iterates state twice (Object.entries + arr.forEach) — fine for now but for large history consider indexing by month.",
+    "No data-testid attributes anywhere — testing relies purely on IDs (which is OK here but not per the app-testing guideline)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (only /api/ai-ask tested — works)", "frontend": "~85% (13/15 features work; 2 modals broken)"},
+  "test_credentials": "N/A — app has no auth (uses localStorage)",
+  "seed_data_creation": "Test injected via UI: 1 Trafic entry (GARCIA MARIA TEST, 30€ importe, 20.60€ tasa), 1 HABER (Ingresso metallic 100€), 1 DEBE (IRPF 25€), datafono 50€ for today. On CEMPLA: 1 HABER (Revisio esport 40€). All cleared at test start via localStorage.clear().",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The Llibreta DEBE/HABER modal, its balance-per-account block, in-modal company switcher (verd→blau), date presets, and print window all WORK correctly. Persistence via F5 works for caja.v1, caja.cempla.v1, caja.datafono, caja.snapshots. Estadistiques modal opens fine and shows table. Historial modal shows list and 'Crear copia ahora' produces a new snapshot (snapshot count grew to 5). The two BROKEN pieces are the AI modal (#btnAiAsk) and the Auditoría modal (#btnAudit) — both throw 'Cannot set properties of null (setting onclick)' and never render. Backend endpoint /api/ai-ask returns 200 when called with proper payload (question+data+company+diff+userGeminiKey) so backend is not the blocker.",
+  "rca_of_the_issue": "Symptom: clicking #btnAiAsk or #btnAudit produces a page error 'Cannot set properties of null (setting onclick)' and .modal-back element is never present in the DOM. Reproduction: fresh load with cleared localStorage → click either button. Both handlers create back, appendChild it, then run several back.querySelector('...').onclick=... without null-guards. Since the appendChild is definitely running (verified path), one of the querySelectors is returning null. Most likely candidates: #aiSaveKey (line 978) and #auReload/#auAskAi/[data-no] (lines 885, 926, 929) if the innerHTML string interpolation is producing an unexpected result (e.g. stray backtick or template-literal issue in a nearby edit that broke the HTML). Suggested mitigation: (1) wrap all .onclick assignments with `const x = back.querySelector('...'); if(x) x.onclick = ...` and (2) console.log(back.innerHTML) at the top of the handler to reveal which element is missing, then fix the innerHTML template."
+}
