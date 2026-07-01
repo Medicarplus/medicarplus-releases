@@ -109,6 +109,7 @@
   <div class="company-switch" data-testid="company-switch">
     <button id="cTrafic" class="active">🚗 CEMPLA C.B</button>
     <button id="cCempla" class="cempla">🩺 CEMPLA ESPORT</button>
+    <button id="cStats" style="color:#f5b301">📊 ESTADÍSTIQUES</button>
   </div>
   <div class="toolbar">
     <label class="small" style="margin:0">FECHA</label>
@@ -277,7 +278,7 @@ async function autoSaveToFile(silent){
     if(!handle)return;
     const perm=await handle.queryPermission({mode:'readwrite'});
     if(perm!=='granted')return;
-    const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),_v:3,_ts:Date.now()};
+    const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),stats:JSON.parse(localStorage.getItem('caja.stats.v1')||'null'),_v:3,_ts:Date.now()};
     // Firma para detectar cambios (excluye _ts)
     const sig=JSON.stringify({a:all.cbTrafic,b:all.cempla,c:all.datafono});
     if(sig===_lastAutoSaveContent){if(!silent)toast('✓ Sin cambios · no hace falta guardar',2000);return}
@@ -381,6 +382,80 @@ function shiftDate(delta){const d=new Date(currentDate);d.setDate(d.getDate()+de
 $('#btnPrevDay').onclick=()=>shiftDate(-1);$('#btnNextDay').onclick=()=>shiftDate(1);$('#btnToday').onclick=()=>setDate(isoToday());$('#fecha').onchange=e=>setDate(e.target.value);
 $('#cTrafic').onclick=()=>switchCompany('trafic');
 $('#cCempla').onclick=()=>switchCompany('cempla');
+$('#cStats').onclick=()=>openStats();
+
+// ============ ESTADÍSTIQUES AUTOESCOLES CEMPLA CB ============
+const STATS_KEY='caja.stats.v1';
+const DEFAULT_AUTOS=['A.E.DAINA','A.E.M-2 (CENTELLES)','A.E.MABEL','ROSSELL/VIC','CARRERA','CLAPERA','FERRER','CONNECT','MOLIST CALLDETENES','MOLIST','MONTSENY','OSONA','PARTICULAR','ROSANAS','A.E.TONA','SARRIÓ','TARADELL','TRÀFIC','TUNEU','CANJE','LLUÇANÈS','HOY-VOY','MANLLEU','MUNELL','RECUPERACIÓ','AVANÇA','TERÇOL'];
+const MESOS=['Gener','Febrer','Març','Abril','Maig','Juny','Juliol','Agost','Setembre','Octubre','Novembre','Desembre'];
+function loadStats(){try{const s=JSON.parse(localStorage.getItem(STATS_KEY)||'{}');if(!s.autoescoles)s.autoescoles=DEFAULT_AUTOS.slice();if(!s.data)s.data={};return s}catch(e){return{autoescoles:DEFAULT_AUTOS.slice(),data:{}}}}
+function saveStats(s){localStorage.setItem(STATS_KEY,JSON.stringify(s));pushSnapshot('auto')}
+function openStats(){
+  const s=loadStats();
+  const back=document.createElement('div');back.className='modal-back stats-modal';back.style.zIndex='500';
+  back.innerHTML=`<div class="modal" style="max-width:1400px;width:97%;max-height:95vh;display:flex;flex-direction:column;padding:16px">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <h3 style="margin:0;color:#f5b301">📊 Estadístiques Autoescoles CEMPLA C.B</h3>
+      <label class="small" style="margin:0 0 0 12px">ANY:</label>
+      <input type="number" id="stYear" value="${new Date().getFullYear()}" min="2020" max="2099" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;width:100px" />
+      <button class="btn" id="stPrev">← Any ant.</button>
+      <button class="btn" id="stNext">Any seg. →</button>
+      <div style="flex:1"></div>
+      <button class="btn" id="stAdd">+ Autoescola</button>
+      <button class="btn btn-primary" id="stPrint">🖨️ Imprimir</button>
+      <button class="btn" data-no>✕ Tancar</button>
+    </div>
+    <div id="stBody" style="flex:1;overflow:auto"></div>
+    <div class="small" style="margin-top:8px;color:var(--muted)">💡 Fes clic en qualsevol casella per editar. Els totals es calculen automàticament.</div>
+  </div>`;
+  document.body.appendChild(back);
+  back.querySelector('[data-no]').onclick=()=>back.remove();
+  back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
+  const renderTable=()=>{
+    const st=loadStats();
+    const year=$('#stYear').value;
+    const body=$('#stBody');
+    const rows=st.autoescoles.map((name,ri)=>{
+      let tot=0;
+      const cells=MESOS.map((_,mi)=>{
+        const key=`${year}-${String(mi+1).padStart(2,'0')}`;
+        const v=(st.data[key]||{})[name]||0;
+        tot+=v;
+        return `<td class="st-cell" data-r="${ri}" data-m="${mi}" style="padding:4px;border:1px solid #2a3040;text-align:center;cursor:cell;min-width:52px">${v||''}</td>`;
+      }).join('');
+      return `<tr><td style="padding:6px 10px;border:1px solid #2a3040;font-weight:600;background:#141821;position:sticky;left:0;z-index:2">${escapeHtml(name)} <button class="icon-btn" data-del="${ri}" title="Eliminar" style="float:right;font-size:10px">🗑</button></td>${cells}<td style="padding:6px 10px;border:1px solid #2a3040;background:#1f2530;font-weight:700;color:#f5b301;text-align:center">${tot||''}</td></tr>`;
+    }).join('');
+    // Columna totals per mes
+    const colTot=MESOS.map((_,mi)=>{const key=`${year}-${String(mi+1).padStart(2,'0')}`;const d=st.data[key]||{};return Object.values(d).reduce((s,v)=>s+(+v||0),0)});
+    const grandTot=colTot.reduce((s,v)=>s+v,0);
+    body.innerHTML=`<table style="border-collapse:collapse;font-size:12px;font-family:'Consolas','Menlo',monospace"><thead><tr style="background:#1a1e26"><th style="padding:8px;border:1px solid #2a3040;position:sticky;left:0;background:#1a1e26;z-index:3;min-width:200px;text-align:left">AUTOESCOLES ${year}</th>${MESOS.map(m=>`<th style="padding:8px;border:1px solid #2a3040;text-transform:uppercase;font-size:10px;letter-spacing:.5px">${m}</th>`).join('')}<th style="padding:8px;border:1px solid #2a3040;background:#1f2530;color:#f5b301">TOTAL</th></tr></thead><tbody>${rows}</tbody><tfoot><tr style="background:#1f2530"><td style="padding:8px;border:1px solid #2a3040;font-weight:700;position:sticky;left:0;background:#1f2530">TOTAL CERTIFICATS</td>${colTot.map(v=>`<td style="padding:8px;border:1px solid #2a3040;text-align:center;font-weight:700">${v||''}</td>`).join('')}<td style="padding:8px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#f5b301;font-size:14px">${grandTot||''}</td></tr></tfoot></table>`;
+    // Attach cell editors
+    body.querySelectorAll('.st-cell').forEach(c=>{c.onclick=()=>{
+      const ri=+c.dataset.r,mi=+c.dataset.m;const name=st.autoescoles[ri];const key=`${year}-${String(mi+1).padStart(2,'0')}`;
+      const cur=(st.data[key]||{})[name]||0;
+      const val=prompt(`${name} · ${MESOS[mi]} ${year}`,cur);
+      if(val===null)return;
+      const n=parseInt(val)||0;
+      st.data[key]=st.data[key]||{};
+      if(n)st.data[key][name]=n;else delete st.data[key][name];
+      saveStats(st);renderTable();
+    }});
+    body.querySelectorAll('[data-del]').forEach(b=>{b.onclick=(ev)=>{ev.stopPropagation();const ri=+b.dataset.del;const name=st.autoescoles[ri];confirmModal('Eliminar autoescola',`¿Eliminar <b>${name}</b> i totes les seves dades?`,()=>{st.autoescoles.splice(ri,1);for(const k in st.data)delete st.data[k][name];saveStats(st);renderTable()},'Eliminar')}});
+  };
+  back.querySelector('#stYear').onchange=renderTable;
+  back.querySelector('#stPrev').onclick=()=>{const y=$('#stYear');y.value=+y.value-1;renderTable()};
+  back.querySelector('#stNext').onclick=()=>{const y=$('#stYear');y.value=+y.value+1;renderTable()};
+  back.querySelector('#stAdd').onclick=()=>{const n=prompt('Nom de la nova autoescola:');if(!n)return;const st=loadStats();if(st.autoescoles.includes(n.trim())){toast('Ja existeix');return}st.autoescoles.push(n.trim());saveStats(st);renderTable()};
+  back.querySelector('#stPrint').onclick=()=>{
+    const year=$('#stYear').value;const st=loadStats();
+    const w=window.open('','_blank');
+    const rows=st.autoescoles.map(name=>{let tot=0;const cells=MESOS.map((_,mi)=>{const key=`${year}-${String(mi+1).padStart(2,'0')}`;const v=(st.data[key]||{})[name]||0;tot+=v;return `<td>${v||''}</td>`}).join('');return `<tr><td style="text-align:left;font-weight:600">${name}</td>${cells}<td style="font-weight:700;background:#ffe6a8">${tot||''}</td></tr>`}).join('');
+    const colTot=MESOS.map((_,mi)=>{const key=`${year}-${String(mi+1).padStart(2,'0')}`;const d=st.data[key]||{};return Object.values(d).reduce((s,v)=>s+(+v||0),0)});
+    const grand=colTot.reduce((s,v)=>s+v,0);
+    w.document.write(`<html><head><title>Estadístiques ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #333;padding:5px;text-align:center}th{background:#333;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:10px}tfoot td{background:#444;color:#fff;font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>ESTADÍSTIQUES AUTOESCOLES ${year}</h1><table><thead><tr><th>AUTOESCOLES</th>${MESOS.map(m=>`<th>${m.slice(0,4).toUpperCase()}</th>`).join('')}<th style="background:#b8860b">TOTAL</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL CERTIFICATS</td>${colTot.map(v=>`<td>${v||''}</td>`).join('')}<td>${grand}</td></tr></tfoot></table><script>setTimeout(()=>window.print(),500)<\/script></body></html>`);
+  };
+  renderTable();
+}
 $$('#chips-priv-cempla .chip').forEach(c=>c.onclick=()=>{$$('#chips-priv-cempla .chip').forEach(x=>x.classList.remove('active'));c.classList.add('active');privConcept=c.dataset.c||'';currentPreu=c.dataset.preu||'';currentSplit=c.dataset.split||'45-45-10';$('#p-tipo-custom').value=privConcept;$('#p-preu-custom').value=currentPreu;const[b,cc,m]=currentSplit.split('-');$('#p-pct-b').value=b;$('#p-pct-c').value=cc;$('#p-pct-m').value=m;setTimeout(()=>$('#p-nombre-cempla').focus(),50)});
 $$('.tabs button').forEach(b=>b.onclick=()=>{$$('.tabs button').forEach(x=>x.classList.remove('active'));$$('.tab').forEach(x=>x.style.display='none');b.classList.add('active');$('#'+b.dataset.tab).style.display='block'});
 $$('#chips-priv .chip').forEach(c=>c.onclick=()=>{$$('#chips-priv .chip').forEach(x=>x.classList.remove('active'));c.classList.add('active');privConcept=c.dataset.c;if(c.dataset.preu){$('#p-importe').value=c.dataset.preu;$('#p-nombre').focus()}});
@@ -470,7 +545,7 @@ async function getStoredHandle(){return _idb({mode:'readonly',fn:s=>s.get('backu
 async function saveStoredHandle(h){return _idb({mode:'readwrite',fn:s=>s.put(h,'backupHandle')})}
 async function clearStoredHandle(){return _idb({mode:'readwrite',fn:s=>s.delete('backupHandle')})}
 $('#btnExport').onclick=async ev=>{
-  const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),_v:3};
+  const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),stats:JSON.parse(localStorage.getItem('caja.stats.v1')||'null'),_v:3};
   const contents=JSON.stringify(all,null,2);
   // SAFETY checks
   if(!contents||contents.length<40){toast('❌ ERROR: contenido vacío, no se guarda',5000);return}
@@ -719,7 +794,8 @@ $('#jsonInput').onchange=async ev=>{
       localStorage.setItem('caja.v1',JSON.stringify(obj.cbTrafic));
       localStorage.setItem('caja.cempla.v1',JSON.stringify(obj.cempla));
       if(obj.datafono)localStorage.setItem('caja.datafono',JSON.stringify(obj.datafono));
-    }else if(hasOnlyCB){localStorage.setItem('caja.v1',JSON.stringify(obj.cbTrafic));if(obj.datafono)localStorage.setItem('caja.datafono',JSON.stringify(obj.datafono))
+      if(obj.stats)localStorage.setItem('caja.stats.v1',JSON.stringify(obj.stats));
+    }else if(hasOnlyCB){localStorage.setItem('caja.v1',JSON.stringify(obj.cbTrafic));if(obj.datafono)localStorage.setItem('caja.datafono',JSON.stringify(obj.datafono));if(obj.stats)localStorage.setItem('caja.stats.v1',JSON.stringify(obj.stats))
     }else if(hasOnlyCempla){localStorage.setItem('caja.cempla.v1',JSON.stringify(obj.cempla));if(obj.datafono)localStorage.setItem('caja.datafono',JSON.stringify(obj.datafono))
     }else{localStorage.setItem(KEYS[currentCompany],JSON.stringify(obj))}
     state=loadState();render();toast('✅ Datos restaurados correctamente',3500);
