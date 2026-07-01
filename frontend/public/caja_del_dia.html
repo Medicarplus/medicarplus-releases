@@ -254,10 +254,13 @@ const MIN_SNAP_INTERVAL=15*60*1000; // 15 min mínimo entre snapshots auto
 function pushSnapshot(reason){
   try{
     const snaps=JSON.parse(localStorage.getItem(SNAPS_KEY)||'[]');
+    const cb=localStorage.getItem('caja.v1')||'';
+    const ce=localStorage.getItem('caja.cempla.v1')||'';
+    const df=localStorage.getItem('caja.datafono')||'';
     const last=snaps[snaps.length-1];
-    // Si es auto y el último snapshot es reciente, no crear otro
-    if(reason==='auto'&&last&&(Date.now()-last.ts)<MIN_SNAP_INTERVAL)return false;
-    const snap={ts:Date.now(),reason:reason||'auto',cbTrafic:localStorage.getItem('caja.v1')||'',cempla:localStorage.getItem('caja.cempla.v1')||'',datafono:localStorage.getItem('caja.datafono')||''};
+    // Si no hay cambios reales vs la última copia, no crear otra
+    if(last&&last.cbTrafic===cb&&last.cempla===ce&&last.datafono===df)return false;
+    const snap={ts:Date.now(),reason:reason||'auto',cbTrafic:cb,cempla:ce,datafono:df};
     snaps.push(snap);
     while(snaps.length>MAX_SNAPS)snaps.shift();
     try{localStorage.setItem(SNAPS_KEY,JSON.stringify(snaps))}
@@ -265,7 +268,8 @@ function pushSnapshot(reason){
     return true;
   }catch(e){console.error('snapshot',e);return false}
 }
-// Auto-guardado a fichero vinculado (silencioso) cada 30 min
+// Auto-guardado a fichero vinculado (silencioso) cada 30 min — solo si hay cambios
+let _lastAutoSaveContent='';
 async function autoSaveToFile(silent){
   if(!window.showSaveFilePicker)return;
   try{
@@ -274,10 +278,23 @@ async function autoSaveToFile(silent){
     const perm=await handle.queryPermission({mode:'readwrite'});
     if(perm!=='granted')return;
     const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),_v:3,_ts:Date.now()};
-    const w=await handle.createWritable();await w.write(JSON.stringify(all,null,2));await w.close();
+    // Firma para detectar cambios (excluye _ts)
+    const sig=JSON.stringify({a:all.cbTrafic,b:all.cempla,c:all.datafono});
+    if(sig===_lastAutoSaveContent){if(!silent)toast('✓ Sin cambios · no hace falta guardar',2000);return}
+    const content=JSON.stringify(all,null,2);
+    // SAFETY: never write empty/truncated content
+    if(!content||content.length<40){console.warn('autoSave: content too small, aborting');return}
+    try{JSON.parse(content)}catch(e){console.error('autoSave: content not valid JSON, aborting');return}
+    const w=await handle.createWritable();
+    await w.write(content);
+    await w.close();
+    // Post-write verification
+    try{const f=await handle.getFile();const check=await f.text();JSON.parse(check)}
+    catch(e){console.error('autoSave verification FAILED',e);if(!silent)toast('⚠ El archivo guardado no verifica. Prueba con Shift+💾',6000);return}
+    _lastAutoSaveContent=sig;
     updateAutosaveBadge(handle.name);
     if(!silent)toast('💾 Autoguardat en '+handle.name,2000);
-  }catch(e){console.error('autoSaveFile',e)}
+  }catch(e){console.error('autoSaveFile',e);if(!silent)toast('❌ Error autoguardando: '+e.message,5000)}
 }
 function updateAutosaveBadge(name){
   const b=$('#autosaveBadge');if(!b)return;
@@ -455,6 +472,9 @@ async function clearStoredHandle(){return _idb({mode:'readwrite',fn:s=>s.delete(
 $('#btnExport').onclick=async ev=>{
   const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),_v:3};
   const contents=JSON.stringify(all,null,2);
+  // SAFETY checks
+  if(!contents||contents.length<40){toast('❌ ERROR: contenido vacío, no se guarda',5000);return}
+  try{JSON.parse(contents)}catch(e){toast('❌ ERROR: JSON inválido, no se guarda',5000);return}
   const forceChoose=ev.shiftKey||ev.altKey;
   if(window.showSaveFilePicker){
     try{
@@ -471,9 +491,12 @@ $('#btnExport').onclick=async ev=>{
       const w=await handle.createWritable();
       await w.write(contents);
       await w.close();
-      toast(`💾 Guardado en ${handle.name} ✅`,2800);
+      // Verify file was written correctly
+      try{const f=await handle.getFile();const check=await f.text();JSON.parse(check);if(check.length!==contents.length)throw new Error('tamaño no coincide')}
+      catch(e){toast('❌ AVISO: el archivo guardado NO VERIFICA. Prueba de nuevo o guarda en otro sitio.',7000);return}
+      toast(`💾 Guardado y verificado en ${handle.name} ✅`,3000);
       return;
-    }catch(e){if(e.name==='AbortError')return}
+    }catch(e){if(e.name==='AbortError')return;toast('❌ Error: '+e.message,5000)}
   }
   // Fallback (Firefox/Safari o error)
   const blob=new Blob([contents],{type:'application/json'});
