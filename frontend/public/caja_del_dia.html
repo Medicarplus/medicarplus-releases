@@ -246,7 +246,7 @@ let currentCompany=localStorage.getItem('caja.company')||'trafic';
 const KEYS={trafic:'caja.v1',cempla:'caja.cempla.v1'};
 let state=loadState();let currentDate=isoToday();let privConcept='Revisión privada';let currentPreu='';let currentSplit='45-45-10';
 function loadState(){try{return JSON.parse(localStorage.getItem(KEYS[currentCompany]))||{byDate:{}}}catch(e){return{byDate:{}}}}
-function saveState(){localStorage.setItem(KEYS[currentCompany],JSON.stringify(state));pushSnapshot('auto')}
+function saveState(){localStorage.setItem(KEYS[currentCompany],JSON.stringify(state));pushSnapshot('auto');scheduleFileAutoSave()}
 
 // ============ SISTEMA ANTI-PÉRDIDA DE DATOS ============
 const SNAPS_KEY='caja.snapshots';
@@ -258,10 +258,11 @@ function pushSnapshot(reason){
     const cb=localStorage.getItem('caja.v1')||'';
     const ce=localStorage.getItem('caja.cempla.v1')||'';
     const df=localStorage.getItem('caja.datafono')||'';
+    const stats=localStorage.getItem('caja.stats.v1')||'';
     const last=snaps[snaps.length-1];
     // Si no hay cambios reales vs la última copia, no crear otra
-    if(last&&last.cbTrafic===cb&&last.cempla===ce&&last.datafono===df)return false;
-    const snap={ts:Date.now(),reason:reason||'auto',cbTrafic:cb,cempla:ce,datafono:df};
+    if(last&&last.cbTrafic===cb&&last.cempla===ce&&last.datafono===df&&last.stats===stats)return false;
+    const snap={ts:Date.now(),reason:reason||'auto',cbTrafic:cb,cempla:ce,datafono:df,stats};
     snaps.push(snap);
     while(snaps.length>MAX_SNAPS)snaps.shift();
     try{localStorage.setItem(SNAPS_KEY,JSON.stringify(snaps))}
@@ -271,6 +272,8 @@ function pushSnapshot(reason){
 }
 // Auto-guardado a fichero vinculado (silencioso) cada 30 min — solo si hay cambios
 let _lastAutoSaveContent='';
+let _fileSaveDebounce=null;
+function scheduleFileAutoSave(){clearTimeout(_fileSaveDebounce);_fileSaveDebounce=setTimeout(()=>autoSaveToFile(true),3000)}
 async function autoSaveToFile(silent){
   if(!window.showSaveFilePicker)return;
   try{
@@ -346,10 +349,11 @@ function openBackupHistory(){
         if(snap.cbTrafic)localStorage.setItem('caja.v1',snap.cbTrafic);
         if(snap.cempla)localStorage.setItem('caja.cempla.v1',snap.cempla);
         if(snap.datafono)localStorage.setItem('caja.datafono',snap.datafono);
+        if(snap.stats)localStorage.setItem('caja.stats.v1',snap.stats);
         state=loadState();render();toast('✅ Copia restaurada correctamente',3500);back.remove();
       },'↩ Restaurar');
     }else if(btn.dataset.act==='download'){
-      const obj={cbTrafic:JSON.parse(snap.cbTrafic||'{"byDate":{}}'),cempla:JSON.parse(snap.cempla||'{"byDate":{}}'),datafono:JSON.parse(snap.datafono||'{}'),_v:3,_ts:snap.ts};
+      const obj={cbTrafic:JSON.parse(snap.cbTrafic||'{"byDate":{}}'),cempla:JSON.parse(snap.cempla||'{"byDate":{}}'),datafono:JSON.parse(snap.datafono||'{}'),stats:JSON.parse(snap.stats||'null'),_v:3,_ts:snap.ts};
       const a=document.createElement('a');a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(obj,null,2));a.download=`SNAPSHOT-${new Date(snap.ts).toISOString().slice(0,19).replace(/[:.]/g,'-')}.json`;a.click();
     }
   });
@@ -389,7 +393,7 @@ const STATS_KEY='caja.stats.v1';
 const DEFAULT_AUTOS=['A.E.DAINA','A.E.M-2 (CENTELLES)','A.E.MABEL','ROSSELL/VIC','CARRERA','CLAPERA','FERRER','CONNECT','MOLIST CALLDETENES','MOLIST','MONTSENY','OSONA','PARTICULAR','ROSANAS','A.E.TONA','SARRIÓ','TARADELL','TRÀFIC','TUNEU','CANJE','LLUÇANÈS','HOY-VOY','MANLLEU','MUNELL','RECUPERACIÓ','AVANÇA','TERÇOL'];
 const MESOS=['Gener','Febrer','Març','Abril','Maig','Juny','Juliol','Agost','Setembre','Octubre','Novembre','Desembre'];
 function loadStats(){try{const s=JSON.parse(localStorage.getItem(STATS_KEY)||'{}');if(!s.autoescoles)s.autoescoles=DEFAULT_AUTOS.slice();if(!s.data)s.data={};return s}catch(e){return{autoescoles:DEFAULT_AUTOS.slice(),data:{}}}}
-function saveStats(s){localStorage.setItem(STATS_KEY,JSON.stringify(s));pushSnapshot('auto')}
+function saveStats(s){localStorage.setItem(STATS_KEY,JSON.stringify(s));pushSnapshot('auto');scheduleFileAutoSave()}
 function openStats(){
   const s=loadStats();
   const back=document.createElement('div');back.className='modal-back stats-modal';back.style.zIndex='500';
@@ -553,7 +557,7 @@ function escapeHtml(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','
 function fpTag(fp){if(!fp)return '—';const m={E:'Efectivo',T:'Tarjeta',B:'Bizum',X:'Transf.'};return `<span class="tag ${fp}">${m[fp]||fp}</span>`}
 function computeTotals(list){const t={bruto:0,dto:0,tasas:0,neto:0,byFp:{E:0,T:0,B:0,X:0},tasasByFp:{E:0,T:0,B:0,X:0},haber:0,debe:0,cnt:list.length,retornos:0};list.forEach(e=>{if(e.retorno){t.retornos++;return}if(e.kind==='DH'){const fp=e.fp||'E';if(e.tipo==='HABER'){t.haber+=e.importe;t.byFp[fp]=(t.byFp[fp]||0)+e.importe;t.neto+=e.importe}else{t.debe+=e.importe;t.byFp[fp]=(t.byFp[fp]||0)-e.importe;t.neto-=e.importe}return}const subt=e.importe-(e.descuento||0);t.bruto+=e.importe;t.dto+=e.descuento||0;t.tasas+=e.tasa||0;const fp=e.fp||'E';t.byFp[fp]=(t.byFp[fp]||0)+subt;const fpt=e.fpTasa||fp;t.tasasByFp[fpt]=(t.tasasByFp[fpt]||0)+(e.tasa||0);t.neto+=subt+(e.tasa||0)});return t}
 function getDatafono(date){try{return (JSON.parse(localStorage.getItem('caja.datafono')||'{}'))[date]||0}catch(e){return 0}}
-function setDatafono(date,amount){const all=JSON.parse(localStorage.getItem('caja.datafono')||'{}');if(amount>0)all[date]=amount;else delete all[date];localStorage.setItem('caja.datafono',JSON.stringify(all))}
+function setDatafono(date,amount){const all=JSON.parse(localStorage.getItem('caja.datafono')||'{}');if(amount>0)all[date]=amount;else delete all[date];localStorage.setItem('caja.datafono',JSON.stringify(all));pushSnapshot('auto');scheduleFileAutoSave()}
 function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(currentDate);const isC=currentCompany==='cempla';const totalCertTasas=t.bruto-t.dto+t.tasas;
   const df=getDatafono(currentDate);
   // Datáfono RECLASIFICA dinero de Efectivo → Tarjeta (el programa DGT lo exporta todo como Efectivo)
