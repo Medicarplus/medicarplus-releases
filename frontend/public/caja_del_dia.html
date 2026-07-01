@@ -331,7 +331,7 @@ $('#btnAiAsk').onclick=()=>{
   back.querySelector('[data-no]').onclick=()=>back.remove();
   back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
   const saveBtn=back.querySelector('#aiSaveKey');
-  saveBtn.onclick=()=>{const k=back.querySelector('#aiKey').value.trim();if(!k.startsWith('AIza')){toast('La clau ha de començar per AIza...');return}localStorage.setItem('caja.geminiKey',k);toast('✅ Clau desada — ara les consultes són GRATIS');back.remove();setTimeout(()=>$('#btnAiAsk').click(),100)};
+  saveBtn.onclick=()=>{let k=back.querySelector('#aiKey').value.trim().replace(/^["'`]+|["'`]+$/g,'').replace(/\s+/g,'');if(k.length<20){toast('❌ La clau sembla massa curta ('+k.length+' car.). Ha de tenir ~39 caràcters.');return}localStorage.setItem('caja.geminiKey',k);toast('✅ Clau desada ('+k.length+' car.) — provant ara...');back.remove();setTimeout(()=>$('#btnAiAsk').click(),100)};
   const clearBtn=back.querySelector('#aiClearKey');
   if(clearBtn)clearBtn.onclick=()=>{localStorage.removeItem('caja.geminiKey');toast('Clau esborrada');back.remove();setTimeout(()=>$('#btnAiAsk').click(),100)};
   const btn=back.querySelector('#aiSend');
