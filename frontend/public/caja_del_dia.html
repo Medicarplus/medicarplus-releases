@@ -401,6 +401,8 @@ function openStats(){
       <button class="btn" id="stPrev">← Any ant.</button>
       <button class="btn" id="stNext">Any seg. →</button>
       <div style="flex:1"></div>
+      <button class="btn btn-primary" id="stImport">📥 Importar CSV</button>
+      <input type="file" id="stFile" accept=".csv,.txt" style="display:none" />
       <button class="btn" id="stAdd">+ Autoescola</button>
       <button class="btn btn-primary" id="stPrint">🖨️ Imprimir</button>
       <button class="btn" data-no>✕ Tancar</button>
@@ -446,6 +448,55 @@ function openStats(){
   back.querySelector('#stPrev').onclick=()=>{const y=$('#stYear');y.value=+y.value-1;renderTable()};
   back.querySelector('#stNext').onclick=()=>{const y=$('#stYear');y.value=+y.value+1;renderTable()};
   back.querySelector('#stAdd').onclick=()=>{const n=prompt('Nom de la nova autoescola:');if(!n)return;const st=loadStats();if(st.autoescoles.includes(n.trim())){toast('Ja existeix');return}st.autoescoles.push(n.trim());saveStats(st);renderTable()};
+  // Alias mapping CSV → canonical name
+  const STAT_ALIAS={
+    'TRAFIC':'TRÀFIC','TRÀFIC':'TRÀFIC',
+    'DAINA':'A.E.DAINA','A.E.DAINA':'A.E.DAINA','AE DAINA':'A.E.DAINA',
+    'MABEL':'A.E.MABEL','A.E.MABEL':'A.E.MABEL','AE MABEL':'A.E.MABEL',
+    'M2':'A.E.M-2 (CENTELLES)','M-2':'A.E.M-2 (CENTELLES)','A.E.M-2':'A.E.M-2 (CENTELLES)','A.E.M-2 (CENTELLES)':'A.E.M-2 (CENTELLES)','CENTELLES':'A.E.M-2 (CENTELLES)',
+    'ROSSELL':'ROSSELL/VIC','ROSELL':'ROSSELL/VIC','VIC':'ROSSELL/VIC','ROSSELL/VIC':'ROSSELL/VIC','ROSELL/VIC':'ROSSELL/VIC',
+    'SARRIO':'SARRIÓ','SARRIÓ':'SARRIÓ',
+    'LLUCANES':'LLUÇANÈS','LLUÇANES':'LLUÇANÈS','LLUCANÈS':'LLUÇANÈS','LLUÇANÈS':'LLUÇANÈS',
+    'MOLIST':'MOLIST','MOLIST(CALLDETENES)':'MOLIST CALLDETENES','MOLIST CALLDETENES':'MOLIST CALLDETENES','CALLDETENES':'MOLIST CALLDETENES',
+    'RECUPERACIO':'RECUPERACIÓ','RECUPERACIÓ':'RECUPERACIÓ',
+    'AVANCA':'AVANÇA','AVANÇA':'AVANÇA','AVANCADA':'AVANÇA','AVANÇADA':'AVANÇA',
+    'TERCOL':'TERÇOL','TERÇOL':'TERÇOL',
+    'A.E.TONA':'A.E.TONA','TONA':'A.E.TONA'
+  };
+  const canonicalName=raw=>{const s=String(raw||'').trim().toUpperCase().replace(/\s+/g,' ');if(STAT_ALIAS[s])return STAT_ALIAS[s];return s};
+  back.querySelector('#stImport').onclick=()=>$('#stFile').click();
+  $('#stFile').onchange=async ev=>{
+    const f=ev.target.files[0];if(!f)return;ev.target.value='';
+    // Ask month
+    const monthInput=prompt(`Import CSV per a l'any ${$('#stYear').value}.\nQuin mes? (1-12, per exemple 6 per Juny)`);
+    if(!monthInput)return;
+    const mi=parseInt(monthInput);if(!mi||mi<1||mi>12){toast('Mes no vàlid');return}
+    // Read file with encoding detection
+    const buf=await f.arrayBuffer();
+    let txt;try{txt=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){txt=new TextDecoder('windows-1252').decode(buf)}
+    if(/�/.test(txt))txt=new TextDecoder('windows-1252').decode(buf);
+    // Parse CSV (semicolon)
+    const lines=txt.split(/\r?\n/).filter(l=>l.trim());
+    const sums={};
+    let ignored=[];
+    for(let i=1;i<lines.length;i++){
+      const parts=lines[i].split(';').map(x=>x.replace(/^"|"$/g,'').trim());
+      if(parts.length<2)continue;
+      const code=parts[0];const n=parseInt(parts[1])||0;if(!code||!n)continue;
+      const canon=canonicalName(code);
+      sums[canon]=(sums[canon]||0)+n;
+    }
+    const year=$('#stYear').value;const key=`${year}-${String(mi).padStart(2,'0')}`;
+    const st=loadStats();
+    // Add missing autoescoles
+    for(const k of Object.keys(sums)){if(!st.autoescoles.includes(k))st.autoescoles.push(k)}
+    // Confirm before overwriting
+    const existing=st.data[key];const hasExisting=existing&&Object.keys(existing).length>0;
+    const total=Object.values(sums).reduce((a,b)=>a+b,0);
+    const detail=Object.entries(sums).sort((a,b)=>b[1]-a[1]).slice(0,15).map(([k,v])=>`${k}: ${v}`).join(' · ');
+    const doApply=()=>{st.data[key]=sums;saveStats(st);renderTable();toast(`✅ Importat ${MESOS[mi-1]} ${year}: ${total} certificats`,3500)};
+    confirmModal(`📥 Importar ${MESOS[mi-1]} ${year}`,`<b>Total ${total} certificats</b> · ${Object.keys(sums).length} autoescoles<br><br><span class="small">${detail}</span>${hasExisting?'<br><br>⚠️ <b>Ja hi ha dades per aquest mes.</b> Es sobreescriuran.':''}`,doApply,'Importar',false);
+  };
   back.querySelector('#stPrint').onclick=()=>{
     const year=$('#stYear').value;const st=loadStats();
     const w=window.open('','_blank');
