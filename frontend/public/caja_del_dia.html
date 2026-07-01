@@ -118,6 +118,7 @@
     <button class="btn" id="btnImportJson" title="Restaurar datos desde copia guardada">📂 Restaurar copia</button>
     <input type="file" id="jsonInput" accept=".json" style="display:none" />
     <button class="btn" id="btnDownloadApp" title="Descargar este programa como archivo .html">⬇️ Descargar app</button>
+    <button class="btn" id="btnAiAsk" title="Pregunta al asesor IA sobre descuadres de caja" style="background:linear-gradient(90deg,#7c3aed 0%,#a855f7 100%);color:#fff;border-color:transparent;font-weight:700">🤖 Asesor IA</button>
     <button class="btn" id="btnPrint">🖨️ Imprimir</button>
   </div>
 </header>
@@ -289,6 +290,69 @@ $('#btnExport').onclick=()=>{const all={cbTrafic:JSON.parse(localStorage.getItem
 function renderCemplaSplit(){if(currentCompany!=='cempla')return;const ym=currentDate.slice(0,7);let bru=0,cem=0,mel=0,tot=0,n=0;Object.entries(state.byDate).forEach(([d,arr])=>{if(!d.startsWith(ym))return;arr.forEach(e=>{if(e.retorno||e.kind==='DH')return;const imp=(e.importe||0)-(e.descuento||0);tot+=imp;n++;const sp=(e.split||'45-45-10').split('-').map(Number);bru+=imp*sp[0]/100;cem+=imp*sp[1]/100;mel+=imp*sp[2]/100})});const mes=['Gener','Febrer','Març','Abril','Maig','Juny','Juliol','Agost','Setembre','Octubre','Novembre','Desembre'][parseInt(ym.slice(5,7))-1];$('#cemplaSplitBox').innerHTML=`<div class="small" style="margin-bottom:8px">INGRESSOS ${mes.toUpperCase()} ${ym.slice(0,4)} · ${n} revisions</div><table style="width:100%"><tbody><tr><td>Total IMPORT</td><td class="num"><b>${fmt(tot)}</b></td></tr><tr><td>F.Brugulat (45%)</td><td class="num" style="color:#5aa9ff"><b>${fmt(bru)}</b></td></tr><tr><td>Cempla (45%)</td><td class="num" style="color:#7ee3aa"><b>${fmt(cem)}</b></td></tr><tr><td>Dr.Mellado (10%)</td><td class="num" style="color:#ffd58a"><b>${fmt(mel)}</b></td></tr><tr style="border-top:1px solid #2a3040"><td style="padding-top:8px"><b>PER CEMPLA-SPORT</b></td><td class="num" style="color:#5aa9ff;font-size:16px"><b>${fmt(cem)}</b></td></tr></tbody></table>`}
 const _origRender=render;render=function(){_origRender();renderCemplaSplit()};
 applyCompanyUI();setDate(currentDate);
+
+/* ============ ASESOR IA ============ */
+const AI_ENDPOINT = 'https://project-helper-47.preview.emergentagent.com/api/ai-ask';
+$('#btnAiAsk').onclick=()=>{
+  const savedKey=localStorage.getItem('caja.geminiKey')||'';
+  const back=document.createElement('div');back.className='modal-back';
+  back.innerHTML=`<div class="modal" style="max-width:680px">
+    <h3 style="color:#a855f7">🤖 Asesor IA · Buscar descuadre</h3>
+    <p>Empresa activa: <b>${currentCompany==='cempla'?'CEMPLA ESPORT':'CEMPLA C.B'}</b> · Datos: ${Object.keys(state.byDate).length} días</p>
+    <details style="margin-bottom:12px;background:#141821;padding:10px;border-radius:8px;border:1px solid #2a3040">
+      <summary style="cursor:pointer;color:${savedKey?'#3ddc97':'#ffd58a'};font-weight:600">⚙️ Clau Google Gemini ${savedKey?'(activa — GRATIS 🎉)':'(recomanat — usa la teva pròpia clau GRATIS)'}</summary>
+      <div style="padding:10px 0">
+        <div class="small" style="margin-bottom:6px;line-height:1.5">
+          🎁 Google et regala <b>1.500 consultes/dia gratis</b>. Passos:<br>
+          1. Ves a <a href="https://aistudio.google.com/apikey" target="_blank" style="color:#5aa9ff">aistudio.google.com/apikey</a><br>
+          2. Inicia sessió amb Google<br>
+          3. Pulsa <b>Create API Key</b> i copia la clau (comença per <code>AIza...</code>)<br>
+          4. Enganxa-la aquí baix i pulsa Desar
+        </div>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="aiKey" placeholder="AIzaSy..." value="${savedKey}" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;flex:1;font-family:monospace;font-size:12px" />
+          <button class="btn btn-success" id="aiSaveKey">💾 Desar</button>
+          ${savedKey?'<button class="btn btn-danger" id="aiClearKey">🗑️</button>':''}
+        </div>
+      </div>
+    </details>
+    <div style="display:grid;grid-template-columns:1fr 140px;gap:8px;margin-bottom:10px">
+      <div><label>Tu pregunta (o descripción del problema)</label>
+        <textarea id="aiQ" rows="3" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;width:100%;font-family:inherit;font-size:13px" placeholder="Ej: Em falten 47€ aquesta setmana, busca duplicats i devolucions"></textarea></div>
+      <div><label>Descuadre (€)</label><input type="number" step="0.01" id="aiDiff" placeholder="0" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;width:100%" /></div>
+    </div>
+    <div class="small" style="margin-bottom:12px">💡 Positivo = te sobra dinero · Negativo = te falta. Deja 0 si solo quieres preguntar.</div>
+    <div id="aiAnswer" style="max-height:340px;overflow:auto;padding:12px;background:#0e1117;border-radius:8px;border:1px solid #2a3040;font-size:13px;line-height:1.55;white-space:pre-wrap;display:none;color:#dbe4f0"></div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" data-no>Cerrar</button>
+      <button class="btn btn-primary" id="aiSend" style="background:linear-gradient(90deg,#7c3aed 0%,#a855f7 100%);color:#fff;border-color:transparent">🚀 Preguntar</button>
+    </div></div>`;
+  document.body.appendChild(back);
+  back.querySelector('[data-no]').onclick=()=>back.remove();
+  back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
+  const saveBtn=back.querySelector('#aiSaveKey');
+  saveBtn.onclick=()=>{const k=back.querySelector('#aiKey').value.trim();if(!k.startsWith('AIza')){toast('La clau ha de començar per AIza...');return}localStorage.setItem('caja.geminiKey',k);toast('✅ Clau desada — ara les consultes són GRATIS');back.remove();setTimeout(()=>$('#btnAiAsk').click(),100)};
+  const clearBtn=back.querySelector('#aiClearKey');
+  if(clearBtn)clearBtn.onclick=()=>{localStorage.removeItem('caja.geminiKey');toast('Clau esborrada');back.remove();setTimeout(()=>$('#btnAiAsk').click(),100)};
+  const btn=back.querySelector('#aiSend');
+  btn.onclick=async()=>{
+    const q=back.querySelector('#aiQ').value.trim();
+    if(!q){toast('Escriu una pregunta');return}
+    const diff=parseFloat(back.querySelector('#aiDiff').value)||0;
+    const userKey=localStorage.getItem('caja.geminiKey')||'';
+    btn.disabled=true;btn.textContent='⏳ Pensando...';
+    const ansEl=back.querySelector('#aiAnswer');
+    ansEl.style.display='block';ansEl.textContent='Consultando al asesor IA...';
+    try{
+      const allData={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}')};
+      const res=await fetch(AI_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,data:allData,company:currentCompany==='cempla'?'cempla':'cbTrafic',diff,userGeminiKey:userKey})});
+      const j=await res.json();
+      ansEl.textContent=(j.source==='user-key'?'🎁 (Resposta gratuïta amb la teva clau Google)\n\n':'')+(j.answer||'(sense resposta)');
+    }catch(e){ansEl.textContent='❌ Error de conexión: '+e.message}
+    btn.disabled=false;btn.textContent='🚀 Preguntar';
+  };
+  setTimeout(()=>back.querySelector('#aiQ').focus(),100);
+};
 $('#btnImportJson').onclick=()=>$('#jsonInput').click();
 $('#jsonInput').onchange=async ev=>{const f=ev.target.files[0];if(!f)return;try{const txt=await f.text();const obj=JSON.parse(txt);const isDual=obj._v===2&&obj.cbTrafic&&obj.cempla;const isOld=obj.byDate;if(!isDual&&!isOld)throw 'formato';const doReplace=()=>{if(isDual){localStorage.setItem('caja.v1',JSON.stringify(obj.cbTrafic));localStorage.setItem('caja.cempla.v1',JSON.stringify(obj.cempla))}else{localStorage.setItem(KEYS[currentCompany],JSON.stringify(obj))}state=loadState();render();toast('✅ Datos restaurados')};const doMerge=()=>{if(isDual){for(const key of ['cbTrafic','cempla']){const target=key==='cbTrafic'?'caja.v1':'caja.cempla.v1';const cur=JSON.parse(localStorage.getItem(target)||'{"byDate":{}}');for(const[d,arr]of Object.entries(obj[key].byDate||{})){cur.byDate[d]=cur.byDate[d]||[];for(const e of arr){if(!cur.byDate[d].some(x=>x.id===e.id))cur.byDate[d].push(e)}}localStorage.setItem(target,JSON.stringify(cur))}}else{for(const[d,arr]of Object.entries(obj.byDate)){const list=entriesOf(d);for(const e of arr){if(!list.some(x=>x.id===e.id))list.push(e)}}saveState()}state=loadState();render();toast('✅ Datos fusionados')};confirmModal('📂 Restaurar copia',isDual?'La copia contiene <b>les dues empreses</b>.<br><br><b>Sustituir</b> = borra todo y pone lo del archivo.<br><b>Fusionar</b> = añade sin borrar.':'¿Sustituir o fusionar los datos actuales?',doReplace,'Sustituir todo',true,{label:'Fusionar',onClick:doMerge})}catch(e){toast('❌ Archivo no válido')}ev.target.value=''};
 setDate(currentDate);// init done via applyCompanyUI above

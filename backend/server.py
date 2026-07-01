@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', 'sk-emergent-2De8513077b69EcF89')
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -53,6 +54,64 @@ async def download_app():
         filename="caja_del_dia.html",
         headers={"Content-Disposition": 'attachment; filename="caja_del_dia.html"'},
     )
+
+
+class AiAskBody(BaseModel):
+    question: str
+    data: dict
+    company: str = "cbTrafic"
+    diff: float = 0.0
+    userGeminiKey: str = ""
+
+
+@api_router.post("/ai-ask")
+async def ai_ask(body: AiAskBody):
+    """Ask Gemini Flash to help find discrepancies in the cash log. Prefers user's own Google API key (free tier)."""
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    company_data = body.data.get(body.company, {}).get("byDate", {})
+    sorted_dates = sorted(company_data.keys())[-45:]
+    lines = []
+    for d in sorted_dates:
+        for e in company_data.get(d, []):
+            if e.get("retorno"):
+                continue
+            kind = e.get("kind", "")
+            if kind == "DH":
+                lines.append(f"{d} [{e.get('tipo')}] {e.get('nombre','')[:35]} {e.get('importe',0)}€ {e.get('fp','')}")
+            else:
+                lines.append(f"{d} {e.get('tipo','')} {e.get('nombre','')[:30]} imp={e.get('importe',0)} tasa={e.get('tasa',0)} {e.get('fp','')}")
+    data_txt = "\n".join(lines[-400:])
+    system = (
+        "Ets un assessor comptable expert en gestories de trànsit i medicina esportiva a Catalunya. "
+        "Analitza el registre de caixa i respon en català o castellà segons l'usuari, breu i pràctic amb vinyetes. "
+        "Si hi ha descuadre (diff), busca causes: devolucions de taxa DGT no apuntades, duplicats, imports atípics. "
+        "Cita dates concretes dd/mm/yyyy."
+    )
+    diff_txt = f"DESCUADRE: {body.diff:.2f}€ (positiu=sobra, negatiu=falta)\n" if body.diff else ""
+    user_msg = f"{diff_txt}Pregunta: {body.question}\n\nRegistre:\n{data_txt}"
+    # Use user's own Google Gemini API key if provided (FREE tier)
+    if body.userGeminiKey and body.userGeminiKey.startswith("AIza"):
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=body.userGeminiKey)
+            model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=system)
+            resp = model.generate_content(user_msg)
+            return {"answer": resp.text, "source": "user-key"}
+        except Exception as ex:
+            logging.exception("User Gemini key error")
+            return {"answer": f"❌ La teva clau Google Gemini ha donat error: {str(ex)[:200]}\n\nRevisa que la clau sigui vàlida a https://aistudio.google.com/apikey", "error": True}
+    # Fallback to Emergent LLM Key
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"caja-{uuid.uuid4().hex[:8]}",
+            system_message=system,
+        ).with_model("gemini", "gemini-2.5-flash")
+        reply = await chat.send_message(UserMessage(text=user_msg))
+        return {"answer": reply, "source": "emergent-key"}
+    except Exception as ex:
+        logging.exception("AI error")
+        return {"answer": f"❌ Error del asesor IA: {str(ex)[:250]}\n\n💡 Consell: introdueix la teva pròpia clau gratuïta de Google Gemini a la app (botó ⚙️ del modal) per no dependre de la clau compartida.", "error": True}
 
 @api_router.post("/status", response_model=StatusCheck)
 async def create_status_check(input: StatusCheckCreate):
