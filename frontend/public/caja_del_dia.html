@@ -401,6 +401,8 @@ function openStats(){
       <h3 style="margin:0;color:#f5b301">📊 Estadístiques Autoescoles CEMPLA C.B</h3>
       <label class="small" style="margin:0 0 0 12px">ANY:</label>
       <input type="number" id="stYear" value="${new Date().getFullYear()}" min="2020" max="2099" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;width:100px" />
+      <select id="stMode" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px"><option value="year">📅 Vista anual (12 mesos)</option><option value="month">📆 Vista mensual</option></select>
+      <select id="stMonth" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:none"><option value="1">Gener</option><option value="2">Febrer</option><option value="3">Març</option><option value="4">Abril</option><option value="5">Maig</option><option value="6">Juny</option><option value="7">Juliol</option><option value="8">Agost</option><option value="9">Setembre</option><option value="10">Octubre</option><option value="11">Novembre</option><option value="12">Desembre</option></select>
       <button class="btn" id="stPrev">← Any ant.</button>
       <button class="btn" id="stNext">Any seg. →</button>
       <div style="flex:1"></div>
@@ -419,22 +421,31 @@ function openStats(){
   const renderTable=()=>{
     const st=loadStats();
     const year=$('#stYear').value;
+    const mode=$('#stMode').value;
+    const monthSel=+$('#stMonth').value;
+    $('#stMonth').style.display=mode==='month'?'':'none';
     const body=$('#stBody');
-    const rows=st.autoescoles.map((name,ri)=>{
-      let tot=0;
-      const cells=MESOS.map((_,mi)=>{
-        const key=`${year}-${String(mi+1).padStart(2,'0')}`;
-        const v=(st.data[key]||{})[name]||0;
-        tot+=v;
-        return `<td class="st-cell" data-r="${ri}" data-m="${mi}" style="padding:4px;border:1px solid #2a3040;text-align:center;cursor:cell;min-width:52px">${v||''}</td>`;
+    if(mode==='month'){
+      // Vista mensual: solo 1 mes
+      const key=`${year}-${String(monthSel).padStart(2,'0')}`;
+      const monthData=st.data[key]||{};
+      const rows=st.autoescoles.map((name,ri)=>{
+        const v=monthData[name]||0;
+        return `<tr><td style="padding:6px 10px;border:1px solid #2a3040;font-weight:600;background:#141821">${escapeHtml(name)} <button class="icon-btn" data-del="${ri}" title="Eliminar" style="float:right;font-size:10px">🗑</button></td><td class="st-cell" data-r="${ri}" data-m="${monthSel-1}" style="padding:6px 10px;border:1px solid #2a3040;text-align:center;cursor:cell">${v||''}</td></tr>`;
       }).join('');
-      return `<tr><td style="padding:6px 10px;border:1px solid #2a3040;font-weight:600;background:#141821;position:sticky;left:0;z-index:2">${escapeHtml(name)} <button class="icon-btn" data-del="${ri}" title="Eliminar" style="float:right;font-size:10px">🗑</button></td>${cells}<td style="padding:6px 10px;border:1px solid #2a3040;background:#1f2530;font-weight:700;color:#f5b301;text-align:center">${tot||''}</td></tr>`;
-    }).join('');
-    // Columna totals per mes
-    const colTot=MESOS.map((_,mi)=>{const key=`${year}-${String(mi+1).padStart(2,'0')}`;const d=st.data[key]||{};return Object.values(d).reduce((s,v)=>s+(+v||0),0)});
-    const grandTot=colTot.reduce((s,v)=>s+v,0);
-    body.innerHTML=`<table style="border-collapse:collapse;font-size:12px;font-family:'Consolas','Menlo',monospace"><thead><tr style="background:#1a1e26"><th style="padding:8px;border:1px solid #2a3040;position:sticky;left:0;background:#1a1e26;z-index:3;min-width:200px;text-align:left">AUTOESCOLES ${year}</th>${MESOS.map(m=>`<th style="padding:8px;border:1px solid #2a3040;text-transform:uppercase;font-size:10px;letter-spacing:.5px">${m}</th>`).join('')}<th style="padding:8px;border:1px solid #2a3040;background:#1f2530;color:#f5b301">TOTAL</th></tr></thead><tbody>${rows}</tbody><tfoot><tr style="background:#1f2530"><td style="padding:8px;border:1px solid #2a3040;font-weight:700;position:sticky;left:0;background:#1f2530">TOTAL CERTIFICATS</td>${colTot.map(v=>`<td style="padding:8px;border:1px solid #2a3040;text-align:center;font-weight:700">${v||''}</td>`).join('')}<td style="padding:8px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#f5b301;font-size:14px">${grandTot||''}</td></tr></tfoot></table>`;
-    // Attach cell editors
+      const total=Object.values(monthData).reduce((s,v)=>s+(+v||0),0);
+      body.innerHTML=`<table style="border-collapse:collapse;font-size:13px;font-family:'Consolas','Menlo',monospace;width:100%"><thead><tr style="background:#1a1e26"><th style="padding:10px;border:1px solid #2a3040;background:#1a1e26;min-width:250px;text-align:left">AUTOESCOLES · ${MESOS[monthSel-1]} ${year}</th><th style="padding:10px;border:1px solid #2a3040;min-width:120px">CERTIFICATS</th></tr></thead><tbody>${rows}</tbody><tfoot><tr style="background:#1f2530"><td style="padding:10px;border:1px solid #2a3040;font-weight:700">TOTAL ${MESOS[monthSel-1]} ${year}</td><td style="padding:10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#f5b301;font-size:16px">${total||''}</td></tr></tfoot></table>`;
+    }else{
+      // Vista anual
+      const rows=st.autoescoles.map((name,ri)=>{
+        let tot=0;
+        const cells=MESOS.map((_,mi)=>{const key=`${year}-${String(mi+1).padStart(2,'0')}`;const v=(st.data[key]||{})[name]||0;tot+=v;return `<td class="st-cell" data-r="${ri}" data-m="${mi}" style="padding:4px;border:1px solid #2a3040;text-align:center;cursor:cell;min-width:52px">${v||''}</td>`}).join('');
+        return `<tr><td style="padding:6px 10px;border:1px solid #2a3040;font-weight:600;background:#141821;position:sticky;left:0;z-index:2">${escapeHtml(name)} <button class="icon-btn" data-del="${ri}" title="Eliminar" style="float:right;font-size:10px">🗑</button></td>${cells}<td style="padding:6px 10px;border:1px solid #2a3040;background:#1f2530;font-weight:700;color:#f5b301;text-align:center">${tot||''}</td></tr>`;
+      }).join('');
+      const colTot=MESOS.map((_,mi)=>{const key=`${year}-${String(mi+1).padStart(2,'0')}`;const d=st.data[key]||{};return Object.values(d).reduce((s,v)=>s+(+v||0),0)});
+      const grandTot=colTot.reduce((s,v)=>s+v,0);
+      body.innerHTML=`<table style="border-collapse:collapse;font-size:12px;font-family:'Consolas','Menlo',monospace"><thead><tr style="background:#1a1e26"><th style="padding:8px;border:1px solid #2a3040;position:sticky;left:0;background:#1a1e26;z-index:3;min-width:200px;text-align:left">AUTOESCOLES ${year}</th>${MESOS.map(m=>`<th style="padding:8px;border:1px solid #2a3040;text-transform:uppercase;font-size:10px;letter-spacing:.5px">${m}</th>`).join('')}<th style="padding:8px;border:1px solid #2a3040;background:#1f2530;color:#f5b301">TOTAL</th></tr></thead><tbody>${rows}</tbody><tfoot><tr style="background:#1f2530"><td style="padding:8px;border:1px solid #2a3040;font-weight:700;position:sticky;left:0;background:#1f2530">TOTAL CERTIFICATS</td>${colTot.map(v=>`<td style="padding:8px;border:1px solid #2a3040;text-align:center;font-weight:700">${v||''}</td>`).join('')}<td style="padding:8px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#f5b301;font-size:14px">${grandTot||''}</td></tr></tfoot></table>`;
+    }
     body.querySelectorAll('.st-cell').forEach(c=>{c.onclick=()=>{
       const ri=+c.dataset.r,mi=+c.dataset.m;const name=st.autoescoles[ri];const key=`${year}-${String(mi+1).padStart(2,'0')}`;
       const cur=(st.data[key]||{})[name]||0;
@@ -448,6 +459,8 @@ function openStats(){
     body.querySelectorAll('[data-del]').forEach(b=>{b.onclick=(ev)=>{ev.stopPropagation();const ri=+b.dataset.del;const name=st.autoescoles[ri];confirmModal('Eliminar autoescola',`¿Eliminar <b>${name}</b> i totes les seves dades?`,()=>{st.autoescoles.splice(ri,1);for(const k in st.data)delete st.data[k][name];saveStats(st);renderTable()},'Eliminar')}});
   };
   back.querySelector('#stYear').onchange=renderTable;
+  back.querySelector('#stMode').onchange=renderTable;
+  back.querySelector('#stMonth').onchange=renderTable;
   back.querySelector('#stPrev').onclick=()=>{const y=$('#stYear');y.value=+y.value-1;renderTable()};
   back.querySelector('#stNext').onclick=()=>{const y=$('#stYear');y.value=+y.value+1;renderTable()};
   back.querySelector('#stAdd').onclick=()=>{const n=prompt('Nom de la nova autoescola:');if(!n)return;const st=loadStats();if(st.autoescoles.includes(n.trim())){toast('Ja existeix');return}st.autoescoles.push(n.trim());saveStats(st);renderTable()};
@@ -501,12 +514,20 @@ function openStats(){
     confirmModal(`📥 Importar ${MESOS[mi-1]} ${year}`,`<b>Total ${total} certificats</b> · ${Object.keys(sums).length} autoescoles<br><br><span class="small">${detail}</span>${hasExisting?'<br><br>⚠️ <b>Ja hi ha dades per aquest mes.</b> Es sobreescriuran.':''}`,doApply,'Importar',false);
   };
   back.querySelector('#stPrint').onclick=()=>{
-    const year=$('#stYear').value;const st=loadStats();
+    const year=$('#stYear').value;const st=loadStats();const mode=$('#stMode').value;const monthSel=+$('#stMonth').value;
     const w=window.open('','_blank');
-    const rows=st.autoescoles.map(name=>{let tot=0;const cells=MESOS.map((_,mi)=>{const key=`${year}-${String(mi+1).padStart(2,'0')}`;const v=(st.data[key]||{})[name]||0;tot+=v;return `<td>${v||''}</td>`}).join('');return `<tr><td style="text-align:left;font-weight:600">${name}</td>${cells}<td style="font-weight:700;background:#ffe6a8">${tot||''}</td></tr>`}).join('');
-    const colTot=MESOS.map((_,mi)=>{const key=`${year}-${String(mi+1).padStart(2,'0')}`;const d=st.data[key]||{};return Object.values(d).reduce((s,v)=>s+(+v||0),0)});
-    const grand=colTot.reduce((s,v)=>s+v,0);
-    w.document.write(`<html><head><title>Estadístiques ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #333;padding:5px;text-align:center}th{background:#333;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:10px}tfoot td{background:#444;color:#fff;font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>ESTADÍSTIQUES AUTOESCOLES ${year}</h1><table><thead><tr><th>AUTOESCOLES</th>${MESOS.map(m=>`<th>${m.slice(0,4).toUpperCase()}</th>`).join('')}<th style="background:#b8860b">TOTAL</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL CERTIFICATS</td>${colTot.map(v=>`<td>${v||''}</td>`).join('')}<td>${grand}</td></tr></tfoot></table><script>setTimeout(()=>window.print(),500)<\/script></body></html>`);
+    if(mode==='month'){
+      const key=`${year}-${String(monthSel).padStart(2,'0')}`;
+      const monthData=st.data[key]||{};
+      const rows=st.autoescoles.map(name=>{const v=monthData[name]||0;return `<tr><td style="text-align:left;font-weight:600">${name}</td><td>${v||''}</td></tr>`}).join('');
+      const total=Object.values(monthData).reduce((s,v)=>s+(+v||0),0);
+      w.document.write(`<html><head><title>Estadístiques ${MESOS[monthSel-1]} ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #333;padding:8px;text-align:center}th{background:#333;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:12px}tfoot td{background:#444;color:#fff;font-weight:700;font-size:15px}@media print{body{padding:5mm}}</style></head><body><h1>ESTADÍSTIQUES · ${MESOS[monthSel-1].toUpperCase()} ${year}</h1><table><thead><tr><th>AUTOESCOLES</th><th>CERTIFICATS</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL ${MESOS[monthSel-1].toUpperCase()} ${year}</td><td>${total}</td></tr></tfoot></table><script>setTimeout(()=>window.print(),500)<\/script></body></html>`);
+    }else{
+      const rows=st.autoescoles.map(name=>{let tot=0;const cells=MESOS.map((_,mi)=>{const key=`${year}-${String(mi+1).padStart(2,'0')}`;const v=(st.data[key]||{})[name]||0;tot+=v;return `<td>${v||''}</td>`}).join('');return `<tr><td style="text-align:left;font-weight:600">${name}</td>${cells}<td style="font-weight:700;background:#ffe6a8">${tot||''}</td></tr>`}).join('');
+      const colTot=MESOS.map((_,mi)=>{const key=`${year}-${String(mi+1).padStart(2,'0')}`;const d=st.data[key]||{};return Object.values(d).reduce((s,v)=>s+(+v||0),0)});
+      const grand=colTot.reduce((s,v)=>s+v,0);
+      w.document.write(`<html><head><title>Estadístiques ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #333;padding:5px;text-align:center}th{background:#333;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:10px}tfoot td{background:#444;color:#fff;font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>ESTADÍSTIQUES AUTOESCOLES ${year}</h1><table><thead><tr><th>AUTOESCOLES</th>${MESOS.map(m=>`<th>${m.slice(0,4).toUpperCase()}</th>`).join('')}<th style="background:#b8860b">TOTAL</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL CERTIFICATS</td>${colTot.map(v=>`<td>${v||''}</td>`).join('')}<td>${grand}</td></tr></tfoot></table><script>setTimeout(()=>window.print(),500)<\/script></body></html>`);
+    }
   };
   renderTable();
 }
