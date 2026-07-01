@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 2 focused on validating the CRITICAL fixes from iteration 1 + new language toggle. RESULT: All previously broken flows now work. Zero pageerrors / zero console.error throughout the entire flow. AI (btnAiAsk), Auditoría (btnAudit), Restaurar còpia (btnImportJson), Historial (btnHistory), Llibreta (btnLedger) and Estadístiques (cStats) modals now open correctly — the 'Cannot set properties of null (setting onclick)' bug is FIXED. New 🌐 Language toggle works CA↔ES and translates all data-i18n texts + placeholders. Bicompany switcher, add Trafic/Priv/DH entries, persistence F5, snapshots, ledger with balance-per-account all work. Found ONE regression bug caused by the new i18n implementation: the '🗑️ Vaciar día' button (#btnClearDay) is nested inside a <h2 data-i18n='entries_of_day'>, and applyLang() overwrites the h2 with textContent, deleting the child button from DOM on every language change (and on initial load, since applyLang runs at startup).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "btnClearDay ('🗑️ Vaciar día')", "issue": "Button is missing from the DOM after applyLang() runs. Root cause: line 228 <h2 data-i18n='entries_of_day'>Entradas del día <span><button id='btnClearDay'>…</button></span></h2>. The i18n loop at line 253 does el.textContent = dict[k] on every [data-i18n] element, which wipes ALL child nodes of the h2 (including the button). Since applyLang() runs on load, btnClearDay disappears immediately — its onclick handler at line 789 still exists in JS but the element it targets is gone.", "selector": "#btnClearDay", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Guardar copia (btnExport)", "issue": "In headless Chromium showSaveFilePicker is unavailable — cannot verify download UX. Same limitation as iteration 1. Recommend an <a download> fallback for browsers/environments without File System Access API.", "affected_selectors": ["#btnExport"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix #btnClearDay disappearing: either (a) move data-i18n from the <h2> to a nested <span> that wraps only the label text, e.g. <h2><span data-i18n='entries_of_day'>Entradas del día</span> <span><button id='btnClearDay' …>…</button></span></h2>, OR (b) change applyLang() to only translate elements that have no element children (e.g. skip elements where el.children.length > 0), OR (c) special-case the h2 by adding data-i18n only on a text-only inner span.",
+    "Optional: add <a download> fallback for Guardar copia (btnExport) so it works without File System Access API.",
+    "Optional: add data-testid attributes to the header buttons for future test robustness (only #btnLang and #appTitle currently have them)."
+  ],
+  "critical_code_review_comments": [
+    "applyLang() uses el.textContent = dict[k] which is destructive to child elements. Any [data-i18n] element that also contains DOM children (buttons, icons, badges) will lose those children on every language switch and on initial load. This is a systemic risk — audit ALL data-i18n usages for nested children. Current victim: h2.entries_of_day → #btnClearDay.",
+    "Suggested robust fix: iterate only over elements where el.children.length === 0 in applyLang(), or use a dedicated <span data-i18n='…'> child element for each translatable text.",
+    "The file is now 1090+ lines — still exceeds the 700-line guideline; consider splitting into modules.",
+    "All previous critical review points from iteration 1 (AI/Audit modal null onclick) are RESOLVED — no more null-onclick errors detected across 6 modal open/close cycles."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (not re-tested — no backend changes)", "frontend": "~95% (all critical flows OK; 1 regression on #btnClearDay caused by new i18n)"},
+  "test_credentials": "N/A — no auth (single-file HTML app + localStorage)",
+  "seed_data_creation": "Test flow injected: 1 Trafic entry (Test Client, 45€ + 8€ tasa), HABER 100€ (Bizum Test), DEBE 30€ (Gasto Test). Verified persistence after F5 (3 rows retained). Snapshots grew to 3 items after entries. All cleared at test start via localStorage.clear().",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 1 blockers (AI + Audit modals) are DEFINITIVELY fixed — verified with 0 pageerrors across a full flow that opens ALL 6 modals. The new 🌐 language toggle works perfectly (ca ↔ es, persists in localStorage['caja.lang'], updates all data-i18n and data-i18n-ph elements + #langLabel). The ONE new regression is #btnClearDay disappearing from the DOM because <h2 data-i18n='entries_of_day'> destroys child button when applyLang overwrites its textContent. Fix is small (see action_items). Do not re-test unrelated flows; focus retest on #btnClearDay after fix, plus a language toggle cycle to ensure other nested-child buttons don't disappear.",
+  "rca_of_the_issue": "btnClearDay missing from DOM. Reproduction: fresh load → check document.getElementById('btnClearDay') → returns null. Root cause: applyLang() runs on startup (line 1088-1090 area) and iterates all [data-i18n] elements, doing el.textContent = translation. Line 228 places the button as a CHILD of a <h2 data-i18n='entries_of_day'>, so its textContent assignment deletes the button. Confirmed via grep: the button IS in the source HTML (line 228) and has a valid onclick handler (line 789), but the runtime DOM shows it removed. Mitigation: move data-i18n to a text-only inner <span>."
+}

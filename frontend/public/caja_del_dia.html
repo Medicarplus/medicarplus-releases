@@ -105,30 +105,31 @@
 </head>
 <body>
 <header>
-  <h1 id="appTitle">Caja del Día <small id="appSub">Cierre diario · Importación CSV/Excel · Debe / Haber</small></h1>
+  <h1 id="appTitle" data-testid="app-title"><span data-i18n="app_title">Caja del Día</span> <small id="appSub" data-i18n="app_sub">Cierre diario · Importación CSV/Excel · Debe / Haber</small></h1>
   <div class="company-switch" data-testid="company-switch">
     <button id="cTrafic" class="active">🚗 CEMPLA C.B</button>
     <button id="cCempla" class="cempla">🩺 CEMPLA ESPORT</button>
-    <button id="cStats" style="color:#f5b301">📊 ESTADÍSTIQUES</button>
+    <button id="cStats" style="color:#f5b301" data-i18n="stats">📊 ESTADÍSTIQUES</button>
   </div>
   <div class="toolbar">
-    <label class="small" style="margin:0">FECHA</label>
+    <label class="small" style="margin:0" data-i18n="date">FECHA</label>
     <input type="date" id="fecha" />
     <button class="btn" id="btnPrevDay" title="Día anterior">←</button>
     <button class="btn" id="btnNextDay" title="Día siguiente">→</button>
-    <button class="btn" id="btnToday">Hoy</button>
-    <span class="pill" id="saldoAnt" style="padding:8px 14px;font-size:12px;display:inline-flex;gap:10px;align-items:center;background:linear-gradient(180deg,#1a2030 0%,#141821 100%);border-color:#2f3547"><span style="color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-size:10px">Saldo anterior</span><span id="saldoAntNum" style="color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums;font-size:14px;font-family:'Consolas','Menlo','Courier New',monospace;letter-spacing:.3px">0,00 €</span></span>
-    <button class="btn btn-primary" id="btnImport">📥 Importar CSV / Excel</button>
+    <button class="btn" id="btnToday" data-i18n="today">Hoy</button>
+    <span class="pill" id="saldoAnt" style="padding:8px 14px;font-size:12px;display:inline-flex;gap:10px;align-items:center;background:linear-gradient(180deg,#1a2030 0%,#141821 100%);border-color:#2f3547"><span style="color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-size:10px" data-i18n="prev_balance">Saldo anterior</span><span id="saldoAntNum" style="color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums;font-size:14px;font-family:'Consolas','Menlo','Courier New',monospace;letter-spacing:.3px">0,00 €</span></span>
+    <button class="btn btn-primary" id="btnImport" data-i18n="import_csv">📥 Importar CSV / Excel</button>
     <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,.xls" style="display:none" />
-    <button class="btn btn-success" id="btnExport" title="Guardar copia · el primer clic te pide dónde, después guarda ahí directamente (Shift+Click = cambiar carpeta)">💾 Guardar copia</button>
-    <button class="btn" id="btnImportJson" title="Restaurar datos desde copia guardada">📂 Restaurar copia</button>
+    <button class="btn btn-success" id="btnExport" data-i18n="save_copy">💾 Guardar copia</button>
+    <button class="btn" id="btnImportJson" data-i18n="restore_copy">📂 Restaurar copia</button>
     <input type="file" id="jsonInput" accept=".json" style="display:none" />
-    <button class="btn" id="btnHistory" title="Ver copias automáticas locales (últimas 5) y restaurar" style="background:#1f3a2e;border-color:#2a5e44;color:#bff0d6;font-weight:600">🛡️ Historial</button>
-    <button class="btn" id="btnLedger" title="Ver Llibre Diari (Debe/Haber contable)" style="background:#2a1f3a;border-color:#5e2a5e;color:#e0bff0;font-weight:600">📖 Llibreta</button>
+    <button class="btn" id="btnHistory" style="background:#1f3a2e;border-color:#2a5e44;color:#bff0d6;font-weight:600" data-i18n="history">🛡️ Historial</button>
+    <button class="btn" id="btnLedger" style="background:#2a1f3a;border-color:#5e2a5e;color:#e0bff0;font-weight:600" data-i18n="ledger">📖 Llibreta</button>
     <span id="autosaveBadge" style="display:none;padding:5px 10px;border-radius:6px;background:#1f3a2e;color:#7ee3aa;font-size:11px;font-family:'Consolas',monospace;letter-spacing:.3px;border:1px solid #2a5e44"></span>
-    <button class="btn traffic-only" id="btnAudit" title="Detectar clientes que aparecen en varios días del mes (posibles descuadres de tasa)" style="background:linear-gradient(90deg,#ea580c 0%,#f97316 100%);color:#fff;border-color:transparent;font-weight:700">🔎 Auditoría</button>
-    <button class="btn" id="btnAiAsk" title="Pregunta al asesor IA sobre descuadres de caja" style="background:linear-gradient(90deg,#7c3aed 0%,#a855f7 100%);color:#fff;border-color:transparent;font-weight:700">🤖 Asesor IA</button>
-    <button class="btn" id="btnPrint">🖨️ Imprimir</button>
+    <button class="btn traffic-only" id="btnAudit" style="background:linear-gradient(90deg,#ea580c 0%,#f97316 100%);color:#fff;border-color:transparent;font-weight:700" data-i18n="audit">🔎 Auditoría</button>
+    <button class="btn" id="btnAiAsk" style="background:linear-gradient(90deg,#7c3aed 0%,#a855f7 100%);color:#fff;border-color:transparent;font-weight:700" data-i18n="ai_advisor">🤖 Asesor IA</button>
+    <button class="btn" id="btnPrint" data-i18n="print">🖨️ Imprimir</button>
+    <button class="btn" id="btnLang" title="Canviar idioma / Cambiar idioma" style="background:#2a2f3a;border-color:#4a5568;color:#e8ecf2;font-weight:700;padding:6px 12px" data-testid="lang-toggle">🌐 <span id="langLabel">ES</span></button>
   </div>
 </header>
 <main>
@@ -136,20 +137,20 @@
     <div>
       <div class="panel" style="margin-bottom:14px">
         <div class="tabs" id="mainTabs">
-          <button class="active traffic-only" data-tab="tab-traf">Tráfico (Renov/Exped)</button>
-          <button data-tab="tab-priv" id="tabPrivBtn">Revisiones / Certificados / Otros</button>
-          <button data-tab="tab-dh">Debe / Haber</button>
+          <button class="active traffic-only" data-tab="tab-traf" data-i18n="tab_traffic">Tráfico (Renov/Exped)</button>
+          <button data-tab="tab-priv" id="tabPrivBtn" data-i18n="tab_reviews">Revisiones / Certificados / Otros</button>
+          <button data-tab="tab-dh" data-i18n="tab_dh">Debe / Haber</button>
         </div>
         <div class="body tab" id="tab-traf">
           <div class="form-row">
-            <div><label>Concepto</label><select id="t-tipo"><option>Renovación</option><option>Expedición</option><option>Duplicado</option><option>Canje</option><option>Otro</option></select></div>
-            <div><label>Grupo</label><select id="t-grupo"><option>Conducir</option><option>Ciclomotor</option><option>BTP</option><option>Otro</option></select></div>
-            <div><label>Nombre</label><input type="text" id="t-nombre" placeholder="Apellidos, Nombre" /></div>
-            <div><label>Importe (€)</label><input type="number" step="0.01" id="t-importe" /></div>
-            <div><label>Tasa DGT (€)</label><input type="number" step="0.01" id="t-tasa" value="0" /></div>
-            <div><label>F. Pago</label><select id="t-fp"><option value="E">Efectivo</option><option value="T">Tarjeta</option><option value="B">Bizum</option><option value="X">Transferencia</option></select></div>
+            <div><label data-i18n="concept">Concepto</label><select id="t-tipo"><option data-i18n="renewal">Renovación</option><option data-i18n="issue">Expedición</option><option data-i18n="duplicate">Duplicado</option><option data-i18n="exchange">Canje</option><option data-i18n="other">Otro</option></select></div>
+            <div><label data-i18n="group">Grupo</label><select id="t-grupo"><option data-i18n="driving">Conducir</option><option data-i18n="moped">Ciclomotor</option><option>BTP</option><option data-i18n="other">Otro</option></select></div>
+            <div><label data-i18n="name">Nombre</label><input type="text" id="t-nombre" data-i18n-ph="ph_name" placeholder="Apellidos, Nombre" /></div>
+            <div><label data-i18n="amount">Importe (€)</label><input type="number" step="0.01" id="t-importe" /></div>
+            <div><label data-i18n="dgt_fee">Tasa DGT (€)</label><input type="number" step="0.01" id="t-tasa" value="0" /></div>
+            <div><label data-i18n="payment">F. Pago</label><select id="t-fp"><option value="E" data-i18n="cash">Efectivo</option><option value="T" data-i18n="card">Tarjeta</option><option value="B">Bizum</option><option value="X" data-i18n="transfer">Transferencia</option></select></div>
           </div>
-          <button class="btn btn-primary" id="btnAddTraf">+ Añadir entrada</button>
+          <button class="btn btn-primary" id="btnAddTraf" data-i18n="add_entry">+ Añadir entrada</button>
         </div>
         <div class="body tab" id="tab-priv" style="display:none">
           <div class="chip-row" id="chips-priv">
@@ -224,24 +225,33 @@
         </div>
       </div>
       <div class="panel">
-        <h2>Entradas del día <span><button class="btn btn-danger no-print" id="btnClearDay">🗑️ Vaciar día</button></span></h2>
+        <h2 data-i18n="entries_of_day">Entradas del día <span><button class="btn btn-danger no-print" id="btnClearDay" data-i18n="clear_day">🗑️ Vaciar día</button></span></h2>
         <div style="max-height:62vh;overflow:auto">
-          <table id="tbl"><thead><tr><th>#</th><th>Tipo</th><th>Grupo</th><th>Nombre / Concepto</th><th class="num">Importe</th><th class="num">Dto</th><th class="num">Tasa</th><th>FP</th><th>FP Tasa</th><th class="num act">Acciones</th></tr></thead><tbody id="tbody"></tbody></table>
-          <div class="empty" id="empty">No hay entradas. Importa CSV/Excel o añade manualmente arriba.</div>
+          <table id="tbl"><thead><tr><th>#</th><th data-i18n="type">Tipo</th><th data-i18n="group">Grupo</th><th data-i18n="name_concept">Nombre / Concepto</th><th class="num" data-i18n="amount_short">Importe</th><th class="num" data-i18n="disc">Dto</th><th class="num" data-i18n="fee_short">Tasa</th><th>FP</th><th data-i18n="fp_fee">FP Tasa</th><th class="num act" data-i18n="actions">Acciones</th></tr></thead><tbody id="tbody"></tbody></table>
+          <div class="empty" id="empty" data-i18n="empty_entries">No hay entradas. Importa CSV/Excel o añade manualmente arriba.</div>
         </div>
       </div>
     </div>
     <div>
-      <div class="panel" style="margin-bottom:14px"><h2>Cierre del día</h2><div class="body"><div class="summary" id="sumBox"></div></div></div>
-      <div class="panel" id="cemplaSplitPanel" style="margin-bottom:14px;display:none"><h2>Repartiment mes actual</h2><div class="body" id="cemplaSplitBox"></div></div>
-      <div class="panel" style="margin-bottom:14px"><h2>Resumen por concepto</h2><div class="body" id="byConcept"></div></div>
-      <div class="panel"><h2>Histórico <span class="small" id="histCount"></span></h2><div id="histList" style="max-height:40vh;overflow:auto"></div></div>
+      <div class="panel" style="margin-bottom:14px"><h2 data-i18n="day_close">Cierre del día</h2><div class="body"><div class="summary" id="sumBox"></div></div></div>
+      <div class="panel" id="cemplaSplitPanel" style="margin-bottom:14px;display:none"><h2 data-i18n="month_split">Repartiment mes actual</h2><div class="body" id="cemplaSplitBox"></div></div>
+      <div class="panel" style="margin-bottom:14px"><h2 data-i18n="by_concept">Resumen por concepto</h2><div class="body" id="byConcept"></div></div>
+      <div class="panel"><h2><span data-i18n="history_title">Histórico</span> <span class="small" id="histCount"></span></h2><div id="histList" style="max-height:40vh;overflow:auto"></div></div>
     </div>
   </div>
 </main>
 <div id="toast"></div>
 <script>
 const STORE_KEY='caja.v1';const $=s=>document.querySelector(s);const $$=s=>document.querySelectorAll(s);
+// ============ i18n ============
+const I18N={
+  es:{app_title:'Caja del Día',app_sub:'Cierre diario · Importación CSV/Excel · Debe / Haber',stats:'📊 ESTADÍSTICAS',date:'FECHA',today:'Hoy',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar copia',restore_copy:'📂 Restaurar copia',history:'🛡️ Historial',ledger:'📖 Libreta',audit:'🔎 Auditoría',ai_advisor:'🤖 Asesor IA',print:'🖨️ Imprimir',tab_traffic:'Tráfico (Renov/Exped)',tab_reviews:'Revisiones / Certificados / Otros',tab_dh:'Debe / Haber',concept:'Concepto',group:'Grupo',name:'Nombre',amount:'Importe (€)',dgt_fee:'Tasa DGT (€)',payment:'F. Pago',cash:'Efectivo',card:'Tarjeta',transfer:'Transferencia',renewal:'Renovación',issue:'Expedición',duplicate:'Duplicado',exchange:'Canje',other:'Otro',driving:'Conducir',moped:'Ciclomotor',ph_name:'Apellidos, Nombre',add_entry:'+ Añadir entrada',entries_of_day:'Entradas del día',clear_day:'🗑️ Vaciar día',type:'Tipo',name_concept:'Nombre / Concepto',amount_short:'Importe',disc:'Dto',fee_short:'Tasa',fp_fee:'FP Tasa',actions:'Acciones',empty_entries:'No hay entradas. Importa CSV/Excel o añade manualmente arriba.',day_close:'Cierre del día',month_split:'Reparto mes actual',by_concept:'Resumen por concepto',history_title:'Histórico'},
+  ca:{app_title:'Caixa del Dia',app_sub:'Tancament diari · Importació CSV/Excel · Deure / Haver',stats:'📊 ESTADÍSTIQUES',date:'DATA',today:'Avui',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar còpia',restore_copy:'📂 Restaurar còpia',history:'🛡️ Historial',ledger:'📖 Llibreta',audit:'🔎 Auditoria',ai_advisor:'🤖 Assessor IA',print:'🖨️ Imprimir',tab_traffic:'Trànsit (Renov/Exped)',tab_reviews:'Revisions / Certificats / Altres',tab_dh:'Deure / Haver',concept:'Concepte',group:'Grup',name:'Nom',amount:'Import (€)',dgt_fee:'Taxa DGT (€)',payment:'F. Pagament',cash:'Efectiu',card:'Targeta',transfer:'Transferència',renewal:'Renovació',issue:'Expedició',duplicate:'Duplicat',exchange:'Canvi',other:'Altres',driving:'Conduir',moped:'Ciclomotor',ph_name:'Cognoms, Nom',add_entry:'+ Afegir entrada',entries_of_day:'Entrades del dia',clear_day:'🗑️ Buidar dia',type:'Tipus',name_concept:'Nom / Concepte',amount_short:'Import',disc:'Dte',fee_short:'Taxa',fp_fee:'FP Taxa',actions:'Accions',empty_entries:"No hi ha entrades. Importa CSV/Excel o afegeix manualment a dalt.",day_close:'Tancament del dia',month_split:'Repartiment mes actual',by_concept:'Resum per concepte',history_title:'Històric'}
+};
+let currentLang=localStorage.getItem('caja.lang')||'ca';
+function t(key){return (I18N[currentLang]||I18N.ca)[key]||key}
+function applyLang(){document.documentElement.lang=currentLang;const dict=I18N[currentLang]||I18N.ca;$$('[data-i18n]').forEach(el=>{const k=el.getAttribute('data-i18n');if(dict[k]!==undefined)el.textContent=dict[k]});$$('[data-i18n-ph]').forEach(el=>{const k=el.getAttribute('data-i18n-ph');if(dict[k]!==undefined)el.placeholder=dict[k]});const lbl=$('#langLabel');if(lbl)lbl.textContent=currentLang.toUpperCase()}
+function toggleLang(){currentLang=currentLang==='ca'?'es':'ca';localStorage.setItem('caja.lang',currentLang);applyLang();if(typeof render==='function')render()}
 let currentCompany=localStorage.getItem('caja.company')||'trafic';
 const KEYS={trafic:'caja.v1',cempla:'caja.cempla.v1'};
 let state=loadState();let currentDate=isoToday();let privConcept='Revisión privada';let currentPreu='';let currentSplit='45-45-10';
@@ -778,7 +788,6 @@ function openLedger(){
 }
 $('#btnClearDay').onclick=()=>{if(!entriesOf(currentDate).length){toast('No hay entradas que vaciar');return}const cnt=entriesOf(currentDate).length;confirmModal('🗑️ Vaciar día',`Se borrarán las <b>${cnt} entrada(s)</b> del día <b>${currentDate.split('-').reverse().join('/')}</b>.<br><br>✅ Se guardará una copia de seguridad automática antes de borrar.`,()=>{pushSnapshot('preClear');delete state.byDate[currentDate];saveState();render();toast('Día vaciado ✅ (copia de seguridad guardada en 🛡️ Historial)',3500)},'Sí, vaciar día')};
 $('#btnPrint').onclick=()=>window.print();
-$('#btnDownloadApp').onclick=async()=>{try{const res=await fetch(location.pathname.endsWith('.html')?location.pathname:'/caja_del_dia.html',{cache:'no-store'});const html=await res.text();const blob=new Blob([html],{type:'text/html;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='caja_del_dia.html';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('Descargando caja_del_dia.html ✅')}catch(e){toast('Error: '+e.message)}};
 // ============ SAVE HANDLE (File System Access API) ============
 async function _idb(op){return new Promise((res)=>{const r=indexedDB.open('caja-io',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{const tx=r.result.transaction('kv',op.mode);const s=tx.objectStore('kv');const req=op.fn(s);req.onsuccess=()=>res(req.result);req.onerror=()=>res(null)};r.onerror=()=>res(null)})}
 async function getStoredHandle(){return _idb({mode:'readonly',fn:s=>s.get('backupHandle')})}
@@ -1077,6 +1086,8 @@ $('#jsonInput').onchange=async ev=>{
   ev.target.value='';
 };
 setDate(currentDate);// init done via applyCompanyUI above
+$('#btnLang').onclick=toggleLang;
+applyLang();
 </script>
 </body>
 </html>
