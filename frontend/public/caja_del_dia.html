@@ -574,7 +574,51 @@ $('#btnAiAsk').onclick=()=>{
   setTimeout(()=>back.querySelector('#aiQ').focus(),100);
 };
 $('#btnImportJson').onclick=()=>$('#jsonInput').click();
-$('#jsonInput').onchange=async ev=>{const f=ev.target.files[0];if(!f)return;try{const txt=await f.text();const obj=JSON.parse(txt);const isDual=(obj._v===2||obj._v===3)&&obj.cbTrafic&&obj.cempla;const isOld=obj.byDate;if(!isDual&&!isOld)throw 'formato';const doReplace=()=>{if(isDual){localStorage.setItem('caja.v1',JSON.stringify(obj.cbTrafic));localStorage.setItem('caja.cempla.v1',JSON.stringify(obj.cempla));if(obj.datafono)localStorage.setItem('caja.datafono',JSON.stringify(obj.datafono))}else{localStorage.setItem(KEYS[currentCompany],JSON.stringify(obj))}state=loadState();render();toast('✅ Datos restaurados')};const doMerge=()=>{if(isDual){for(const key of ['cbTrafic','cempla']){const target=key==='cbTrafic'?'caja.v1':'caja.cempla.v1';const cur=JSON.parse(localStorage.getItem(target)||'{"byDate":{}}');for(const[d,arr]of Object.entries(obj[key].byDate||{})){cur.byDate[d]=cur.byDate[d]||[];for(const e of arr){if(!cur.byDate[d].some(x=>x.id===e.id))cur.byDate[d].push(e)}}localStorage.setItem(target,JSON.stringify(cur))}if(obj.datafono){const curDf=JSON.parse(localStorage.getItem('caja.datafono')||'{}');Object.assign(curDf,obj.datafono);localStorage.setItem('caja.datafono',JSON.stringify(curDf))}}else{for(const[d,arr]of Object.entries(obj.byDate)){const list=entriesOf(d);for(const e of arr){if(!list.some(x=>x.id===e.id))list.push(e)}}saveState()}state=loadState();render();toast('✅ Datos fusionados')};confirmModal('📂 Restaurar copia',isDual?'La copia contiene <b>les dues empreses</b>.<br><br><b>Sustituir</b> = borra todo y pone lo del archivo.<br><b>Fusionar</b> = añade sin borrar.':'¿Sustituir o fusionar los datos actuales?',doReplace,'Sustituir todo',true,{label:'Fusionar',onClick:doMerge})}catch(e){toast('❌ Archivo no válido')}ev.target.value=''};
+$('#jsonInput').onchange=async ev=>{
+  const f=ev.target.files[0];if(!f)return;
+  let txt='',obj=null;
+  try{txt=await f.text()}catch(e){toast('❌ No se puede leer el archivo: '+e.message,5000);ev.target.value='';return}
+  try{obj=JSON.parse(txt)}catch(e){toast('❌ El archivo no es un JSON válido. Errror: '+e.message,7000);console.error('Restore parse error',e,txt.slice(0,500));ev.target.value='';return}
+  // Detectar cualquier variante:
+  // 1) Doble empresa: tiene cbTrafic + cempla (con o sin _v)
+  // 2) Antigua individual: tiene byDate
+  // 3) Solo cempla o solo cbTrafic
+  const hasDual=obj&&typeof obj==='object'&&obj.cbTrafic&&obj.cempla&&(obj.cbTrafic.byDate||obj.cempla.byDate);
+  const hasSingle=obj&&typeof obj==='object'&&obj.byDate&&typeof obj.byDate==='object';
+  const hasOnlyCB=obj&&typeof obj==='object'&&obj.cbTrafic&&obj.cbTrafic.byDate&&!obj.cempla;
+  const hasOnlyCempla=obj&&typeof obj==='object'&&obj.cempla&&obj.cempla.byDate&&!obj.cbTrafic;
+  if(!hasDual&&!hasSingle&&!hasOnlyCB&&!hasOnlyCempla){
+    const keys=obj&&typeof obj==='object'?Object.keys(obj).slice(0,8).join(', '):'(no es objeto)';
+    toast(`❌ Archivo no reconocido. Contenido: {${keys}}. Debe tener "cbTrafic"/"cempla" o "byDate".`,8000);
+    console.error('Restore: unknown format',obj);
+    ev.target.value='';return;
+  }
+  // Contar entradas para info al usuario
+  const cntCB=hasDual||hasOnlyCB?Object.values(obj.cbTrafic.byDate||{}).reduce((s,a)=>s+(a?.length||0),0):0;
+  const cntCempla=hasDual||hasOnlyCempla?Object.values(obj.cempla.byDate||{}).reduce((s,a)=>s+(a?.length||0),0):0;
+  const cntSingle=hasSingle?Object.values(obj.byDate).reduce((s,a)=>s+(a?.length||0),0):0;
+  const doReplace=()=>{
+    if(hasDual){
+      localStorage.setItem('caja.v1',JSON.stringify(obj.cbTrafic));
+      localStorage.setItem('caja.cempla.v1',JSON.stringify(obj.cempla));
+      if(obj.datafono)localStorage.setItem('caja.datafono',JSON.stringify(obj.datafono));
+    }else if(hasOnlyCB){localStorage.setItem('caja.v1',JSON.stringify(obj.cbTrafic));if(obj.datafono)localStorage.setItem('caja.datafono',JSON.stringify(obj.datafono))
+    }else if(hasOnlyCempla){localStorage.setItem('caja.cempla.v1',JSON.stringify(obj.cempla));if(obj.datafono)localStorage.setItem('caja.datafono',JSON.stringify(obj.datafono))
+    }else{localStorage.setItem(KEYS[currentCompany],JSON.stringify(obj))}
+    state=loadState();render();toast('✅ Datos restaurados correctamente',3500);
+  };
+  const doMerge=()=>{
+    const mergeInto=(targetKey,srcData)=>{const cur=JSON.parse(localStorage.getItem(targetKey)||'{"byDate":{}}');for(const[d,arr]of Object.entries(srcData.byDate||{})){cur.byDate[d]=cur.byDate[d]||[];for(const e of arr){if(!cur.byDate[d].some(x=>x.id===e.id))cur.byDate[d].push(e)}}localStorage.setItem(targetKey,JSON.stringify(cur))};
+    if(hasDual){mergeInto('caja.v1',obj.cbTrafic);mergeInto('caja.cempla.v1',obj.cempla);if(obj.datafono){const curDf=JSON.parse(localStorage.getItem('caja.datafono')||'{}');Object.assign(curDf,obj.datafono);localStorage.setItem('caja.datafono',JSON.stringify(curDf))}}
+    else if(hasOnlyCB){mergeInto('caja.v1',obj.cbTrafic);if(obj.datafono){const curDf=JSON.parse(localStorage.getItem('caja.datafono')||'{}');Object.assign(curDf,obj.datafono);localStorage.setItem('caja.datafono',JSON.stringify(curDf))}}
+    else if(hasOnlyCempla){mergeInto('caja.cempla.v1',obj.cempla);if(obj.datafono){const curDf=JSON.parse(localStorage.getItem('caja.datafono')||'{}');Object.assign(curDf,obj.datafono);localStorage.setItem('caja.datafono',JSON.stringify(curDf))}}
+    else{for(const[d,arr]of Object.entries(obj.byDate)){const list=entriesOf(d);for(const e of arr){if(!list.some(x=>x.id===e.id))list.push(e)}}saveState()}
+    state=loadState();render();toast('✅ Datos fusionados correctamente',3500);
+  };
+  const info=hasDual?`Contiene <b>${cntCB}</b> fichas Tráfico + <b>${cntCempla}</b> Cempla Esport`:hasSingle?`Contiene <b>${cntSingle}</b> fichas`:hasOnlyCB?`Contiene <b>${cntCB}</b> fichas Tráfico`:`Contiene <b>${cntCempla}</b> fichas Cempla`;
+  confirmModal('📂 Restaurar copia',`${info}<br><br><b>Sustituir</b> = borra los datos actuales y pone los del archivo.<br><b>Fusionar</b> = añade solo lo que no está sin borrar nada.`,doReplace,'Sustituir todo',true,{label:'Fusionar',onClick:doMerge});
+  ev.target.value='';
+};
 setDate(currentDate);// init done via applyCompanyUI above
 </script>
 </body>
