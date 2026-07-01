@@ -123,6 +123,8 @@
     <button class="btn" id="btnImportJson" title="Restaurar datos desde copia guardada">📂 Restaurar copia</button>
     <input type="file" id="jsonInput" accept=".json" style="display:none" />
     <button class="btn" id="btnDownloadApp" title="Descargar este programa como archivo .html">⬇️ Descargar app</button>
+    <button class="btn" id="btnHistory" title="Ver copias automáticas locales (últimas 5) y restaurar" style="background:#1f3a2e;border-color:#2a5e44;color:#bff0d6;font-weight:600">🛡️ Historial</button>
+    <span id="autosaveBadge" style="display:none;padding:5px 10px;border-radius:6px;background:#1f3a2e;color:#7ee3aa;font-size:11px;font-family:'Consolas',monospace;letter-spacing:.3px;border:1px solid #2a5e44"></span>
     <button class="btn traffic-only" id="btnAudit" title="Detectar clientes que aparecen en varios días del mes (posibles descuadres de tasa)" style="background:linear-gradient(90deg,#ea580c 0%,#f97316 100%);color:#fff;border-color:transparent;font-weight:700">🔎 Auditoría</button>
     <button class="btn" id="btnAiAsk" title="Pregunta al asesor IA sobre descuadres de caja" style="background:linear-gradient(90deg,#7c3aed 0%,#a855f7 100%);color:#fff;border-color:transparent;font-weight:700">🤖 Asesor IA</button>
     <button class="btn" id="btnPrint">🖨️ Imprimir</button>
@@ -243,7 +245,97 @@ let currentCompany=localStorage.getItem('caja.company')||'trafic';
 const KEYS={trafic:'caja.v1',cempla:'caja.cempla.v1'};
 let state=loadState();let currentDate=isoToday();let privConcept='Revisión privada';let currentPreu='';let currentSplit='45-45-10';
 function loadState(){try{return JSON.parse(localStorage.getItem(KEYS[currentCompany]))||{byDate:{}}}catch(e){return{byDate:{}}}}
-function saveState(){localStorage.setItem(KEYS[currentCompany],JSON.stringify(state))}
+function saveState(){localStorage.setItem(KEYS[currentCompany],JSON.stringify(state));pushSnapshot('auto')}
+
+// ============ SISTEMA ANTI-PÉRDIDA DE DATOS ============
+const SNAPS_KEY='caja.snapshots';
+const MAX_SNAPS=5;
+const MIN_SNAP_INTERVAL=15*60*1000; // 15 min mínimo entre snapshots auto
+function pushSnapshot(reason){
+  try{
+    const snaps=JSON.parse(localStorage.getItem(SNAPS_KEY)||'[]');
+    const last=snaps[snaps.length-1];
+    // Si es auto y el último snapshot es reciente, no crear otro
+    if(reason==='auto'&&last&&(Date.now()-last.ts)<MIN_SNAP_INTERVAL)return false;
+    const snap={ts:Date.now(),reason:reason||'auto',cbTrafic:localStorage.getItem('caja.v1')||'',cempla:localStorage.getItem('caja.cempla.v1')||'',datafono:localStorage.getItem('caja.datafono')||''};
+    snaps.push(snap);
+    while(snaps.length>MAX_SNAPS)snaps.shift();
+    try{localStorage.setItem(SNAPS_KEY,JSON.stringify(snaps))}
+    catch(e){snaps.shift();try{localStorage.setItem(SNAPS_KEY,JSON.stringify(snaps))}catch(_){return false}}
+    return true;
+  }catch(e){console.error('snapshot',e);return false}
+}
+// Auto-guardado a fichero vinculado (silencioso) cada 30 min
+async function autoSaveToFile(silent){
+  if(!window.showSaveFilePicker)return;
+  try{
+    const handle=await getStoredHandle();
+    if(!handle)return;
+    const perm=await handle.queryPermission({mode:'readwrite'});
+    if(perm!=='granted')return;
+    const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),_v:3,_ts:Date.now()};
+    const w=await handle.createWritable();await w.write(JSON.stringify(all,null,2));await w.close();
+    updateAutosaveBadge(handle.name);
+    if(!silent)toast('💾 Autoguardat en '+handle.name,2000);
+  }catch(e){console.error('autoSaveFile',e)}
+}
+function updateAutosaveBadge(name){
+  const b=$('#autosaveBadge');if(!b)return;
+  const t=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+  b.textContent=`✓ ${name||'archivo'} · ${t}`;
+  b.style.display='inline-flex';
+}
+// Ejecutar cada 30 minutos
+setInterval(()=>autoSaveToFile(true),30*60*1000);
+// También al ocultar la pestaña
+document.addEventListener('visibilitychange',()=>{if(document.hidden)autoSaveToFile(true)});
+// Al primer arranque, verificar si hay handle
+(async()=>{const h=await getStoredHandle();if(h){const b=$('#autosaveBadge');if(b){b.style.display='inline-flex';b.textContent=`🔗 ${h.name}`}}})();
+
+// Modal de historial de copias locales
+function openBackupHistory(){
+  const snaps=JSON.parse(localStorage.getItem(SNAPS_KEY)||'[]').slice().reverse();
+  const back=document.createElement('div');back.className='modal-back';
+  const cntEntries=s=>{try{return Object.values(JSON.parse(s||'{}').byDate||{}).reduce((n,a)=>n+(a?.length||0),0)}catch(e){return '?'}};
+  back.innerHTML=`<div class="modal" style="max-width:640px;max-height:85vh;display:flex;flex-direction:column">
+    <h3>🛡️ Historial de copias automáticas</h3>
+    <p class="small" style="margin-bottom:10px">Se guardan hasta ${MAX_SNAPS} copias automáticas locales. Puedes restaurar cualquiera si algo va mal.<br>Antes de cualquier restauración se crea otra copia por seguridad.</p>
+    <div style="flex:1;overflow:auto;padding-right:6px">${snaps.length?snaps.map((s,i)=>{
+      const d=new Date(s.ts);
+      const reasonTxt={auto:'Auto',preRestore:'⚠ Antes de restaurar',manual:'Manual',preClear:'⚠ Antes de borrar día'}[s.reason]||s.reason;
+      return `<div style="background:#141821;padding:10px 12px;border-radius:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;border:1px solid ${s.reason!=='auto'?'#5e4a2a':'#2a3040'}">
+        <div><b>${d.toLocaleString('es-ES')}</b><br><span class="small">${reasonTxt} · Tràfic: ${cntEntries(s.cbTrafic)} · Cempla: ${cntEntries(s.cempla)}</span></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-success" data-i="${i}" data-act="restore">↩ Restaurar</button>
+          <button class="btn" data-i="${i}" data-act="download" title="Descargar como JSON">💾</button>
+        </div>
+      </div>`;
+    }).join(''):'<div class="empty" style="padding:30px">No hay copias todavía. Se crearán automáticamente al hacer cambios.</div>'}</div>
+    <div class="row" style="margin-top:14px;justify-content:space-between">
+      <button class="btn" id="snapNow">📸 Crear copia ahora</button>
+      <button class="btn" data-no>Cerrar</button>
+    </div></div>`;
+  document.body.appendChild(back);
+  back.querySelector('[data-no]').onclick=()=>back.remove();
+  back.querySelector('#snapNow').onclick=()=>{pushSnapshot('manual');back.remove();openBackupHistory();toast('📸 Copia creada')};
+  back.addEventListener('click',ev=>{
+    if(ev.target===back){back.remove();return}
+    const btn=ev.target.closest('button[data-act]');if(!btn)return;
+    const snap=snaps[+btn.dataset.i];if(!snap)return;
+    if(btn.dataset.act==='restore'){
+      confirmModal('↩ Restaurar esta copia',`¿Restaurar la copia del <b>${new Date(snap.ts).toLocaleString('es-ES')}</b>?<br><br>Antes de sustituir, se guardará una nueva copia de seguridad del estado actual.`,()=>{
+        pushSnapshot('preRestore');
+        if(snap.cbTrafic)localStorage.setItem('caja.v1',snap.cbTrafic);
+        if(snap.cempla)localStorage.setItem('caja.cempla.v1',snap.cempla);
+        if(snap.datafono)localStorage.setItem('caja.datafono',snap.datafono);
+        state=loadState();render();toast('✅ Copia restaurada correctamente',3500);back.remove();
+      },'↩ Restaurar');
+    }else if(btn.dataset.act==='download'){
+      const obj={cbTrafic:JSON.parse(snap.cbTrafic||'{"byDate":{}}'),cempla:JSON.parse(snap.cempla||'{"byDate":{}}'),datafono:JSON.parse(snap.datafono||'{}'),_v:3,_ts:snap.ts};
+      const a=document.createElement('a');a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(obj,null,2));a.download=`SNAPSHOT-${new Date(snap.ts).toISOString().slice(0,19).replace(/[:.]/g,'-')}.json`;a.click();
+    }
+  });
+}
 function switchCompany(c){currentCompany=c;localStorage.setItem('caja.company',c);state=loadState();applyCompanyUI();render()}
 function applyCompanyUI(){const isC=currentCompany==='cempla';document.body.classList.toggle('cempla',isC);$('#cTrafic').classList.toggle('active',!isC);$('#cCempla').classList.toggle('active',isC);$('#appTitle').firstChild.nodeValue=isC?'CEMPLA ESPORT ':'Caja del Día ';$('#appSub').textContent=isC?'Medicina esportiva · Revisions':'Cierre diario · Importación CSV/Excel · Debe / Haber';
   // Show/hide traffic-only elements
@@ -351,7 +443,8 @@ function renderSaldoAnterior(){$('#saldoAntNum').textContent=fmt(saldoAnterior(c
 function renderHistory(){const dates=Object.keys(state.byDate).filter(d=>entriesOf(d).length).sort().reverse();$('#histCount').textContent=`${dates.length} día(s)`;$('#histList').innerHTML=dates.length?dates.map(d=>{const t=computeTotals(entriesOf(d));const cls=d===currentDate?'style="background:#1a1e27"':'';return `<div class="history-item" ${cls} data-d="${d}"><div><div class="date">${d.split('-').reverse().join('/')}</div><div class="totals">${t.cnt} entrada(s) · ${fmt(t.neto)}</div></div><button class="icon-btn" data-delday="${d}" title="Borrar día">🗑️</button></div>`}).join(''):'<div class="empty">Sin histórico todavía</div>';$$('#histList .history-item').forEach(el=>el.onclick=e=>{if(e.target.dataset.delday){const day=e.target.dataset.delday;confirmModal('Borrar día',`¿Borrar TODOS los datos del día <b>${day.split('-').reverse().join('/')}</b>?`,()=>{delete state.byDate[day];saveState();render()},'Borrar día');e.stopPropagation();return}setDate(el.dataset.d)})}
 function actEntry(act,id){const list=entriesOf(currentDate);const i=list.findIndex(x=>x.id===id);if(i<0)return;if(act==='del'){confirmModal('Eliminar entrada',`¿Eliminar <b>${escapeHtml(list[i].nombre)}</b>?`,()=>{list.splice(i,1);saveState();render()},'Eliminar');return}if(act==='ret'){list[i].retorno=!list[i].retorno;saveState();render();return}if(act==='edit'){const e=list[i];const isDh=e.kind==='DH';const nN=prompt(isDh?'Concepto:':'Nombre / concepto:',e.nombre);if(nN===null)return;const nI=prompt('Importe (€):',e.importe);if(nI===null)return;const nT=isDh?'0':prompt('Tasa DGT (€):',e.tasa);if(nT===null)return;const nF=prompt('Forma de pago (E/T/B/X):',e.fp)||e.fp;e.nombre=nN.trim()||e.nombre;e.importe=num(nI);e.tasa=num(nT);e.fp=nF.toUpperCase()[0];e.fpTasa=e.fp;saveState();render()}}
 function confirmModal(title,message,onYes,yesLabel='Sí, borrar',danger=true,extraBtn=null){const back=document.createElement('div');back.className='modal-back';let extraHTML=extraBtn?`<button class="btn btn-primary" data-extra>${extraBtn.label}</button>`:'';back.innerHTML=`<div class="modal"><h3>${title}</h3><p>${message}</p><div class="row"><button class="btn" data-no>Cancelar</button>${extraHTML}<button class="btn ${danger?'btn-danger':'btn-primary'}" data-yes>${yesLabel}</button></div></div>`;document.body.appendChild(back);back.querySelector('[data-no]').focus();back.addEventListener('click',ev=>{if(ev.target===back)back.remove();if(ev.target.matches('[data-no]'))back.remove();if(ev.target.matches('[data-yes]')){back.remove();onYes()}if(ev.target.matches('[data-extra]')&&extraBtn){back.remove();extraBtn.onClick()}});document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){back.remove();document.removeEventListener('keydown',esc)}})}
-$('#btnClearDay').onclick=()=>{if(!entriesOf(currentDate).length){toast('No hay entradas que vaciar');return}const cnt=entriesOf(currentDate).length;confirmModal('🗑️ Vaciar día',`Se borrarán las <b>${cnt} entrada(s)</b> del día <b>${currentDate.split('-').reverse().join('/')}</b>. Esta acción no se puede deshacer.`,()=>{delete state.byDate[currentDate];saveState();render();toast('Día vaciado ✅')},'Sí, vaciar día')};
+$('#btnHistory').onclick=()=>openBackupHistory();
+$('#btnClearDay').onclick=()=>{if(!entriesOf(currentDate).length){toast('No hay entradas que vaciar');return}const cnt=entriesOf(currentDate).length;confirmModal('🗑️ Vaciar día',`Se borrarán las <b>${cnt} entrada(s)</b> del día <b>${currentDate.split('-').reverse().join('/')}</b>.<br><br>✅ Se guardará una copia de seguridad automática antes de borrar.`,()=>{pushSnapshot('preClear');delete state.byDate[currentDate];saveState();render();toast('Día vaciado ✅ (copia de seguridad guardada en 🛡️ Historial)',3500)},'Sí, vaciar día')};
 $('#btnPrint').onclick=()=>window.print();
 $('#btnDownloadApp').onclick=async()=>{try{const res=await fetch(location.pathname.endsWith('.html')?location.pathname:'/caja_del_dia.html',{cache:'no-store'});const html=await res.text();const blob=new Blob([html],{type:'text/html;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='caja_del_dia.html';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('Descargando caja_del_dia.html ✅')}catch(e){toast('Error: '+e.message)}};
 // ============ SAVE HANDLE (File System Access API) ============
