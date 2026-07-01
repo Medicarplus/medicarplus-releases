@@ -1,47 +1,34 @@
-# Caja del Día – PRD
+# Caja del Día - PRD
 
-## Original problem statement
-Aplicación tipo cuaderno de caja diaria para autoescuela/gestoría de tráfico.
-Ampliada para incluir segunda empresa: CEMPLA ESPORT (medicina deportiva).
+## Original Problem Statement
+Aplicación standalone (`caja_del_dia.html`) que sustituye una libreta de contabilidad de 40 años para gestoría con dos negocios (CEMPLA C.B / Tráfico DGT + CEMPLA ESPORT / medicina deportiva).
 
-## Architecture
-- Single-file HTML app: `/app/frontend/public/caja_del_dia.html`
-- React App.js redirects `/` → `/caja_del_dia.html`
-- Data persistence: localStorage
-  - `caja.v1` → datos empresa Trànsit
-  - `caja.cempla.v1` → datos empresa CEMPLA ESPORT
-  - `caja.company` → última empresa activa
-- Backend endpoint: `/api/download-app` (force-download del HTML)
-- No MongoDB usada (pura app cliente)
+## Sections
+1. **CEMPLA C.B (Tráfico)** - Renovaciones, Duplicados, Certificados, DEBE/HABER
+2. **CEMPLA ESPORT** - Revisiones deportivas con splits 45-45-10 personalizables
+3. **ESTADÍSTIQUES** - Tabla anual + mensual de autoescoles con import CSV
 
-## Features implementadas
+## Key Features Implemented
+- Import CSV/Excel con detección FP automática + auto-detect columna sin cabecera
+- Chips rápidos con precios (C.Oficial 20€, Fotos 4€, Certificado 66,50€, Duplicado 25€, deportes 40€)
+- Datáfono manual integrado en fila Tarjeta (input +botón ✓)
+- Contabilidad doble entrada: HABER auto (todas las entradas) + DEBE auto (tarjeta/transf/bizum → BBVA)
+- Separación CAJA FÍSICA / COMPTE BBVA en el resumen
+- Auditoría por rango de fechas con detección de clientes repetidos y sospechosos (0€ sin compensación)
+- Asesor IA (Gemini + Emergent fallback) con contexto de auditoría automático
+- Sistema anti-pérdida 5 capas: localStorage + 5 snapshots + auto-file 3s + auto-file 30min + auto-file al ocultar pestaña
+- Restore ultra-tolerante (6 formatos): sustituir o fusionar
+- Estadísticas con vista anual/mensual + import CSV mensual con alias (ROSELL/VIC → ROSSELL/VIC, etc.)
+- Backup pack: CB + Cempla + Datáfono + Stats en un solo JSON
+- Vinculación de archivo persistente (IndexedDB)
+- Verificación post-escritura (nunca guarda vacío/corrupto)
 
-### Modo Trànsit (tráfico) 🚗
-- Importación CSV/Excel del programa de tráfico (Win-1252, `;` delim)
-- Manual entry: Tráfico / Privadas / Debe-Haber
-- Chips rápidos Debe/Haber: IRPF, Mercadona, Devolució tasa, Honoraris, Foto, Ciclista
-- Cierre día completo: bruto, dto, tasas DGT, formas de pago, HABER/DEBE, saldo anterior
-- Retorno (tacha entrada), editar, eliminar
-- Histórico navegable
-- Modal de confirmación (no confirm() del navegador)
+## Backend
+- `/api/download-app` - descarga del HTML
+- `/api/ai-ask` - endpoint IA con Gemini/Emergent fallback + auditSummary
 
-### Modo CEMPLA ESPORT (medicina deportiva) 🩺
-- Selector top-right: 🚗 Trànsit / 🩺 CEMPLA ESPORT (azul)
-- Datos separados totalmente
-- Chips con precios auto: Recon C/Dte 40€, Recon C 40€, P.Esforç 77€, Ciclista 40€ (50/50/0), Futbol 36,50€, Bàsquet/Atletisme/Natació/Tennis/Pàdel/Muntanya/Triatló 40€
-- "Escriure a mà" → panel editable con Esport, Preu, F.Brugulat%, Cempla%, Dr.Mellado%
-- Reparto automático por defecto: 45/45/10 (Ciclista 50/50/0)
-- Panel "Repartiment mes actual": Total, F.Brugulat, Cempla, Dr.Mellado, PER CEMPLA-SPORT
-- Cierre del día simplificado (sin tráfico, sin tasas DGT)
-
-### Comunes
-- Copia de seguridad JSON (con nombre por empresa: COPIA-TRAFIC-... / COPIA-CEMPLA-...)
-- Restaurar copia (sustituir o fusionar)
-- Imprimir
-- Descargar app (botón + endpoint backend)
-
-## Deferred / Backlog
-- P2: Recordatorio automático de copia (más de 15 días sin backup)
-- P2: Búsqueda por nombre/DNI en histórico
-- P3: Gráficos de evolución mensual
-- P3: Sincronización en la nube multi-dispositivo
+## Test Coverage
+- 13/13 pruebas byte-a-byte de save+restore superadas
+- Auditoría detecta caso Juan Pérez (renovación día 5 + trámite 0€ día 12 = SOSPECHOSO)
+- IA endpoint responde 200 con source=emergent-key
+- All 27 UI buttons + functions verified
