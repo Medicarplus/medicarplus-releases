@@ -7,7 +7,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List
+from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
 
@@ -62,6 +62,7 @@ class AiAskBody(BaseModel):
     company: str = "cbTrafic"
     diff: float = 0.0
     userGeminiKey: str = ""
+    auditSummary: Optional[dict] = None
 
 
 @api_router.post("/ai-ask")
@@ -88,9 +89,21 @@ async def ai_ask(body: AiAskBody):
         "Cita dates concretes dd/mm/yyyy."
     )
     diff_txt = f"DESCUADRE: {body.diff:.2f}€ (positiu=sobra, negatiu=falta)\n" if body.diff else ""
-    user_msg = f"{diff_txt}Pregunta: {body.question}\n\nRegistre:\n{data_txt}"
+    audit_txt = ""
+    if body.auditSummary:
+        au = body.auditSummary
+        clients = au.get("clients", [])
+        if clients:
+            lines_au = [f"\n📊 AUDITORIA MES {au.get('month','')} · {au.get('totalRepeated',0)} clients repetits ({au.get('suspiciousCount',0)} sospitosos):"]
+            for c in clients[:15]:
+                flag = "🚨 " if c.get("suspicious") else ""
+                lines_au.append(f"{flag}{c.get('name','')} — {c.get('fichas',0)} fitxes {c.get('dates',[])} imp={c.get('totalImp',0)}€ tasa={c.get('totalTasa',0)}€ dh={c.get('dhSum',0)}€")
+                for en in c.get("entries", [])[:6]:
+                    lines_au.append(f"   · {en.get('date')} {en.get('kind')}/{en.get('tipo','')} imp={en.get('importe',0)} tasa={en.get('tasa',0)} {en.get('fp','')}")
+            audit_txt = "\n".join(lines_au) + "\n"
+    user_msg = f"{diff_txt}Pregunta: {body.question}\n{audit_txt}\nRegistre:\n{data_txt}"
     # Use user's own Google Gemini API key if provided (FREE tier)
-    if body.userGeminiKey and body.userGeminiKey.startswith("AIza"):
+    if body.userGeminiKey and len(body.userGeminiKey.strip()) >= 20:
         try:
             import google.generativeai as genai
             genai.configure(api_key=body.userGeminiKey)
