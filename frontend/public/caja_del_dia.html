@@ -81,7 +81,8 @@
   .company-switch{display:flex;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px;order:99;margin-left:auto}
   .company-switch button{border:none;background:transparent;color:var(--muted);padding:8px 16px;border-radius:7px;font-weight:700;font-size:12px;letter-spacing:.5px;transition:all .2s ease}
   .company-switch button:hover{color:var(--text)}
-  .company-switch button#cTrafic.active{background:var(--accent);color:#1a1a1a}
+  .company-switch button#cTrafic{color:#3ddc97}
+  .company-switch button#cTrafic.active{background:#3ddc97;color:#0a2e1d;box-shadow:0 0 0 2px rgba(61,220,151,.25)}
   .company-switch button#cCempla{color:#5aa9ff}
   .company-switch button#cCempla.active{background:#5aa9ff;color:#0a1d2e;box-shadow:0 0 0 2px rgba(90,169,255,.25)}
   body.cempla{--accent:#5aa9ff;--accent-2:#86b6ff}
@@ -95,8 +96,8 @@
 <header>
   <h1 id="appTitle">Caja del Día <small id="appSub">Cierre diario · Importación CSV/Excel · Debe / Haber</small></h1>
   <div class="company-switch" data-testid="company-switch">
-    <button id="cTrafic" class="active" data-testid="company-trafic">🚗 Trànsit</button>
-    <button id="cCempla" class="cempla" data-testid="company-cempla">🩺 CEMPLA ESPORT</button>
+    <button id="cTrafic" class="active">🚗 CEMPLA C.B</button>
+    <button id="cCempla" class="cempla">🩺 CEMPLA ESPORT</button>
   </div>
   <div class="toolbar">
     <label class="small" style="margin:0">FECHA</label>
@@ -276,12 +277,12 @@ function confirmModal(title,message,onYes,yesLabel='Sí, borrar',danger=true,ext
 $('#btnClearDay').onclick=()=>{if(!entriesOf(currentDate).length){toast('No hay entradas que vaciar');return}const cnt=entriesOf(currentDate).length;confirmModal('🗑️ Vaciar día',`Se borrarán las <b>${cnt} entrada(s)</b> del día <b>${currentDate.split('-').reverse().join('/')}</b>. Esta acción no se puede deshacer.`,()=>{delete state.byDate[currentDate];saveState();render();toast('Día vaciado ✅')},'Sí, vaciar día')};
 $('#btnPrint').onclick=()=>window.print();
 $('#btnDownloadApp').onclick=async()=>{try{const res=await fetch(location.pathname.endsWith('.html')?location.pathname:'/caja_del_dia.html',{cache:'no-store'});const html=await res.text();const blob=new Blob([html],{type:'text/html;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='caja_del_dia.html';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('Descargando caja_del_dia.html ✅')}catch(e){toast('Error: '+e.message)}};
-$('#btnExport').onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`COPIA-${currentCompany.toUpperCase()}-${isoToday()}.json`;a.click();toast('💾 Copia guardada')};
+$('#btnExport').onclick=()=>{const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),_v:2};const blob=new Blob([JSON.stringify(all,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`COPIA-TOTAL-${isoToday()}.json`;a.click();toast('💾 Copia completa guardada (les dues empreses)')};
 function renderCemplaSplit(){if(currentCompany!=='cempla')return;const ym=currentDate.slice(0,7);let bru=0,cem=0,mel=0,tot=0,n=0;Object.entries(state.byDate).forEach(([d,arr])=>{if(!d.startsWith(ym))return;arr.forEach(e=>{if(e.retorno||e.kind==='DH')return;const imp=(e.importe||0)-(e.descuento||0);tot+=imp;n++;const sp=(e.split||'45-45-10').split('-').map(Number);bru+=imp*sp[0]/100;cem+=imp*sp[1]/100;mel+=imp*sp[2]/100})});const mes=['Gener','Febrer','Març','Abril','Maig','Juny','Juliol','Agost','Setembre','Octubre','Novembre','Desembre'][parseInt(ym.slice(5,7))-1];$('#cemplaSplitBox').innerHTML=`<div class="small" style="margin-bottom:8px">INGRESSOS ${mes.toUpperCase()} ${ym.slice(0,4)} · ${n} revisions</div><table style="width:100%"><tbody><tr><td>Total IMPORT</td><td class="num"><b>${fmt(tot)}</b></td></tr><tr><td>F.Brugulat (45%)</td><td class="num" style="color:#5aa9ff"><b>${fmt(bru)}</b></td></tr><tr><td>Cempla (45%)</td><td class="num" style="color:#7ee3aa"><b>${fmt(cem)}</b></td></tr><tr><td>Dr.Mellado (10%)</td><td class="num" style="color:#ffd58a"><b>${fmt(mel)}</b></td></tr><tr style="border-top:1px solid #2a3040"><td style="padding-top:8px"><b>PER CEMPLA-SPORT</b></td><td class="num" style="color:#5aa9ff;font-size:16px"><b>${fmt(cem)}</b></td></tr></tbody></table>`}
 const _origRender=render;render=function(){_origRender();renderCemplaSplit()};
 applyCompanyUI();setDate(currentDate);
 $('#btnImportJson').onclick=()=>$('#jsonInput').click();
-$('#jsonInput').onchange=async ev=>{const f=ev.target.files[0];if(!f)return;try{const txt=await f.text();const obj=JSON.parse(txt);if(!obj.byDate)throw 'formato';confirmModal('📂 Restaurar copia','¿Qué quieres hacer con los datos del archivo?<br><br><b>Sustituir</b> = borra todo lo actual y pone los del archivo.<br><b>Fusionar</b> = añade los del archivo sin borrar los actuales.',()=>{state=obj;saveState();render();toast('✅ Datos sustituidos')},'Sustituir todo',true,{label:'Fusionar',onClick:()=>{for(const[d,arr]of Object.entries(obj.byDate)){const list=entriesOf(d);for(const e of arr){if(!list.some(x=>x.id===e.id))list.push(e)}}saveState();render();toast('✅ Datos fusionados')}})}catch(e){toast('❌ Archivo no válido')}ev.target.value=''};
+$('#jsonInput').onchange=async ev=>{const f=ev.target.files[0];if(!f)return;try{const txt=await f.text();const obj=JSON.parse(txt);const isDual=obj._v===2&&obj.cbTrafic&&obj.cempla;const isOld=obj.byDate;if(!isDual&&!isOld)throw 'formato';const doReplace=()=>{if(isDual){localStorage.setItem('caja.v1',JSON.stringify(obj.cbTrafic));localStorage.setItem('caja.cempla.v1',JSON.stringify(obj.cempla))}else{localStorage.setItem(KEYS[currentCompany],JSON.stringify(obj))}state=loadState();render();toast('✅ Datos restaurados')};const doMerge=()=>{if(isDual){for(const key of ['cbTrafic','cempla']){const target=key==='cbTrafic'?'caja.v1':'caja.cempla.v1';const cur=JSON.parse(localStorage.getItem(target)||'{"byDate":{}}');for(const[d,arr]of Object.entries(obj[key].byDate||{})){cur.byDate[d]=cur.byDate[d]||[];for(const e of arr){if(!cur.byDate[d].some(x=>x.id===e.id))cur.byDate[d].push(e)}}localStorage.setItem(target,JSON.stringify(cur))}}else{for(const[d,arr]of Object.entries(obj.byDate)){const list=entriesOf(d);for(const e of arr){if(!list.some(x=>x.id===e.id))list.push(e)}}saveState()}state=loadState();render();toast('✅ Datos fusionados')};confirmModal('📂 Restaurar copia',isDual?'La copia contiene <b>les dues empreses</b>.<br><br><b>Sustituir</b> = borra todo y pone lo del archivo.<br><b>Fusionar</b> = añade sin borrar.':'¿Sustituir o fusionar los datos actuales?',doReplace,'Sustituir todo',true,{label:'Fusionar',onClick:doMerge})}catch(e){toast('❌ Archivo no válido')}ev.target.value=''};
 setDate(currentDate);// init done via applyCompanyUI above
 </script>
 </body>
