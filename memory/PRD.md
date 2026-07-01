@@ -1,42 +1,47 @@
 # Caja del Día – PRD
 
-## Original problem statement (es)
-> "ESTO ES LO QUE LLEVO HECHO, AYUDAME A ACABARLO" – PDF "Seguimiento de Proceso (3).pdf"
+## Original problem statement
+Aplicación tipo cuaderno de caja diaria para autoescuela/gestoría de tráfico.
+Ampliada para incluir segunda empresa: CEMPLA ESPORT (medicina deportiva).
 
-Aplicación tipo cuaderno de caja diaria de una autoescuela / gestoría de tráfico.
-El usuario quería terminar una HTML SPA autocontenida en localStorage.
-
-## Architecture decision
-- Single-file HTML app served from `/app/frontend/public/caja_del_dia.html`
+## Architecture
+- Single-file HTML app: `/app/frontend/public/caja_del_dia.html`
 - React App.js redirects `/` → `/caja_del_dia.html`
-- Data persistence: `localStorage` (key `caja.v1`, `{byDate: {YYYY-MM-DD: [...entries]}}`)
-- No backend used (MongoDB / FastAPI untouched, default boilerplate)
+- Data persistence: localStorage
+  - `caja.v1` → datos empresa Trànsit
+  - `caja.cempla.v1` → datos empresa CEMPLA ESPORT
+  - `caja.company` → última empresa activa
+- Backend endpoint: `/api/download-app` (force-download del HTML)
+- No MongoDB usada (pura app cliente)
 
-## CSV format (programa de tráfico)
-Encoding: Windows-1252 (auto-detect UTF-8 fallback)
-Delimiter: `;`  Quotes: `"`  Decimal: `,`  Date: `dd/mm/yyyy`
-Columns: FECHA;DNI;NOMBRE;APELLIDO1;APELLIDO2;NÚMERO;TIPO;GRUPO;IMPORTE;FP;COBRADO;TASA;FP
-FP codes: E=Efectivo, T=Tarjeta, B=Bizum, X=Transferencia
+## Features implementadas
 
-## What's been implemented (2026-01)
-- CSV import (robust quoted-CSV parser, encoding auto-detect, dedup vs previous imports)
-- Manual entry: 3 tabs
-  - Tráfico (Renovación / Expedición / Duplicado / Canje)
-  - Privadas (Revisión privada / Certificado / Duplicado / Informe / Psicotécnico)
-  - Debe/Haber libre (concepto libre, HABER suma / DEBE resta)
-- Cierre del día: bruto, descuentos, tasas DGT, totales por forma de pago, Haber/Debe, saldo anterior arrastrado, TOTAL caja
-- Resumen por concepto (agrupado)
-- Histórico navegable (clic en fecha = ir, papelera = borrar día)
-- Retorno (toggle): tacha la fila y la excluye del total. Reactivable.
-- Editar/Eliminar entradas
-- Navegación por días (←/→/Hoy/calendario)
-- Export/Import JSON (backup)
-- Print-friendly (oculta toolbar y muestra solo tabla + resumen)
-- Robust number parsing: acepta "66,50", "66.50", "1.234,56", "1,234.56"
+### Modo Trànsit (tráfico) 🚗
+- Importación CSV/Excel del programa de tráfico (Win-1252, `;` delim)
+- Manual entry: Tráfico / Privadas / Debe-Haber
+- Chips rápidos Debe/Haber: IRPF, Mercadona, Devolució tasa, Honoraris, Foto, Ciclista
+- Cierre día completo: bruto, dto, tasas DGT, formas de pago, HABER/DEBE, saldo anterior
+- Retorno (tacha entrada), editar, eliminar
+- Histórico navegable
+- Modal de confirmación (no confirm() del navegador)
 
-## Backlog / future
-- P1: Importar automáticamente desde carpeta compartida (File System Access API)
-- P2: Sincronización en la nube (multi-dispositivo)
-- P2: Edición inline (sin prompts)
+### Modo CEMPLA ESPORT (medicina deportiva) 🩺
+- Selector top-right: 🚗 Trànsit / 🩺 CEMPLA ESPORT (azul)
+- Datos separados totalmente
+- Chips con precios auto: Recon C/Dte 40€, Recon C 40€, P.Esforç 77€, Ciclista 40€ (50/50/0), Futbol 36,50€, Bàsquet/Atletisme/Natació/Tennis/Pàdel/Muntanya/Triatló 40€
+- "Escriure a mà" → panel editable con Esport, Preu, F.Brugulat%, Cempla%, Dr.Mellado%
+- Reparto automático por defecto: 45/45/10 (Ciclista 50/50/0)
+- Panel "Repartiment mes actual": Total, F.Brugulat, Cempla, Dr.Mellado, PER CEMPLA-SPORT
+- Cierre del día simplificado (sin tráfico, sin tasas DGT)
+
+### Comunes
+- Copia de seguridad JSON (con nombre por empresa: COPIA-TRAFIC-... / COPIA-CEMPLA-...)
+- Restaurar copia (sustituir o fusionar)
+- Imprimir
+- Descargar app (botón + endpoint backend)
+
+## Deferred / Backlog
+- P2: Recordatorio automático de copia (más de 15 días sin backup)
+- P2: Búsqueda por nombre/DNI en histórico
 - P3: Gráficos de evolución mensual
-- P3: Exportar a PDF directamente
+- P3: Sincronización en la nube multi-dispositivo
