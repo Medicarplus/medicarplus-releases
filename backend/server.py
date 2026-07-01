@@ -94,10 +94,12 @@ async def ai_ask(body: AiAskBody):
         au = body.auditSummary
         clients = au.get("clients", [])
         if clients:
-            lines_au = [f"\n📊 AUDITORIA MES {au.get('month','')} · {au.get('totalRepeated',0)} clients repetits ({au.get('suspiciousCount',0)} sospitosos):"]
+            rng = f"{au.get('from','')} → {au.get('to','')}" if au.get('from') else au.get('month','')
+            lines_au = [f"\n📊 AUDITORIA RANG {rng} · {au.get('totalRepeated',0)} clients repetits ({au.get('suspiciousCount',0)} sospitosos):"]
             for c in clients[:15]:
                 flag = "🚨 " if c.get("suspicious") else ""
-                lines_au.append(f"{flag}{c.get('name','')} — {c.get('fichas',0)} fitxes {c.get('dates',[])} imp={c.get('totalImp',0)}€ tasa={c.get('totalTasa',0)}€ dh={c.get('dhSum',0)}€")
+                span = f" ({c.get('daySpan',0)} dies entre visites)" if c.get('daySpan',0) > 60 else ""
+                lines_au.append(f"{flag}{c.get('name','')} — {c.get('fichas',0)} fitxes {c.get('dates',[])}{span} imp={c.get('totalImp',0)}€ tasa={c.get('totalTasa',0)}€ dh={c.get('dhSum',0)}€")
                 for en in c.get("entries", [])[:6]:
                     lines_au.append(f"   · {en.get('date')} {en.get('kind')}/{en.get('tipo','')} imp={en.get('importe',0)} tasa={en.get('tasa',0)} {en.get('fp','')}")
             audit_txt = "\n".join(lines_au) + "\n"

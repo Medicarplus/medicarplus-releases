@@ -294,10 +294,10 @@ applyCompanyUI();setDate(currentDate);
 
 /* ============ AUDITORIA DE TASAS ============ */
 function normalizeName(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim()}
-function computeAudit(ym){
+function computeAudit(dateFrom,dateTo){
   const clients={};
   Object.entries(state.byDate).forEach(([d,arr])=>{
-    if(!d.startsWith(ym))return;
+    if(d<dateFrom||d>dateTo)return;
     arr.forEach(e=>{
       const norm=normalizeName(e.nombre);
       if(!norm||norm.length<3||norm.includes('sin nombre')||norm.includes('sense nom')||norm.includes('sin concepto')||norm.includes('sense concepte'))return;
@@ -314,21 +314,35 @@ function computeAudit(ym){
       if((e.importe||0)===0&&(e.tasa||0)===0)zeroCount++;
     });
     v.entries.sort((a,b)=>a.date.localeCompare(b.date));
-    // Suspicious: has traffic entries + has one with 0€/0tasa but no compensating DH entry
     const suspicious=zeroCount>0&&dhCount===0;
-    return {key:k,display:v.display,entries:v.entries,totalImp,totalTasa,zeroCount,dhCount,dhSum,trafCount,suspicious};
+    // Compute days between first and last entry (useful to spot long gaps)
+    const dFirst=new Date(v.entries[0].date),dLast=new Date(v.entries[v.entries.length-1].date);
+    const daySpan=Math.round((dLast-dFirst)/86400000);
+    return {key:k,display:v.display,entries:v.entries,totalImp,totalTasa,zeroCount,dhCount,dhSum,trafCount,suspicious,daySpan};
   }).sort((a,b)=>{if(a.suspicious!==b.suspicious)return a.suspicious?-1:1;return b.entries.length-a.entries.length});
 }
 $('#btnAudit').onclick=()=>{
-  const ymNow=currentDate.slice(0,7);
+  // Default range: last 12 months (or all data if less)
+  const today=isoToday();
+  const d=new Date();d.setMonth(d.getMonth()-12);
+  const defFrom=d.toISOString().slice(0,10);
   const back=document.createElement('div');back.className='modal-back';
   back.innerHTML=`<div class="modal" style="max-width:1100px;width:95%;max-height:90vh;display:flex;flex-direction:column">
-    <h3 style="color:#f97316">🔎 Auditoría de tasas · Clientes repetidos en el mes</h3>
+    <h3 style="color:#f97316">🔎 Auditoría de tasas · Clientes repetidos en el rango</h3>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-      <label class="small" style="margin:0">MES:</label>
-      <input type="month" id="auMonth" value="${ymNow}" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px" />
-      <button class="btn" id="auReload">🔄 Actualizar</button>
-      <span class="small" style="margin-left:auto;color:#f97316">🚨 = Sospechoso (0€ sin devolución vinculada) · 📅 = varios días</span>
+      <label class="small" style="margin:0">DESDE:</label>
+      <input type="date" id="auFrom" value="${defFrom}" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px" />
+      <label class="small" style="margin:0">HASTA:</label>
+      <input type="date" id="auTo" value="${today}" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px" />
+      <button class="btn" id="auReload">🔄 Buscar</button>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn" data-preset="1m" style="padding:6px 10px;font-size:11px">1 mes</button>
+        <button class="btn" data-preset="3m" style="padding:6px 10px;font-size:11px">3 meses</button>
+        <button class="btn" data-preset="6m" style="padding:6px 10px;font-size:11px">6 meses</button>
+        <button class="btn" data-preset="12m" style="padding:6px 10px;font-size:11px">1 año</button>
+        <button class="btn" data-preset="all" style="padding:6px 10px;font-size:11px">Todo</button>
+      </div>
+      <span class="small" style="margin-left:auto;color:#f97316">🚨 = Sospechoso · 📅 = varios días</span>
     </div>
     <div id="auBody" style="flex:1;overflow:auto;padding-right:6px"></div>
     <div class="row" style="margin-top:14px">
@@ -338,14 +352,24 @@ $('#btnAudit').onclick=()=>{
   document.body.appendChild(back);
   back.querySelector('[data-no]').onclick=()=>back.remove();
   back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
+  const applyPreset=p=>{
+    const t=isoToday();const dt=new Date();
+    if(p==='all'){const dates=Object.keys(state.byDate).sort();if(dates.length){back.querySelector('#auFrom').value=dates[0];back.querySelector('#auTo').value=t}}
+    else{const map={'1m':1,'3m':3,'6m':6,'12m':12};dt.setMonth(dt.getMonth()-map[p]);back.querySelector('#auFrom').value=dt.toISOString().slice(0,10);back.querySelector('#auTo').value=t}
+    renderAudit();
+  };
+  back.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>applyPreset(b.dataset.preset));
   const renderAudit=()=>{
-    const ym=back.querySelector('#auMonth').value;
-    const data=computeAudit(ym);
+    const from=back.querySelector('#auFrom').value;
+    const to=back.querySelector('#auTo').value;
+    if(!from||!to||from>to){back.querySelector('#auBody').innerHTML='<div class="empty">Rango de fechas no válido</div>';return}
+    const data=computeAudit(from,to);
     const body=back.querySelector('#auBody');
-    if(!data.length){body.innerHTML=`<div class="empty" style="padding:40px">✅ Ningún cliente aparece más de una vez en ${ym}.<br><br>Todo limpio en este mes.</div>`;return}
+    const rangeTxt=`${from.split('-').reverse().join('/')} → ${to.split('-').reverse().join('/')}`;
+    if(!data.length){body.innerHTML=`<div class="empty" style="padding:40px">✅ Ningún cliente aparece más de una vez entre ${rangeTxt}.<br><br>Todo limpio en este rango.</div>`;return}
     const suspCount=data.filter(x=>x.suspicious).length;
     body.innerHTML=`<div style="padding:10px 14px;background:${suspCount?'#3a1c22':'#1f3a2e'};border:1px solid ${suspCount?'#5e2a33':'#2a5e44'};border-radius:8px;margin-bottom:12px;font-size:13px">
-      <b>${data.length}</b> cliente(s) repetido(s) · <b style="color:${suspCount?'#ff96a0':'#7ee3aa'}">${suspCount}</b> sospechoso(s) de descuadre
+      Rango: <b>${rangeTxt}</b> · <b>${data.length}</b> cliente(s) repetido(s) · <b style="color:${suspCount?'#ff96a0':'#7ee3aa'}">${suspCount}</b> sospechoso(s) de descuadre
     </div>`+
     data.map(c=>{
       const rows=c.entries.map(({date,e})=>{
@@ -356,9 +380,10 @@ $('#btnAudit').onclick=()=>{
         const goto=`onclick="event.stopPropagation();document.querySelector('.modal-back').remove();setDate('${date}')" style="cursor:pointer;${bg}"`;
         return `<tr ${goto}><td>${date.split('-').reverse().join('/')}</td><td>${label}</td><td class="num">${fmt(e.importe||0)}</td><td class="num">${e.tasa?fmt(e.tasa):'—'}</td><td>${e.fp||'-'}</td><td class="small">${isZero?'⚠️ TRÁMITE 0€':(isDh?'💰 Debe/Haber libre':'')}</td></tr>`;
       }).join('');
+      const gap=c.daySpan>60?`<span class="pill" style="background:#3a2a1c;color:#ffd58a;border-color:#5e4a2a">⏱ ${c.daySpan} días entre visitas</span>`:'';
       return `<div style="background:#141821;border:1px solid ${c.suspicious?'#ff5d6c':'#2a3040'};border-radius:10px;padding:12px;margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
-          <b style="font-size:15px;color:${c.suspicious?'#ff96a0':'#e8ecf2'}">${c.suspicious?'🚨 ':''}${escapeHtml(c.display)} <span class="pill">📅 ${c.entries.length} fichas</span></b>
+          <b style="font-size:15px;color:${c.suspicious?'#ff96a0':'#e8ecf2'}">${c.suspicious?'🚨 ':''}${escapeHtml(c.display)} <span class="pill">📅 ${c.entries.length} fichas</span> ${gap}</b>
           <div class="small">Total imp: <b class="num">${fmt(c.totalImp)}</b> · Tasa: <b class="num">${fmt(c.totalTasa)}</b>${c.dhCount?` · D/H: <b class="num" style="color:${c.dhSum>=0?'#7ee3aa':'#ff96a0'}">${fmt(c.dhSum)}</b>`:''}</div>
         </div>
         <table style="width:100%;font-size:12px"><thead><tr><th>Día</th><th>Tipo</th><th class="num">Importe</th><th class="num">Tasa</th><th>FP</th><th></th></tr></thead><tbody>${rows}</tbody></table>
@@ -367,12 +392,14 @@ $('#btnAudit').onclick=()=>{
     }).join('');
   };
   back.querySelector('#auReload').onclick=renderAudit;
-  back.querySelector('#auMonth').onchange=renderAudit;
+  back.querySelector('#auFrom').onchange=renderAudit;
+  back.querySelector('#auTo').onchange=renderAudit;
   back.querySelector('#auAskAi').onclick=()=>{
-    const ym=back.querySelector('#auMonth').value;
-    const data=computeAudit(ym);
+    const from=back.querySelector('#auFrom').value;
+    const to=back.querySelector('#auTo').value;
+    const data=computeAudit(from,to);
     back.remove();
-    setTimeout(()=>{$('#btnAiAsk').click();setTimeout(()=>{const q=document.querySelector('#aiQ');if(q){const susp=data.filter(x=>x.suspicious).map(x=>x.display).slice(0,10).join(', ');q.value=`Analiza los clientes repetidos del mes ${ym}. Los sospechosos son: ${susp||'(ninguno marcado, pero revisa todos)'}. Total clientes repetidos: ${data.length}. Busca posibles devoluciones olvidadas de tasa DGT que hayan quedado sin apuntar en Debe/Haber.`}},200)},100);
+    setTimeout(()=>{$('#btnAiAsk').click();setTimeout(()=>{const q=document.querySelector('#aiQ');if(q){const susp=data.filter(x=>x.suspicious).map(x=>x.display).slice(0,10).join(', ');q.value=`Analiza los clientes repetidos entre ${from} y ${to}. Los sospechosos son: ${susp||'(ninguno marcado, pero revisa todos)'}. Total clientes repetidos: ${data.length}. Busca posibles devoluciones olvidadas de tasa DGT que hayan quedado sin apuntar en Debe/Haber.`}},200)},100);
   };
   renderAudit();
 };
@@ -431,12 +458,12 @@ $('#btnAiAsk').onclick=()=>{
     ansEl.style.display='block';ansEl.textContent='Consultando al asesor IA...';
     try{
       const allData={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}')};
-      // Compute audit summary for current month (only Tráfico has tasas)
-      const ymAudit=currentDate.slice(0,7);
+      // Compute audit summary for last 12 months (only Tráfico has tasas)
+      const dTo=isoToday();const dt=new Date();dt.setMonth(dt.getMonth()-12);const dFrom=dt.toISOString().slice(0,10);
       const prevCompany=currentCompany;
       const savedState=state;
       let auditSummary=null;
-      try{currentCompany='trafic';state=JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}');const au=computeAudit(ymAudit);auditSummary={month:ymAudit,totalRepeated:au.length,suspiciousCount:au.filter(x=>x.suspicious).length,clients:au.slice(0,30).map(c=>({name:c.display,fichas:c.entries.length,suspicious:c.suspicious,totalImp:c.totalImp,totalTasa:c.totalTasa,dhSum:c.dhSum,dates:c.entries.map(x=>x.date),entries:c.entries.map(({date,e})=>({date,kind:e.kind,tipo:e.tipo,importe:e.importe,tasa:e.tasa,fp:e.fp}))}))}}catch(er){}
+      try{currentCompany='trafic';state=JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}');const au=computeAudit(dFrom,dTo);auditSummary={from:dFrom,to:dTo,totalRepeated:au.length,suspiciousCount:au.filter(x=>x.suspicious).length,clients:au.slice(0,30).map(c=>({name:c.display,fichas:c.entries.length,suspicious:c.suspicious,totalImp:c.totalImp,totalTasa:c.totalTasa,dhSum:c.dhSum,daySpan:c.daySpan,dates:c.entries.map(x=>x.date),entries:c.entries.map(({date,e})=>({date,kind:e.kind,tipo:e.tipo,importe:e.importe,tasa:e.tasa,fp:e.fp}))}))}}catch(er){}
       currentCompany=prevCompany;state=savedState;
       const res=await fetch(AI_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,data:allData,company:currentCompany==='cempla'?'cempla':'cbTrafic',diff,userGeminiKey:userKey,auditSummary})});
       const j=await res.json();
