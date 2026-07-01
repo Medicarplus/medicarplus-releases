@@ -118,7 +118,7 @@
     <span class="pill" id="saldoAnt">Saldo anterior: 0,00 €</span>
     <button class="btn btn-primary" id="btnImport">📥 Importar CSV / Excel</button>
     <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,.xls" style="display:none" />
-    <button class="btn btn-success" id="btnExport" title="Guarda todos los datos en un archivo">💾 Guardar copia</button>
+    <button class="btn btn-success" id="btnExport" title="Guardar copia · el primer clic te pide dónde, después guarda ahí directamente (Shift+Click = cambiar carpeta)">💾 Guardar copia</button>
     <button class="btn" id="btnImportJson" title="Restaurar datos desde copia guardada">📂 Restaurar copia</button>
     <input type="file" id="jsonInput" accept=".json" style="display:none" />
     <button class="btn" id="btnDownloadApp" title="Descargar este programa como archivo .html">⬇️ Descargar app</button>
@@ -353,7 +353,41 @@ function confirmModal(title,message,onYes,yesLabel='Sí, borrar',danger=true,ext
 $('#btnClearDay').onclick=()=>{if(!entriesOf(currentDate).length){toast('No hay entradas que vaciar');return}const cnt=entriesOf(currentDate).length;confirmModal('🗑️ Vaciar día',`Se borrarán las <b>${cnt} entrada(s)</b> del día <b>${currentDate.split('-').reverse().join('/')}</b>. Esta acción no se puede deshacer.`,()=>{delete state.byDate[currentDate];saveState();render();toast('Día vaciado ✅')},'Sí, vaciar día')};
 $('#btnPrint').onclick=()=>window.print();
 $('#btnDownloadApp').onclick=async()=>{try{const res=await fetch(location.pathname.endsWith('.html')?location.pathname:'/caja_del_dia.html',{cache:'no-store'});const html=await res.text();const blob=new Blob([html],{type:'text/html;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='caja_del_dia.html';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('Descargando caja_del_dia.html ✅')}catch(e){toast('Error: '+e.message)}};
-$('#btnExport').onclick=()=>{const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),_v:3};const blob=new Blob([JSON.stringify(all,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`COPIA-TOTAL-${isoToday()}.json`;a.click();toast('💾 Copia completa guardada (les dues empreses + datàfon)')};
+// ============ SAVE HANDLE (File System Access API) ============
+async function _idb(op){return new Promise((res)=>{const r=indexedDB.open('caja-io',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{const tx=r.result.transaction('kv',op.mode);const s=tx.objectStore('kv');const req=op.fn(s);req.onsuccess=()=>res(req.result);req.onerror=()=>res(null)};r.onerror=()=>res(null)})}
+async function getStoredHandle(){return _idb({mode:'readonly',fn:s=>s.get('backupHandle')})}
+async function saveStoredHandle(h){return _idb({mode:'readwrite',fn:s=>s.put(h,'backupHandle')})}
+async function clearStoredHandle(){return _idb({mode:'readwrite',fn:s=>s.delete('backupHandle')})}
+$('#btnExport').onclick=async ev=>{
+  const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),_v:3};
+  const contents=JSON.stringify(all,null,2);
+  const forceChoose=ev.shiftKey||ev.altKey;
+  if(window.showSaveFilePicker){
+    try{
+      let handle=forceChoose?null:await getStoredHandle();
+      if(handle){
+        let perm=await handle.queryPermission({mode:'readwrite'});
+        if(perm!=='granted'){perm=await handle.requestPermission({mode:'readwrite'})}
+        if(perm!=='granted')handle=null;
+      }
+      if(!handle){
+        handle=await window.showSaveFilePicker({suggestedName:`COPIA-CAJA-${isoToday()}.json`,types:[{description:'Còpia de seguretat',accept:{'application/json':['.json']}}]});
+        await saveStoredHandle(handle);
+      }
+      const w=await handle.createWritable();
+      await w.write(contents);
+      await w.close();
+      toast(`💾 Guardado en ${handle.name} ✅`,2800);
+      return;
+    }catch(e){if(e.name==='AbortError')return}
+  }
+  // Fallback (Firefox/Safari o error)
+  const blob=new Blob([contents],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`COPIA-CAJA-${isoToday()}.json`;a.click();
+  toast('💾 Copia descargada (para elegir carpeta usa Chrome/Edge)',3500);
+};
+// Mostrar tooltip con destino actual
+(async()=>{const h=await getStoredHandle();if(h)$('#btnExport').title=`Guardar en ${h.name} · Shift+Click para cambiar carpeta`})();
 function renderCemplaSplit(){if(currentCompany!=='cempla')return;const ym=currentDate.slice(0,7);let bru=0,cem=0,mel=0,tot=0,n=0;Object.entries(state.byDate).forEach(([d,arr])=>{if(!d.startsWith(ym))return;arr.forEach(e=>{if(e.retorno||e.kind==='DH')return;const imp=(e.importe||0)-(e.descuento||0);tot+=imp;n++;const sp=(e.split||'45-45-10').split('-').map(Number);bru+=imp*sp[0]/100;cem+=imp*sp[1]/100;mel+=imp*sp[2]/100})});const mes=['Gener','Febrer','Març','Abril','Maig','Juny','Juliol','Agost','Setembre','Octubre','Novembre','Desembre'][parseInt(ym.slice(5,7))-1];$('#cemplaSplitBox').innerHTML=`<div class="small" style="margin-bottom:8px">INGRESSOS ${mes.toUpperCase()} ${ym.slice(0,4)} · ${n} revisions</div><table style="width:100%"><tbody><tr><td>Total IMPORT</td><td class="num"><b>${fmt(tot)}</b></td></tr><tr><td>F.Brugulat (45%)</td><td class="num" style="color:#5aa9ff"><b>${fmt(bru)}</b></td></tr><tr><td>Cempla (45%)</td><td class="num" style="color:#7ee3aa"><b>${fmt(cem)}</b></td></tr><tr><td>Dr.Mellado (10%)</td><td class="num" style="color:#ffd58a"><b>${fmt(mel)}</b></td></tr><tr style="border-top:1px solid #2a3040"><td style="padding-top:8px"><b>PER CEMPLA-SPORT</b></td><td class="num" style="color:#5aa9ff;font-size:16px"><b>${fmt(cem)}</b></td></tr></tbody></table>`}
 const _origRender=render;render=function(){_origRender();renderCemplaSplit()};
 applyCompanyUI();setDate(currentDate);
