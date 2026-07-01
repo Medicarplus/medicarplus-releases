@@ -124,6 +124,7 @@
     <button class="btn" id="btnImportJson" title="Restaurar datos desde copia guardada">📂 Restaurar copia</button>
     <input type="file" id="jsonInput" accept=".json" style="display:none" />
     <button class="btn" id="btnHistory" title="Ver copias automáticas locales (últimas 5) y restaurar" style="background:#1f3a2e;border-color:#2a5e44;color:#bff0d6;font-weight:600">🛡️ Historial</button>
+    <button class="btn" id="btnLedger" title="Ver Llibre Diari (Debe/Haber contable)" style="background:#2a1f3a;border-color:#5e2a5e;color:#e0bff0;font-weight:600">📖 Llibreta</button>
     <span id="autosaveBadge" style="display:none;padding:5px 10px;border-radius:6px;background:#1f3a2e;color:#7ee3aa;font-size:11px;font-family:'Consolas',monospace;letter-spacing:.3px;border:1px solid #2a5e44"></span>
     <button class="btn traffic-only" id="btnAudit" title="Detectar clientes que aparecen en varios días del mes (posibles descuadres de tasa)" style="background:linear-gradient(90deg,#ea580c 0%,#f97316 100%);color:#fff;border-color:transparent;font-weight:700">🔎 Auditoría</button>
     <button class="btn" id="btnAiAsk" title="Pregunta al asesor IA sobre descuadres de caja" style="background:linear-gradient(90deg,#7c3aed 0%,#a855f7 100%);color:#fff;border-color:transparent;font-weight:700">🤖 Asesor IA</button>
@@ -602,6 +603,95 @@ function renderHistory(){const dates=Object.keys(state.byDate).filter(d=>entries
 function actEntry(act,id){const list=entriesOf(currentDate);const i=list.findIndex(x=>x.id===id);if(i<0)return;if(act==='del'){confirmModal('Eliminar entrada',`¿Eliminar <b>${escapeHtml(list[i].nombre)}</b>?`,()=>{list.splice(i,1);saveState();render()},'Eliminar');return}if(act==='ret'){list[i].retorno=!list[i].retorno;saveState();render();return}if(act==='edit'){const e=list[i];const isDh=e.kind==='DH';const nN=prompt(isDh?'Concepto:':'Nombre / concepto:',e.nombre);if(nN===null)return;const nI=prompt('Importe (€):',e.importe);if(nI===null)return;const nT=isDh?'0':prompt('Tasa DGT (€):',e.tasa);if(nT===null)return;const nF=prompt('Forma de pago (E/T/B/X):',e.fp)||e.fp;e.nombre=nN.trim()||e.nombre;e.importe=num(nI);e.tasa=num(nT);e.fp=nF.toUpperCase()[0];e.fpTasa=e.fp;saveState();render()}}
 function confirmModal(title,message,onYes,yesLabel='Sí, borrar',danger=true,extraBtn=null){const back=document.createElement('div');back.className='modal-back';let extraHTML=extraBtn?`<button class="btn btn-primary" data-extra>${extraBtn.label}</button>`:'';back.innerHTML=`<div class="modal"><h3>${title}</h3><p>${message}</p><div class="row"><button class="btn" data-no>Cancelar</button>${extraHTML}<button class="btn ${danger?'btn-danger':'btn-primary'}" data-yes>${yesLabel}</button></div></div>`;document.body.appendChild(back);back.querySelector('[data-no]').focus();back.addEventListener('click',ev=>{if(ev.target===back)back.remove();if(ev.target.matches('[data-no]'))back.remove();if(ev.target.matches('[data-yes]')){back.remove();onYes()}if(ev.target.matches('[data-extra]')&&extraBtn){back.remove();extraBtn.onClick()}});document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){back.remove();document.removeEventListener('keydown',esc)}})}
 $('#btnHistory').onclick=()=>openBackupHistory();
+$('#btnLedger').onclick=()=>openLedger();
+
+// ============ LLIBRETA (LIBRO DIARIO CONTABLE) ============
+function generateLedgerEntries(dateFrom,dateTo){
+  const rows=[];
+  const src=state.byDate||{};
+  const fpToAccount={'E':'570 Caixa','T':'572 Banc BBVA','B':'572 Banc BBVA (Bizum)','X':'572 Banc BBVA (Transf)'};
+  const isCempla=currentCompany==='cempla';
+  Object.entries(src).sort(([a],[b])=>a.localeCompare(b)).forEach(([date,arr])=>{
+    if(date<dateFrom||date>dateTo)return;
+    arr.forEach(e=>{
+      if(e.retorno)return;
+      const acct=fpToAccount[e.fp]||'570 Caixa';
+      const acctT=fpToAccount[e.fpTasa||e.fp]||acct;
+      if(e.kind==='DH'){
+        if(e.tipo==='HABER'){
+          // Ingreso: HABER=Ingressos, DEBE=Caixa/Banc
+          rows.push({date,concepto:e.nombre||'Ingrés',debeAcct:acct,debeAmt:e.importe,haberAcct:'705 Ingressos serveis',haberAmt:e.importe});
+        }else{
+          // Gasto: DEBE=Gastos, HABER=Caixa/Banc
+          rows.push({date,concepto:e.nombre||'Gasto',debeAcct:'629 Despeses',debeAmt:e.importe,haberAcct:acct,haberAmt:e.importe});
+        }
+      }else{
+        // TRAF/PRIV: Cobro por servicio
+        const importeNeto=e.importe-(e.descuento||0);
+        if(importeNeto>0){
+          rows.push({date,concepto:`${e.tipo||'Servei'} - ${e.nombre||''}`,debeAcct:acct,debeAmt:importeNeto,haberAcct:isCempla?'705 Ingressos serveis mèdics':'705 Ingressos serveis',haberAmt:importeNeto});
+        }
+        if(e.tasa>0){
+          rows.push({date,concepto:`Tasa DGT - ${e.nombre||''}`,debeAcct:acctT,debeAmt:e.tasa,haberAcct:'475 Tasa DGT',haberAmt:e.tasa});
+        }
+      }
+    });
+  });
+  return rows;
+}
+function openLedger(){
+  const isC=currentCompany==='cempla';
+  const dTo=isoToday();const dt=new Date();dt.setMonth(dt.getMonth()-1);const dFrom=dt.toISOString().slice(0,10);
+  const back=document.createElement('div');back.className='modal-back';
+  back.innerHTML=`<div class="modal" style="max-width:1200px;width:97%;max-height:92vh;display:flex;flex-direction:column;padding:16px">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <h3 style="margin:0;color:#e0bff0">📖 Llibreta Diari · ${isC?'CEMPLA ESPORT':'CEMPLA C.B'}</h3>
+      <label class="small" style="margin:0 0 0 12px">DESDE:</label>
+      <input type="date" id="ldFrom" value="${dFrom}" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px" />
+      <label class="small" style="margin:0">HASTA:</label>
+      <input type="date" id="ldTo" value="${dTo}" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px" />
+      <button class="btn" id="ldReload">🔄</button>
+      <div style="display:flex;gap:4px">
+        <button class="btn" data-p="7d" style="padding:6px 10px;font-size:11px">7 dies</button>
+        <button class="btn" data-p="1m" style="padding:6px 10px;font-size:11px">1 mes</button>
+        <button class="btn" data-p="3m" style="padding:6px 10px;font-size:11px">3 mesos</button>
+        <button class="btn" data-p="1y" style="padding:6px 10px;font-size:11px">1 any</button>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" id="ldPrint">🖨️ Imprimir</button>
+      <button class="btn" data-no>✕ Tancar</button>
+    </div>
+    <div id="ldBody" style="flex:1;overflow:auto;font-family:'Consolas','Menlo',monospace"></div>
+    <div class="small" style="margin-top:8px;color:var(--muted)">💡 Cada operació genera un assentament amb DEBE i HABER equilibrats. La suma total del DEBE ha de ser igual a la suma total del HABER.</div>
+  </div>`;
+  document.body.appendChild(back);
+  back.querySelector('[data-no]').onclick=()=>back.remove();
+  back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
+  const renderLedger=()=>{
+    const from=back.querySelector('#ldFrom').value;
+    const to=back.querySelector('#ldTo').value;
+    const rows=generateLedgerEntries(from,to);
+    const body=back.querySelector('#ldBody');
+    if(!rows.length){body.innerHTML='<div class="empty" style="padding:40px">No hi ha moviments en aquest rang.</div>';return}
+    let totD=0,totH=0;
+    const trs=rows.map(r=>{totD+=r.debeAmt;totH+=r.haberAmt;return `<tr style="border-bottom:1px solid #262b36"><td style="padding:6px 8px;font-size:11px">${r.date.split('-').reverse().join('/')}</td><td style="padding:6px 8px;font-size:12px">${escapeHtml(r.concepto)}</td><td style="padding:6px 8px;font-size:11px;color:#ff96a0">${r.debeAcct}</td><td style="padding:6px 8px;text-align:right;color:#ff96a0;font-weight:600">${fmt(r.debeAmt)}</td><td style="padding:6px 8px;font-size:11px;color:#7ee3aa">${r.haberAcct}</td><td style="padding:6px 8px;text-align:right;color:#7ee3aa;font-weight:600">${fmt(r.haberAmt)}</td></tr>`}).join('');
+    const cuadra=Math.abs(totD-totH)<0.01;
+    body.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px"><thead style="background:#1a1e26;position:sticky;top:0"><tr><th style="padding:8px;text-align:left">Data</th><th style="padding:8px;text-align:left">Concepte</th><th style="padding:8px;text-align:left;color:#ff96a0">Compte DEBE</th><th style="padding:8px;text-align:right;color:#ff96a0">Import DEBE</th><th style="padding:8px;text-align:left;color:#7ee3aa">Compte HABER</th><th style="padding:8px;text-align:right;color:#7ee3aa">Import HABER</th></tr></thead><tbody>${trs}</tbody><tfoot style="background:#1f2530;position:sticky;bottom:0"><tr><td colspan="3" style="padding:10px 8px;font-weight:700;text-align:right">TOTAL (${rows.length} assentaments)</td><td style="padding:10px 8px;text-align:right;font-weight:700;color:#ff96a0;font-size:14px">${fmt(totD)}</td><td style="padding:10px 8px;text-align:right;font-weight:700;color:${cuadra?'#7ee3aa':'#ff96a0'}">${cuadra?'✓ QUADRA':'⚠ NO CUADRA'}</td><td style="padding:10px 8px;text-align:right;font-weight:700;color:#7ee3aa;font-size:14px">${fmt(totH)}</td></tr></tfoot></table>`;
+  };
+  const applyPreset=p=>{const t=isoToday();const dt=new Date();const map={'7d':0.25,'1m':1,'3m':3,'1y':12};if(p==='7d')dt.setDate(dt.getDate()-7);else dt.setMonth(dt.getMonth()-map[p]);back.querySelector('#ldFrom').value=dt.toISOString().slice(0,10);back.querySelector('#ldTo').value=t;renderLedger()};
+  back.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>applyPreset(b.dataset.p));
+  back.querySelector('#ldReload').onclick=renderLedger;
+  back.querySelector('#ldFrom').onchange=renderLedger;
+  back.querySelector('#ldTo').onchange=renderLedger;
+  back.querySelector('#ldPrint').onclick=()=>{
+    const from=back.querySelector('#ldFrom').value;const to=back.querySelector('#ldTo').value;
+    const rows=generateLedgerEntries(from,to);let totD=0,totH=0;
+    const trs=rows.map(r=>{totD+=r.debeAmt;totH+=r.haberAmt;return `<tr><td>${r.date.split('-').reverse().join('/')}</td><td>${r.concepto}</td><td>${r.debeAcct}</td><td style="text-align:right">${fmt(r.debeAmt)}</td><td>${r.haberAcct}</td><td style="text-align:right">${fmt(r.haberAmt)}</td></tr>`}).join('');
+    const w=window.open('','_blank');
+    w.document.write(`<html><head><title>Llibreta Diari</title><style>body{font-family:Arial;padding:15mm;color:#000;font-size:11px}h1{text-align:center}table{width:100%;border-collapse:collapse}th,td{border:1px solid #333;padding:4px 6px}th{background:#333;color:#fff;font-size:10px}tfoot td{background:#eee;font-weight:700}@media print{body{padding:10mm}}</style></head><body><h1>LLIBRETA DIARI · ${isC?'CEMPLA ESPORT':'CEMPLA C.B'}</h1><p style="text-align:center">${from} → ${to}</p><table><thead><tr><th>Data</th><th>Concepte</th><th>Compte DEBE</th><th>DEBE</th><th>Compte HABER</th><th>HABER</th></tr></thead><tbody>${trs}</tbody><tfoot><tr><td colspan="3">TOTAL ${rows.length} assentaments</td><td style="text-align:right">${fmt(totD)}</td><td></td><td style="text-align:right">${fmt(totH)}</td></tr></tfoot></table><script>setTimeout(()=>window.print(),500)<\/script></body></html>`);
+  };
+  renderLedger();
+}
 $('#btnClearDay').onclick=()=>{if(!entriesOf(currentDate).length){toast('No hay entradas que vaciar');return}const cnt=entriesOf(currentDate).length;confirmModal('🗑️ Vaciar día',`Se borrarán las <b>${cnt} entrada(s)</b> del día <b>${currentDate.split('-').reverse().join('/')}</b>.<br><br>✅ Se guardará una copia de seguridad automática antes de borrar.`,()=>{pushSnapshot('preClear');delete state.byDate[currentDate];saveState();render();toast('Día vaciado ✅ (copia de seguridad guardada en 🛡️ Historial)',3500)},'Sí, vaciar día')};
 $('#btnPrint').onclick=()=>window.print();
 $('#btnDownloadApp').onclick=async()=>{try{const res=await fetch(location.pathname.endsWith('.html')?location.pathname:'/caja_del_dia.html',{cache:'no-store'});const html=await res.text();const blob=new Blob([html],{type:'text/html;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='caja_del_dia.html';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('Descargando caja_del_dia.html ✅')}catch(e){toast('Error: '+e.message)}};
