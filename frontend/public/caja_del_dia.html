@@ -225,7 +225,7 @@
         </div>
       </div>
       <div class="panel">
-        <h2 data-i18n="entries_of_day">Entradas del día <span><button class="btn btn-danger no-print" id="btnClearDay" data-i18n="clear_day">🗑️ Vaciar día</button></span></h2>
+        <h2><span data-i18n="entries_of_day">Entradas del día</span> <span><button class="btn btn-danger no-print" id="btnClearDay" data-i18n="clear_day">🗑️ Vaciar día</button></span></h2>
         <div style="max-height:62vh;overflow:auto">
           <table id="tbl"><thead><tr><th>#</th><th data-i18n="type">Tipo</th><th data-i18n="group">Grupo</th><th data-i18n="name_concept">Nombre / Concepto</th><th class="num" data-i18n="amount_short">Importe</th><th class="num" data-i18n="disc">Dto</th><th class="num" data-i18n="fee_short">Tasa</th><th>FP</th><th data-i18n="fp_fee">FP Tasa</th><th class="num act" data-i18n="actions">Acciones</th></tr></thead><tbody id="tbody"></tbody></table>
           <div class="empty" id="empty" data-i18n="empty_entries">No hay entradas. Importa CSV/Excel o añade manualmente arriba.</div>
@@ -250,7 +250,7 @@ const I18N={
 };
 let currentLang=localStorage.getItem('caja.lang')||'ca';
 function t(key){return (I18N[currentLang]||I18N.ca)[key]||key}
-function applyLang(){document.documentElement.lang=currentLang;const dict=I18N[currentLang]||I18N.ca;$$('[data-i18n]').forEach(el=>{const k=el.getAttribute('data-i18n');if(dict[k]!==undefined)el.textContent=dict[k]});$$('[data-i18n-ph]').forEach(el=>{const k=el.getAttribute('data-i18n-ph');if(dict[k]!==undefined)el.placeholder=dict[k]});const lbl=$('#langLabel');if(lbl)lbl.textContent=currentLang.toUpperCase()}
+function applyLang(){document.documentElement.lang=currentLang;const dict=I18N[currentLang]||I18N.ca;$$('[data-i18n]').forEach(el=>{const k=el.getAttribute('data-i18n');if(dict[k]!==undefined&&el.children.length===0)el.textContent=dict[k]});$$('[data-i18n-ph]').forEach(el=>{const k=el.getAttribute('data-i18n-ph');if(dict[k]!==undefined)el.placeholder=dict[k]});const lbl=$('#langLabel');if(lbl)lbl.textContent=currentLang.toUpperCase()}
 function toggleLang(){currentLang=currentLang==='ca'?'es':'ca';localStorage.setItem('caja.lang',currentLang);applyLang();if(typeof render==='function')render()}
 let currentCompany=localStorage.getItem('caja.company')||'trafic';
 const KEYS={trafic:'caja.v1',cempla:'caja.cempla.v1'};
