@@ -886,16 +886,29 @@ function openLedger(){
   back.querySelector('#ldReload').onclick=renderLedger;
   back.querySelector('#ldFrom').onchange=renderLedger;
   back.querySelector('#ldTo').onchange=renderLedger;
-  // Fletxes de navegació per dia: si DES DE == FINS, mou el mateix dia; si és un rang, mou tot el rang N dies.
+  // Fletxes de navegació per dia: sempre col·lapsen a un sol dia (mode diari) i mou +/- 1 dia.
+  // Ancora sobre el FINS actual (o el DES DE si FINS està buit).
   const shiftDays=(delta)=>{
     const f=back.querySelector('#ldFrom'),t=back.querySelector('#ldTo');
-    const df=new Date(f.value+'T00:00:00'),dt=new Date(t.value+'T00:00:00');
-    df.setDate(df.getDate()+delta);dt.setDate(dt.getDate()+delta);
-    f.value=df.toISOString().slice(0,10);t.value=dt.toISOString().slice(0,10);
+    const anchor=t.value||f.value||isoToday();
+    const d=new Date(anchor+'T00:00:00');
+    d.setDate(d.getDate()+delta);
+    const iso=d.toISOString().slice(0,10);
+    f.value=iso;t.value=iso;
     renderLedger();
   };
   back.querySelector('#ldPrev').onclick=()=>shiftDays(-1);
   back.querySelector('#ldNext').onclick=()=>shiftDays(1);
+  // Fletxes del teclat també naveguen dia a dia (evitant conflicte amb els inputs de data).
+  const kbNav=(e)=>{
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag==='input'||tag==='textarea'||tag==='select')return;
+    if(e.key==='ArrowLeft'){e.preventDefault();shiftDays(-1)}
+    else if(e.key==='ArrowRight'){e.preventDefault();shiftDays(1)}
+  };
+  document.addEventListener('keydown',kbNav);
+  const origRemove=back.remove.bind(back);
+  back.remove=()=>{document.removeEventListener('keydown',kbNav);origRemove()};
   back.querySelector('#ldPrint').onclick=()=>{
     const from=back.querySelector('#ldFrom').value;const to=back.querySelector('#ldTo').value;
     const rows=generateLedgerEntries(from,to,ledgerComp);let totD=0,totH=0;
