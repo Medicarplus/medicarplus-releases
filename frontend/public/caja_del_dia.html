@@ -592,11 +592,13 @@ function getDatafono(date){try{return (JSON.parse(localStorage.getItem('caja.dat
 function setDatafono(date,amount){const all=JSON.parse(localStorage.getItem('caja.datafono')||'{}');if(amount>0)all[date]=amount;else delete all[date];localStorage.setItem('caja.datafono',JSON.stringify(all));pushSnapshot('auto');scheduleFileAutoSave()}
 function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(currentDate);const isC=currentCompany==='cempla';const totalCertTasas=t.bruto-t.dto+t.tasas;
   const df=getDatafono(currentDate);
-  // Efectivo pot ser negatiu si s'ha gastat més cash del cobrat (DEBE E > HABER E). El datàfono trasllada cash a banc.
-  const efShown=(t.byFp.E||0)-df;
-  const trShown=(t.byFp.T||0)+df;
-  const efShownCB=((t.byFp.E||0)+(t.tasasByFp.E||0))-df;
-  const trShownCB=((t.byFp.T||0)+(t.tasasByFp.T||0))+df;
+  // Manual "datàfono" a la fila Tarjeta:
+  //  - Si l'usuari escriu un valor > 0, SUBSTITUEIX el càlcul automàtic (només val el manual)
+  //  - Si el deixa buit (0), es calcula automàticament (suma de Tarjeta)
+  const efShown=(t.byFp.E||0);
+  const trShown=df>0?df:(t.byFp.T||0);
+  const efShownCB=(t.byFp.E||0)+(t.tasasByFp.E||0);
+  const trShownCB=df>0?df:((t.byFp.T||0)+(t.tasasByFp.T||0));
   // HABER TOTAL = tots els ingressos (serveis + entrades HABER manuals)
   // DEBE TOTAL = totes les sortides (només entrades DEBE manuals)
   const haberTotalC=t.bruto+t.haber;
