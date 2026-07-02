@@ -920,9 +920,24 @@ function openLedger(){
 }
 
 // ============ IRPF (RETENCIONS TRIMESTRALS A HISENDA) ============
-// Estructura localStorage: `caja.irpf.v1` = { months:{ 'YYYY-MM':{ totalCertificats, totalCertfBombers, entries:[{nom,cert,brut,ss,netSS}] } }, quarters:{ 'YYYY-Qn':{ paid, paidDate, paidAmount } } }
-function loadIrpf(){try{return JSON.parse(localStorage.getItem('caja.irpf.v1')||'{"months":{},"quarters":{}}')}catch(e){return {months:{},quarters:{}}}}
+// Estructura localStorage: `caja.irpf.v1` = { trafic:{months,quarters}, cempla:{months,quarters} }
+// Cada empresa té les seves persones per defecte i el seu registre independent.
+const IRPF_DEFAULTS={
+  trafic:['JOSEP BRUGULAT','JOSEP Mª RAFART'],
+  cempla:['JOSEP BRUGULAT','JOSE ANT. MELLADO']
+};
+function loadIrpf(){
+  try{
+    const raw=JSON.parse(localStorage.getItem('caja.irpf.v1')||'{}');
+    // Migració v1 antic (sense empresa) → posar-ho tot sota trafic
+    if(raw.months&&!raw.trafic&&!raw.cempla){
+      return {trafic:{months:raw.months||{},quarters:raw.quarters||{}},cempla:{months:{},quarters:{}}};
+    }
+    return {trafic:raw.trafic||{months:{},quarters:{}},cempla:raw.cempla||{months:{},quarters:{}}};
+  }catch(e){return {trafic:{months:{},quarters:{}},cempla:{months:{},quarters:{}}}}
+}
 function saveIrpf(o){localStorage.setItem('caja.irpf.v1',JSON.stringify(o));pushSnapshot('auto');scheduleFileAutoSave()}
+function seedIrpfMonth(comp){return {totalCertificats:0,totalCertfBombers:0,entries:IRPF_DEFAULTS[comp].map(n=>({nom:n,cert:0,brut:0,ss:0,netSS:0}))}}
 function irpfCalc(e){
   const brut=Number(e.brut)||0,ss=Number(e.ss)||0;
   const hasSs=ss>0;
@@ -939,10 +954,18 @@ function openIRPF(){
   const back=document.createElement('div');back.className='modal-back';
   const now=new Date();
   let currentMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  let irpfComp=currentCompany==='cempla'?'cempla':'trafic';
+  const compName=(c)=>c==='cempla'?'CEMPLA ESPORT':'CEMPLA C.B';
+  const compColor=(c)=>c==='cempla'?'#1e5aa8':'#166534';
+  const compBg=(c)=>c==='cempla'?'#dbeafe':'#dcfce7';
   const monthLabel=ym=>{const [y,m]=ym.split('-');const names=['gen','feb','març','abr','maig','juny','jul','ago','set','oct','nov','des'];return `${names[parseInt(m)-1]}-${y.slice(2)}`};
   back.innerHTML=`<div class="modal" style="max-width:1400px;width:98%;max-height:96vh;display:flex;flex-direction:column;padding:16px;background:#faf6e8;color:#1a1a1a">
-    <div style="padding:10px 14px;margin:-16px -16px 12px -16px;border-radius:12px 12px 0 0;background:#fef3c7;border-bottom:3px solid #b45309;display:flex;align-items:center;gap:14px">
-      <h3 style="margin:0;color:#78350f;font-family:Georgia,serif;flex:1">📋 IRPF · Retencions trimestrals</h3>
+    <div id="irpfTitleBar" style="padding:10px 14px;margin:-16px -16px 12px -16px;border-radius:12px 12px 0 0;background:${compBg(irpfComp)};border-bottom:3px solid ${compColor(irpfComp)};display:flex;align-items:center;gap:14px">
+      <h3 style="margin:0;color:${compColor(irpfComp)};font-family:Georgia,serif;flex:1">📋 IRPF · Retencions trimestrals · <span id="irpfCompName">${compName(irpfComp)}</span></h3>
+      <div style="display:flex;gap:6px;background:#fff;padding:4px;border-radius:8px;border:1px solid #999">
+        <button class="btn" data-icomp="trafic" style="padding:6px 14px;font-size:12px;font-weight:700;border:none;border-radius:6px">CEMPLA C.B</button>
+        <button class="btn" data-icomp="cempla" style="padding:6px 14px;font-size:12px;font-weight:700;border:none;border-radius:6px">CEMPLA ESPORT</button>
+      </div>
       <button class="btn" data-no style="background:#b45309;color:#fff;border-color:#78350f">✕ Tancar</button>
     </div>
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;padding-bottom:10px;border-bottom:2px solid #b45309">
@@ -959,24 +982,41 @@ function openIRPF(){
   back.querySelector('[data-no]').onclick=()=>back.remove();
   back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
 
+  const updateCompUI=()=>{
+    const bar=back.querySelector('#irpfTitleBar');
+    bar.style.background=compBg(irpfComp);
+    bar.style.borderBottomColor=compColor(irpfComp);
+    bar.querySelector('h3').style.color=compColor(irpfComp);
+    back.querySelector('#irpfCompName').textContent=compName(irpfComp);
+    back.querySelectorAll('[data-icomp]').forEach(b=>{
+      const active=b.dataset.icomp===irpfComp;
+      const color=b.dataset.icomp==='cempla'?'#1e5aa8':'#166534';
+      b.style.background=active?color:'transparent';
+      b.style.color=active?'#fff':color;
+    });
+  };
+  back.querySelectorAll('[data-icomp]').forEach(b=>b.onclick=()=>{irpfComp=b.dataset.icomp;updateCompUI();render()});
+
   const render=()=>{
     const data=loadIrpf();
+    const cd=data[irpfComp]||(data[irpfComp]={months:{},quarters:{}});
     const m=back.querySelector('#irpfMonth').value;
     currentMonth=m;
-    if(!data.months[m])data.months[m]={totalCertificats:0,totalCertfBombers:0,entries:[]};
-    const md=data.months[m];
+    // Seed automàtic: si el mes no existeix, precarreguem les persones per defecte de l'empresa activa.
+    if(!cd.months[m]){cd.months[m]=seedIrpfMonth(irpfComp);saveIrpf(data)}
+    const md=cd.months[m];
     // Total IRPF acumulat del trimestre (només mesos no ingressats)
     const q=quarterOf(m);
     const monthsQ=monthsOfQuarter(q);
     let pendentIRPF=0,pendentBrut=0;const perMonth=[];
     monthsQ.forEach(ym=>{
-      const md2=data.months[ym];if(!md2)return;
+      const md2=cd.months[ym];if(!md2)return;
       const irpfMonth=(md2.entries||[]).reduce((a,e)=>a+irpfCalc(e).irpf,0);
       const brutMonth=(md2.entries||[]).reduce((a,e)=>a+(Number(e.brut)||0),0);
       perMonth.push({ym,irpf:irpfMonth,brut:brutMonth,entries:(md2.entries||[]).length});
       pendentIRPF+=irpfMonth;pendentBrut+=brutMonth;
     });
-    const qData=data.quarters[q]||{paid:false};
+    const qData=cd.quarters[q]||{paid:false};
     if(qData.paid)pendentIRPF=0;
     // Sobre IRPF: retirades manuals d'efectiu del calaix que l'usuari va guardant en un sobre
     // per pagar Hisenda al final del trimestre. NO afecta la comptabilitat de C.B ni Esport,
@@ -1067,40 +1107,40 @@ function openIRPF(){
         </table>
         ${!qData.paid?`<div style="margin-top:12px;padding:10px;background:${diff>=0?'#dcfce7':'#fef2f2'};border-left:4px solid ${diff>=0?'#166534':'#b91c1c'};border-radius:4px;font-family:Georgia,serif"><b style="color:${diff>=0?'#166534':'#b91c1c'}">${diff>=0?'✓ Ja tens prou al sobre':'⚠ Encara falta al sobre'}</b> · Sobre: <b>${fmt(sobreTotal)}</b> · Pendent Hisenda: <b>${fmt(pendentIRPF)}</b> · Diferència: <b style="color:${diff>=0?'#166534':'#b91c1c'}">${diff>=0?'+':''}${fmt(diff)}</b></div>`:''}
       </div>`;
-    // Handlers
+    // Handlers — tots operen sobre l'empresa activa (irpfComp)
     back.querySelectorAll('input[data-i]').forEach(inp=>{
-      inp.oninput=()=>{const i=parseInt(inp.dataset.i),f=inp.dataset.f;const val=f==='nom'?inp.value:parseFloat(inp.value)||0;const d2=loadIrpf();if(!d2.months[m])d2.months[m]={totalCertificats:0,totalCertfBombers:0,entries:[]};d2.months[m].entries[i][f]=val;saveIrpf(d2)};
+      inp.oninput=()=>{const i=parseInt(inp.dataset.i),f=inp.dataset.f;const val=f==='nom'?inp.value:parseFloat(inp.value)||0;const d2=loadIrpf();if(!d2[irpfComp].months[m])d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);d2[irpfComp].months[m].entries[i][f]=val;saveIrpf(d2)};
       inp.onblur=()=>render();
     });
-    back.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const i=parseInt(b.dataset.del);const d2=loadIrpf();d2.months[m].entries.splice(i,1);saveIrpf(d2);render()});
-    back.querySelector('#irpfAdd').onclick=()=>{const d2=loadIrpf();if(!d2.months[m])d2.months[m]={totalCertificats:0,totalCertfBombers:0,entries:[]};d2.months[m].entries.push({nom:'',cert:0,brut:0,ss:0,netSS:0});saveIrpf(d2);render()};
-    back.querySelector('#irpfTC').oninput=(ev)=>{const d2=loadIrpf();if(!d2.months[m])d2.months[m]={totalCertificats:0,totalCertfBombers:0,entries:[]};d2.months[m].totalCertificats=parseFloat(ev.target.value)||0;saveIrpf(d2)};
-    back.querySelector('#irpfTCB').oninput=(ev)=>{const d2=loadIrpf();if(!d2.months[m])d2.months[m]={totalCertificats:0,totalCertfBombers:0,entries:[]};d2.months[m].totalCertfBombers=parseFloat(ev.target.value)||0;saveIrpf(d2)};
+    back.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const i=parseInt(b.dataset.del);const d2=loadIrpf();d2[irpfComp].months[m].entries.splice(i,1);saveIrpf(d2);render()});
+    back.querySelector('#irpfAdd').onclick=()=>{const d2=loadIrpf();if(!d2[irpfComp].months[m])d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);d2[irpfComp].months[m].entries.push({nom:'',cert:0,brut:0,ss:0,netSS:0});saveIrpf(d2);render()};
+    back.querySelector('#irpfTC').oninput=(ev)=>{const d2=loadIrpf();if(!d2[irpfComp].months[m])d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);d2[irpfComp].months[m].totalCertificats=parseFloat(ev.target.value)||0;saveIrpf(d2)};
+    back.querySelector('#irpfTCB').oninput=(ev)=>{const d2=loadIrpf();if(!d2[irpfComp].months[m])d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);d2[irpfComp].months[m].totalCertfBombers=parseFloat(ev.target.value)||0;saveIrpf(d2)};
     const payBtn=back.querySelector('#irpfPay');if(payBtn)payBtn.onclick=()=>{
-      confirmModal('Marcar '+q+' com a ingressat',`S'ha d'ingressar <b>${fmt(pendentIRPF)}€</b> a Hisenda pel trimestre <b>${q}</b>.<br><br>Confirmes que ja s'ha ingressat en metàl·lic al banc?`,()=>{
-        const d2=loadIrpf();d2.quarters[q]={paid:true,paidDate:isoToday(),paidAmount:pendentIRPF};saveIrpf(d2);
-        toast(`✓ ${q} marcat com a ingressat (${fmt(pendentIRPF)}€)`,3500);render();
+      confirmModal('Marcar '+q+' com a ingressat',`S'ha d'ingressar <b>${fmt(pendentIRPF)}€</b> a Hisenda pel trimestre <b>${q}</b> · <b>${compName(irpfComp)}</b>.<br><br>Confirmes que ja s'ha ingressat en metàl·lic al banc?`,()=>{
+        const d2=loadIrpf();const existing=d2[irpfComp].quarters[q]||{};d2[irpfComp].quarters[q]={...existing,paid:true,paidDate:isoToday(),paidAmount:pendentIRPF};saveIrpf(d2);
+        toast(`✓ ${q} · ${compName(irpfComp)} marcat com a ingressat (${fmt(pendentIRPF)}€)`,3500);render();
       },'Sí, confirmar ingrés',false);
     };
     const undoBtn=back.querySelector('#irpfUndo');if(undoBtn)undoBtn.onclick=()=>{
-      confirmModal('Revertir '+q,'Segur que vols revertir el pagament?',()=>{const d2=loadIrpf();delete d2.quarters[q].paid;delete d2.quarters[q].paidDate;delete d2.quarters[q].paidAmount;saveIrpf(d2);toast('Revertit',2500);render()},'Sí, revertir');
+      confirmModal('Revertir '+q,'Segur que vols revertir el pagament?',()=>{const d2=loadIrpf();if(d2[irpfComp].quarters[q]){delete d2[irpfComp].quarters[q].paid;delete d2[irpfComp].quarters[q].paidDate;delete d2[irpfComp].quarters[q].paidAmount}saveIrpf(d2);toast('Revertit',2500);render()},'Sí, revertir');
     };
-    // SOBRE IRPF: afegir/esborrar retirades manuals d'efectiu
+    // SOBRE IRPF: afegir/esborrar retirades manuals d'efectiu (per empresa i trimestre)
     const sobreAddBtn=back.querySelector('#sobreAdd');
     if(sobreAddBtn)sobreAddBtn.onclick=()=>{
       const date=back.querySelector('#sobreDate').value||isoToday();
       const amt=parseFloat(back.querySelector('#sobreAmt').value)||0;
       const note=back.querySelector('#sobreNote').value||'';
       if(amt<=0){toast('Import ha de ser > 0',2500);return}
-      const d2=loadIrpf();if(!d2.quarters[q])d2.quarters[q]={paid:false};if(!d2.quarters[q].sobre)d2.quarters[q].sobre=[];
-      d2.quarters[q].sobre.push({_id:Date.now()+'-'+Math.random().toString(36).slice(2,6),date,amount:amt,note});
-      saveIrpf(d2);toast(`✓ Afegit ${fmt(amt)} al sobre ${q}`,2500);render();
+      const d2=loadIrpf();if(!d2[irpfComp].quarters[q])d2[irpfComp].quarters[q]={paid:false};if(!d2[irpfComp].quarters[q].sobre)d2[irpfComp].quarters[q].sobre=[];
+      d2[irpfComp].quarters[q].sobre.push({_id:Date.now()+'-'+Math.random().toString(36).slice(2,6),date,amount:amt,note});
+      saveIrpf(d2);toast(`✓ Afegit ${fmt(amt)} al sobre ${q} · ${compName(irpfComp)}`,2500);render();
     };
     back.querySelectorAll('[data-sobredel]').forEach(b=>b.onclick=()=>{
       const id=b.dataset.sobredel;
       confirmModal('Esborrar retirada','Segur que vols esborrar aquesta retirada del sobre?',()=>{
-        const d2=loadIrpf();if(!d2.quarters[q]||!d2.quarters[q].sobre)return;
-        d2.quarters[q].sobre=d2.quarters[q].sobre.filter((w,i)=>String(w._id||i)!==String(id));
+        const d2=loadIrpf();if(!d2[irpfComp].quarters[q]||!d2[irpfComp].quarters[q].sobre)return;
+        d2[irpfComp].quarters[q].sobre=d2[irpfComp].quarters[q].sobre.filter((w,i)=>String(w._id||i)!==String(id));
         saveIrpf(d2);render();
       },'Sí, esborrar');
     });
@@ -1117,14 +1157,15 @@ function openIRPF(){
   back.querySelector('#irpfNext').addEventListener('click',(ev)=>{ev.preventDefault();ev.stopPropagation();shiftMonth(1)});
   back.querySelector('#irpfMonth').onchange=render;
   back.querySelector('#irpfPrint').onclick=()=>{
-    const data=loadIrpf();const md=data.months[currentMonth]||{entries:[]};
+    const data=loadIrpf();const md=data[irpfComp].months[currentMonth]||{entries:[]};
     const rows=(md.entries||[]).map(e=>{const c=irpfCalc(e);return `<tr><td><b>${escapeHtml(e.nom||'')}</b></td><td class="num">${e.cert||''}</td><td class="num">${fmt(Number(e.brut)||0)}</td><td class="num">${fmt(Number(e.ss)||0)}</td><td class="num">${c.hasSs?fmt(c.total):''}</td><td class="num" style="background:#fef3c7">${fmt(c.irpf)}</td><td class="num">${fmt(c.net)}</td><td class="num">${c.hasSs?fmt(c.netSS):''}</td><td class="num">${c.hasSs?fmt(c.totalFinal):''}</td></tr>`}).join('');
     const totals=(md.entries||[]).reduce((a,e)=>{const c=irpfCalc(e);a.brut+=Number(e.brut)||0;a.ss+=Number(e.ss)||0;if(c.hasSs){a.total+=c.total;a.netSS+=c.netSS;a.totalFinal+=c.totalFinal;a.net+=c.net;}else{a.net+=c.net;}a.irpf+=c.irpf;return a},{brut:0,ss:0,total:0,irpf:0,net:0,netSS:0,totalFinal:0});
     const w=window.open('','_blank');
-    w.document.write(`<html><head><title>IRPF ${monthLabel(currentMonth)}</title><style>body{font-family:Georgia,serif;padding:10mm;font-size:11px}h1{text-align:center;color:#78350f}h2{text-align:center;color:#78350f;margin:6px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border:1px solid #333;padding:5px 7px}th{background:#78350f;color:#fff}td.num{text-align:right;font-family:'Courier New',monospace;font-weight:700}.tot{background:#fef3c7;font-weight:700}.hd{font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>IRPF · ${monthLabel(currentMonth).toUpperCase()}</h1><div style="margin:10px 0"><b>TOTAL CERTIFICATS:</b> ${md.totalCertificats||0} &nbsp;&nbsp;·&nbsp;&nbsp; <b>TOTAL CERTF. BOMBERS:</b> ${md.totalCertfBombers||0}</div><table><thead><tr><th>NOM</th><th>CERT.</th><th>BRUT</th><th>S.S.</th><th>TOTAL</th><th style="background:#b45309">IRPF 15%</th><th>NET</th><th>NET S.S.</th><th>TOTAL</th></tr></thead><tbody>${rows}<tr class="tot"><td colspan="2" style="text-align:right">TOTALS:</td><td class="num">${fmt(totals.brut)}</td><td class="num">${fmt(totals.ss)}</td><td class="num">${fmt(totals.total)}</td><td class="num" style="background:#b45309;color:#fff">${fmt(totals.irpf)}</td><td class="num">${fmt(totals.net)}</td><td class="num">${fmt(totals.netSS)}</td><td class="num">${fmt(totals.totalFinal)}</td></tr></tbody></table><div style="margin-top:16px;text-align:right;font-size:14px"><b>TOTAL IRPF DEL MES:</b> ${fmt(totals.irpf)} €</div><script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
+    w.document.write(`<html><head><title>IRPF ${compName(irpfComp)} · ${monthLabel(currentMonth)}</title><style>body{font-family:Georgia,serif;padding:10mm;font-size:11px}h1{text-align:center;color:#78350f}h2{text-align:center;color:#78350f;margin:6px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border:1px solid #333;padding:5px 7px}th{background:#78350f;color:#fff}td.num{text-align:right;font-family:'Courier New',monospace;font-weight:700}.tot{background:#fef3c7;font-weight:700}.hd{font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>IRPF · ${compName(irpfComp)}</h1><h2>${monthLabel(currentMonth).toUpperCase()}</h2><div style="margin:10px 0"><b>TOTAL CERTIFICATS:</b> ${md.totalCertificats||0} &nbsp;&nbsp;·&nbsp;&nbsp; <b>TOTAL CERTF. BOMBERS:</b> ${md.totalCertfBombers||0}</div><table><thead><tr><th>NOM</th><th>CERT.</th><th>BRUT</th><th>S.S.</th><th>TOTAL</th><th style="background:#b45309">IRPF 15%</th><th>NET</th><th>NET S.S.</th><th>TOTAL</th></tr></thead><tbody>${rows}<tr class="tot"><td colspan="2" style="text-align:right">TOTALS:</td><td class="num">${fmt(totals.brut)}</td><td class="num">${fmt(totals.ss)}</td><td class="num">${fmt(totals.total)}</td><td class="num" style="background:#b45309;color:#fff">${fmt(totals.irpf)}</td><td class="num">${fmt(totals.net)}</td><td class="num">${fmt(totals.netSS)}</td><td class="num">${fmt(totals.totalFinal)}</td></tr></tbody></table><div style="margin-top:16px;text-align:right;font-size:14px"><b>TOTAL IRPF DEL MES:</b> ${fmt(totals.irpf)} €</div><script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
   };
 
   render();
+  updateCompUI();
 }
 $('#btnClearDay').onclick=()=>{if(!entriesOf(currentDate).length){toast('No hay entradas que vaciar');return}const cnt=entriesOf(currentDate).length;confirmModal('🗑️ Vaciar día',`Se borrarán las <b>${cnt} entrada(s)</b> del día <b>${currentDate.split('-').reverse().join('/')}</b>.<br><br>✅ Se guardará una copia de seguridad automática antes de borrar.`,()=>{pushSnapshot('preClear');delete state.byDate[currentDate];saveState();render();toast('Día vaciado ✅ (copia de seguridad guardada en 🛡️ Historial)',3500)},'Sí, vaciar día')};
 $('#btnPrint').onclick=()=>window.print();
