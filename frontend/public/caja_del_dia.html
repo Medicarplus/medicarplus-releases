@@ -674,38 +674,86 @@ function generateLedgerEntries(dateFrom,dateTo,company){
   const fpToAccount={'E':'570 Caixa','T':'572 Banc BBVA','B':'572 Banc BBVA (Bizum)','X':'572 Banc BBVA (Transf)'};
   const isCempla=comp==='cempla';
   const acct705=isCempla?'705 Ingressos serveis mèdics':'705 Ingressos serveis';
+  // Ambdues empreses (C.B i Esport) agrupen per DIA (totals) — no client a client.
+  const aggregate=true;
   Object.entries(src).sort(([a],[b])=>a.localeCompare(b)).forEach(([date,arr])=>{
     if(date<dateFrom||date>dateTo)return;
     const dfDay=parseFloat(dfMap[date]||0);
     const useDf=dfDay>0;
-    arr.forEach(e=>{
-      if(e.retorno)return;
-      const acct=fpToAccount[e.fp]||'570 Caixa';
-      const acctT=fpToAccount[e.fpTasa||e.fp]||acct;
-      if(e.kind==='DH'){
-        // Ingressos/despeses manuals: si són en Targeta i hi ha df, s'agreguen al total del datàfon; si no, línia normal.
-        if(e.tipo==='HABER'){
-          if(useDf&&e.fp==='T'){/* absorbit al total datàfon */}
-          else rows.push({date,concepto:e.nombre||'Ingrés',debeAcct:acct,debeAmt:e.importe,haberAcct:'705 Ingressos serveis',haberAmt:e.importe});
+    if(aggregate){
+      // Agrupació per (compte DEBE × compte HABER): sumem tots els imports del dia.
+      // Ingressos serveis (bruto-dto per FP) i Tasa DGT (tasa per fpTasa) es sumen per compte destí.
+      const bucket={}; // key: `${debeAcct}|${haberAcct}` -> {debe,haber}
+      const add=(debeAcct,haberAcct,amt)=>{
+        if(amt<=0)return;
+        const k=`${debeAcct}|${haberAcct}`;
+        if(!bucket[k])bucket[k]={debe:0,haber:0};
+        bucket[k].debe+=amt;bucket[k].haber+=amt;
+      };
+      let totHaberDh=0,totDebeDh={};
+      arr.forEach(e=>{
+        if(e.retorno)return;
+        const acct=fpToAccount[e.fp]||'570 Caixa';
+        const acctT=fpToAccount[e.fpTasa||e.fp]||acct;
+        if(e.kind==='DH'){
+          if(e.tipo==='HABER'){
+            // Ingrés manual: si és Targeta i hi ha df, s'agrega al total datàfon; si no, línia agregada normal.
+            if(useDf&&e.fp==='T'){/* absorbit al total datàfon */}
+            else add(acct,'705 Ingressos serveis',e.importe);
+          }else{
+            // Despesa manual: 629 Despeses / compte pagament.
+            add('629 Despeses',acct,e.importe);
+          }
         }else{
-          rows.push({date,concepto:e.nombre||'Gasto',debeAcct:'629 Despeses',debeAmt:e.importe,haberAcct:acct,haberAmt:e.importe});
+          const importeNeto=e.importe-(e.descuento||0);
+          if(importeNeto>0){
+            if(useDf&&e.fp==='T'){/* absorbit al total datàfon */}
+            else add(acct,acct705,importeNeto);
+          }
+          if(e.tasa>0){
+            if(useDf&&(e.fpTasa||e.fp)==='T'){/* absorbit al total datàfon */}
+            else add(acctT,'475 Tasa DGT',e.tasa);
+          }
         }
-      }else{
-        const importeNeto=e.importe-(e.descuento||0);
-        if(importeNeto>0){
-          // Si és Targeta i hi ha datàfon manual, s'omet aquesta línia (s'agrega al total del dia).
-          if(useDf&&e.fp==='T'){/* absorbit al total datàfon */}
-          else rows.push({date,concepto:`${e.tipo||'Servei'} - ${e.nombre||''}`,debeAcct:acct,debeAmt:importeNeto,haberAcct:acct705,haberAmt:importeNeto});
+      });
+      // Etiquetes clares per als assentaments agregats del dia.
+      const conceptFor=(debeAcct,haberAcct)=>{
+        if(haberAcct==='475 Tasa DGT')return `Tasa DGT del dia (${debeAcct.split(' ')[0]})`;
+        if(debeAcct==='629 Despeses')return `Despeses del dia (${haberAcct.split(' ')[0]})`;
+        if(haberAcct==='705 Ingressos serveis')return `Ingressos del dia (${debeAcct.split(' ')[0]})`;
+        return `Assentament del dia (${debeAcct.split(' ')[0]} → ${haberAcct.split(' ')[0]})`;
+      };
+      Object.entries(bucket).forEach(([k,v])=>{
+        const [debeAcct,haberAcct]=k.split('|');
+        rows.push({date,concepto:conceptFor(debeAcct,haberAcct),debeAcct,debeAmt:v.debe,haberAcct,haberAmt:v.haber});
+      });
+    }else{
+      // ESPORT: detall per entrada (revisió/certificat).
+      arr.forEach(e=>{
+        if(e.retorno)return;
+        const acct=fpToAccount[e.fp]||'570 Caixa';
+        const acctT=fpToAccount[e.fpTasa||e.fp]||acct;
+        if(e.kind==='DH'){
+          if(e.tipo==='HABER'){
+            if(useDf&&e.fp==='T'){/* absorbit al total datàfon */}
+            else rows.push({date,concepto:e.nombre||'Ingrés',debeAcct:acct,debeAmt:e.importe,haberAcct:'705 Ingressos serveis',haberAmt:e.importe});
+          }else{
+            rows.push({date,concepto:e.nombre||'Gasto',debeAcct:'629 Despeses',debeAmt:e.importe,haberAcct:acct,haberAmt:e.importe});
+          }
+        }else{
+          const importeNeto=e.importe-(e.descuento||0);
+          if(importeNeto>0){
+            if(useDf&&e.fp==='T'){/* absorbit al total datàfon */}
+            else rows.push({date,concepto:`${e.tipo||'Servei'} - ${e.nombre||''}`,debeAcct:acct,debeAmt:importeNeto,haberAcct:acct705,haberAmt:importeNeto});
+          }
+          if(e.tasa>0){
+            if(useDf&&(e.fpTasa||e.fp)==='T'){/* absorbit al total datàfon */}
+            else rows.push({date,concepto:`Tasa DGT - ${e.nombre||''}`,debeAcct:acctT,debeAmt:e.tasa,haberAcct:'475 Tasa DGT',haberAmt:e.tasa});
+          }
         }
-        if(e.tasa>0){
-          // Si la tasa és per Targeta i hi ha datàfon manual, també s'agrega al total del dia.
-          if(useDf&&(e.fpTasa||e.fp)==='T'){/* absorbit al total datàfon */}
-          else rows.push({date,concepto:`Tasa DGT - ${e.nombre||''}`,debeAcct:acctT,debeAmt:e.tasa,haberAcct:'475 Tasa DGT',haberAmt:e.tasa});
-        }
-      }
-    });
+      });
+    }
     // Línia única agregada del datàfon manual del dia (autoritatiu):
-    // DEBE 572 Banc BBVA (df) / HABER 705 Ingressos (df) — concepte: Datàfon manual del dia.
     if(useDf){
       rows.push({date,concepto:'Datàfon manual · targeta (total del dia)',debeAcct:'572 Banc BBVA',debeAmt:dfDay,haberAcct:acct705,haberAmt:dfDay});
     }
