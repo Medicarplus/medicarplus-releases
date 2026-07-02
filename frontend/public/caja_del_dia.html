@@ -274,10 +274,11 @@ function pushSnapshot(reason){
     const df=localStorage.getItem('caja.datafono')||'';
     const dfC=localStorage.getItem('caja.cempla.datafono')||'';
     const stats=localStorage.getItem('caja.stats.v1')||'';
+    const irpf=localStorage.getItem('caja.irpf.v1')||'';
     const last=snaps[snaps.length-1];
     // Si no hay cambios reales vs la última copia, no crear otra
-    if(last&&last.cbTrafic===cb&&last.cempla===ce&&last.datafono===df&&last.datafonoCempla===dfC&&last.stats===stats)return false;
-    const snap={ts:Date.now(),reason:reason||'auto',cbTrafic:cb,cempla:ce,datafono:df,datafonoCempla:dfC,stats};
+    if(last&&last.cbTrafic===cb&&last.cempla===ce&&last.datafono===df&&last.datafonoCempla===dfC&&last.stats===stats&&last.irpf===irpf)return false;
+    const snap={ts:Date.now(),reason:reason||'auto',cbTrafic:cb,cempla:ce,datafono:df,datafonoCempla:dfC,stats,irpf};
     snaps.push(snap);
     while(snaps.length>MAX_SNAPS)snaps.shift();
     try{localStorage.setItem(SNAPS_KEY,JSON.stringify(snaps))}
@@ -296,9 +297,9 @@ async function autoSaveToFile(silent){
     if(!handle)return;
     const perm=await handle.queryPermission({mode:'readwrite'});
     if(perm!=='granted')return;
-    const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),datafonoCempla:JSON.parse(localStorage.getItem('caja.cempla.datafono')||'{}'),stats:JSON.parse(localStorage.getItem('caja.stats.v1')||'null'),_v:3,_ts:Date.now()};
+    const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),datafonoCempla:JSON.parse(localStorage.getItem('caja.cempla.datafono')||'{}'),stats:JSON.parse(localStorage.getItem('caja.stats.v1')||'null'),irpf:JSON.parse(localStorage.getItem('caja.irpf.v1')||'{"months":{},"quarters":{}}'),_v:4,_ts:Date.now()};
     // Firma para detectar cambios (excluye _ts)
-    const sig=JSON.stringify({a:all.cbTrafic,b:all.cempla,c:all.datafono});
+    const sig=JSON.stringify({a:all.cbTrafic,b:all.cempla,c:all.datafono,d:all.datafonoCempla,e:all.stats,f:all.irpf});
     if(sig===_lastAutoSaveContent){if(!silent)toast('✓ Sin cambios · no hace falta guardar',2000);return}
     const content=JSON.stringify(all,null,2);
     // SAFETY: never write empty/truncated content
@@ -366,10 +367,11 @@ function openBackupHistory(){
         if(snap.datafono)localStorage.setItem('caja.datafono',snap.datafono);
         if(snap.datafonoCempla)localStorage.setItem('caja.cempla.datafono',snap.datafonoCempla);
         if(snap.stats)localStorage.setItem('caja.stats.v1',snap.stats);
+        if(snap.irpf)localStorage.setItem('caja.irpf.v1',snap.irpf);
         state=loadState();render();toast('✅ Copia restaurada correctamente',3500);back.remove();
       },'↩ Restaurar');
     }else if(btn.dataset.act==='download'){
-      const obj={cbTrafic:JSON.parse(snap.cbTrafic||'{"byDate":{}}'),cempla:JSON.parse(snap.cempla||'{"byDate":{}}'),datafono:JSON.parse(snap.datafono||'{}'),datafonoCempla:JSON.parse(snap.datafonoCempla||'{}'),stats:JSON.parse(snap.stats||'null'),_v:3,_ts:snap.ts};
+      const obj={cbTrafic:JSON.parse(snap.cbTrafic||'{"byDate":{}}'),cempla:JSON.parse(snap.cempla||'{"byDate":{}}'),datafono:JSON.parse(snap.datafono||'{}'),datafonoCempla:JSON.parse(snap.datafonoCempla||'{}'),stats:JSON.parse(snap.stats||'null'),irpf:JSON.parse(snap.irpf||'{"months":{},"quarters":{}}'),_v:4,_ts:snap.ts};
       const a=document.createElement('a');a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(obj,null,2));a.download=`SNAPSHOT-${new Date(snap.ts).toISOString().slice(0,19).replace(/[:.]/g,'-')}.json`;a.click();
     }
   });
@@ -976,6 +978,12 @@ function openIRPF(){
     });
     const qData=data.quarters[q]||{paid:false};
     if(qData.paid)pendentIRPF=0;
+    // Sobre IRPF: retirades manuals d'efectiu del calaix que l'usuari va guardant en un sobre
+    // per pagar Hisenda al final del trimestre. NO afecta la comptabilitat de C.B ni Esport,
+    // és només un registre visual per l'usuari.
+    if(!qData.sobre)qData.sobre=[];
+    const sobreTotal=(qData.sobre||[]).reduce((a,w)=>a+(Number(w.amount)||0),0);
+    const diff=sobreTotal-pendentIRPF;
     // Files de la taula del mes
     const entriesHTML=(md.entries||[]).map((e,i)=>{
       const c=irpfCalc(e);
@@ -1040,6 +1048,24 @@ function openIRPF(){
         <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           ${qData.paid?`<span style="color:#166534;font-weight:700">✓ Ingressat el ${qData.paidDate?qData.paidDate.split('-').reverse().join('/'):'?'} · Import: ${fmt(qData.paidAmount||0)}</span><button class="btn" id="irpfUndo" style="background:#b91c1c;color:#fff;border-color:#b91c1c">↺ Revertir</button>`:`<button class="btn" id="irpfPay" style="background:#166534;color:#fff;border-color:#166534;padding:10px 20px;font-weight:700;font-size:14px">✓ Marcar com a ingressat a Hisenda</button><span style="color:#78350f;font-style:italic">Al marcar-ho, es generarà l'assentament comptable a la caixa (opcional).</span>`}
         </div>
+      </div>
+      <!-- SOBRE IRPF: llista personal de retirades d'efectiu (només visual, no afecta comptabilitat) -->
+      <div style="background:#f0f9ff;border:2px solid #0369a1;border-radius:8px;padding:14px;margin-top:16px">
+        <h3 style="margin:0 0 6px 0;color:#0369a1;font-family:Georgia,serif">💰 Sobre IRPF · ${q} <span style="font-size:12px;color:#64748b;font-weight:400;font-style:italic">(només per tu · no afecta C.B ni Esport)</span></h3>
+        <p style="margin:0 0 12px 0;color:#475569;font-size:12px;font-style:italic">Anota aquí els diners que vas traient de la caixa d'efectiu setmanalment per anar-los guardant al sobre per pagar Hisenda. Quan pagues el trimestre, marca'l com a "ingressat" i podràs començar amb el sobre nou del pròxim trimestre.</p>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:end">
+          <div><label style="font-size:11px;color:#0369a1;font-weight:700;display:block">DATA</label><input id="sobreDate" type="date" value="${isoToday()}" style="padding:6px 8px;border:1px solid #0369a1;border-radius:4px;background:#fff" /></div>
+          <div><label style="font-size:11px;color:#0369a1;font-weight:700;display:block">IMPORT (€)</label><input id="sobreAmt" type="number" step="0.01" placeholder="0.00" style="padding:6px 8px;border:1px solid #0369a1;border-radius:4px;background:#fff;width:110px;text-align:right;font-family:'Courier New',monospace" /></div>
+          <div style="flex:1;min-width:180px"><label style="font-size:11px;color:#0369a1;font-weight:700;display:block">NOTA (opcional)</label><input id="sobreNote" type="text" placeholder="p.ex. Setmana 27" style="padding:6px 8px;border:1px solid #0369a1;border-radius:4px;background:#fff;width:100%" /></div>
+          <button class="btn" id="sobreAdd" style="background:#0369a1;color:#fff;border-color:#0369a1;padding:8px 16px;font-weight:700">+ Afegir</button>
+        </div>
+        <table style="width:100%;border-collapse:collapse;background:#fff">
+          <thead><tr style="background:#0369a1;color:#fff"><th style="padding:6px 10px;text-align:left">Data</th><th style="padding:6px 10px;text-align:right">Import</th><th style="padding:6px 10px">Nota</th><th style="padding:6px 10px;width:50px"></th></tr></thead>
+          <tbody>${(qData.sobre||[]).length?(qData.sobre||[]).slice().sort((a,b)=>a.date.localeCompare(b.date)).map((w,i)=>`<tr style="border-bottom:1px solid #cbd5e1"><td style="padding:6px 10px">${(w.date||'').split('-').reverse().join('/')}</td><td style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#0369a1">${fmt(Number(w.amount)||0)}</td><td style="padding:6px 10px;color:#475569;font-style:italic">${escapeHtml(w.note||'')}</td><td style="padding:6px 10px;text-align:center"><button class="btn" data-sobredel="${w._id||i}" style="padding:2px 8px;background:#b91c1c;color:#fff;border:none;border-radius:3px;font-size:11px">🗑️</button></td></tr>`).join(''):'<tr><td colspan="4" style="padding:20px;text-align:center;color:#64748b;font-style:italic">Cap retirada encara. Afegeix la primera quan treguis efectiu de la caixa per al sobre IRPF.</td></tr>'}
+          <tr style="background:#e0f2fe;font-weight:700;border-top:2px solid #0369a1"><td style="padding:8px 10px;color:#0369a1">TOTAL AL SOBRE:</td><td style="padding:8px 10px;text-align:right;font-family:'Courier New',monospace;color:#0369a1;font-size:14px">${fmt(sobreTotal)}</td><td colspan="2"></td></tr>
+          </tbody>
+        </table>
+        ${!qData.paid?`<div style="margin-top:12px;padding:10px;background:${diff>=0?'#dcfce7':'#fef2f2'};border-left:4px solid ${diff>=0?'#166534':'#b91c1c'};border-radius:4px;font-family:Georgia,serif"><b style="color:${diff>=0?'#166534':'#b91c1c'}">${diff>=0?'✓ Ja tens prou al sobre':'⚠ Encara falta al sobre'}</b> · Sobre: <b>${fmt(sobreTotal)}</b> · Pendent Hisenda: <b>${fmt(pendentIRPF)}</b> · Diferència: <b style="color:${diff>=0?'#166534':'#b91c1c'}">${diff>=0?'+':''}${fmt(diff)}</b></div>`:''}
       </div>`;
     // Handlers
     back.querySelectorAll('input[data-i]').forEach(inp=>{
@@ -1057,8 +1083,27 @@ function openIRPF(){
       },'Sí, confirmar ingrés',false);
     };
     const undoBtn=back.querySelector('#irpfUndo');if(undoBtn)undoBtn.onclick=()=>{
-      confirmModal('Revertir '+q,'Segur que vols revertir el pagament?',()=>{const d2=loadIrpf();delete d2.quarters[q];saveIrpf(d2);toast('Revertit',2500);render()},'Sí, revertir');
+      confirmModal('Revertir '+q,'Segur que vols revertir el pagament?',()=>{const d2=loadIrpf();delete d2.quarters[q].paid;delete d2.quarters[q].paidDate;delete d2.quarters[q].paidAmount;saveIrpf(d2);toast('Revertit',2500);render()},'Sí, revertir');
     };
+    // SOBRE IRPF: afegir/esborrar retirades manuals d'efectiu
+    const sobreAddBtn=back.querySelector('#sobreAdd');
+    if(sobreAddBtn)sobreAddBtn.onclick=()=>{
+      const date=back.querySelector('#sobreDate').value||isoToday();
+      const amt=parseFloat(back.querySelector('#sobreAmt').value)||0;
+      const note=back.querySelector('#sobreNote').value||'';
+      if(amt<=0){toast('Import ha de ser > 0',2500);return}
+      const d2=loadIrpf();if(!d2.quarters[q])d2.quarters[q]={paid:false};if(!d2.quarters[q].sobre)d2.quarters[q].sobre=[];
+      d2.quarters[q].sobre.push({_id:Date.now()+'-'+Math.random().toString(36).slice(2,6),date,amount:amt,note});
+      saveIrpf(d2);toast(`✓ Afegit ${fmt(amt)} al sobre ${q}`,2500);render();
+    };
+    back.querySelectorAll('[data-sobredel]').forEach(b=>b.onclick=()=>{
+      const id=b.dataset.sobredel;
+      confirmModal('Esborrar retirada','Segur que vols esborrar aquesta retirada del sobre?',()=>{
+        const d2=loadIrpf();if(!d2.quarters[q]||!d2.quarters[q].sobre)return;
+        d2.quarters[q].sobre=d2.quarters[q].sobre.filter((w,i)=>String(w._id||i)!==String(id));
+        saveIrpf(d2);render();
+      },'Sí, esborrar');
+    });
   };
 
   const shiftMonth=(delta)=>{
@@ -1089,7 +1134,7 @@ async function getStoredHandle(){return _idb({mode:'readonly',fn:s=>s.get('backu
 async function saveStoredHandle(h){return _idb({mode:'readwrite',fn:s=>s.put(h,'backupHandle')})}
 async function clearStoredHandle(){return _idb({mode:'readwrite',fn:s=>s.delete('backupHandle')})}
 $('#btnExport').onclick=async ev=>{
-  const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),datafonoCempla:JSON.parse(localStorage.getItem('caja.cempla.datafono')||'{}'),stats:JSON.parse(localStorage.getItem('caja.stats.v1')||'null'),_v:3};
+  const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),datafonoCempla:JSON.parse(localStorage.getItem('caja.cempla.datafono')||'{}'),stats:JSON.parse(localStorage.getItem('caja.stats.v1')||'null'),irpf:JSON.parse(localStorage.getItem('caja.irpf.v1')||'{"months":{},"quarters":{}}'),_v:4};
   const contents=JSON.stringify(all,null,2);
   // SAFETY checks
   if(!contents||contents.length<40){toast('❌ ERROR: contenido vacío, no se guarda',5000);return}
@@ -1366,6 +1411,20 @@ $('#jsonInput').onchange=async ev=>{
         localStorage.setItem('caja.stats.v1',JSON.stringify(cur));
       }
       log.push(`Estadístiques (${cntStats} mesos, ${cntStatsAutos} autoescoles)`);
+    }
+    if(obj.irpf){
+      if(replace)localStorage.setItem('caja.irpf.v1',JSON.stringify(obj.irpf));
+      else{
+        const cur=JSON.parse(localStorage.getItem('caja.irpf.v1')||'{"months":{},"quarters":{}}');
+        // Merge mesos (sobreescriu si ja existeix el mes)
+        for(const[k,v]of Object.entries(obj.irpf.months||{})){cur.months[k]=v}
+        // Merge trimestres (sobreescriu — inclou sobre i estat de pagament)
+        for(const[k,v]of Object.entries(obj.irpf.quarters||{})){cur.quarters[k]=v}
+        localStorage.setItem('caja.irpf.v1',JSON.stringify(cur));
+      }
+      const nMesos=Object.keys(obj.irpf.months||{}).length;
+      const nTrim=Object.keys(obj.irpf.quarters||{}).length;
+      log.push(`IRPF (${nMesos} mesos, ${nTrim} trimestres)`);
     }
     if(hasSingle){
       if(replace)localStorage.setItem(KEYS[currentCompany],JSON.stringify(obj));
