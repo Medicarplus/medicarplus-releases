@@ -712,13 +712,13 @@ function generateLedgerEntries(dateFrom,dateTo,company){
           }
           if(e.tasa>0){
             if(useDf&&(e.fpTasa||e.fp)==='T'){/* absorbit al total datàfon */}
-            else add(acctT,'475 Tasa DGT',e.tasa);
+            else add(acctT,'705 Ingressos tasas',e.tasa);
           }
         }
       });
       // Etiquetes clares per als assentaments agregats del dia.
       const conceptFor=(debeAcct,haberAcct)=>{
-        if(haberAcct==='475 Tasa DGT')return `Tasa DGT del dia (${debeAcct.split(' ')[0]})`;
+        if(haberAcct==='705 Ingressos tasas')return `Tasa DGT del dia (${debeAcct.split(' ')[0]})`;
         if(debeAcct==='629 Despeses')return `Despeses del dia (${haberAcct.split(' ')[0]})`;
         if(haberAcct==='705 Ingressos serveis')return `Ingressos del dia (${debeAcct.split(' ')[0]})`;
         return `Assentament del dia (${debeAcct.split(' ')[0]} → ${haberAcct.split(' ')[0]})`;
@@ -748,7 +748,7 @@ function generateLedgerEntries(dateFrom,dateTo,company){
           }
           if(e.tasa>0){
             if(useDf&&(e.fpTasa||e.fp)==='T'){/* absorbit al total datàfon */}
-            else rows.push({date,concepto:`Tasa DGT - ${e.nombre||''}`,debeAcct:acctT,debeAmt:e.tasa,haberAcct:'475 Tasa DGT',haberAmt:e.tasa});
+            else rows.push({date,concepto:`Tasa DGT - ${e.nombre||''}`,debeAcct:acctT,debeAmt:e.tasa,haberAcct:'705 Ingressos tasas',haberAmt:e.tasa});
           }
         }
       });
@@ -834,7 +834,7 @@ function openLedger(){
     const balRows=Object.entries(balance).sort(([a],[b])=>a.localeCompare(b)).map(([acct,v])=>{
       const saldo=v.debe-v.haber;
       const isDebtor=saldo>0.005;const isCreditor=saldo<-0.005;
-      const nature=acct.startsWith('570')||acct.startsWith('572')||acct.startsWith('629')?'Deutor':(acct.startsWith('705')||acct.startsWith('475')?'Creditor':'');
+      const nature=acct.startsWith('570')||acct.startsWith('572')||acct.startsWith('629')?'Deutor':(acct.startsWith('705')?'Creditor':'');
       return `<tr style="border-bottom:1px dashed #c9b78c"><td style="padding:6px 10px;font-size:12px"><b style="color:#5a3a1a">${acct.split(' ')[0]}</b> ${escapeHtml(acct.split(' ').slice(1).join(' '))}<br><span style="font-size:10px;color:#888;font-style:italic">Naturalesa: ${nature}</span></td><td style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace;color:#8b1a1a;font-weight:${v.debe>0?700:400}">${fmt(v.debe)}</td><td style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace;color:#1a5a2a;font-weight:${v.haber>0?700:400}">${fmt(v.haber)}</td><td style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:${isDebtor?'#8b1a1a':(isCreditor?'#1a5a2a':'#5a3a1a')}">${isDebtor?'D ':isCreditor?'H ':' '}${fmt(Math.abs(saldo))}</td></tr>`;
     }).join('');
     // Totals per naturalesa
