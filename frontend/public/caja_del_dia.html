@@ -602,11 +602,11 @@ function getDatafono(date){try{return (JSON.parse(localStorage.getItem(dfKey())|
 function setDatafono(date,amount){const all=JSON.parse(localStorage.getItem(dfKey())||'{}');if(amount>0)all[date]=amount;else delete all[date];localStorage.setItem(dfKey(),JSON.stringify(all));pushSnapshot('auto');scheduleFileAutoSave()}
 function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(currentDate);const saCC=saldoAnteriorPorCuenta(currentDate);const isC=currentCompany==='cempla';const totalCertTasas=t.bruto-t.dto+t.tasas;
   const df=getDatafono(currentDate);
-  // Datàfono manual: RECLASSIFICA els cobros. Si dius que 500€ es van cobrar per Tarjeta,
-  // resta 500€ de l'Efectivo i suma 500€ al Banc. Total facturació NO canvia, només la ubicació dels diners.
-  const efShown=(t.byFp.E||0)-df;
+  // Datàfon manual NOMÉS afecta la línia de Tarjeta (override del càlcul auto). NO toca l'Efectiu.
+  // Per reclassificar una entrada mal classificada, usar clic dret sobre el tag FP a la taula.
+  const efShown=(t.byFp.E||0);
   const trShown=df>0?df:(t.byFp.T||0);
-  const efShownCB=((t.byFp.E||0)+(t.tasasByFp.E||0))-df;
+  const efShownCB=(t.byFp.E||0)+(t.tasasByFp.E||0);
   const trShownCB=df>0?df:((t.byFp.T||0)+(t.tasasByFp.T||0));
   // Partida doble: TOTAL DEBE = TOTAL HABER (com a la Llibreta). Cada moviment genera DEBE i HABER equilibrats.
   // Serveis facturats: DEBE compte (Caixa/Banc) · HABER Ingressos → contribueix (bruto+tasas)
@@ -638,10 +638,10 @@ function saldoAnteriorPorCuenta(date){
   dates.forEach(d=>{
     const t=computeTotals(entriesOf(d));
     const df=parseFloat(dfMap[d]||0);
-    // Mateixa regla que renderSummary: si df>0, RECLASSIFICA d'Efectiu → Banc
+    // El manual del datàfon NOMÉS afecta la Tarjeta (no resta d'Efectiu).
     const cajaDayAuto=isC?(t.byFp.E||0):((t.byFp.E||0)+(t.tasasByFp.E||0));
     const bancTAuto=isC?(t.byFp.T||0):((t.byFp.T||0)+(t.tasasByFp.T||0));
-    const cajaDay=cajaDayAuto-df;
+    const cajaDay=cajaDayAuto;
     const bancT=df>0?df:bancTAuto;
     const bancB=isC?(t.byFp.B||0):((t.byFp.B||0)+(t.tasasByFp.B||0));
     const bancX=isC?(t.byFp.X||0):((t.byFp.X||0)+(t.tasasByFp.X||0));
@@ -691,11 +691,13 @@ function generateLedgerEntries(dateFrom,dateTo,company){
         }
       }
     });
-    // Afegir assentament del datàfono manual: Caixa → Banc BBVA (només CB)
+    // Afegir assentament del datàfono manual (només si supera la Tarjeta auto): part que s'ha reclassificat de Caixa → Banc BBVA
     if(!isCempla){
       const df=parseFloat(dfMap[date]||0);
-      if(df>0){
-        rows.push({date,concepto:'Datàfon manual (Efectiu → Banc)',debeAcct:'572 Banc BBVA',debeAmt:df,haberAcct:'570 Caixa',haberAmt:df});
+      const autoT=(src[date]||[]).filter(e=>!e.retorno&&e.kind==='TRAF'&&e.fp==='T').reduce((s,e)=>s+(e.importe-(e.descuento||0))+(e.fpTasa==='T'?(e.tasa||0):0),0);
+      const diff=df-autoT;
+      if(diff>0.005){
+        rows.push({date,concepto:'Ajust datàfon manual (excés sobre Tarjeta auto)',debeAcct:'572 Banc BBVA',debeAmt:diff,haberAcct:'570 Caixa',haberAmt:diff});
       }
     }
   });
