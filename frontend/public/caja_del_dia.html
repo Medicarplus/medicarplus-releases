@@ -271,11 +271,12 @@ function pushSnapshot(reason){
     const cb=localStorage.getItem('caja.v1')||'';
     const ce=localStorage.getItem('caja.cempla.v1')||'';
     const df=localStorage.getItem('caja.datafono')||'';
+    const dfC=localStorage.getItem('caja.cempla.datafono')||'';
     const stats=localStorage.getItem('caja.stats.v1')||'';
     const last=snaps[snaps.length-1];
     // Si no hay cambios reales vs la última copia, no crear otra
-    if(last&&last.cbTrafic===cb&&last.cempla===ce&&last.datafono===df&&last.stats===stats)return false;
-    const snap={ts:Date.now(),reason:reason||'auto',cbTrafic:cb,cempla:ce,datafono:df,stats};
+    if(last&&last.cbTrafic===cb&&last.cempla===ce&&last.datafono===df&&last.datafonoCempla===dfC&&last.stats===stats)return false;
+    const snap={ts:Date.now(),reason:reason||'auto',cbTrafic:cb,cempla:ce,datafono:df,datafonoCempla:dfC,stats};
     snaps.push(snap);
     while(snaps.length>MAX_SNAPS)snaps.shift();
     try{localStorage.setItem(SNAPS_KEY,JSON.stringify(snaps))}
@@ -294,7 +295,7 @@ async function autoSaveToFile(silent){
     if(!handle)return;
     const perm=await handle.queryPermission({mode:'readwrite'});
     if(perm!=='granted')return;
-    const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),stats:JSON.parse(localStorage.getItem('caja.stats.v1')||'null'),_v:3,_ts:Date.now()};
+    const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),datafonoCempla:JSON.parse(localStorage.getItem('caja.cempla.datafono')||'{}'),stats:JSON.parse(localStorage.getItem('caja.stats.v1')||'null'),_v:3,_ts:Date.now()};
     // Firma para detectar cambios (excluye _ts)
     const sig=JSON.stringify({a:all.cbTrafic,b:all.cempla,c:all.datafono});
     if(sig===_lastAutoSaveContent){if(!silent)toast('✓ Sin cambios · no hace falta guardar',2000);return}
@@ -362,11 +363,12 @@ function openBackupHistory(){
         if(snap.cbTrafic)localStorage.setItem('caja.v1',snap.cbTrafic);
         if(snap.cempla)localStorage.setItem('caja.cempla.v1',snap.cempla);
         if(snap.datafono)localStorage.setItem('caja.datafono',snap.datafono);
+        if(snap.datafonoCempla)localStorage.setItem('caja.cempla.datafono',snap.datafonoCempla);
         if(snap.stats)localStorage.setItem('caja.stats.v1',snap.stats);
         state=loadState();render();toast('✅ Copia restaurada correctamente',3500);back.remove();
       },'↩ Restaurar');
     }else if(btn.dataset.act==='download'){
-      const obj={cbTrafic:JSON.parse(snap.cbTrafic||'{"byDate":{}}'),cempla:JSON.parse(snap.cempla||'{"byDate":{}}'),datafono:JSON.parse(snap.datafono||'{}'),stats:JSON.parse(snap.stats||'null'),_v:3,_ts:snap.ts};
+      const obj={cbTrafic:JSON.parse(snap.cbTrafic||'{"byDate":{}}'),cempla:JSON.parse(snap.cempla||'{"byDate":{}}'),datafono:JSON.parse(snap.datafono||'{}'),datafonoCempla:JSON.parse(snap.datafonoCempla||'{}'),stats:JSON.parse(snap.stats||'null'),_v:3,_ts:snap.ts};
       const a=document.createElement('a');a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(obj,null,2));a.download=`SNAPSHOT-${new Date(snap.ts).toISOString().slice(0,19).replace(/[:.]/g,'-')}.json`;a.click();
     }
   });
@@ -595,8 +597,9 @@ function escapeHtml(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','
 function fpTag(fp,id,which){if(!fp)return '—';const m={E:'Efectivo',T:'Tarjeta',B:'Bizum',X:'Transf.'};const attrs=id?` data-fp-tag="${id}" data-fp-which="${which||'fp'}" style="cursor:context-menu" title="Clic dret per canviar mètode de pagament"`:'';return `<span class="tag ${fp}"${attrs}>${m[fp]||fp}</span>`}
 function isTramiteDGT(tipo){const s=String(tipo||'').toUpperCase();return /RENOV|EXPED|DUPLIC|CANJE|CANVI|RECUPER|OBTEN/.test(s)}
 function computeTotals(list){const t={bruto:0,dto:0,tasas:0,neto:0,byFp:{E:0,T:0,B:0,X:0},tasasByFp:{E:0,T:0,B:0,X:0},haber:0,debe:0,cnt:list.length,retornos:0,brutoDGT:0,tasasDGT:0,cntDGT:0,brutoOtros:0,cntOtros:0};list.forEach(e=>{if(e.retorno){t.retornos++;return}if(e.kind==='DH'){const fp=e.fp||'E';if(e.tipo==='HABER'){t.haber+=e.importe;t.byFp[fp]=(t.byFp[fp]||0)+e.importe;t.neto+=e.importe}else{t.debe+=e.importe;t.byFp[fp]=(t.byFp[fp]||0)-e.importe;t.neto-=e.importe}return}const subt=e.importe-(e.descuento||0);t.bruto+=e.importe;t.dto+=e.descuento||0;t.tasas+=e.tasa||0;const fp=e.fp||'E';t.byFp[fp]=(t.byFp[fp]||0)+subt;const fpt=e.fpTasa||fp;t.tasasByFp[fpt]=(t.tasasByFp[fpt]||0)+(e.tasa||0);t.neto+=subt+(e.tasa||0);if(isTramiteDGT(e.tipo)){t.brutoDGT+=subt;t.tasasDGT+=(e.tasa||0);t.cntDGT++}else{t.brutoOtros+=subt;t.cntOtros++}});return t}
-function getDatafono(date){try{return (JSON.parse(localStorage.getItem('caja.datafono')||'{}'))[date]||0}catch(e){return 0}}
-function setDatafono(date,amount){const all=JSON.parse(localStorage.getItem('caja.datafono')||'{}');if(amount>0)all[date]=amount;else delete all[date];localStorage.setItem('caja.datafono',JSON.stringify(all));pushSnapshot('auto');scheduleFileAutoSave()}
+function dfKey(){return currentCompany==='cempla'?'caja.cempla.datafono':'caja.datafono'}
+function getDatafono(date){try{return (JSON.parse(localStorage.getItem(dfKey())||'{}'))[date]||0}catch(e){return 0}}
+function setDatafono(date,amount){const all=JSON.parse(localStorage.getItem(dfKey())||'{}');if(amount>0)all[date]=amount;else delete all[date];localStorage.setItem(dfKey(),JSON.stringify(all));pushSnapshot('auto');scheduleFileAutoSave()}
 function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(currentDate);const saCC=saldoAnteriorPorCuenta(currentDate);const isC=currentCompany==='cempla';const totalCertTasas=t.bruto-t.dto+t.tasas;
   const df=getDatafono(currentDate);
   // Datàfono manual: RECLASSIFICA els cobros. Si dius que 500€ es van cobrar per Tarjeta,
@@ -626,7 +629,7 @@ function saldoAnteriorPorCuenta(date){
   const dates=Object.keys(state.byDate).filter(d=>d<date).sort();
   let caja=0,banc=0;
   const isC=currentCompany==='cempla';
-  let dfMap={};try{dfMap=JSON.parse(localStorage.getItem('caja.datafono')||'{}')}catch(e){}
+  let dfMap={};try{dfMap=JSON.parse(localStorage.getItem(dfKey())||'{}')}catch(e){}
   dates.forEach(d=>{
     const t=computeTotals(entriesOf(d));
     const df=parseFloat(dfMap[d]||0);
@@ -658,7 +661,7 @@ function generateLedgerEntries(dateFrom,dateTo,company){
   let src={};
   try{src=(JSON.parse(localStorage.getItem(key))||{}).byDate||{}}catch(e){src={}}
   // Datàfono manual: si l'usuari ha anotat un import Tarjeta, això és un moviment Caixa→Banc que ha d'aparèixer al llibre
-  let dfMap={};try{dfMap=JSON.parse(localStorage.getItem('caja.datafono')||'{}')}catch(e){dfMap={}}
+  let dfMap={};try{dfMap=JSON.parse(localStorage.getItem(comp==='cempla'?'caja.cempla.datafono':'caja.datafono')||'{}')}catch(e){dfMap={}}
   const fpToAccount={'E':'570 Caixa','T':'572 Banc BBVA','B':'572 Banc BBVA (Bizum)','X':'572 Banc BBVA (Transf)'};
   const isCempla=comp==='cempla';
   Object.entries(src).sort(([a],[b])=>a.localeCompare(b)).forEach(([date,arr])=>{
@@ -838,7 +841,7 @@ async function getStoredHandle(){return _idb({mode:'readonly',fn:s=>s.get('backu
 async function saveStoredHandle(h){return _idb({mode:'readwrite',fn:s=>s.put(h,'backupHandle')})}
 async function clearStoredHandle(){return _idb({mode:'readwrite',fn:s=>s.delete('backupHandle')})}
 $('#btnExport').onclick=async ev=>{
-  const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),stats:JSON.parse(localStorage.getItem('caja.stats.v1')||'null'),_v:3};
+  const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),datafonoCempla:JSON.parse(localStorage.getItem('caja.cempla.datafono')||'{}'),stats:JSON.parse(localStorage.getItem('caja.stats.v1')||'null'),_v:3};
   const contents=JSON.stringify(all,null,2);
   // SAFETY checks
   if(!contents||contents.length<40){toast('❌ ERROR: contenido vacío, no se guarda',5000);return}
@@ -1097,7 +1100,12 @@ $('#jsonInput').onchange=async ev=>{
     if(obj.datafono){
       if(replace)localStorage.setItem('caja.datafono',JSON.stringify(obj.datafono));
       else{const curDf=JSON.parse(localStorage.getItem('caja.datafono')||'{}');Object.assign(curDf,obj.datafono);localStorage.setItem('caja.datafono',JSON.stringify(curDf))}
-      log.push(`Datàfon (${cntDatafono} dies)`);
+      log.push(`Datàfon CB (${cntDatafono} dies)`);
+    }
+    if(obj.datafonoCempla){
+      if(replace)localStorage.setItem('caja.cempla.datafono',JSON.stringify(obj.datafonoCempla));
+      else{const curDf=JSON.parse(localStorage.getItem('caja.cempla.datafono')||'{}');Object.assign(curDf,obj.datafonoCempla);localStorage.setItem('caja.cempla.datafono',JSON.stringify(curDf))}
+      log.push(`Datàfon Esport (${Object.keys(obj.datafonoCempla).length} dies)`);
     }
     if(obj.stats){
       if(replace)localStorage.setItem('caja.stats.v1',JSON.stringify(obj.stats));
