@@ -786,7 +786,8 @@ function generateLedgerEntries(dateFrom,dateTo,company){
 }
 function openLedger(){
   let ledgerComp=currentCompany;
-  const dTo=isoToday();const dt=new Date();dt.setMonth(dt.getMonth()-1);const dFrom=dt.toISOString().slice(0,10);
+  // Obertura per defecte: només el dia d'AVUI (des de = fins = avui). L'usuari pot expandir amb els presets o fletxes.
+  const dTo=isoToday();const dFrom=dTo;
   const back=document.createElement('div');back.className='modal-back';
   const headerColor=(c)=>c==='cempla'?'#1e5aa8':'#166534';
   const headerBg=(c)=>c==='cempla'?'#dbeafe':'#dcfce7';
