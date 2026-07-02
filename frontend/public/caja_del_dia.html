@@ -780,7 +780,11 @@ function openLedger(){
       <input type="date" id="ldFrom" value="${dFrom}" style="background:#fff;color:#1a1a1a;border:1px solid #8b6f47;border-radius:4px;padding:6px 10px" />
       <label class="small" style="margin:0;color:#5a3a1a">FINS:</label>
       <input type="date" id="ldTo" value="${dTo}" style="background:#fff;color:#1a1a1a;border:1px solid #8b6f47;border-radius:4px;padding:6px 10px" />
-      <button class="btn" id="ldReload" style="background:#8b6f47;color:#fff;border-color:#5a3a1a">🔄</button>
+      <button class="btn" id="ldReload" style="background:#8b6f47;color:#fff;border-color:#5a3a1a" title="Recarregar">🔄</button>
+      <div style="display:flex;gap:2px;align-items:center;margin-left:6px">
+        <button class="btn" id="ldPrev" title="Dia anterior" style="background:#5a3a1a;color:#fff;border-color:#5a3a1a;padding:6px 10px;font-size:14px">◀</button>
+        <button class="btn" id="ldNext" title="Dia següent" style="background:#5a3a1a;color:#fff;border-color:#5a3a1a;padding:6px 10px;font-size:14px">▶</button>
+      </div>
       <div style="display:flex;gap:4px;flex-wrap:wrap">
         <button class="btn" data-p="today" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">Avui</button>
         <button class="btn" data-p="7d" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">7 dies</button>
@@ -882,6 +886,16 @@ function openLedger(){
   back.querySelector('#ldReload').onclick=renderLedger;
   back.querySelector('#ldFrom').onchange=renderLedger;
   back.querySelector('#ldTo').onchange=renderLedger;
+  // Fletxes de navegació per dia: si DES DE == FINS, mou el mateix dia; si és un rang, mou tot el rang N dies.
+  const shiftDays=(delta)=>{
+    const f=back.querySelector('#ldFrom'),t=back.querySelector('#ldTo');
+    const df=new Date(f.value+'T00:00:00'),dt=new Date(t.value+'T00:00:00');
+    df.setDate(df.getDate()+delta);dt.setDate(dt.getDate()+delta);
+    f.value=df.toISOString().slice(0,10);t.value=dt.toISOString().slice(0,10);
+    renderLedger();
+  };
+  back.querySelector('#ldPrev').onclick=()=>shiftDays(-1);
+  back.querySelector('#ldNext').onclick=()=>shiftDays(1);
   back.querySelector('#ldPrint').onclick=()=>{
     const from=back.querySelector('#ldFrom').value;const to=back.querySelector('#ldTo').value;
     const rows=generateLedgerEntries(from,to,ledgerComp);let totD=0,totH=0;
