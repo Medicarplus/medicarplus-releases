@@ -596,12 +596,11 @@ function getDatafono(date){try{return (JSON.parse(localStorage.getItem('caja.dat
 function setDatafono(date,amount){const all=JSON.parse(localStorage.getItem('caja.datafono')||'{}');if(amount>0)all[date]=amount;else delete all[date];localStorage.setItem('caja.datafono',JSON.stringify(all));pushSnapshot('auto');scheduleFileAutoSave()}
 function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(currentDate);const saCC=saldoAnteriorPorCuenta(currentDate);const isC=currentCompany==='cempla';const totalCertTasas=t.bruto-t.dto+t.tasas;
   const df=getDatafono(currentDate);
-  // Manual "datàfono" a la fila Tarjeta:
-  //  - Si l'usuari escriu un valor > 0, SUBSTITUEIX el càlcul automàtic (només val el manual)
-  //  - Si el deixa buit (0), es calcula automàticament (suma de Tarjeta)
-  const efShown=(t.byFp.E||0);
+  // Datàfono manual: RECLASSIFICA els cobros. Si dius que 500€ es van cobrar per Tarjeta,
+  // resta 500€ de l'Efectivo i suma 500€ al Banc. Total facturació NO canvia, només la ubicació dels diners.
+  const efShown=(t.byFp.E||0)-df;
   const trShown=df>0?df:(t.byFp.T||0);
-  const efShownCB=(t.byFp.E||0)+(t.tasasByFp.E||0);
+  const efShownCB=((t.byFp.E||0)+(t.tasasByFp.E||0))-df;
   const trShownCB=df>0?df:((t.byFp.T||0)+(t.tasasByFp.T||0));
   // HABER TOTAL = tots els ingressos (serveis + entrades HABER manuals)
   // DEBE TOTAL = totes les sortides (només entrades DEBE manuals)
@@ -628,9 +627,11 @@ function saldoAnteriorPorCuenta(date){
   dates.forEach(d=>{
     const t=computeTotals(entriesOf(d));
     const df=parseFloat(dfMap[d]||0);
-    const cajaDay=isC?(t.byFp.E||0):((t.byFp.E||0)+(t.tasasByFp.E||0));
-    const autoT=isC?(t.byFp.T||0):((t.byFp.T||0)+(t.tasasByFp.T||0));
-    const bancT=df>0?df:autoT;
+    // Mateixa regla que renderSummary: si df>0, RECLASSIFICA d'Efectiu → Banc
+    const cajaDayAuto=isC?(t.byFp.E||0):((t.byFp.E||0)+(t.tasasByFp.E||0));
+    const bancTAuto=isC?(t.byFp.T||0):((t.byFp.T||0)+(t.tasasByFp.T||0));
+    const cajaDay=cajaDayAuto-df;
+    const bancT=df>0?df:bancTAuto;
     const bancB=isC?(t.byFp.B||0):((t.byFp.B||0)+(t.tasasByFp.B||0));
     const bancX=isC?(t.byFp.X||0):((t.byFp.X||0)+(t.tasasByFp.X||0));
     caja+=cajaDay;
