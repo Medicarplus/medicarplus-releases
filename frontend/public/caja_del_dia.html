@@ -408,6 +408,26 @@ $('#cStats').onclick=()=>openStats();
 
 // ============ ESTADÍSTIQUES AUTOESCOLES CEMPLA CB ============
 const STATS_KEY='caja.stats.v1';
+// Auto-seed one-time: dades estadístiques Gener–Maig 2026 (importació automàtica única)
+(function seedStats2026(){
+  try{
+    if(localStorage.getItem('caja.stats.seed.2026.jan-may')==='1')return;
+    const cur=JSON.parse(localStorage.getItem(STATS_KEY)||'{"autoescoles":[],"data":{}}');
+    if(!cur.autoescoles||!cur.autoescoles.length)cur.autoescoles=['A.E.DAINA','A.E.M-2 (CENTELLES)','A.E.MABEL','ROSSELL/VIC','CARRERA','CLAPERA','FERRER','CONNECT','MOLIST CALLDETENES','MOLIST','MONTSENY','OSONA','PARTICULAR','ROSANAS','A.E.TONA','SARRIÓ','TARADELL','TRÀFIC','TUNEU','CANJE','LLUÇANÈS','HOY-VOY','MANLLEU','MUNELL','RECUPERACIÓ','AVANÇA','TERÇOL'];
+    if(!cur.data)cur.data={};
+    const D={
+      '2026-01':{'A.E.DAINA':2,'A.E.M-2 (CENTELLES)':0,'A.E.MABEL':14,'ROSSELL/VIC':30,'CARRERA':1,'CLAPERA':2,'FERRER':10,'CONNECT':9,'MOLIST CALLDETENES':2,'MOLIST':1,'MONTSENY':25,'OSONA':1,'PARTICULAR':38,'ROSANAS':9,'A.E.TONA':0,'SARRIÓ':6,'TARADELL':5,'TRÀFIC':278,'TUNEU':2,'CANJE':22,'LLUÇANÈS':3,'HOY-VOY':17,'MANLLEU':1,'RECUPERACIÓ':9,'AVANÇA':0,'TERÇOL':0},
+      '2026-02':{'A.E.DAINA':2,'A.E.M-2 (CENTELLES)':1,'A.E.MABEL':8,'ROSSELL/VIC':34,'CARRERA':1,'CLAPERA':2,'FERRER':10,'CONNECT':15,'MOLIST CALLDETENES':1,'MOLIST':1,'MONTSENY':23,'OSONA':2,'PARTICULAR':46,'ROSANAS':11,'A.E.TONA':0,'SARRIÓ':4,'TARADELL':2,'TRÀFIC':300,'TUNEU':2,'CANJE':25,'LLUÇANÈS':7,'HOY-VOY':18,'MANLLEU':1,'RECUPERACIÓ':4,'AVANÇA':0,'TERÇOL':0},
+      '2026-03':{'A.E.DAINA':3,'A.E.M-2 (CENTELLES)':1,'A.E.MABEL':13,'ROSSELL/VIC':36,'CARRERA':1,'CLAPERA':0,'FERRER':10,'CONNECT':13,'MOLIST CALLDETENES':6,'MOLIST':1,'MONTSENY':18,'OSONA':1,'PARTICULAR':42,'ROSANAS':12,'A.E.TONA':0,'SARRIÓ':0,'TARADELL':5,'TRÀFIC':291,'TUNEU':0,'CANJE':14,'LLUÇANÈS':3,'HOY-VOY':16,'MANLLEU':0,'RECUPERACIÓ':3,'AVANÇA':0,'TERÇOL':0},
+      '2026-04':{'A.E.DAINA':4,'A.E.M-2 (CENTELLES)':4,'A.E.MABEL':14,'ROSSELL/VIC':26,'CARRERA':1,'CLAPERA':2,'FERRER':11,'CONNECT':9,'MOLIST CALLDETENES':4,'MOLIST':2,'MONTSENY':14,'OSONA':2,'PARTICULAR':42,'ROSANAS':6,'A.E.TONA':1,'SARRIÓ':2,'TARADELL':5,'TRÀFIC':305,'TUNEU':1,'CANJE':12,'LLUÇANÈS':2,'HOY-VOY':9,'MANLLEU':2,'RECUPERACIÓ':6,'AVANÇA':0,'TERÇOL':0},
+      '2026-05':{'A.E.DAINA':6,'A.E.M-2 (CENTELLES)':0,'A.E.MABEL':21,'ROSSELL/VIC':19,'CARRERA':1,'CLAPERA':2,'FERRER':11,'CONNECT':19,'MOLIST CALLDETENES':7,'MOLIST':0,'MONTSENY':16,'OSONA':4,'PARTICULAR':44,'ROSANAS':12,'A.E.TONA':0,'SARRIÓ':4,'TARADELL':10,'TRÀFIC':271,'TUNEU':2,'CANJE':18,'LLUÇANÈS':4,'HOY-VOY':15,'MANLLEU':1,'RECUPERACIÓ':4,'AVANÇA':1,'TERÇOL':0}
+    };
+    // Només introdueix el mes si NO existeix encara (no sobreescriu res que l'usuari hagi entrat)
+    Object.entries(D).forEach(([ym,vals])=>{if(!cur.data[ym]||!Object.keys(cur.data[ym]).length)cur.data[ym]=vals});
+    localStorage.setItem(STATS_KEY,JSON.stringify(cur));
+    localStorage.setItem('caja.stats.seed.2026.jan-may','1');
+  }catch(e){console.warn('seedStats2026',e)}
+})();
 const DEFAULT_AUTOS=['A.E.DAINA','A.E.M-2 (CENTELLES)','A.E.MABEL','ROSSELL/VIC','CARRERA','CLAPERA','FERRER','CONNECT','MOLIST CALLDETENES','MOLIST','MONTSENY','OSONA','PARTICULAR','ROSANAS','A.E.TONA','SARRIÓ','TARADELL','TRÀFIC','TUNEU','CANJE','LLUÇANÈS','HOY-VOY','MANLLEU','MUNELL','RECUPERACIÓ','AVANÇA','TERÇOL'];
 const MESOS=['Gener','Febrer','Març','Abril','Maig','Juny','Juliol','Agost','Setembre','Octubre','Novembre','Desembre'];
 function loadStats(){try{const s=JSON.parse(localStorage.getItem(STATS_KEY)||'{}');if(!s.autoescoles)s.autoescoles=DEFAULT_AUTOS.slice();if(!s.data)s.data={};return s}catch(e){return{autoescoles:DEFAULT_AUTOS.slice(),data:{}}}}
