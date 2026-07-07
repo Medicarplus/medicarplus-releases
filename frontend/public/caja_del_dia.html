@@ -171,6 +171,7 @@
     <button class="btn" id="btnHistory" style="background:#1f3a2e;border-color:#2a5e44;color:#bff0d6;font-weight:600" data-i18n="history">🛡️ Historial</button>
     <button class="btn" id="btnLedger" style="background:#2a1f3a;border-color:#5e2a5e;color:#e0bff0;font-weight:600" data-i18n="ledger">📖 Llibreta</button>
     <button class="btn" id="btnIrpf" style="background:#3a2a1f;border-color:#8b5e2a;color:#f0d6bf;font-weight:600">📋 IRPF</button>
+    <button class="btn" id="btnSms" style="background:linear-gradient(90deg,#059669 0%,#10b981 100%);color:#fff;border-color:transparent;font-weight:700" title="Avisos SMS / WhatsApp de renovació">📱 Avisos</button>
     <span id="autosaveBadge" style="display:none;padding:5px 10px;border-radius:6px;background:#1f3a2e;color:#7ee3aa;font-size:11px;font-family:'Consolas',monospace;letter-spacing:.3px;border:1px solid #2a5e44"></span>
     <button class="btn traffic-only" id="btnAudit" style="background:linear-gradient(90deg,#ea580c 0%,#f97316 100%);color:#fff;border-color:transparent;font-weight:700" data-i18n="audit">🔎 Auditoría</button>
     <button class="btn" id="btnAiAsk" style="background:linear-gradient(90deg,#7c3aed 0%,#a855f7 100%);color:#fff;border-color:transparent;font-weight:700" data-i18n="ai_advisor">🤖 Asesor IA</button>
@@ -1618,6 +1619,177 @@ $('#jsonInput').onchange=async ev=>{
 setDate(currentDate);// init done via applyCompanyUI above
 $('#btnLang').onclick=toggleLang;
 applyLang();
+
+// ============================================================================
+// AVISOS · SMS / WhatsApp de renovacions (Twilio) · MÒDUL AÏLLAT
+// ============================================================================
+(function initSmsModule(){
+  const NOTIF_TMPL_KEY='caja.notif.template.v1';
+  const NOTIF_SETTINGS_KEY='caja.notif.settings.v1';
+  const BACKEND_URL='https://project-helper-47.preview.emergentagent.com';
+  let contacts=[];
+  const defaultTemplate='Hola {NOM}, li recordem que el seu carnet de conduir caduca el {DATA_CADUCITAT}. Truqui\'ns per demanar cita.';
+  function normHeader(h){return String(h||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'')}
+  function detectCol(headers,candidates){
+    const nh=headers.map(normHeader);
+    for(const c of candidates){const idx=nh.indexOf(normHeader(c));if(idx>=0)return idx}
+    for(let i=0;i<nh.length;i++){for(const c of candidates){if(nh[i].includes(normHeader(c)))return i}}
+    return -1;
+  }
+  function parseCSV(text){
+    const rows=[];let row=[];let field='';let inQ=false;
+    for(let i=0;i<text.length;i++){
+      const c=text[i],n=text[i+1];
+      if(inQ){if(c==='"'&&n==='"'){field+='"';i++}else if(c==='"'){inQ=false}else{field+=c}}
+      else{if(c==='"')inQ=true;else if(c===','||c===';'||c==='\t'){row.push(field);field=''}else if(c==='\r'){}else if(c==='\n'){row.push(field);rows.push(row);row=[];field=''}else{field+=c}}
+    }
+    if(field||row.length){row.push(field);rows.push(row)}
+    return rows.filter(r=>r.some(x=>String(x).trim()!==''));
+  }
+  function personalize(tmpl,c){return String(tmpl||'').replace(/\{NOM\}/gi,c.nom||'').replace(/\{DNI\}/gi,c.dni||'').replace(/\{DATA_CADUCITAT\}/gi,c.dataCad||'').replace(/\{ADRECA\}/gi,c.adreca||'').replace(/\{TELEFON\}/gi,c.telefon||'')}
+  function cleanPhone(p){let s=String(p||'').replace(/[\s\-\.\(\)]/g,'');if(!s)return '';if(!s.startsWith('+'))s='+34'+s.replace(/^0+/,'');return s}
+  function renderModal(){
+    const settings=(function(){try{return JSON.parse(localStorage.getItem(NOTIF_SETTINGS_KEY)||'{}')}catch(e){return {}}})();
+    const template=localStorage.getItem(NOTIF_TMPL_KEY)||defaultTemplate;
+    const back=document.createElement('div');back.className='modal-back';back.style.zIndex='90000';
+    back.innerHTML='<div class="modal" style="max-width:1200px;width:97%;max-height:96vh;display:flex;flex-direction:column;padding:0;background:#0f1115;color:#e8ecf2;border:1px solid #1f3a2e">'
+      +'<div style="padding:14px 18px;background:linear-gradient(90deg,#065f46 0%,#059669 100%);border-radius:12px 12px 0 0;display:flex;align-items:center;gap:10px">'
+      +'<h3 style="margin:0;color:#fff;font-family:Georgia,serif;flex:1">📱 Avisos SMS / WhatsApp · Recordatoris de renovació</h3>'
+      +'<button class="btn" id="notifCloseBtn" style="background:rgba(0,0,0,.3);color:#fff;border:1px solid rgba(255,255,255,.2)">✕ Tancar</button>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px;overflow:auto;flex:1">'
+      +'<div style="display:flex;flex-direction:column;gap:14px">'
+        +'<div style="background:#171a21;border:1px solid #262b36;border-radius:10px;padding:14px">'
+          +'<div style="font-size:11px;color:#7ee3aa;letter-spacing:1.5px;font-weight:700;margin-bottom:8px">1️⃣ IMPORTAR LLISTA</div>'
+          +'<input type="file" id="notifFile" accept=".csv,.xlsx,.xls" style="width:100%;color:#e8ecf2;font-size:12px" />'
+          +'<div id="notifImportInfo" style="margin-top:8px;font-size:11px;color:#94a3b8;font-style:italic">Exporta la llista des del teu programa DGT (Nom, DNI, Telèfon, Data caducitat, Adreça).</div>'
+        +'</div>'
+        +'<div style="background:#171a21;border:1px solid #262b36;border-radius:10px;padding:14px">'
+          +'<div style="font-size:11px;color:#7ee3aa;letter-spacing:1.5px;font-weight:700;margin-bottom:8px">2️⃣ MISSATGE A ENVIAR</div>'
+          +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'
+            +'<button type="button" class="notif-var-btn" data-v="{NOM}" style="padding:3px 8px;background:#1e3a5f;color:#86b6ff;border:1px solid #2a5285;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700">+ {NOM}</button>'
+            +'<button type="button" class="notif-var-btn" data-v="{DNI}" style="padding:3px 8px;background:#1e3a5f;color:#86b6ff;border:1px solid #2a5285;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700">+ {DNI}</button>'
+            +'<button type="button" class="notif-var-btn" data-v="{DATA_CADUCITAT}" style="padding:3px 8px;background:#1e3a5f;color:#86b6ff;border:1px solid #2a5285;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700">+ {DATA_CADUCITAT}</button>'
+            +'<button type="button" class="notif-var-btn" data-v="{ADRECA}" style="padding:3px 8px;background:#1e3a5f;color:#86b6ff;border:1px solid #2a5285;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700">+ {ADRECA}</button>'
+          +'</div>'
+          +'<textarea id="notifTemplate" rows="5" style="width:100%;padding:10px;background:#0e1117;border:1px solid #2a3040;border-radius:6px;color:#e8ecf2;font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical">'+template.replace(/</g,'&lt;')+'</textarea>'
+          +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">'
+            +'<span id="notifCharCount" style="font-size:11px;color:#94a3b8">0 caràcters · 1 SMS</span>'
+            +'<button type="button" id="notifSaveTmpl" style="padding:4px 10px;background:transparent;border:1px solid #2a5e44;border-radius:4px;color:#7ee3aa;cursor:pointer;font-size:11px">💾 Desar plantilla</button>'
+          +'</div>'
+        +'</div>'
+        +'<div style="background:#171a21;border:1px solid #262b36;border-radius:10px;padding:14px">'
+          +'<div style="font-size:11px;color:#7ee3aa;letter-spacing:1.5px;font-weight:700;margin-bottom:8px">3️⃣ CANALS D\'ENVIAMENT</div>'
+          +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="notifChSms" '+(settings.sms!==false?'checked':'')+' /> <span>📱 Enviar per SMS</span></label>'
+          +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="notifChWa" '+(settings.wa?'checked':'')+' /> <span>💬 Enviar per WhatsApp</span></label>'
+        +'</div>'
+      +'</div>'
+      +'<div style="display:flex;flex-direction:column;gap:14px">'
+        +'<div style="background:#171a21;border:1px solid #262b36;border-radius:10px;padding:14px;flex:1;display:flex;flex-direction:column;min-height:400px">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+            +'<div style="font-size:11px;color:#7ee3aa;letter-spacing:1.5px;font-weight:700">4️⃣ CONTACTES <span id="notifCountLbl" style="color:#94a3b8;font-weight:400">(cap importat)</span></div>'
+            +'<div><button type="button" id="notifSelAll" style="padding:3px 8px;background:transparent;color:#86b6ff;border:1px solid #2a5285;border-radius:4px;cursor:pointer;font-size:10px">Tots</button> <button type="button" id="notifSelNone" style="padding:3px 8px;background:transparent;color:#94a3b8;border:1px solid #3a4050;border-radius:4px;cursor:pointer;font-size:10px">Cap</button></div>'
+          +'</div>'
+          +'<div id="notifList" style="flex:1;overflow:auto;background:#0e1117;border:1px solid #1f2530;border-radius:6px;padding:6px"><div style="padding:30px;text-align:center;color:#64748b;font-style:italic">Importa un CSV per veure els contactes aquí</div></div>'
+        +'</div>'
+        +'<div id="notifPreview" style="background:#0e2438;border:1px solid #2a5285;border-radius:10px;padding:14px;display:none">'
+          +'<div style="font-size:11px;color:#86b6ff;letter-spacing:1.5px;font-weight:700;margin-bottom:6px">💬 PREVISUALITZACIÓ (primer contacte)</div>'
+          +'<div id="notifPreviewText" style="font-size:13px;line-height:1.6;color:#cbd5e1;background:#0f172a;padding:10px;border-radius:6px;border-left:3px solid #86b6ff"></div>'
+        +'</div>'
+      +'</div>'
+      +'</div>'
+      +'<div style="padding:14px 18px;background:#0e1117;border-top:1px solid #262b36;border-radius:0 0 12px 12px;display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap">'
+        +'<div id="notifStatus" style="font-size:12px;color:#94a3b8"></div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+          +'<button id="notifExportBtn" class="btn" style="background:#1f3a5e;border-color:#2a5285;color:#86b6ff;font-weight:700">📤 Exportar CSV</button>'
+          +'<button id="notifSendBtn" class="btn btn-success" style="background:linear-gradient(90deg,#059669,#10b981);color:#fff;font-weight:700;border:none;padding:8px 18px">🚀 Enviar avisos</button>'
+        +'</div>'
+      +'</div>'
+      +'</div>';
+    document.body.appendChild(back);
+    const $q=s=>back.querySelector(s);
+    $q('#notifCloseBtn').onclick=()=>back.remove();
+    const templateInput=$q('#notifTemplate');
+    const updateCharCount=()=>{const l=templateInput.value.length;const sms=Math.max(1,Math.ceil(l/160));$q('#notifCharCount').textContent=l+' caràcters · '+sms+' SMS'};
+    templateInput.oninput=()=>{updateCharCount();renderList()};
+    updateCharCount();
+    back.querySelectorAll('.notif-var-btn').forEach(b=>b.onclick=()=>{const v=b.dataset.v;const t=templateInput;const p=t.selectionStart;t.value=t.value.slice(0,p)+v+t.value.slice(t.selectionEnd);t.focus();t.selectionStart=t.selectionEnd=p+v.length;updateCharCount();renderList()});
+    $q('#notifSaveTmpl').onclick=()=>{localStorage.setItem(NOTIF_TMPL_KEY,templateInput.value);toast('💾 Plantilla desada')};
+    $q('#notifChSms').onchange=$q('#notifChWa').onchange=()=>{const s={sms:$q('#notifChSms').checked,wa:$q('#notifChWa').checked};localStorage.setItem(NOTIF_SETTINGS_KEY,JSON.stringify(s))};
+    $q('#notifSelAll').onclick=()=>{contacts.forEach(c=>c.selected=true);renderList()};
+    $q('#notifSelNone').onclick=()=>{contacts.forEach(c=>c.selected=false);renderList()};
+    $q('#notifFile').onchange=async(ev)=>{
+      const f=ev.target.files[0];if(!f)return;
+      try{
+        let rows;
+        if(f.name.toLowerCase().match(/\.xlsx?$/)){
+          if(typeof XLSX==='undefined'){toast('⚠ Excel no suportat. Exporta a CSV.',5000);return}
+          const buf=await f.arrayBuffer();const wb=XLSX.read(buf,{type:'array'});const sh=wb.Sheets[wb.SheetNames[0]];rows=XLSX.utils.sheet_to_json(sh,{header:1,defval:''});
+        }else{const text=await f.text();rows=parseCSV(text)}
+        if(!rows||rows.length<2){toast('✗ CSV buit o mal format');return}
+        const headers=rows[0].map(h=>String(h).trim());
+        const iNom=detectCol(headers,['nombre','nom','nombreapellidos','cliente','name','apellidosnombre','apellidos']);
+        const iDni=detectCol(headers,['dni','nie','documento']);
+        const iTel=detectCol(headers,['telefono','telefon','tel','movil','mobile','phone']);
+        const iCad=detectCol(headers,['fechacaducidad','datacaducitat','caducidad','caducitat','vencimiento','expiry']);
+        const iAdr=detectCol(headers,['direccion','adreca','address','domicilio']);
+        if(iNom<0||iTel<0){toast('✗ El CSV ha de tenir com a mínim columnes de Nom i Telèfon',6000);return}
+        contacts=rows.slice(1).map(r=>({nom:String(r[iNom]||'').trim(),dni:iDni>=0?String(r[iDni]||'').trim():'',telefon:cleanPhone(r[iTel]),dataCad:iCad>=0?String(r[iCad]||'').trim():'',adreca:iAdr>=0?String(r[iAdr]||'').trim():'',selected:true})).filter(c=>c.nom&&c.telefon);
+        $q('#notifImportInfo').innerHTML='✓ <b style="color:#7ee3aa">'+contacts.length+' contactes importats</b> (cols: nom, telèfon'+(iDni>=0?', DNI':'')+(iCad>=0?', caducitat':'')+(iAdr>=0?', adreça':'')+')';
+        renderList();
+      }catch(e){toast('✗ Error: '+e.message,6000);console.error(e)}
+    };
+    const renderList=()=>{
+      const list=$q('#notifList');
+      $q('#notifCountLbl').textContent=contacts.length?'('+contacts.filter(c=>c.selected).length+' de '+contacts.length+' seleccionats)':'(cap importat)';
+      if(!contacts.length){list.innerHTML='<div style="padding:30px;text-align:center;color:#64748b;font-style:italic">Importa un CSV per veure els contactes aquí</div>';$q('#notifPreview').style.display='none';return}
+      list.innerHTML=contacts.map((c,i)=>'<div style="display:grid;grid-template-columns:24px 1fr auto;gap:8px;align-items:center;padding:6px 8px;border-bottom:1px solid #1a1e26"><input type="checkbox" data-cidx="'+i+'" '+(c.selected?'checked':'')+' /><div style="min-width:0"><div style="font-weight:700;color:#e8ecf2;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+String(c.nom).replace(/</g,'&lt;')+'</div><div style="color:#94a3b8;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+String(c.telefon).replace(/</g,'&lt;')+(c.dataCad?' · caduca '+String(c.dataCad).replace(/</g,'&lt;'):'')+'</div></div></div>').join('');
+      list.querySelectorAll('[data-cidx]').forEach(cb=>cb.onchange=e=>{contacts[+e.target.dataset.cidx].selected=e.target.checked;$q('#notifCountLbl').textContent='('+contacts.filter(c=>c.selected).length+' de '+contacts.length+' seleccionats)'});
+      const first=contacts.find(c=>c.selected);
+      if(first){$q('#notifPreview').style.display='block';$q('#notifPreviewText').textContent=personalize(templateInput.value,first)}
+      else{$q('#notifPreview').style.display='none'}
+    };
+    $q('#notifExportBtn').onclick=()=>{
+      const sel=contacts.filter(c=>c.selected);
+      if(!sel.length){toast('Selecciona almenys 1 contacte');return}
+      const lines=['telefon,nom,missatge'];
+      sel.forEach(c=>{const msg=personalize(templateInput.value,c).replace(/"/g,'""');lines.push('"'+c.telefon+'","'+c.nom.replace(/"/g,'""')+'","'+msg+'"')});
+      const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8'});
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='avisos-'+isoToday()+'.csv';a.click();
+      toast('📤 CSV exportat ('+sel.length+' contactes)');
+    };
+    $q('#notifSendBtn').onclick=async()=>{
+      const sel=contacts.filter(c=>c.selected);
+      if(!sel.length){toast('Selecciona almenys 1 contacte');return}
+      const chSms=$q('#notifChSms').checked,chWa=$q('#notifChWa').checked;
+      if(!chSms&&!chWa){toast('Selecciona almenys un canal');return}
+      if(!confirm('Enviar avisos a '+sel.length+' contactes'+(chSms&&chWa?' (SMS + WhatsApp)':chSms?' (SMS)':' (WhatsApp)')+'?'))return;
+      const btn=$q('#notifSendBtn');btn.disabled=true;btn.textContent='Enviant…';
+      $q('#notifStatus').textContent='Contactant servidor…';
+      try{
+        const payload={channels:{sms:chSms,whatsapp:chWa},messages:sel.map(c=>({nom:c.nom,telefon:c.telefon,dni:c.dni,body:personalize(templateInput.value,c)}))};
+        const r=await fetch(BACKEND_URL+'/api/notifications/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        const res=await r.json();
+        if(!r.ok)throw new Error(res.detail||res.error||'Error servidor');
+        const okCnt=(res.results||[]).filter(x=>x.ok).length;
+        const errCnt=(res.results||[]).length-okCnt;
+        $q('#notifStatus').innerHTML='<b style="color:#7ee3aa">✓ '+okCnt+' enviats</b>'+(errCnt?' · <b style="color:#ff96a0">✗ '+errCnt+' errors</b>':'');
+        toast('✓ Avisos enviats · '+okCnt+' correctes'+(errCnt?', '+errCnt+' errors':''),5000);
+        if(confirm('Enviament completat. Vols buidar la llista?')){contacts=[];renderList();$q('#notifFile').value=''}
+      }catch(e){
+        console.error(e);
+        $q('#notifStatus').innerHTML='<b style="color:#ff96a0">✗ '+e.message+'</b>';
+        if(String(e.message).toLowerCase().includes('twilio')||String(e.message).includes('not configured')){
+          alert('⚠ Twilio no està configurat al servidor. Mentrestant, pots exportar el CSV amb "📤 Exportar CSV".');
+        }else{toast('✗ Error: '+e.message,6000)}
+      }finally{btn.disabled=false;btn.textContent='🚀 Enviar avisos'}
+    };
+    renderList();
+  }
+  const btn=document.getElementById('btnSms');
+  if(btn)btn.onclick=renderModal;
+})();
+
 </script>
 </body>
 </html>
