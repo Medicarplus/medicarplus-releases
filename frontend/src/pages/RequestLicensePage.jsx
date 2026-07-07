@@ -13,7 +13,7 @@ export default function RequestLicensePage() {
     email: "",
     phone: "",
     tax_id: "",
-    plan_requested: "STD",
+    plan_requested: "STD_ANY",
     notes: "",
     consent: false,
     website: "", // honeypot
@@ -26,16 +26,17 @@ export default function RequestLicensePage() {
     e.preventDefault();
     setErr("");
     const installId = form.install_id.trim().toUpperCase();
-    if (!INSTALL_ID_RE.test(installId)) {
+    // Install ID is now OPTIONAL. Si el client encara no té l'app, deixa-ho buit.
+    if (installId && !INSTALL_ID_RE.test(installId)) {
       setErr(
-        "L'Install ID ha de tenir el format CD-XXXX-XXXX-XXXX-XXXX. El pots trobar al modal d'activació de l'aplicació.",
+        "El format de l'Install ID no és vàlid. Ha de ser CD-XXXX-XXXX-XXXX-XXXX o deixa'l buit si encara no tens l'app.",
       );
       return;
     }
     setBusy(true);
     try {
       await createLicenseRequest({
-        install_id: installId,
+        install_id: installId || "CD-PENDING-0000-0000-0000",
         company_name: form.company_name.trim(),
         contact_name: form.contact_name.trim() || null,
         email: form.email.trim(),
@@ -113,7 +114,7 @@ export default function RequestLicensePage() {
             Et contactarem aviat per email amb la teva clau d'activació.
           </p>
           <p style={{ color: "#94a3b8", fontSize: 12, marginTop: 24 }}>
-            Marc Brugulat Lopez · MediCar Plus
+            M.Brugulat Lopez · MediCar Plus
           </p>
         </div>
       </div>
@@ -150,8 +151,55 @@ export default function RequestLicensePage() {
               Sol·licitar llicència
             </h1>
             <p style={{ color: "#94a3b8", fontSize: 13, margin: "8px 0 0" }}>
-              MediCar Plus · Software comercial · Marc Brugulat Lopez
+              MediCar Plus · Software comercial · M.Brugulat Lopez
             </p>
+          </div>
+
+          {/* PRICING CARDS */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 24 }}>
+            <PricingCard
+              title="TRIAL"
+              subtitle="Prova"
+              price="0€"
+              period="30 dies"
+              features={["✓ Totes les funcions", "✓ Sense targeta", "✓ 30 dies gratis"]}
+              accent="#64748b"
+              selected={form.plan_requested === "TRIAL"}
+              onClick={() => setForm({ ...form, plan_requested: "TRIAL" })}
+            />
+            <PricingCard
+              title="STD"
+              subtitle="Estàndard"
+              price="30€"
+              period="/mes"
+              altPrice="299€/any"
+              savings="17% descompte"
+              features={["✓ Caixa del dia", "✓ IRPF + Llibreta", "✓ Estadístiques", "✓ Suport email"]}
+              accent="#f5b301"
+              hasBillingToggle
+              billingValue={form.plan_requested}
+              onMonthly={() => setForm({ ...form, plan_requested: "STD_MES" })}
+              onYearly={() => setForm({ ...form, plan_requested: "STD_ANY" })}
+              monthlyValue="STD_MES"
+              yearlyValue="STD_ANY"
+            />
+            <PricingCard
+              title="PREMIUM"
+              subtitle="Ampliat"
+              price="45€"
+              period="/mes"
+              altPrice="499€/any"
+              savings="7% descompte"
+              features={["✓ Tot STD +", "✓ SMS / WhatsApp", "✓ Cercador clients", "✓ Suport prioritari"]}
+              accent="#3ddc97"
+              badge="POPULAR"
+              hasBillingToggle
+              billingValue={form.plan_requested}
+              onMonthly={() => setForm({ ...form, plan_requested: "PREMIUM_MES" })}
+              onYearly={() => setForm({ ...form, plan_requested: "PREMIUM_ANY" })}
+              monthlyValue="PREMIUM_MES"
+              yearlyValue="PREMIUM_ANY"
+            />
           </div>
 
           <div
@@ -166,19 +214,18 @@ export default function RequestLicensePage() {
               lineHeight: 1.55,
             }}
           >
-            <b style={{ color: "#f5b301" }}>Com trobar l'Install ID:</b> obre l'aplicació{" "}
-            <b>MediCar Plus</b> · al modal d'activació apareixerà un codi amb el format{" "}
-            <code style={{ color: "#e2e8f0" }}>CD-XXXX-XXXX-XXXX-XXXX</code>. Copia'l i
-            enganxa'l aquí sota.
+            <b style={{ color: "#f5b301" }}>ℹ️ Sobre l'Install ID:</b> és un codi únic que identifica la teva instal·lació.
+            Si <b>encara no tens l'app</b>, deixa aquest camp buit — quan aprovem la teva sol·licitud t'enviarem l'app perquè el generi.
+            Si <b>ja tens l'app instal·lada</b>, obre-la, ves al modal d'activació i copia el codi{" "}
+            <code style={{ color: "#e2e8f0" }}>CD-XXXX-XXXX-XXXX-XXXX</code>.
           </div>
 
           <div style={{ display: "grid", gap: 14 }}>
             <div>
-              <label style={labelStyle}>INSTALL ID *</label>
+              <label style={labelStyle}>INSTALL ID <span style={{ color: "#64748b", fontWeight: 400 }}>(opcional)</span></label>
               <input
                 data-testid="req-install-id"
-                required
-                placeholder="CD-XXXX-XXXX-XXXX-XXXX"
+                placeholder="CD-XXXX-XXXX-XXXX-XXXX o deixa-ho buit"
                 value={form.install_id}
                 onChange={(e) => setForm({ ...form, install_id: e.target.value.toUpperCase() })}
                 style={inputStyle}
@@ -237,17 +284,17 @@ export default function RequestLicensePage() {
               </div>
             </div>
             <div>
-              <label style={labelStyle}>PLAN SOL·LICITAT</label>
-              <select
-                data-testid="req-plan"
-                value={form.plan_requested}
-                onChange={(e) => setForm({ ...form, plan_requested: e.target.value })}
-                style={inputStyle}
-              >
-                <option value="TRIAL">TRIAL — Prova gratuïta</option>
-                <option value="STD">STD — Estàndard</option>
-                <option value="PREMIUM">PREMIUM — Ampliat</option>
-              </select>
+              <label style={labelStyle}>PLAN SELECCIONAT</label>
+              <div style={{ padding: "10px 14px", background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#f5b301", fontFamily: "Georgia,serif", fontSize: 13 }}>
+                {form.plan_requested === "TRIAL" && "🆓 TRIAL — Prova gratuïta 30 dies"}
+                {form.plan_requested === "STD_MES" && "📦 STD Mensual — 30€/mes"}
+                {form.plan_requested === "STD_ANY" && "📦 STD Anual — 299€/any (estalvies 17%)"}
+                {form.plan_requested === "PREMIUM_MES" && "⭐ PREMIUM Mensual — 45€/mes"}
+                {form.plan_requested === "PREMIUM_ANY" && "⭐ PREMIUM Anual — 499€/any (estalvies 7%)"}
+                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, fontStyle: "italic" }}>
+                  Selecciona un altre pla clicant les targetes de dalt.
+                </div>
+              </div>
             </div>
             <div>
               <label style={labelStyle}>NOTES / COMENTARIS</label>
@@ -367,12 +414,122 @@ export default function RequestLicensePage() {
             }}
           >
             En enviar, acceptes que rebis la teva clau de llicència a l'adreça de correu
-            indicada. Marc Brugulat Lopez es reserva el dret d'aprovar o denegar
+            indicada. M.Brugulat Lopez es reserva el dret d'aprovar o denegar
             sol·licituds.
           </p>
         </form>
       </div>
       <Toaster position="top-right" richColors closeButton theme="dark" />
     </>
+  );
+}
+
+/** PricingCard · Targeta per triar pla amb toggle mensual/anual opcional */
+function PricingCard({
+  title, subtitle, price, period, altPrice, savings, features, accent,
+  selected, onClick, badge,
+  hasBillingToggle, billingValue, onMonthly, onYearly, monthlyValue, yearlyValue,
+}) {
+  const isSelected =
+    selected ||
+    (hasBillingToggle && (billingValue === monthlyValue || billingValue === yearlyValue));
+  const isMonthly = hasBillingToggle && billingValue === monthlyValue;
+  const isYearly = hasBillingToggle && billingValue === yearlyValue;
+
+  return (
+    <div
+      onClick={hasBillingToggle ? undefined : onClick}
+      style={{
+        position: "relative",
+        background: isSelected ? "#0f172a" : "#141a24",
+        border: `2px solid ${isSelected ? accent : "#334155"}`,
+        borderRadius: 12,
+        padding: 12,
+        cursor: hasBillingToggle ? "default" : "pointer",
+        transition: "all .2s ease",
+        boxShadow: isSelected ? `0 4px 18px ${accent}30` : "none",
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+      }}
+    >
+      {badge && (
+        <div
+          style={{
+            position: "absolute",
+            top: -10,
+            right: 8,
+            background: accent,
+            color: "#0f172a",
+            fontSize: 9,
+            padding: "2px 8px",
+            borderRadius: 4,
+            fontWeight: 700,
+            letterSpacing: 1,
+          }}
+        >
+          {badge}
+        </div>
+      )}
+      <div style={{ color: accent, fontSize: 11, fontWeight: 700, letterSpacing: 1.5 }}>{title}</div>
+      <div style={{ color: "#94a3b8", fontSize: 10, marginTop: -4 }}>{subtitle}</div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 4 }}>
+        <div style={{ color: "#e2e8f0", fontSize: 22, fontWeight: 700 }}>
+          {hasBillingToggle && isYearly ? altPrice.split("/")[0] : price}
+        </div>
+        <div style={{ color: "#64748b", fontSize: 11 }}>
+          {hasBillingToggle && isYearly ? "/any" : period}
+        </div>
+      </div>
+      {hasBillingToggle && (
+        <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+          <button
+            type="button"
+            onClick={onMonthly}
+            style={{
+              flex: 1,
+              padding: "5px 6px",
+              background: isMonthly ? accent : "transparent",
+              color: isMonthly ? "#0f172a" : "#94a3b8",
+              border: `1px solid ${isMonthly ? accent : "#334155"}`,
+              borderRadius: 4,
+              fontSize: 10,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            MENSUAL
+          </button>
+          <button
+            type="button"
+            onClick={onYearly}
+            style={{
+              flex: 1,
+              padding: "5px 6px",
+              background: isYearly ? accent : "transparent",
+              color: isYearly ? "#0f172a" : "#94a3b8",
+              border: `1px solid ${isYearly ? accent : "#334155"}`,
+              borderRadius: 4,
+              fontSize: 10,
+              fontWeight: 700,
+              cursor: "pointer",
+              position: "relative",
+            }}
+          >
+            ANUAL
+          </button>
+        </div>
+      )}
+      {savings && hasBillingToggle && (
+        <div style={{ color: accent, fontSize: 9, fontStyle: "italic", textAlign: "center", marginTop: 2 }}>
+          {isYearly ? `✓ ${savings}` : `↓ ${altPrice} anual`}
+        </div>
+      )}
+      <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 3, borderTop: "1px solid #334155", paddingTop: 8 }}>
+        {features.map((f, i) => (
+          <div key={i} style={{ color: "#cbd5e1", fontSize: 10 }}>{f}</div>
+        ))}
+      </div>
+    </div>
   );
 }
