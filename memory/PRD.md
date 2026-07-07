@@ -20,14 +20,18 @@ Transició d'una app HTML offline estable ("Caja del Día") a una app comercial 
 6. Electron builder amb auto-updater (`electron-updater`) preparat.
 
 ## Implemented (2026-07-07 fork)
-- ✅ **Reset v2 = v1** — v2.html reconstruïda com a còpia exacta de v1 amb només 3 mods:
-  - Títol MediCar Plus + i18n
-  - `data-cfg-name` a les tabs + override de CFG a `applyCompanyUI`, Llibreta, IRPF, Estadístiques, Assessor IA
-  - Bloc de llicència + wizard (280 línies) appended al final
-- ✅ Preus dels chips preservats (C.Oficial 20€, Certificado 66.5€, Duplicado 25€, splits 45-45-10, etc.)
-- ✅ Repartiments F.Brugulat/Cempla/Dr.Mellado preservats
-- ✅ Obfuscador arregla `</script>` bleeding (línia 99 de `obfuscate.js`)
+- ✅ **Reset v2 = v1** — v2.html reconstruïda com a còpia exacta de v1 amb capes comercials
+- ✅ Preus dels chips preservats (C.Oficial 20€, Certificado 66.5€, splits 45-45-10, etc.)
+- ✅ Wizard inicial ampliat: noms d'empreses (obligatori) + socis opcionals (0 a 5 amb % configurables)
+- ✅ Tots els noms hardcoded eliminats: CEMPLA C.B/ESPORT → "Empresa 1"/"Empresa 2" per defecte
+- ✅ IRPF_DEFAULTS buit (JOSEP BRUGULAT/RAFART/MELLADO eliminats de defaults)
+- ✅ Neteja automàtica `commercialCleanupV3()` que treu els metges pre-cargats de localStorage si són sense dades
+- ✅ Toasts d'importació utilitzen CFG.company2 en lloc de "Cempla Esport"
+- ✅ Sobre IRPF: "no afecta C.B ni Esport" → "no afecta la comptabilitat"
+- ✅ Tooltip ℹ️ al costat de l'input "manual" del datàfon
+- ✅ Obfuscador arregla `</script>` bleeding
 - ✅ ZIP Electron regenerat i disponible a `/api/download-electron`
+- ✅ TOTS els botons testejats: PrevDay/NextDay/Today, Historial, Llibreta, IRPF, Auditoria, Asesor IA, Imprimir, ⚙️ Config, CA/ES, canvi empresa
 
 ## Previous session work
 - Admin panel React + `/request-license` portal
