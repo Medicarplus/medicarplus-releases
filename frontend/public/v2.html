@@ -144,10 +144,15 @@
   <div class="grid">
     <div>
       <div class="panel" style="margin-bottom:14px">
-        <div class="tabs" id="mainTabs">
+        <div class="tabs" id="mainTabs" style="align-items:center">
           <button class="active traffic-only" data-tab="tab-traf" data-i18n="tab_traffic">Tráfico (Renov/Exped)</button>
           <button data-tab="tab-priv" id="tabPrivBtn" data-i18n="tab_reviews">Revisiones / Certificados / Otros</button>
           <button data-tab="tab-dh" data-i18n="tab_dh">Debe / Haber</button>
+          <div style="flex:1"></div>
+          <div id="searchWrap" style="position:relative;margin:0 8px 0 0">
+            <input type="text" id="searchClient" placeholder="🔍 Cercar per nom o cognom..." autocomplete="off" spellcheck="false" style="background:#0e1117;color:#e2e8f0;border:1px solid #3a4050;border-radius:6px;padding:6px 10px;font-size:12px;width:230px;font-family:inherit" data-testid="client-search-input" />
+            <div id="searchResults" style="display:none;position:absolute;top:calc(100% + 4px);right:0;width:360px;max-height:340px;overflow:auto;background:#141821;border:1px solid #3a4050;border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.6);z-index:9998"></div>
+          </div>
         </div>
         <div class="body tab" id="tab-traf">
           <div class="form-row">
@@ -1661,6 +1666,85 @@ $('#jsonInput').onchange=async ev=>{
 setDate(currentDate);// init done via applyCompanyUI above
 $('#btnLang').onclick=toggleLang;
 applyLang();
+
+// ============================================================================
+// CERCADOR DE CLIENTS · per nom / cognom / concepte
+// ============================================================================
+(function initClientSearch(){
+  const inp=document.getElementById('searchClient');
+  const box=document.getElementById('searchResults');
+  if(!inp||!box)return;
+  const escHtml=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const highlight=(txt,q)=>{
+    const s=escHtml(txt);
+    if(!q)return s;
+    try{const re=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');return s.replace(re,'<mark style="background:#f5b301;color:#0f172a;padding:0 2px;border-radius:2px">$1</mark>')}catch(e){return s}
+  };
+  const doSearch=()=>{
+    const q=inp.value.trim();
+    if(q.length<2){box.style.display='none';box.innerHTML='';return}
+    const qL=q.toLowerCase();
+    const results=[];
+    Object.entries(state.byDate).forEach(([date,arr])=>{
+      arr.forEach(e=>{
+        const nomMatch=(e.nombre||'').toLowerCase().includes(qL);
+        const conceptMatch=(e.tipo||'').toLowerCase().includes(qL)||(e.grupo||'').toLowerCase().includes(qL);
+        if(nomMatch||conceptMatch)results.push({date,e,strong:nomMatch});
+      });
+    });
+    results.sort((a,b)=>(b.strong-a.strong)||(a.date<b.date?1:-1));
+    if(!results.length){
+      box.innerHTML='<div style="padding:14px;color:#94a3b8;font-size:12px;text-align:center;font-style:italic">Cap resultat per <b>"'+escHtml(q)+'"</b></div>';
+      box.style.display='block';return;
+    }
+    const top=results.slice(0,30);
+    const fpLabels={E:'💵',T:'💳',B:'📱',X:'🏦'};
+    box.innerHTML='<div style="padding:8px 12px;font-size:10px;color:#7a8394;letter-spacing:1.5px;border-bottom:1px solid #2a3040;background:#0e1117">'+results.length+' RESULTAT(S)'+(results.length>30?' · mostrant els 30 més recents':'')+'</div>'
+      +top.map(r=>{
+        const imp=(r.e.importe||0)-(r.e.descuento||0)+(r.e.tasa||0);
+        const isDh=r.e.kind==='DH';
+        const tipoColor=isDh?(r.e.tipo==='HABER'?'#7ee3aa':'#ff96a0'):(r.e.kind==='PRIV'?'#5aa9ff':'#3ddc97');
+        const tipoLbl=escHtml(r.e.tipo||r.e.kind||'-');
+        const dateFmt=r.date.split('-').reverse().join('/');
+        return '<div class="search-row" style="padding:10px 12px;border-bottom:1px solid #1e242f;cursor:pointer" data-date="'+r.date+'" data-entry-id="'+r.e.id+'">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'
+          +'<span style="font-weight:700;color:#e8ecf2;font-size:13px">'+highlight(r.e.nombre||'(sense nom)',q)+'</span>'
+          +'<span style="color:#7ee3aa;font-weight:700;font-size:13px">'+fmt(imp)+' €</span>'
+          +'</div>'
+          +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:3px;font-size:11px">'
+          +'<span style="color:#94a3b8">📅 '+dateFmt+' · <span style="color:'+tipoColor+';font-weight:600">'+tipoLbl+'</span>'+(r.e.grupo&&r.e.grupo!=='-'?' · '+highlight(r.e.grupo,q):'')+'</span>'
+          +'<span style="color:#94a3b8">'+(fpLabels[r.e.fp]||'')+' '+escHtml(r.e.fp||'')+(r.e.retorno?' <span style="color:#ff96a0">↺ retorn</span>':'')+'</span>'
+          +'</div>'
+          +'</div>';
+      }).join('');
+    box.style.display='block';
+    box.querySelectorAll('.search-row').forEach(row=>{
+      row.onmouseenter=()=>row.style.background='rgba(245,179,1,.08)';
+      row.onmouseleave=()=>row.style.background='transparent';
+      row.onclick=()=>{
+        setDate(row.dataset.date);
+        box.style.display='none';
+        inp.value='';
+        setTimeout(()=>{
+          const tgt=document.querySelector('#tbody [data-id="'+row.dataset.entryId+'"]');
+          const tr=tgt?tgt.closest('tr'):null;
+          if(tr){
+            tr.scrollIntoView({behavior:'smooth',block:'center'});
+            const orig=tr.style.background;
+            tr.style.transition='background .3s';
+            tr.style.background='rgba(245,179,1,.25)';
+            setTimeout(()=>{tr.style.background=orig},2500);
+          }
+        },250);
+      };
+    });
+  };
+  let t=null;
+  inp.oninput=()=>{clearTimeout(t);t=setTimeout(doSearch,150)};
+  inp.onkeydown=(e)=>{if(e.key==='Escape'){inp.value='';box.style.display='none'}};
+  document.addEventListener('click',(ev)=>{if(!inp.contains(ev.target)&&!box.contains(ev.target))box.style.display='none'});
+  inp.onfocus=()=>{if(inp.value.trim().length>=2)doSearch()};
+})();
 
 // ============================================================================
 // SISTEMA DE LLICÈNCIES · v2 COMERCIAL · Marc Brugulat Lopez
