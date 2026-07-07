@@ -739,12 +739,14 @@ function generateLedgerEntries(dateFrom,dateTo,company){
         const acct=fpToAccount[e.fp]||'570 Caixa';
         const acctT=fpToAccount[e.fpTasa||e.fp]||acct;
         if(e.kind==='DH'){
+          // Els DEBE/HABER manuals apareixen com a LÍNIES SEPARADES (no s'agrupen amb els ingressos del programa DGT)
           if(e.tipo==='HABER'){
-            add(acct,e.importe);
+            expenseRows.push({date,concepto:`Ingrés manual: ${e.nombre||'—'}`,debeAcct:acct,debeAmt:e.importe,haberAcct:'705 Ingressos serveis',haberAmt:e.importe});
           }else{
             expenseRows.push({date,concepto:`Despesa: ${e.nombre||'—'}`,debeAcct:'629 Despeses',debeAmt:e.importe,haberAcct:acct,haberAmt:e.importe});
           }
         }else{
+          // Ingressos del programa Trànsit: s'agreguen en 2 línies (Caixa / Banc) al final.
           const importeNeto=e.importe-(e.descuento||0);
           if(importeNeto>0)add(acct,importeNeto);
           if(e.tasa>0)add(acctT,e.tasa);
