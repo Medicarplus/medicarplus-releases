@@ -887,8 +887,21 @@ function openLedger(){
     const body=back.querySelector('#ldBody');
     if(!rows.length){body.innerHTML=`<div class="empty" style="padding:40px;color:#5a3a1a">No hi ha moviments a la llibreta de <b>${compName(ledgerComp)}</b> en aquest rang.</div>`;return}
     let totD=0,totH=0;
-    const debeRows=rows.map(r=>{totD+=r.debeAmt;return `<tr style="border-bottom:1px dashed #c9b78c"><td style="padding:6px 8px;font-size:11px;width:75px;color:#5a3a1a">${r.date.split('-').reverse().join('/').slice(0,5)}</td><td style="padding:6px 8px;font-size:12px"><b style="color:#8b1a1a">${r.debeAcct.split(' ')[0]}</b> ${escapeHtml(r.debeAcct.split(' ').slice(1).join(' '))}<br><span style="font-size:11px;color:#666;font-style:italic">${escapeHtml(r.concepto)}</span></td><td style="padding:6px 8px;text-align:right;font-weight:700;color:#8b1a1a;font-size:13px;width:90px;font-family:'Courier New',monospace">${fmt(r.debeAmt)}</td></tr>`}).join('');
-    const haberRows=rows.map(r=>{totH+=r.haberAmt;return `<tr style="border-bottom:1px dashed #c9b78c"><td style="padding:6px 8px;font-size:11px;width:75px;color:#5a3a1a">${r.date.split('-').reverse().join('/').slice(0,5)}</td><td style="padding:6px 8px;font-size:12px"><b style="color:#1a5a2a">${r.haberAcct.split(' ')[0]}</b> ${escapeHtml(r.haberAcct.split(' ').slice(1).join(' '))}<br><span style="font-size:11px;color:#666;font-style:italic">${escapeHtml(r.concepto)}</span></td><td style="padding:6px 8px;text-align:right;font-weight:700;color:#1a5a2a;font-size:13px;width:90px;font-family:'Courier New',monospace">${fmt(r.haberAmt)}</td></tr>`}).join('');
+    // Format tradicional del Libro Diario: cada assentament ocupa 2 files en diagonal.
+    // Fila 1: DEBE (compte a l'esquerra, import a la columna DEBE)
+    // Fila 2: HABER (compte indentat "a X", import a la columna HABER)
+    const journalRows=rows.map((r,i)=>{
+      totD+=r.debeAmt;totH+=r.haberAmt;
+      const zebra=i%2===0?'#faf6e8':'#f4ecd0';
+      const dateStr=r.date.split('-').reverse().join('/').slice(0,5);
+      return `<tr style="background:${zebra}"><td rowspan="2" style="padding:8px 10px;font-size:11px;color:#5a3a1a;border-bottom:1px solid #8b6f47;border-right:1px solid #c9b78c;vertical-align:top;width:60px">${dateStr}</td>
+        <td style="padding:6px 10px;font-size:13px;border-right:1px solid #c9b78c"><b style="color:#8b1a1a">${r.debeAcct.split(' ')[0]}</b> ${escapeHtml(r.debeAcct.split(' ').slice(1).join(' '))}<br><span style="font-size:10px;color:#888;font-style:italic">${escapeHtml(r.concepto)}</span></td>
+        <td style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#8b1a1a;font-size:13px;border-right:1px solid #c9b78c;width:110px">${fmt(r.debeAmt)}</td>
+        <td style="padding:6px 10px;width:110px"></td></tr>
+      <tr style="background:${zebra}"><td style="padding:6px 10px 10px 30px;font-size:13px;border-right:1px solid #c9b78c;border-bottom:1px solid #8b6f47;color:#1a5a2a"><span style="color:#888">a</span> <b>${r.haberAcct.split(' ')[0]}</b> ${escapeHtml(r.haberAcct.split(' ').slice(1).join(' '))}</td>
+        <td style="border-right:1px solid #c9b78c;border-bottom:1px solid #8b6f47"></td>
+        <td style="padding:6px 10px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#1a5a2a;font-size:13px;border-bottom:1px solid #8b6f47">${fmt(r.haberAmt)}</td></tr>`;
+    }).join('');
     const cuadra=Math.abs(totD-totH)<0.01;
     // Balanç per comptes: agrupar tots els comptes que han tingut moviment
     const balance={};
@@ -911,19 +924,27 @@ function openLedger(){
       if(acct.startsWith('570'))saldoCaixa+=s;
       if(acct.startsWith('572'))saldoBanc+=s;
     });
-    body.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;background:#faf6e8;border:2px solid #8b6f47;border-radius:4px">
-      <div style="border-right:2px solid #8b6f47">
-        <div style="background:#8b1a1a;color:#fff;padding:8px 12px;text-align:center;font-weight:700;letter-spacing:3px;font-family:Georgia,serif;font-size:14px">D E B E</div>
-        <table style="width:100%;border-collapse:collapse"><thead style="background:#e8dfc4"><tr><th style="padding:6px;text-align:left;font-size:10px;color:#5a3a1a;border-bottom:1px solid #8b6f47">Data</th><th style="padding:6px;text-align:left;font-size:10px;color:#5a3a1a;border-bottom:1px solid #8b6f47">Compte / Concepte</th><th style="padding:6px;text-align:right;font-size:10px;color:#5a3a1a;border-bottom:1px solid #8b6f47">Import</th></tr></thead><tbody>${debeRows}</tbody></table>
-      </div>
-      <div>
-        <div style="background:#1a5a2a;color:#fff;padding:8px 12px;text-align:center;font-weight:700;letter-spacing:3px;font-family:Georgia,serif;font-size:14px">H A B E R</div>
-        <table style="width:100%;border-collapse:collapse"><thead style="background:#e8dfc4"><tr><th style="padding:6px;text-align:left;font-size:10px;color:#5a3a1a;border-bottom:1px solid #8b6f47">Data</th><th style="padding:6px;text-align:left;font-size:10px;color:#5a3a1a;border-bottom:1px solid #8b6f47">Compte / Concepte</th><th style="padding:6px;text-align:right;font-size:10px;color:#5a3a1a;border-bottom:1px solid #8b6f47">Import</th></tr></thead><tbody>${haberRows}</tbody></table>
-      </div>
-      <div style="background:#5a3a1a;color:#fff;padding:10px 14px;text-align:right;font-weight:700;font-family:'Courier New',monospace;font-size:14px;border-top:2px solid #8b6f47">Total DEBE: ${fmt(totD)}</div>
-      <div style="background:#5a3a1a;color:#fff;padding:10px 14px;text-align:right;font-weight:700;font-family:'Courier New',monospace;font-size:14px;border-top:2px solid #8b6f47">Total HABER: ${fmt(totH)}</div>
-      <div style="grid-column:1/-1;background:${cuadra?'#1a5a2a':'#8b1a1a'};color:#fff;padding:10px 14px;text-align:center;font-weight:700;font-family:Georgia,serif;font-size:14px">${cuadra?`✓ QUADRA · ${rows.length} assentaments · Saldo net: ${fmt(totD-totH)}`:`⚠ NO QUADRA · Diferència: ${fmt(Math.abs(totD-totH))}`}</div>
-      <div style="grid-column:1/-1;background:#e8dfc4;padding:0;border-top:2px solid #8b6f47">
+    body.innerHTML=`<div style="background:#faf6e8;border:2px solid #8b6f47;border-radius:4px">
+      <table style="width:100%;border-collapse:collapse;font-family:Georgia,'Times New Roman',serif">
+        <thead>
+          <tr style="background:#5a3a1a;color:#fff">
+            <th style="padding:8px;text-align:center;font-size:10px;letter-spacing:2px;border-right:1px solid #8b6f47;width:60px">DATA</th>
+            <th style="padding:8px;text-align:left;font-size:11px;letter-spacing:2px;border-right:1px solid #8b6f47">COMPTE / CONCEPTE</th>
+            <th style="padding:8px;text-align:right;font-size:11px;letter-spacing:2px;border-right:1px solid #8b6f47;color:#ffcbcb;width:110px">DEBE</th>
+            <th style="padding:8px;text-align:right;font-size:11px;letter-spacing:2px;color:#c8f5d0;width:110px">HABER</th>
+          </tr>
+        </thead>
+        <tbody>${journalRows}</tbody>
+        <tfoot>
+          <tr style="background:#5a3a1a;color:#fff;font-family:'Courier New',monospace;font-weight:700;font-size:14px">
+            <td colspan="2" style="padding:10px 14px;text-align:right;border-right:1px solid #8b6f47">TOTALS:</td>
+            <td style="padding:10px 14px;text-align:right;color:#ffcbcb;border-right:1px solid #8b6f47">${fmt(totD)}</td>
+            <td style="padding:10px 14px;text-align:right;color:#c8f5d0">${fmt(totH)}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <div style="background:${cuadra?'#1a5a2a':'#8b1a1a'};color:#fff;padding:10px 14px;text-align:center;font-weight:700;font-family:Georgia,serif;font-size:14px">${cuadra?`✓ QUADRA · ${rows.length} assentaments · Saldo net: ${fmt(totD-totH)}`:`⚠ NO QUADRA · Diferència: ${fmt(Math.abs(totD-totH))}`}</div>
+      <div style="background:#e8dfc4;padding:0;border-top:2px solid #8b6f47">
         <div style="background:#5a3a1a;color:#fff;padding:10px 14px;text-align:center;font-weight:700;letter-spacing:4px;font-family:Georgia,serif;font-size:14px">B A L A N Ç · P E R · C O M P T E S</div>
         <table style="width:100%;border-collapse:collapse;background:#faf6e8">
           <thead style="background:#e8dfc4">
