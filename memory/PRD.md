@@ -48,6 +48,14 @@ Transició d'una app HTML offline estable ("Caja del Día") a una app comercial 
   - Admin UI: nou botó 🔓 (taronja) per desbloquejar HWID amb tooltip mostrant HWID actual + comptador resets
   - ZIP Electron regenerat amb preload.js nou (629 KB)
   - Tots 8 tests curl passen: binding, re-verify, block PC pirata, reset, re-binding, block antic
+- ✅ **Panell d'estadístiques** (nova pestanya 📊 al admin) — MRR/ARR, breakdown per pla, sol·licituds, activitat 7d/30d, top clients
+- ✅ **UX v2.html** (07/07 nit):
+  - Idioma per defecte canviat de català a **castellà** (`localStorage.getItem('caja.lang')||'es'`)
+  - Traduccions afegides al modal d'activació + wizard de configuració (helper `L(ca,es)`)
+  - **Empresa 2 100% opcional** al wizard — si es deixa buida, `applyCompanyUI()` amaga el botó Empresa 2 i força `currentCompany='cbTrafic'`
+  - `isConfigured()` només exigeix Empresa 1
+  - Botons Llibreta + IRPF agrupats en dropdown **🔧 Contabilidad** (traduccions ca/es afegides al i18n)
+  - ZIP Electron regenerat (630 KB, 21:18)
 
 ## Roadmap
 ### P1 (imminent — bloquejat per usuari)
