@@ -544,6 +544,23 @@ export default function AdminDashboard({ onLogout }) {
     }
   };
 
+  const handleResetHwid = async (installId) => {
+    const ok = window.confirm(
+      `Desbloquejar el HWID d'aquesta llicència?\n\n` +
+      `Fes això només si el client legítim canvia d'ordinador.\n` +
+      `La propera vegada que activi la llicència al nou PC, quedarà vinculada al nou maquinari.`,
+    );
+    if (!ok) return;
+    try {
+      const { resetHwid } = await import("@/lib/licenseApi");
+      const res = await resetHwid(installId);
+      toast.success(`HWID desbloquejat (reset #${res.reset_count})`);
+      await refresh();
+    } catch (ex) {
+      toast.error(ex?.response?.data?.detail || ex.message);
+    }
+  };
+
   const handleCopyJwt = async (installId) => {
     try {
       const { getLicense } = await import("@/lib/licenseApi");
@@ -882,6 +899,21 @@ export default function AdminDashboard({ onLogout }) {
                               }}
                             >
                               🚫
+                            </button>
+                            <button
+                              data-testid={`reset-hwid-${l.install_id}`}
+                              onClick={() => handleResetHwid(l.install_id)}
+                              disabled={l.status !== "active" || !l.hwid_lock}
+                              title={l.hwid_lock
+                                ? `Desbloquejar HWID (client ha canviat d'ordinador)\nHWID actual: ${l.hwid_lock}\nResets previs: ${l.hwid_reset_count || 0}`
+                                : "Encara no hi ha HWID vinculat"}
+                              style={{
+                                ...actionBtnStyle(l.status !== "active" || !l.hwid_lock),
+                                background: (l.status !== "active" || !l.hwid_lock) ? "#334155" : "#7c2d12",
+                                color: "#fff",
+                              }}
+                            >
+                              🔓
                             </button>
                           </div>
                         </td>

@@ -101,6 +101,9 @@ def _doc_to_record(doc: dict, include_key: bool = False) -> LicenseRecord:
         revoked_reason=doc.get("revoked_reason"),
         last_verified_at=_to_dt(doc.get("last_verified_at")),
         verify_count=int(doc.get("verify_count", 0) or 0),
+        hwid_lock=doc.get("hwid_lock"),
+        hwid_locked_at=_to_dt(doc.get("hwid_locked_at")),
+        hwid_reset_count=int(doc.get("hwid_reset_count", 0) or 0),
         license_key=doc.get("license_key") if include_key else None,
     )
 
@@ -298,6 +301,39 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
                 plan=doc.get("plan"), expires_at=expires_at,
             )
 
+        # 3.5) HWID lock: la 1a activació registra el HWID; les següents han de coincidir
+        stored_hwid = (doc.get("hwid_lock") or "").strip()
+        req_hwid = (body.hwid or "").strip()
+        if req_hwid:
+            if not stored_hwid:
+                # Primera vegada que aquest client verifica amb HWID → binding
+                await coll.update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": {
+                        "hwid_lock": req_hwid,
+                        "hwid_locked_at": _now().isoformat(),
+                    }},
+                )
+                logger.info("HWID binding for %s → %s", body.install_id, req_hwid)
+            elif stored_hwid != req_hwid:
+                logger.warning(
+                    "HWID mismatch for %s (stored=%s, request=%s)",
+                    body.install_id, stored_hwid, req_hwid,
+                )
+                return LicenseVerifyResponse(
+                    ok=False,
+                    hwid_mismatch=True,
+                    status="active",
+                    reason=(
+                        "Aquesta llicència està vinculada a un altre ordinador. "
+                        "Contacta amb el proveïdor per fer el canvi."
+                    ),
+                    install_id=body.install_id,
+                    client_name=doc.get("client_name"),
+                    plan=doc.get("plan"),
+                    expires_at=expires_at,
+                )
+
         # 4) Tot OK → actualitzem estadístiques
         await coll.update_one(
             {"_id": doc["_id"]},
@@ -338,6 +374,40 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         await _audit(request, "license.revoke", body.install_id, extra={"reason": body.reason})
         updated = await coll.find_one({"_id": doc["_id"]})
         return _doc_to_record(updated)
+
+    # ---------- Reset HWID lock (admin) ----------
+    @router.post(
+        "/{install_id}/reset-hwid",
+        dependencies=[Depends(require_admin)],
+    )
+    async def reset_hwid_lock(install_id: str, request: Request) -> dict:
+        """
+        Desbloqueja el HWID lock d'una llicència activa.
+        Cal fer-ho quan un client legítim canvia d'ordinador.
+        La propera verificació re-vinculara la llicència al nou HWID.
+        """
+        install_id = install_id.strip().upper()
+        doc = await coll.find_one({"install_id": install_id, "status": "active"})
+        if not doc:
+            raise HTTPException(status_code=404, detail="No hi ha llicència activa per aquest install_id")
+        prev_hwid = doc.get("hwid_lock") or ""
+        prev_count = int(doc.get("hwid_reset_count") or 0)
+        await coll.update_one(
+            {"_id": doc["_id"]},
+            {"$set": {
+                "hwid_lock": None,
+                "hwid_locked_at": None,
+                "hwid_reset_count": prev_count + 1,
+                "hwid_last_reset_at": _now().isoformat(),
+            }},
+        )
+        await _audit(request, "license.reset_hwid", install_id, extra={"prev_hwid": prev_hwid})
+        return {
+            "ok": True,
+            "install_id": install_id,
+            "message": "HWID desbloquejat. La propera activació al nou PC lligarà la llicència automàticament.",
+            "reset_count": prev_count + 1,
+        }
 
     # ---------- Delete (RGPD C6) ----------
     @router.delete(

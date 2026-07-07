@@ -49,6 +49,10 @@ class LicenseVerify(BaseModel):
 
     install_id: str
     key: str = Field(..., min_length=10)
+    hwid: Optional[str] = Field(
+        None, max_length=64,
+        description="Hardware fingerprint (HW-XXXXXXXX...). Lligat a la 1a activació."
+    )
 
     @field_validator("install_id")
     @classmethod
@@ -87,6 +91,10 @@ class LicenseRecord(BaseModel):
     revoked_reason: Optional[str] = None
     last_verified_at: Optional[datetime] = None
     verify_count: int = 0
+    # HWID lock: hardware fingerprint on which the license was first activated
+    hwid_lock: Optional[str] = None
+    hwid_locked_at: Optional[datetime] = None
+    hwid_reset_count: int = 0
     # La clau JWT — es retorna només al moment de generar-la. En verificar
     # només retornem metadades.
     license_key: Optional[str] = None
@@ -97,6 +105,7 @@ class LicenseVerifyResponse(BaseModel):
     status: Optional[LicenseStatus] = None
     revoked: bool = False
     expired: bool = False
+    hwid_mismatch: bool = False
     reason: Optional[str] = None
     install_id: Optional[str] = None
     client_name: Optional[str] = None

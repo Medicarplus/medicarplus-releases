@@ -2190,9 +2190,24 @@ function validateKey(key,installId){
   }
   return {ok:false,reason:'Format incorrecte. Introdueix una clau JWT (xxx.yyy.zzz) o MB-XXXX-XXXX-XXXX-XXXX'};
 }
+function _getHwid(){
+  // Prefer HWID del preload Electron (fort). Fallback a fingerprint de navegador (feble).
+  try{
+    if(typeof window!=='undefined' && window.appInfo && window.appInfo.hwid){
+      return window.appInfo.hwid;
+    }
+  }catch(e){}
+  // Fallback: fingerprint navegador (només per preview web, no per producció Electron)
+  try{
+    const parts=[navigator.userAgent||'',navigator.platform||'',screen.width+'x'+screen.height,new Date().getTimezoneOffset()];
+    let h=0;const s=parts.join('|');for(let i=0;i<s.length;i++){h=((h<<5)-h+s.charCodeAt(i))|0}
+    return 'HW-BROWSER-'+Math.abs(h).toString(16).toUpperCase().padStart(8,'0');
+  }catch(e){return null}
+}
 async function verifyOnline(key,installId){
   if(!LIC.VERIFY_URL)return {ok:true,skipped:true};
-  const r=await fetch(LIC.VERIFY_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({install_id:installId,key})});
+  const hwid=_getHwid();
+  const r=await fetch(LIC.VERIFY_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({install_id:installId,key,hwid})});
   return await r.json();
 }
 function isLicenseActive(){

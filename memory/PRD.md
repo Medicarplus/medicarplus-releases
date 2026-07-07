@@ -37,7 +37,17 @@ Transició d'una app HTML offline estable ("Caja del Día") a una app comercial 
   - Workflow `/app/commercial/electron/.github/workflows/release.yml` — build Windows NSIS + portable + publish a GitHub Releases al fer tag `v*`
   - main.js + package.json ja tenien electron-updater configurat
   - Guia HTML pas-a-pas: `/guia-github-releases.html`
-- ✅ Enllaços afegits a `guia-medicar-plus.html` cap a les dues guies noves
+- ✅ **Guies noves refetes** (`guia-medicar-plus.html` admin + `guia-client-installacio.html` client) amb estat actual del sistema
+- ✅ **🔒 HWID Lock anti-pirateig** — sistema complet per evitar que un client copiï el JWT a un altre PC
+  - `preload.js` genera HWID Electron via SHA-256(hostname + platform + arch + memòria + primera MAC no-virtual)
+  - Frontend v2.html: `_getHwid()` prioritza `window.appInfo.hwid` (Electron), fallback fingerprint navegador
+  - Backend `LicenseVerify` accepta camp opcional `hwid`
+  - Verify: 1a activació fa `hwid_lock` binding automàtic; verifies posteriors amb HWID diferent retornen `ok:false, hwid_mismatch:true` amb missatge en català
+  - Admin endpoint `POST /api/licenses/{install_id}/reset-hwid` per canvi legítim de PC
+  - LicenseRecord model amplia: `hwid_lock`, `hwid_locked_at`, `hwid_reset_count`, `hwid_last_reset_at`
+  - Admin UI: nou botó 🔓 (taronja) per desbloquejar HWID amb tooltip mostrant HWID actual + comptador resets
+  - ZIP Electron regenerat amb preload.js nou (629 KB)
+  - Tots 8 tests curl passen: binding, re-verify, block PC pirata, reset, re-binding, block antic
 
 ## Roadmap
 ### P1 (imminent — bloquejat per usuari)
