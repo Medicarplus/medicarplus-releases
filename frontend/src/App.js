@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "@/App.css";
 import AdminPage from "@/pages/AdminPage";
 import RequestLicensePage from "@/pages/RequestLicensePage";
+import PrivacyPage from "@/pages/PrivacyPage";
 
 function LegacyRedirect() {
   useEffect(() => {
@@ -42,6 +43,7 @@ function App() {
       <Routes>
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/request-license" element={<RequestLicensePage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="*" element={<LegacyRedirect />} />
       </Routes>
     </BrowserRouter>

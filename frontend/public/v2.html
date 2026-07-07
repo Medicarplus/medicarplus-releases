@@ -136,6 +136,7 @@
     <span id="autosaveBadge" style="display:none;padding:5px 10px;border-radius:6px;background:#1f3a2e;color:#7ee3aa;font-size:11px;font-family:'Consolas',monospace;letter-spacing:.3px;border:1px solid #2a5e44"></span>
     <button class="btn traffic-only" id="btnAudit" style="background:linear-gradient(90deg,#ea580c 0%,#f97316 100%);color:#fff;border-color:transparent;font-weight:700" data-i18n="audit">🔎 Auditoría</button>
     <button class="btn" id="btnAiAsk" style="background:linear-gradient(90deg,#7c3aed 0%,#a855f7 100%);color:#fff;border-color:transparent;font-weight:700" data-i18n="ai_advisor">🤖 Asesor IA</button>
+    <button class="btn" id="btnArqueig" title="Arqueig fi de dia — comprovar caixa física" style="background:#7c3aed;border-color:#7c3aed;color:#fff;font-weight:700;padding:6px 12px" data-testid="btn-arqueig">🧾 Arqueig</button>
     <button class="btn" id="btnPrint" data-i18n="print">🖨️ Imprimir</button>
     <button class="btn" id="btnLang" title="Canviar idioma / Cambiar idioma" style="background:#2a2f3a;border-color:#4a5568;color:#e8ecf2;font-weight:700;padding:6px 12px" data-testid="lang-toggle">🌐 <span id="langLabel">ES</span></button>
   </div>
@@ -1258,6 +1259,45 @@ function openIRPF(){
 }
 $('#btnClearDay').onclick=()=>{if(!entriesOf(currentDate).length){toast('No hay entradas que vaciar');return}const cnt=entriesOf(currentDate).length;confirmModal('🗑️ Vaciar día',`Se borrarán las <b>${cnt} entrada(s)</b> del día <b>${currentDate.split('-').reverse().join('/')}</b>.<br><br>✅ Se guardará una copia de seguridad automática antes de borrar.`,()=>{pushSnapshot('preClear');delete state.byDate[currentDate];saveState();render();toast('Día vaciado ✅ (copia de seguridad guardada en 🛡️ Historial)',3500)},'Sí, vaciar día')};
 $('#btnPrint').onclick=()=>window.print();
+// Arqueig fi de dia — modal que pregunta la caixa física i mostra descuadre
+$('#btnArqueig').onclick=function(){
+  const efectivo=cajaFisicaAcumulada(currentDate);
+  const back=document.createElement('div');back.className='modal-back';
+  back.innerHTML=`<div class="modal" style="max-width:520px;padding:26px;font-family:Georgia,serif">
+    <h3 style="margin:0 0 6px 0;color:#f5b301">🧾 Arqueig fi de dia</h3>
+    <p style="color:#94a3b8;font-size:13px;margin:0 0 18px 0">Data: <b>${currentDate}</b></p>
+    <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span>Efectiu que hauries de tenir a la caixa:</span>
+        <b style="color:#f5b301;font-family:'Courier New',monospace">${fmt(efectivo)}</b>
+      </div>
+      <div style="font-size:11px;color:#64748b;line-height:1.5">Aquest és el saldo teòric segons les entrades del dia menys els pagaments en efectiu registrats.</div>
+    </div>
+    <label style="display:block;font-size:12px;color:#f5b301;letter-spacing:1.5px;font-weight:700;margin-bottom:8px">EFECTIU FÍSIC A LA CAIXA (conta bitllets + monedes)</label>
+    <input type="number" step="0.01" id="arqCash" placeholder="0.00" autofocus style="width:100%;padding:12px;background:#0f172a;border:2px solid #475569;border-radius:8px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:20px;text-align:right;box-sizing:border-box" />
+    <div id="arqResult" style="margin-top:14px;padding:14px;border-radius:8px;display:none;font-size:14px;font-family:Georgia,serif"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn" data-no>Cancel·lar</button>
+      <button class="btn" id="arqCalc" style="background:#f5b301;color:#0f172a;font-weight:700">Comprovar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(back);
+  const inp=back.querySelector('#arqCash');
+  const res=back.querySelector('#arqResult');
+  const calc=()=>{
+    const fisic=parseFloat(inp.value)||0;
+    const diff=fisic-efectivo;
+    let color,icon,msg;
+    if(Math.abs(diff)<0.01){color='#065f46';icon='✓';msg=`Caixa quadrada! Perfect.`}
+    else if(diff<0){color='#7f1d1d';icon='⚠️';msg=`Falta a caixa: <b style="font-family:'Courier New',monospace">${fmt(Math.abs(diff))}</b>`}
+    else{color='#78350f';icon='⚠️';msg=`Sobra a caixa: <b style="font-family:'Courier New',monospace">${fmt(diff)}</b>`}
+    res.style.display='block';res.style.background=color;res.style.color='#fff';res.innerHTML=`<div style="font-size:22px">${icon}</div><div style="margin-top:6px">${msg}</div>`;
+  };
+  back.querySelector('#arqCalc').onclick=calc;
+  inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();calc()}};
+  back.querySelector('[data-no]').onclick=()=>back.remove();
+  back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
+};
 // ============ SAVE HANDLE (File System Access API) ============
 async function _idb(op){return new Promise((res)=>{const r=indexedDB.open('caja-io',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{const tx=r.result.transaction('kv',op.mode);const s=tx.objectStore('kv');const req=op.fn(s);req.onsuccess=()=>res(req.result);req.onerror=()=>res(null)};r.onerror=()=>res(null)})}
 async function getStoredHandle(){return _idb({mode:'readonly',fn:s=>s.get('backupHandle')})}

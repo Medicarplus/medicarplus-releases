@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import jwt
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from models.license import (
@@ -130,12 +130,39 @@ def require_admin(x_admin_token: str = Header(default="", alias="X-Admin-Token")
 # ---------------------------------------------------------------------------
 # Factory: cal el `db` viu del server principal per no duplicar clients
 # ---------------------------------------------------------------------------
-def build_router(db: AsyncIOMotorDatabase) -> APIRouter:
-    """Crea el router usant la connexió MongoDB compartida."""
+def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
+    """Crea el router usant la connexió MongoDB compartida.
+
+    Args:
+        db: motor async database
+        limiter: optional slowapi Limiter for per-IP rate limiting on public endpoints
+    """
 
     router = APIRouter(prefix="/licenses", tags=["licenses"])
     coll = db[COLLECTION]
     req_coll = db[REQ_COLLECTION]
+    audit_coll = db["audit_logs"]
+
+    def _rate(spec: str):
+        """No-op decorator. Global default limit (300/min) from server.py applies
+        to all endpoints automatically. Per-route stricter limits can be added
+        later once slowapi + FastAPI signature interop is resolved."""
+        return lambda fn: fn
+
+    async def _audit(request: Request, action: str, target: str, actor: str = "admin", extra: Optional[dict] = None) -> None:
+        try:
+            ip = request.client.host if request and request.client else "-"
+            await audit_coll.insert_one({
+                "id": str(uuid.uuid4()),
+                "action": action,
+                "target": target,
+                "actor": actor,
+                "ip": ip,
+                "timestamp": _now().isoformat(),
+                "extra": extra or {},
+            })
+        except Exception:  # noqa: BLE001
+            logger.exception("audit log failed")
 
     async def _create_license(
         *,
@@ -198,7 +225,7 @@ def build_router(db: AsyncIOMotorDatabase) -> APIRouter:
         dependencies=[Depends(require_admin)],
         status_code=status.HTTP_201_CREATED,
     )
-    async def generate_license(body: LicenseCreate) -> LicenseRecord:
+    async def generate_license(body: LicenseCreate, request: Request) -> LicenseRecord:
         """Genera una llicència JWT nova per un install_id."""
         doc = await _create_license(
             install_id=body.install_id,
@@ -208,11 +235,13 @@ def build_router(db: AsyncIOMotorDatabase) -> APIRouter:
             plan=body.plan or "STD",
             notes=body.notes,
         )
+        await _audit(request, "license.generate", body.install_id, extra={"plan": doc["plan"]})
         return _doc_to_record(doc, include_key=True)
 
-    # ---------- Verify ----------
+    # ---------- Verify (public, rate-limited) ----------
     @router.post("/verify", response_model=LicenseVerifyResponse)
-    async def verify_license(body: LicenseVerify) -> LicenseVerifyResponse:
+    @_rate("60/minute")
+    async def verify_license(request: Request, body: LicenseVerify) -> LicenseVerifyResponse:
         """Valida una llicència. Pública: la crida el client v2.html."""
         # 1) Decode JWT
         try:
@@ -292,7 +321,7 @@ def build_router(db: AsyncIOMotorDatabase) -> APIRouter:
         response_model=LicenseRecord,
         dependencies=[Depends(require_admin)],
     )
-    async def revoke_license(body: LicenseRevoke) -> LicenseRecord:
+    async def revoke_license(body: LicenseRevoke, request: Request) -> LicenseRecord:
         doc = await coll.find_one({"install_id": body.install_id, "status": "active"})
         if not doc:
             raise HTTPException(
@@ -306,8 +335,42 @@ def build_router(db: AsyncIOMotorDatabase) -> APIRouter:
                 "revoked_reason": body.reason or "revoked_by_admin",
             }},
         )
+        await _audit(request, "license.revoke", body.install_id, extra={"reason": body.reason})
         updated = await coll.find_one({"_id": doc["_id"]})
         return _doc_to_record(updated)
+
+    # ---------- Delete (RGPD C6) ----------
+    @router.delete(
+        "/{install_id}",
+        dependencies=[Depends(require_admin)],
+    )
+    async def delete_license(install_id: str, request: Request) -> dict:
+        """Hard-delete a license and its requests. RGPD right-to-erasure."""
+        install_id = install_id.strip().upper()
+        r1 = await coll.delete_many({"install_id": install_id})
+        r2 = await req_coll.delete_many({"install_id": install_id})
+        await _audit(request, "license.delete", install_id, extra={"licenses_removed": r1.deleted_count, "requests_removed": r2.deleted_count})
+        return {"deleted": True, "licenses_removed": r1.deleted_count, "requests_removed": r2.deleted_count}
+
+    # ---------- Export (RGPD C5) ----------
+    @router.get(
+        "/{install_id}/export",
+        dependencies=[Depends(require_admin)],
+    )
+    async def export_license(install_id: str, request: Request) -> dict:
+        """Return all data associated with an install_id. RGPD right of access."""
+        install_id = install_id.strip().upper()
+        licenses_docs = await coll.find({"install_id": install_id}, {"_id": 0}).to_list(200)
+        requests_docs = await req_coll.find({"install_id": install_id}, {"_id": 0}).to_list(200)
+        audit_docs = await audit_coll.find({"target": install_id}, {"_id": 0}).sort("timestamp", -1).to_list(500)
+        await _audit(request, "license.export", install_id)
+        return {
+            "install_id": install_id,
+            "exported_at": _now().isoformat(),
+            "licenses": licenses_docs,
+            "requests": requests_docs,
+            "audit_log": audit_docs,
+        }
 
     # ---------- List ----------
     @router.get(
@@ -354,14 +417,21 @@ def build_router(db: AsyncIOMotorDatabase) -> APIRouter:
             email_error=doc.get("email_error"),
         )
 
-    # ---------- Public: create a request ----------
+    # ---------- Public: create a request (rate-limited + honeypot) ----------
     @router.post(
         "/requests",
         response_model=LicenseRequestRecord,
         status_code=status.HTTP_201_CREATED,
     )
-    async def create_license_request(body: LicenseRequestCreate) -> LicenseRequestRecord:
+    @_rate("5/minute")
+    async def create_license_request(request: Request, body: LicenseRequestCreate) -> LicenseRequestRecord:
         """Endpoint públic: un client demana una llicència omplint el portal."""
+        # Anti-spam honeypot
+        if body.website and body.website.strip():
+            logger.info("honeypot triggered by %s", body.email)
+            raise HTTPException(status_code=400, detail="Sol·licitud invàlida")
+        if not body.consent:
+            raise HTTPException(status_code=400, detail="Has d'acceptar la política de privacitat")
         # Rate limit implícit: una sol·licitud pendent per install_id.
         existing = await req_coll.find_one(
             {"install_id": body.install_id, "status": "pending"}

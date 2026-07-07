@@ -124,6 +124,9 @@ class LicenseRequestCreate(BaseModel):
     tax_id: Optional[str] = Field(None, max_length=40, description="NIF/CIF")
     plan_requested: Optional[str] = Field("STD", max_length=40)
     notes: Optional[str] = Field(None, max_length=1000)
+    consent: bool = Field(True, description="RGPD consent checkbox")
+    # Anti-spam honeypot: humans leave it empty; bots fill it.
+    website: Optional[str] = Field(None, max_length=200)
 
     @field_validator("install_id")
     @classmethod

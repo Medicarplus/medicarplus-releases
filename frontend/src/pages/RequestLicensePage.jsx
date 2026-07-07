@@ -15,6 +15,8 @@ export default function RequestLicensePage() {
     tax_id: "",
     plan_requested: "STD",
     notes: "",
+    consent: false,
+    website: "", // honeypot
   });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -41,6 +43,8 @@ export default function RequestLicensePage() {
         tax_id: form.tax_id.trim() || null,
         plan_requested: form.plan_requested,
         notes: form.notes.trim() || null,
+        consent: form.consent,
+        website: form.website, // honeypot; humans leave empty
       });
       setDone(true);
       toast.success("Sol·licitud enviada");
@@ -275,15 +279,68 @@ export default function RequestLicensePage() {
             </div>
           )}
 
+          {/* Honeypot: visually hidden, tab-index -1. Real users won't fill it. */}
+          <div style={{ position: "absolute", left: "-9999px", top: "-9999px" }} aria-hidden="true">
+            <label>Web (deixa buit)</label>
+            <input
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              value={form.website}
+              onChange={(e) => setForm({ ...form, website: e.target.value })}
+            />
+          </div>
+
+          <label
+            data-testid="req-consent-label"
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+              marginTop: 20,
+              padding: 12,
+              background: "#0f172a",
+              border: "1px solid #334155",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontSize: 12,
+              color: "#cbd5e1",
+              lineHeight: 1.5,
+            }}
+          >
+            <input
+              data-testid="req-consent"
+              type="checkbox"
+              checked={form.consent}
+              onChange={(e) => setForm({ ...form, consent: e.target.checked })}
+              style={{ marginTop: 3, transform: "scale(1.2)", accentColor: "#f5b301" }}
+            />
+            <span>
+              He llegit i accepto la{" "}
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: "#f5b301", textDecoration: "underline" }}
+              >
+                política de privacitat
+              </a>
+              . Les meves dades es tractaran per gestionar la meva sol·licitud de llicència.
+            </span>
+          </label>
+
           <button
             data-testid="request-submit"
             type="submit"
-            disabled={busy}
+            disabled={busy || !form.consent}
             style={{
-              marginTop: 24,
+              marginTop: 18,
               width: "100%",
               padding: 14,
-              background: busy ? "#475569" : "linear-gradient(135deg,#f5b301,#d97706)",
+              background:
+                busy || !form.consent
+                  ? "#475569"
+                  : "linear-gradient(135deg,#f5b301,#d97706)",
               color: "#0f172a",
               border: "none",
               borderRadius: 10,
@@ -291,7 +348,7 @@ export default function RequestLicensePage() {
               fontSize: 16,
               fontWeight: 700,
               letterSpacing: 2,
-              cursor: busy ? "wait" : "pointer",
+              cursor: busy || !form.consent ? "not-allowed" : "pointer",
               textTransform: "uppercase",
             }}
           >

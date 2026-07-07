@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, Request
 from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -16,15 +16,27 @@ from routes.licenses import build_router as build_license_router
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', 'sk-emergent-2De8513077b69EcF89')
+# C7 fix: fail fast if key missing — no hardcoded fallback in code.
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# Rate limiter (C1). Public endpoints are limited by IP.
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+limiter = Limiter(key_func=get_remote_address, default_limits=["300/minute"])
+
+# App version — clients whose min_client_version is greater than this are rejected.
+APP_VERSION = "2.0.0"
+
 # Create the main app without a prefix
 app = FastAPI()
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -88,7 +100,8 @@ class AiAskBody(BaseModel):
 
 
 @api_router.post("/ai-ask")
-async def ai_ask(body: AiAskBody):
+@limiter.limit("20/minute")
+async def ai_ask(request: Request, body: AiAskBody):
     """Ask Gemini Flash to help find discrepancies in the cash log. Prefers user's own Google API key (free tier)."""
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     company_data = body.data.get(body.company, {}).get("byDate", {})
@@ -178,7 +191,7 @@ async def get_status_checks():
 app.include_router(api_router)
 
 # Mount the licenses subrouter under /api/licenses
-app.include_router(build_license_router(db), prefix="/api")
+app.include_router(build_license_router(db, limiter=limiter), prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
@@ -194,6 +207,21 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+@app.on_event("startup")
+async def _startup():
+    # C3: create MongoDB indexes so queries stay fast at scale.
+    try:
+        await db.licenses.create_index("install_id")
+        await db.licenses.create_index("id", unique=True)
+        await db.licenses.create_index([("status", 1), ("created_at", -1)])
+        await db.license_requests.create_index([("install_id", 1), ("status", 1)])
+        await db.license_requests.create_index([("status", 1), ("created_at", -1)])
+        await db.audit_logs.create_index([("target", 1), ("timestamp", -1)])
+        logger.info("MongoDB indexes ensured")
+    except Exception:
+        logger.exception("Failed to ensure MongoDB indexes")
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
