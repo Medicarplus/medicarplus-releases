@@ -400,6 +400,51 @@ function LicenseKeyModal({ data, onClose }) {
             📋 Copiar JWT
           </button>
           <button
+            data-testid="license-email-mailto"
+            onClick={() => {
+              const email = data?.license?.client_email || data?.request?.email || "";
+              const jwt = data?.license?.license_key || "";
+              const client = data?.license?.client_name || data?.request?.company_name || "";
+              const plan = (data?.license?.plan || "").toUpperCase();
+              const expLbl = data?.license?.expires_at
+                ? new Date(data.license.expires_at).toLocaleDateString("ca-ES")
+                : "perpètua";
+              const subject = encodeURIComponent(`La teva llicència MediCar Plus (${plan})`);
+              const body = encodeURIComponent(
+                `Benvingut/da a MediCar Plus!\n\n` +
+                `Aquí tens la teva clau de llicència personal (${plan}, vàlida fins a ${expLbl}):\n\n` +
+                `${jwt}\n\n` +
+                `📥 DESCARREGA L'APP:\n` +
+                `[Enganxa aquí el link de WeTransfer o Google Drive amb el fitxer .exe]\n\n` +
+                `📖 GUIA D'INSTAL·LACIÓ (per no perdre't):\n` +
+                `https://project-helper-47.preview.emergentagent.com/guia-client-installacio.html\n\n` +
+                `Passos ràpids:\n` +
+                `1. Descarrega el fitxer del link de dalt\n` +
+                `2. Feu doble clic per instal·lar (si Windows avisa, cliqui "Más información" → "Ejecutar de todos modos")\n` +
+                `3. Un cop instal·lada, obri l'app i enganxi la clau de dalt\n` +
+                `4. Segueixi el wizard per configurar els noms de les seves empreses\n` +
+                `5. Ja pot començar a treballar!\n\n` +
+                `Dubtes? Escrigui'm a brugulatmarc@gmail.com\n\n` +
+                `Salutacions,\nM. Brugulat Lopez\nMediCar Plus`,
+              );
+              window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+            }}
+            disabled={!(data?.license?.client_email || data?.request?.email)}
+            style={{
+              padding: "10px 22px",
+              background: "linear-gradient(135deg,#059669,#10b981)",
+              border: "none",
+              borderRadius: 8,
+              color: "#fff",
+              cursor: "pointer",
+              fontWeight: 700,
+              letterSpacing: 1.2,
+              fontFamily: "Georgia, serif",
+            }}
+          >
+            📧 Enviar per email
+          </button>
+          <button
             data-testid="license-close-modal"
             onClick={onClose}
             style={{
