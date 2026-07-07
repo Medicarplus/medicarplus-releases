@@ -1961,7 +1961,7 @@ function showConfigWizard(isFirstRun){
 // Inicialització: bloqueja l'app si no hi ha llicència; després pregunta noms
 if(!isLicenseActive()){showActivationModal()}
 else if(!isConfigured()){setTimeout(()=>showConfigWizard(true),200)}
-// Botó ⚙️ Configuració al header + clic a la signatura per info de llicència
+// Botons ⚙️ Configuració + 🔓 Sortir/Canviar llicència al header
 setTimeout(()=>{
   const langBtn=document.querySelector('#btnLang');
   if(langBtn&&!document.querySelector('#btnCfg')){
@@ -1971,6 +1971,20 @@ setTimeout(()=>{
     cfgBtn.style.cssText='margin-right:6px;padding:6px 10px;font-size:15px';
     cfgBtn.onclick=()=>showConfigWizard(false);
     langBtn.parentElement.insertBefore(cfgBtn,langBtn);
+  }
+  if(langBtn&&!document.querySelector('#btnLogout')){
+    const logoutBtn=document.createElement('button');
+    logoutBtn.id='btnLogout';logoutBtn.className='btn';logoutBtn.innerHTML='🔓';
+    logoutBtn.title='Sortir · Canviar llicència';
+    logoutBtn.style.cssText='margin-right:6px;padding:6px 10px;font-size:15px;background:#3a1f1f;border-color:#7f1d1d;color:#fca5a5';
+    logoutBtn.onclick=()=>{
+      if(confirm('Desactivar la llicència actual i tornar a la pantalla d\'activació?\n\nLes teves dades locals (dies, entrades, IRPF, còpies) NO s\'esborraran.')){
+        localStorage.removeItem('caja.license.v1');
+        localStorage.removeItem('caja.license.lastcheck.v1');
+        location.reload();
+      }
+    };
+    langBtn.parentElement.insertBefore(logoutBtn,langBtn);
   }
   const sig=document.querySelector('[style*="Created by"]');
   const sigParent=sig?sig.parentElement:null;
