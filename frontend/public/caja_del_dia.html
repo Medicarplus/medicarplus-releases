@@ -721,15 +721,16 @@ function generateLedgerEntries(dateFrom,dateTo,company){
     const dfDay=parseFloat(dfMap[date]||0);
     const useDf=dfDay>0;
     if(aggregate){
-      // Agrupació per (compte DEBE × compte HABER): sumem tots els imports del dia.
-      // Ingressos serveis (bruto-dto per FP) i Tasa DGT (tasa per fpTasa) es sumen per compte destí.
-      const bucket={}; // key: `${debeAcct}|${haberAcct}` -> {debe,haber}
-      const add=(debeAcct,haberAcct,amt)=>{
+      // C.B agregat: només 2 nivells de detall al mode Llibreta — el DEBE per compte físic (Caixa/Banc)
+      // i el HABER consolidat a "705 Ingressos". La separació ingressos/tasas es veu a la secció principal.
+      const bucket={}; // key: debeAcct -> {debe,haber}
+      const add=(debeAcct,amt)=>{
         if(amt<=0)return;
-        const k=`${debeAcct}|${haberAcct}`;
-        if(!bucket[k])bucket[k]={debe:0,haber:0};
-        bucket[k].debe+=amt;bucket[k].haber+=amt;
+        if(!bucket[debeAcct])bucket[debeAcct]={debe:0,haber:0};
+        bucket[debeAcct].debe+=amt;bucket[debeAcct].haber+=amt;
       };
+      // Despeses van a un compte separat (629 Despeses / compte pagament)
+      const expenseRows=[];
       // Càlcul de autoT del dia (per la reclassificació datàfon)
       let autoT=0;
       arr.forEach(e=>{if(e.retorno||e.kind==='DH')return;if(e.fp==='T')autoT+=(e.importe-(e.descuento||0));if((e.fpTasa||e.fp)==='T')autoT+=(e.tasa||0)});
@@ -739,62 +740,49 @@ function generateLedgerEntries(dateFrom,dateTo,company){
         const acctT=fpToAccount[e.fpTasa||e.fp]||acct;
         if(e.kind==='DH'){
           if(e.tipo==='HABER'){
-            add(acct,'705 Ingressos serveis',e.importe);
+            add(acct,e.importe);
           }else{
-            add('629 Despeses',acct,e.importe);
+            expenseRows.push({date,concepto:`Despesa: ${e.nombre||'—'}`,debeAcct:'629 Despeses',debeAmt:e.importe,haberAcct:acct,haberAmt:e.importe});
           }
         }else{
           const importeNeto=e.importe-(e.descuento||0);
-          if(importeNeto>0)add(acct,acct705,importeNeto);
-          if(e.tasa>0)add(acctT,'705 Ingressos tasas',e.tasa);
+          if(importeNeto>0)add(acct,importeNeto);
+          if(e.tasa>0)add(acctT,e.tasa);
         }
       });
-      // Datàfon manual: redistribueix imports entre Caixa (570) i Banc (572) DINS els mateixos
-      // assentaments existents (no crea línia extra). El datàfon és el total autoritatiu de targeta.
+      // Datàfon manual: mou 'delta' del compte 570 Caixa al 572 Banc BBVA (o viceversa).
       if(useDf){
         let delta=dfDay-autoT;
-        if(delta>0){
-          // Mou 'delta' de Caixa a Banc, mantenint el mateix compte HABER (705 Ingressos / 705 Tasas).
-          for(const key of Object.keys(bucket)){
-            if(delta<=0.005)break;
-            const [debeAcct,haberAcct]=key.split('|');
-            if(debeAcct==='570 Caixa'&&bucket[key].debe>0){
-              const move=Math.min(bucket[key].debe,delta);
-              bucket[key].debe-=move;bucket[key].haber-=move;delta-=move;
-              const bankKey=`572 Banc BBVA|${haberAcct}`;
-              if(!bucket[bankKey])bucket[bankKey]={debe:0,haber:0};
-              bucket[bankKey].debe+=move;bucket[bankKey].haber+=move;
-            }
-          }
+        if(delta>0&&bucket['570 Caixa']){
+          const move=Math.min(bucket['570 Caixa'].debe,delta);
+          bucket['570 Caixa'].debe-=move;bucket['570 Caixa'].haber-=move;
+          if(!bucket['572 Banc BBVA'])bucket['572 Banc BBVA']={debe:0,haber:0};
+          bucket['572 Banc BBVA'].debe+=move;bucket['572 Banc BBVA'].haber+=move;
         }else if(delta<0){
-          // Mou |delta| de Banc a Caixa (menys targeta del que estava marcat).
           let need=-delta;
-          for(const key of Object.keys(bucket)){
+          for(const k of Object.keys(bucket)){
             if(need<=0.005)break;
-            const [debeAcct,haberAcct]=key.split('|');
-            if(debeAcct.startsWith('572')&&bucket[key].debe>0){
-              const move=Math.min(bucket[key].debe,need);
-              bucket[key].debe-=move;bucket[key].haber-=move;need-=move;
-              const cashKey=`570 Caixa|${haberAcct}`;
-              if(!bucket[cashKey])bucket[cashKey]={debe:0,haber:0};
-              bucket[cashKey].debe+=move;bucket[cashKey].haber+=move;
+            if(k.startsWith('572')&&bucket[k].debe>0){
+              const move=Math.min(bucket[k].debe,need);
+              bucket[k].debe-=move;bucket[k].haber-=move;need-=move;
+              if(!bucket['570 Caixa'])bucket['570 Caixa']={debe:0,haber:0};
+              bucket['570 Caixa'].debe+=move;bucket['570 Caixa'].haber+=move;
             }
           }
         }
-        // Netejem buckets buits (residus per arrodoniment).
-        for(const key of Object.keys(bucket)){if(bucket[key].debe<0.005&&bucket[key].haber<0.005)delete bucket[key]}
+        for(const k of Object.keys(bucket)){if(bucket[k].debe<0.005&&bucket[k].haber<0.005)delete bucket[k]}
       }
-      // Etiquetes clares per als assentaments agregats del dia.
-      const conceptFor=(debeAcct,haberAcct)=>{
-        if(haberAcct==='705 Ingressos tasas')return `Tasa DGT del dia (${debeAcct.split(' ')[0]})`;
-        if(debeAcct==='629 Despeses')return `Despeses del dia (${haberAcct.split(' ')[0]})`;
-        if(haberAcct==='705 Ingressos serveis')return `Ingressos del dia (${debeAcct.split(' ')[0]})`;
-        return `Assentament del dia (${debeAcct.split(' ')[0]} → ${haberAcct.split(' ')[0]})`;
+      // Emet les línies agregades: DEBE = compte físic (Caixa/Banc), HABER = 705 Ingressos consolidat.
+      const labelFor=(debeAcct)=>{
+        if(debeAcct==='570 Caixa')return 'Total en Caixa (efectiu)';
+        if(debeAcct.startsWith('572'))return `Total en ${debeAcct.replace('572 ','')}`;
+        return `Assentament del dia (${debeAcct})`;
       };
-      Object.entries(bucket).forEach(([k,v])=>{
-        const [debeAcct,haberAcct]=k.split('|');
-        rows.push({date,concepto:conceptFor(debeAcct,haberAcct),debeAcct,debeAmt:v.debe,haberAcct,haberAmt:v.haber});
+      Object.entries(bucket).forEach(([debeAcct,v])=>{
+        rows.push({date,concepto:labelFor(debeAcct),debeAcct,debeAmt:v.debe,haberAcct:acct705,haberAmt:v.haber});
       });
+      // Afegim les despeses (compte 629) — són línies individuals per no barrejar amb els ingressos.
+      expenseRows.forEach(r=>rows.push(r));
     }else{
       // ESPORT: detall per entrada (revisió/certificat) — manté totes les entrades tal com són.
       arr.forEach(e=>{
