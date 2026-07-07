@@ -28,15 +28,22 @@ from models.license import (
     LicenseCreate,
     LicenseListResponse,
     LicenseRecord,
+    LicenseRequestApprove,
+    LicenseRequestCreate,
+    LicenseRequestListResponse,
+    LicenseRequestRecord,
+    LicenseRequestReject,
     LicenseRevoke,
     LicenseVerify,
     LicenseVerifyResponse,
 )
+from services import mailer
 
 logger = logging.getLogger(__name__)
 
 JWT_ALG = "HS256"
 COLLECTION = "licenses"
+REQ_COLLECTION = "license_requests"
 
 
 # ---------------------------------------------------------------------------
@@ -128,19 +135,19 @@ def build_router(db: AsyncIOMotorDatabase) -> APIRouter:
 
     router = APIRouter(prefix="/licenses", tags=["licenses"])
     coll = db[COLLECTION]
+    req_coll = db[REQ_COLLECTION]
 
-    # ---------- Generate ----------
-    @router.post(
-        "/generate",
-        response_model=LicenseRecord,
-        dependencies=[Depends(require_admin)],
-        status_code=status.HTTP_201_CREATED,
-    )
-    async def generate_license(body: LicenseCreate) -> LicenseRecord:
-        """Genera una llicència JWT nova per un install_id."""
-        # Si ja existeix una llicència activa per aquest install_id, la revoquem
-        # implícitament reemplaçant-la (una màquina = una llicència vigent).
-        existing = await coll.find_one({"install_id": body.install_id, "status": "active"})
+    async def _create_license(
+        *,
+        install_id: str,
+        client_name: str,
+        client_email: Optional[str],
+        duration_days: Optional[int],
+        plan: str,
+        notes: Optional[str],
+    ) -> dict:
+        """Reusable helper: revoca l'anterior + insereix una nova llicència."""
+        existing = await coll.find_one({"install_id": install_id, "status": "active"})
         if existing:
             await coll.update_one(
                 {"_id": existing["_id"]},
@@ -154,25 +161,24 @@ def build_router(db: AsyncIOMotorDatabase) -> APIRouter:
         license_id = str(uuid.uuid4())
         created_at = _now()
         expires_at: Optional[datetime] = None
-        if body.duration_days:
-            expires_at = created_at + timedelta(days=body.duration_days)
+        if duration_days:
+            expires_at = created_at + timedelta(days=duration_days)
 
         jwt_key = _mint_jwt(
-            install_id=body.install_id,
+            install_id=install_id,
             license_id=license_id,
-            plan=body.plan or "STD",
+            plan=plan,
             expires_at=expires_at,
         )
-
         doc = {
             "id": license_id,
-            "install_id": body.install_id,
-            "client_name": body.client_name.strip(),
-            "client_email": (body.client_email or "").strip() or None,
-            "plan": body.plan or "STD",
+            "install_id": install_id,
+            "client_name": (client_name or "").strip(),
+            "client_email": (client_email or "").strip() or None,
+            "plan": plan,
             "status": "active",
-            "duration_days": body.duration_days,
-            "notes": body.notes,
+            "duration_days": duration_days,
+            "notes": notes,
             "created_at": created_at.isoformat(),
             "expires_at": expires_at.isoformat() if expires_at else None,
             "revoked_at": None,
@@ -182,7 +188,26 @@ def build_router(db: AsyncIOMotorDatabase) -> APIRouter:
             "license_key": jwt_key,
         }
         await coll.insert_one(doc)
-        logger.info("license generated for %s (id=%s)", body.install_id, license_id)
+        logger.info("license created for %s (id=%s)", install_id, license_id)
+        return doc
+
+    # ---------- Generate ----------
+    @router.post(
+        "/generate",
+        response_model=LicenseRecord,
+        dependencies=[Depends(require_admin)],
+        status_code=status.HTTP_201_CREATED,
+    )
+    async def generate_license(body: LicenseCreate) -> LicenseRecord:
+        """Genera una llicència JWT nova per un install_id."""
+        doc = await _create_license(
+            install_id=body.install_id,
+            client_name=body.client_name,
+            client_email=body.client_email,
+            duration_days=body.duration_days,
+            plan=body.plan or "STD",
+            notes=body.notes,
+        )
         return _doc_to_record(doc, include_key=True)
 
     # ---------- Verify ----------
@@ -304,7 +329,184 @@ def build_router(db: AsyncIOMotorDatabase) -> APIRouter:
             items=[_doc_to_record(d) for d in docs],
         )
 
-    # ---------- Detail ----------
+    # =========================================================================
+    # LLICÈNCIES · SOL·LICITUDS PÚBLIQUES (portal /request-license + admin)
+    # Declarades ABANS de /{install_id} perquè la ruta literal /requests
+    # no quedi ombrejada per la paramètrica.
+    # =========================================================================
+    def _req_to_record(doc: dict) -> LicenseRequestRecord:
+        return LicenseRequestRecord(
+            id=doc["id"],
+            install_id=doc["install_id"],
+            company_name=doc.get("company_name", ""),
+            contact_name=doc.get("contact_name"),
+            email=doc.get("email", ""),
+            phone=doc.get("phone"),
+            tax_id=doc.get("tax_id"),
+            plan_requested=doc.get("plan_requested", "STD"),
+            notes=doc.get("notes"),
+            status=doc.get("status", "pending"),
+            created_at=_to_dt(doc.get("created_at")) or _now(),
+            processed_at=_to_dt(doc.get("processed_at")),
+            processed_reason=doc.get("processed_reason"),
+            license_id=doc.get("license_id"),
+            email_sent=bool(doc.get("email_sent", False)),
+            email_error=doc.get("email_error"),
+        )
+
+    # ---------- Public: create a request ----------
+    @router.post(
+        "/requests",
+        response_model=LicenseRequestRecord,
+        status_code=status.HTTP_201_CREATED,
+    )
+    async def create_license_request(body: LicenseRequestCreate) -> LicenseRequestRecord:
+        """Endpoint públic: un client demana una llicència omplint el portal."""
+        # Rate limit implícit: una sol·licitud pendent per install_id.
+        existing = await req_coll.find_one(
+            {"install_id": body.install_id, "status": "pending"}
+        )
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail="Ja hi ha una sol·licitud pendent per aquest Install ID. Espera resposta o contacta amb el proveïdor.",
+            )
+        req_id = str(uuid.uuid4())
+        doc = {
+            "id": req_id,
+            "install_id": body.install_id,
+            "company_name": body.company_name.strip(),
+            "contact_name": (body.contact_name or "").strip() or None,
+            "email": body.email,
+            "phone": (body.phone or "").strip() or None,
+            "tax_id": (body.tax_id or "").strip() or None,
+            "plan_requested": (body.plan_requested or "STD").upper(),
+            "notes": body.notes,
+            "status": "pending",
+            "created_at": _now().isoformat(),
+            "processed_at": None,
+            "processed_reason": None,
+            "license_id": None,
+            "email_sent": False,
+            "email_error": None,
+        }
+        await req_coll.insert_one(doc)
+        logger.info("license request received for %s", body.install_id)
+        return _req_to_record(doc)
+
+    # ---------- Admin: list requests ----------
+    @router.get(
+        "/requests",
+        response_model=LicenseRequestListResponse,
+        dependencies=[Depends(require_admin)],
+    )
+    async def list_license_requests(
+        status_filter: Optional[str] = Query(None, alias="status"),
+        limit: int = Query(200, ge=1, le=1000),
+    ) -> LicenseRequestListResponse:
+        query: dict[str, Any] = {}
+        if status_filter:
+            query["status"] = status_filter
+        cursor = req_coll.find(query, {"_id": 0}).sort("created_at", -1).limit(limit)
+        docs = await cursor.to_list(limit)
+        pending = await req_coll.count_documents({"status": "pending"})
+        return LicenseRequestListResponse(
+            total=len(docs),
+            pending=pending,
+            items=[_req_to_record(d) for d in docs],
+        )
+
+    # ---------- Admin: approve request ----------
+    @router.post(
+        "/requests/{req_id}/approve",
+        dependencies=[Depends(require_admin)],
+    )
+    async def approve_license_request(
+        req_id: str, body: Optional[LicenseRequestApprove] = None
+    ) -> dict:
+        body = body or LicenseRequestApprove()
+        doc = await req_coll.find_one({"id": req_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Sol·licitud no trobada")
+        if doc.get("status") != "pending":
+            raise HTTPException(
+                status_code=409,
+                detail=f"La sol·licitud ja està {doc.get('status')}",
+            )
+
+        plan = (body.plan or doc.get("plan_requested") or "STD").upper()
+        lic_doc = await _create_license(
+            install_id=doc["install_id"],
+            client_name=doc.get("company_name", ""),
+            client_email=doc.get("email"),
+            duration_days=body.duration_days,
+            plan=plan,
+            notes=f"Aprovada des de sol·licitud {req_id}. {doc.get('notes') or ''}".strip(),
+        )
+
+        # Intent d'enviar email (opcional)
+        email_sent = False
+        email_error: Optional[str] = None
+        if body.send_email:
+            expires_at = _to_dt(lic_doc.get("expires_at"))
+            ok, info = await mailer.send_license_email(
+                to_email=doc["email"],
+                client_name=doc.get("company_name", ""),
+                install_id=doc["install_id"],
+                license_key=lic_doc["license_key"],
+                plan=plan,
+                expires_at=expires_at,
+            )
+            email_sent = ok
+            if not ok:
+                email_error = info
+
+        await req_coll.update_one(
+            {"id": req_id},
+            {"$set": {
+                "status": "approved",
+                "processed_at": _now().isoformat(),
+                "license_id": lic_doc["id"],
+                "email_sent": email_sent,
+                "email_error": email_error,
+            }},
+        )
+        updated_req = await req_coll.find_one({"id": req_id})
+        return {
+            "request": _req_to_record(updated_req).model_dump(mode="json"),
+            "license": _doc_to_record(lic_doc, include_key=True).model_dump(mode="json"),
+            "email_sent": email_sent,
+            "email_error": email_error,
+            "mailer_configured": mailer.is_configured(),
+        }
+
+    # ---------- Admin: reject request ----------
+    @router.post(
+        "/requests/{req_id}/reject",
+        response_model=LicenseRequestRecord,
+        dependencies=[Depends(require_admin)],
+    )
+    async def reject_license_request(
+        req_id: str, body: Optional[LicenseRequestReject] = None
+    ) -> LicenseRequestRecord:
+        body = body or LicenseRequestReject()
+        doc = await req_coll.find_one({"id": req_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Sol·licitud no trobada")
+        if doc.get("status") != "pending":
+            raise HTTPException(status_code=409, detail="Sol·licitud ja processada")
+        await req_coll.update_one(
+            {"id": req_id},
+            {"$set": {
+                "status": "rejected",
+                "processed_at": _now().isoformat(),
+                "processed_reason": body.reason or "rejected_by_admin",
+            }},
+        )
+        updated = await req_coll.find_one({"id": req_id})
+        return _req_to_record(updated)
+
+    # ---------- Detail (paramètrica, va al final) ----------
     @router.get(
         "/{install_id}",
         response_model=LicenseRecord,

@@ -8,6 +8,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 LicenseStatus = Literal["active", "revoked", "expired"]
+RequestStatus = Literal["pending", "approved", "rejected"]
 
 # Format d'Install ID generat pel frontend v2.html: CD-XXXX-XXXX-XXXX-XXXX
 INSTALL_ID_RE = re.compile(r"^CD-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$")
@@ -107,3 +108,71 @@ class LicenseVerifyResponse(BaseModel):
 class LicenseListResponse(BaseModel):
     total: int
     items: list[LicenseRecord]
+
+
+# ---------------------------------------------------------------------------
+# Sol·licituds públiques de llicència (public request → admin approval)
+# ---------------------------------------------------------------------------
+class LicenseRequestCreate(BaseModel):
+    """Payload públic que envia un client des del portal /request-license."""
+
+    install_id: str
+    company_name: str = Field(..., min_length=1, max_length=200)
+    contact_name: Optional[str] = Field(None, max_length=200)
+    email: str = Field(..., max_length=200)
+    phone: Optional[str] = Field(None, max_length=40)
+    tax_id: Optional[str] = Field(None, max_length=40, description="NIF/CIF")
+    plan_requested: Optional[str] = Field("STD", max_length=40)
+    notes: Optional[str] = Field(None, max_length=1000)
+
+    @field_validator("install_id")
+    @classmethod
+    def _norm_install_id(cls, v: str) -> str:
+        return _validate_install_id(v)
+
+    @field_validator("email")
+    @classmethod
+    def _basic_email(cls, v: str) -> str:
+        v = (v or "").strip().lower()
+        if "@" not in v or "." not in v.split("@", 1)[1]:
+            raise ValueError("Adreça de correu invàlida")
+        return v
+
+
+class LicenseRequestApprove(BaseModel):
+    """Payload d'aprovació (admin). Permet sobreescriure plan / duració."""
+
+    duration_days: Optional[int] = Field(None, ge=1, le=365 * 20)
+    plan: Optional[str] = Field(None, max_length=40)
+    send_email: bool = Field(True, description="Intentar enviar email al client")
+
+
+class LicenseRequestReject(BaseModel):
+    reason: Optional[str] = Field(None, max_length=500)
+
+
+class LicenseRequestRecord(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    install_id: str
+    company_name: str
+    contact_name: Optional[str] = None
+    email: str
+    phone: Optional[str] = None
+    tax_id: Optional[str] = None
+    plan_requested: Optional[str] = "STD"
+    notes: Optional[str] = None
+    status: RequestStatus = "pending"
+    created_at: datetime
+    processed_at: Optional[datetime] = None
+    processed_reason: Optional[str] = None
+    license_id: Optional[str] = None  # llicència creada quan s'aprova
+    email_sent: bool = False
+    email_error: Optional[str] = None
+
+
+class LicenseRequestListResponse(BaseModel):
+    total: int
+    pending: int
+    items: list[LicenseRequestRecord]
