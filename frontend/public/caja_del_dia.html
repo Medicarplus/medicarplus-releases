@@ -639,11 +639,11 @@ function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(
   const trShownCB=df>0?df:autoT_CB;
   const delta_C=df>0?(df-autoT_C):0;
   const delta_CB=df>0?(df-autoT_CB):0;
-  // Partida doble: entrades auto + reclassificació |delta|. Cada moviment és balancejat.
-  const totalMovC=(t.bruto-t.dto)+t.haber+t.debe+Math.abs(delta_C);
+  // Partida doble: entrades auto (i, en agregat, redistribuïdes entre Caixa/Banc segons datàfon).
+  const totalMovC=(t.bruto-t.dto)+t.haber+t.debe;
   const haberTotalC=totalMovC;
   const debeTotalC=totalMovC;
-  const totalMovCB=(t.bruto-t.dto)+t.tasas+t.haber+t.debe+Math.abs(delta_CB);
+  const totalMovCB=(t.bruto-t.dto)+t.tasas+t.haber+t.debe;
   const haberTotalCB=totalMovCB;
   const debeTotalCB=totalMovCB;
   // CAIXA FÍSICA = Efectiu auto − delta (el que va anar a targeta segons datàfon).
@@ -749,6 +749,41 @@ function generateLedgerEntries(dateFrom,dateTo,company){
           if(e.tasa>0)add(acctT,'705 Ingressos tasas',e.tasa);
         }
       });
+      // Datàfon manual: redistribueix imports entre Caixa (570) i Banc (572) DINS els mateixos
+      // assentaments existents (no crea línia extra). El datàfon és el total autoritatiu de targeta.
+      if(useDf){
+        let delta=dfDay-autoT;
+        if(delta>0){
+          // Mou 'delta' de Caixa a Banc, mantenint el mateix compte HABER (705 Ingressos / 705 Tasas).
+          for(const key of Object.keys(bucket)){
+            if(delta<=0.005)break;
+            const [debeAcct,haberAcct]=key.split('|');
+            if(debeAcct==='570 Caixa'&&bucket[key].debe>0){
+              const move=Math.min(bucket[key].debe,delta);
+              bucket[key].debe-=move;bucket[key].haber-=move;delta-=move;
+              const bankKey=`572 Banc BBVA|${haberAcct}`;
+              if(!bucket[bankKey])bucket[bankKey]={debe:0,haber:0};
+              bucket[bankKey].debe+=move;bucket[bankKey].haber+=move;
+            }
+          }
+        }else if(delta<0){
+          // Mou |delta| de Banc a Caixa (menys targeta del que estava marcat).
+          let need=-delta;
+          for(const key of Object.keys(bucket)){
+            if(need<=0.005)break;
+            const [debeAcct,haberAcct]=key.split('|');
+            if(debeAcct.startsWith('572')&&bucket[key].debe>0){
+              const move=Math.min(bucket[key].debe,need);
+              bucket[key].debe-=move;bucket[key].haber-=move;need-=move;
+              const cashKey=`570 Caixa|${haberAcct}`;
+              if(!bucket[cashKey])bucket[cashKey]={debe:0,haber:0};
+              bucket[cashKey].debe+=move;bucket[cashKey].haber+=move;
+            }
+          }
+        }
+        // Netejem buckets buits (residus per arrodoniment).
+        for(const key of Object.keys(bucket)){if(bucket[key].debe<0.005&&bucket[key].haber<0.005)delete bucket[key]}
+      }
       // Etiquetes clares per als assentaments agregats del dia.
       const conceptFor=(debeAcct,haberAcct)=>{
         if(haberAcct==='705 Ingressos tasas')return `Tasa DGT del dia (${debeAcct.split(' ')[0]})`;
@@ -779,19 +814,18 @@ function generateLedgerEntries(dateFrom,dateTo,company){
         }
       });
       // autoT per la reclassificació datàfon (ESPORT també)
-      var autoT=0;
-      arr.forEach(e=>{if(e.retorno||e.kind==='DH')return;if(e.fp==='T')autoT+=(e.importe-(e.descuento||0));if((e.fpTasa||e.fp)==='T')autoT+=(e.tasa||0)});
-    }
-    // Reclassificació datàfon: una sola línia amb la diferència entre el manual i l'auto.
-    // Si delta > 0: Efectiu → Datàfon manual (DEBE 572 / HABER 570).
-    // Si delta < 0: Datàfon → Efectiu (DEBE 570 / HABER 572).
-    if(useDf){
-      const delta=dfDay-(typeof autoT!=='undefined'?autoT:0);
-      if(Math.abs(delta)>0.005){
-        if(delta>0){
-          rows.push({date,concepto:'Reclassificació · Efectiu → Datàfon manual',debeAcct:'572 Banc BBVA',debeAmt:delta,haberAcct:'570 Caixa',haberAmt:delta});
-        }else{
-          rows.push({date,concepto:'Reclassificació · Datàfon manual → Efectiu',debeAcct:'570 Caixa',debeAmt:-delta,haberAcct:'572 Banc BBVA',haberAmt:-delta});
+      var autoTe=0;
+      arr.forEach(e=>{if(e.retorno||e.kind==='DH')return;if(e.fp==='T')autoTe+=(e.importe-(e.descuento||0));if((e.fpTasa||e.fp)==='T')autoTe+=(e.tasa||0)});
+      // Datàfon manual ESPORT: emet una única línia de reclassificació (compensada) al final del dia.
+      // (Al detall d'Esport es manté cada revisió amb el seu compte, no es redistribueix a dins.)
+      if(useDf){
+        const delta=dfDay-autoTe;
+        if(Math.abs(delta)>0.005){
+          if(delta>0){
+            rows.push({date,concepto:'Reclassificació · Efectiu → Datàfon manual',debeAcct:'572 Banc BBVA',debeAmt:delta,haberAcct:'570 Caixa',haberAmt:delta});
+          }else{
+            rows.push({date,concepto:'Reclassificació · Datàfon manual → Efectiu',debeAcct:'570 Caixa',debeAmt:-delta,haberAcct:'572 Banc BBVA',haberAmt:-delta});
+          }
         }
       }
     }
