@@ -888,19 +888,25 @@ function openLedger(){
     if(!rows.length){body.innerHTML=`<div class="empty" style="padding:40px;color:#5a3a1a">No hi ha moviments a la llibreta de <b>${compName(ledgerComp)}</b> en aquest rang.</div>`;return}
     let totD=0,totH=0;
     // Format tradicional del Libro Diario: cada assentament ocupa 2 files en diagonal.
-    // Fila 1: DEBE (compte a l'esquerra, import a la columna DEBE)
-    // Fila 2: HABER (compte indentat "a X", import a la columna HABER)
+    // Fila 1: compte DEBE (esquerra) + import DEBE
+    // Fila 2: compte HABER (dreta, indentat "a X") + import HABER
     const journalRows=rows.map((r,i)=>{
       totD+=r.debeAmt;totH+=r.haberAmt;
       const zebra=i%2===0?'#faf6e8':'#f4ecd0';
       const dateStr=r.date.split('-').reverse().join('/').slice(0,5);
-      return `<tr style="background:${zebra}"><td rowspan="2" style="padding:8px 10px;font-size:11px;color:#5a3a1a;border-bottom:1px solid #8b6f47;border-right:1px solid #c9b78c;vertical-align:top;width:60px">${dateStr}</td>
+      return `<tr style="background:${zebra}">
+        <td rowspan="2" style="padding:8px 10px;font-size:11px;color:#5a3a1a;border-bottom:1px solid #8b6f47;border-right:1px solid #c9b78c;vertical-align:top;width:60px">${dateStr}</td>
         <td style="padding:6px 10px;font-size:13px;border-right:1px solid #c9b78c"><b style="color:#8b1a1a">${r.debeAcct.split(' ')[0]}</b> ${escapeHtml(r.debeAcct.split(' ').slice(1).join(' '))}<br><span style="font-size:10px;color:#888;font-style:italic">${escapeHtml(r.concepto)}</span></td>
-        <td style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#8b1a1a;font-size:13px;border-right:1px solid #c9b78c;width:110px">${fmt(r.debeAmt)}</td>
-        <td style="padding:6px 10px;width:110px"></td></tr>
-      <tr style="background:${zebra}"><td style="padding:6px 10px 10px 30px;font-size:13px;border-right:1px solid #c9b78c;border-bottom:1px solid #8b6f47;color:#1a5a2a"><span style="color:#888">a</span> <b>${r.haberAcct.split(' ')[0]}</b> ${escapeHtml(r.haberAcct.split(' ').slice(1).join(' '))}</td>
-        <td style="border-right:1px solid #c9b78c;border-bottom:1px solid #8b6f47"></td>
-        <td style="padding:6px 10px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#1a5a2a;font-size:13px;border-bottom:1px solid #8b6f47">${fmt(r.haberAmt)}</td></tr>`;
+        <td style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#8b1a1a;font-size:13px;border-right:2px solid #8b6f47;width:110px">${fmt(r.debeAmt)}</td>
+        <td style="padding:6px 10px;font-size:13px;border-right:1px solid #c9b78c;color:#aaa;font-style:italic;font-size:11px"></td>
+        <td style="padding:6px 10px;width:110px"></td>
+      </tr>
+      <tr style="background:${zebra}">
+        <td style="padding:6px 10px 10px;font-size:13px;border-right:1px solid #c9b78c;border-bottom:1px solid #8b6f47"></td>
+        <td style="border-right:2px solid #8b6f47;border-bottom:1px solid #8b6f47"></td>
+        <td style="padding:6px 10px 10px 30px;font-size:13px;border-right:1px solid #c9b78c;border-bottom:1px solid #8b6f47;color:#1a5a2a"><span style="color:#888">a</span> <b>${r.haberAcct.split(' ')[0]}</b> ${escapeHtml(r.haberAcct.split(' ').slice(1).join(' '))}</td>
+        <td style="padding:6px 10px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#1a5a2a;font-size:13px;border-bottom:1px solid #8b6f47">${fmt(r.haberAmt)}</td>
+      </tr>`;
     }).join('');
     const cuadra=Math.abs(totD-totH)<0.01;
     // Balanç per comptes: agrupar tots els comptes que han tingut moviment
@@ -929,16 +935,18 @@ function openLedger(){
         <thead>
           <tr style="background:#5a3a1a;color:#fff">
             <th style="padding:8px;text-align:center;font-size:10px;letter-spacing:2px;border-right:1px solid #8b6f47;width:60px">DATA</th>
-            <th style="padding:8px;text-align:left;font-size:11px;letter-spacing:2px;border-right:1px solid #8b6f47">COMPTE / CONCEPTE</th>
-            <th style="padding:8px;text-align:right;font-size:11px;letter-spacing:2px;border-right:1px solid #8b6f47;color:#ffcbcb;width:110px">DEBE</th>
-            <th style="padding:8px;text-align:right;font-size:11px;letter-spacing:2px;color:#c8f5d0;width:110px">HABER</th>
+            <th style="padding:8px;text-align:left;font-size:11px;letter-spacing:2px;border-right:1px solid #8b6f47;color:#ffcbcb">COMPTE DEBE</th>
+            <th style="padding:8px;text-align:right;font-size:11px;letter-spacing:2px;border-right:2px solid #8b6f47;color:#ffcbcb;width:110px">DEBE €</th>
+            <th style="padding:8px;text-align:left;font-size:11px;letter-spacing:2px;border-right:1px solid #8b6f47;color:#c8f5d0">COMPTE HABER</th>
+            <th style="padding:8px;text-align:right;font-size:11px;letter-spacing:2px;color:#c8f5d0;width:110px">HABER €</th>
           </tr>
         </thead>
         <tbody>${journalRows}</tbody>
         <tfoot>
           <tr style="background:#5a3a1a;color:#fff;font-family:'Courier New',monospace;font-weight:700;font-size:14px">
             <td colspan="2" style="padding:10px 14px;text-align:right;border-right:1px solid #8b6f47">TOTALS:</td>
-            <td style="padding:10px 14px;text-align:right;color:#ffcbcb;border-right:1px solid #8b6f47">${fmt(totD)}</td>
+            <td style="padding:10px 14px;text-align:right;color:#ffcbcb;border-right:2px solid #8b6f47">${fmt(totD)}</td>
+            <td style="padding:10px 14px;text-align:right;border-right:1px solid #8b6f47"></td>
             <td style="padding:10px 14px;text-align:right;color:#c8f5d0">${fmt(totH)}</td>
           </tr>
         </tfoot>
