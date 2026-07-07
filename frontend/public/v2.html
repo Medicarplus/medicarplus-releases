@@ -502,7 +502,7 @@ const STATS_KEY='caja.stats.v1';
     localStorage.setItem('caja.stats.seed.2026.jan-may','1');
   }catch(e){console.warn('seedStats2026',e)}
 })();
-const DEFAULT_AUTOS=['A.E.DAINA','A.E.M-2 (CENTELLES)','A.E.MABEL','ROSSELL/VIC','CARRERA','CLAPERA','FERRER','CONNECT','MOLIST CALLDETENES','MOLIST','MONTSENY','OSONA','PARTICULAR','ROSANAS','A.E.TONA','SARRIÓ','TARADELL','TRÀFIC','TUNEU','CANJE','LLUÇANÈS','HOY-VOY','MANLLEU','MUNELL','RECUPERACIÓ','AVANÇA','TERÇOL'];
+const DEFAULT_AUTOS=[]; // Comercial: llista buida, cada client afegeix les seves autoescoles amb el botó "+ Autoescola"
 const MESOS=['Gener','Febrer','Març','Abril','Maig','Juny','Juliol','Agost','Setembre','Octubre','Novembre','Desembre'];
 function loadStats(){try{const s=JSON.parse(localStorage.getItem(STATS_KEY)||'{}');if(!s.autoescoles)s.autoescoles=DEFAULT_AUTOS.slice();if(!s.data)s.data={};return s}catch(e){return{autoescoles:DEFAULT_AUTOS.slice(),data:{}}}}
 function saveStats(s){localStorage.setItem(STATS_KEY,JSON.stringify(s));pushSnapshot('auto');scheduleFileAutoSave()}
@@ -2406,10 +2406,12 @@ function showConfigWizard(isFirstRun){
 // de l'IRPF. Aquesta neteja els elimina de qualsevol dada guardada localment
 // SI mai s'han fet servir (tot a zero). Es fa una sola vegada per instal·lació.
 (function commercialCleanupV3(){
-  const FLAG='caja.commercialClean.v3';
+  const FLAG='caja.commercialClean.v4';
   if(localStorage.getItem(FLAG))return;
   const SEED_NAMES=['JOSEP BRUGULAT','JOSEP Mª RAFART','JOSE ANT. MELLADO'];
+  const SEED_AUTOS=['A.E.DAINA','A.E.M-2 (CENTELLES)','A.E.MABEL','ROSSELL/VIC','CARRERA','CLAPERA','FERRER','CONNECT','MOLIST CALLDETENES','MOLIST','MONTSENY','OSONA','PARTICULAR','ROSANAS','A.E.TONA','SARRIÓ','TARADELL','TRÀFIC','TUNEU','CANJE','LLUÇANÈS','HOY-VOY','MANLLEU','MUNELL','RECUPERACIÓ','AVANÇA','TERÇOL'];
   try{
+    // IRPF · elimina metges pre-cargats no usats
     const raw=JSON.parse(localStorage.getItem('caja.irpf.v1')||'null');
     if(raw){
       const clean=obj=>{
@@ -2427,6 +2429,19 @@ function showConfigWizard(isFirstRun){
       if(raw.cempla)clean(raw.cempla);
       if(raw.months)clean(raw);
       localStorage.setItem('caja.irpf.v1',JSON.stringify(raw));
+    }
+    // Estadístiques · elimina les 27 autoescoles pre-cargades del creador si no s'han fet servir
+    const statsRaw=JSON.parse(localStorage.getItem('caja.stats.v1')||'null');
+    if(statsRaw&&Array.isArray(statsRaw.autoescoles)){
+      const data=statsRaw.data||{};
+      const usedNames=new Set();
+      Object.values(data).forEach(monthlyData=>{
+        if(monthlyData&&typeof monthlyData==='object'){
+          Object.entries(monthlyData).forEach(([name,val])=>{if(val)usedNames.add(name)});
+        }
+      });
+      statsRaw.autoescoles=statsRaw.autoescoles.filter(a=>!SEED_AUTOS.includes(a)||usedNames.has(a));
+      localStorage.setItem('caja.stats.v1',JSON.stringify(statsRaw));
     }
   }catch(e){console.warn('Cleanup v3:',e)}
   localStorage.setItem(FLAG,'1');
