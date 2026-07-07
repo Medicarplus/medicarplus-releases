@@ -1585,8 +1585,13 @@ applyLang();
 // SISTEMA DE LLICÈNCIES · v2 COMERCIAL · Marc Brugulat Lopez
 // ============================================================================
 // Cada instal·lació genera un ID únic. Sense llicència vàlida → app bloquejada.
-// Format llicència: MB-XXXX-XXXX-XXXX-XXXX (16 caràcters + prefix)
-// Verificació online cada 15 dies (opcional, tolera 30 dies offline).
+// Formats acceptats:
+//   · MASTER: 'MB-MASTER-BRUGULAT-2026-OWNER' (universal, offline)
+//   · JWT   : xxx.yyy.zzz signat pel servidor (recomanat, verifiable online)
+//   · MB-XX : legacy 'MB-XXXX-XXXX-XXXX-XXXX' (checksum local, sense server)
+// Verificació online al servidor (Fase 4/5): cada CHECK_INTERVAL_DAYS,
+// tolera MAX_OFFLINE_DAYS sense poder verificar. Si el servidor revoca o
+// diu que ha caducat → la llicència queda invalidada al proper cicle.
 // ============================================================================
 const LIC={
   KEY:'caja.license.v1',
@@ -1595,8 +1600,11 @@ const LIC={
   LAST_CHECK:'caja.license.lastcheck.v1',
   CHECK_INTERVAL_DAYS:15,
   MAX_OFFLINE_DAYS:30,
-  VERIFY_URL:'',// posar la URL del teu servidor quan la tinguis
-  MASTER_KEY:'MB-MASTER-BRUGULAT-2026-OWNER',// clau universal per Marc (creator)
+  // Servidor de llicències (Fase 4/5). Canvia aquesta URL al teu domini
+  // definitiu abans de compilar l'Electron per als clients.
+  VERIFY_URL:'https://project-helper-47.preview.emergentagent.com/api/licenses/verify',
+  REQUEST_URL:'https://project-helper-47.preview.emergentagent.com/request-license',
+  MASTER_KEY:'MB-MASTER-BRUGULAT-2026-OWNER',
 };
 function getInstallId(){
   let id=localStorage.getItem(LIC.INSTALL_KEY);
@@ -1609,40 +1617,83 @@ function getInstallId(){
 }
 function loadLicense(){try{return JSON.parse(localStorage.getItem(LIC.KEY)||'null')}catch(e){return null}}
 function saveLicense(lic){localStorage.setItem(LIC.KEY,JSON.stringify(lic));localStorage.setItem(LIC.LAST_CHECK,Date.now().toString())}
-// Validació d'una clau: MASTER key sempre val · resta: format + checksum vs Install ID
+// --- Detecció de format ---
+const JWT_RE=/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+const LEGACY_RE=/^MB-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+// Decode base64url payload of a JWT (client-side, WITHOUT verifying signature —
+// això només mira que el payload sigui coherent. La signatura la valida el
+// servidor a VERIFY_URL. Un JWT falsificat pot passar aquesta comprovació però
+// serà rebutjat al primer re-check online).
+function _b64urlDecode(s){
+  s=s.replace(/-/g,'+').replace(/_/g,'/');
+  while(s.length%4)s+='=';
+  return decodeURIComponent(atob(s).split('').map(c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+}
+function _decodeJwtPayload(jwt){
+  const parts=jwt.split('.');
+  if(parts.length!==3)throw new Error('JWT malformat');
+  return JSON.parse(_b64urlDecode(parts[1]));
+}
+function _validateJwtLocal(jwt,installId){
+  let p;
+  try{p=_decodeJwtPayload(jwt)}catch(e){return {ok:false,reason:'JWT invàlid: '+e.message}}
+  if(!p||typeof p!=='object')return {ok:false,reason:'JWT invàlid'};
+  if(p.sub&&p.sub!==installId)return {ok:false,reason:"La clau no correspon a aquesta instal·lació"};
+  if(p.exp){
+    const now=Math.floor(Date.now()/1000);
+    if(p.exp<now)return {ok:false,reason:'Llicència expirada'};
+  }
+  const expLabel=p.exp?new Date(p.exp*1000).toLocaleDateString('ca-ES'):'PERPÈTUA';
+  return {ok:true,type:'JWT',plan:p.plan||'STD',centre:'Client comercial',expires:expLabel,payload:p};
+}
+// Validació d'una clau. MASTER sempre val. JWT: decode local (server = font
+// de veritat). MB-XXXX: format + checksum local (sistema legacy pre-Fase 4).
 function validateKey(key,installId){
   if(!key)return {ok:false,reason:'Clau buida'};
-  key=key.trim().toUpperCase();
-  if(key===LIC.MASTER_KEY)return {ok:true,type:'MASTER',centre:'Marc Brugulat Lopez (creator)',expires:'PERMANENT'};
-  // Format: MB-XXXX-XXXX-XXXX-XXXX
-  if(!/^MB-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(key))return {ok:false,reason:'Format incorrecte. Ha de ser MB-XXXX-XXXX-XXXX-XXXX'};
-  // Checksum XOR (versió demo — en producció serà signatura RSA-PSS del servidor)
-  const digits=key.replace(/[^A-Z0-9]/g,'');
-  let sum=0;for(let i=0;i<digits.length;i++)sum=(sum*31+digits.charCodeAt(i))%100000;
-  const installDigits=installId.replace(/[^A-Z0-9]/g,'');
-  let installSum=0;for(let i=0;i<installDigits.length;i++)installSum=(installSum*17+installDigits.charCodeAt(i))%100000;
-  if(sum===installSum||(sum%1000)===(installSum%1000))return {ok:true,type:'STD',centre:'Client comercial',expires:'ANUAL'};
-  return {ok:false,reason:'Clau no vàlida per aquesta instal·lació'};
+  const raw=key.trim();
+  if(raw.toUpperCase()===LIC.MASTER_KEY)return {ok:true,type:'MASTER',centre:'Marc Brugulat Lopez (creator)',expires:'PERMANENT'};
+  if(JWT_RE.test(raw))return _validateJwtLocal(raw,installId);
+  const upper=raw.toUpperCase();
+  if(LEGACY_RE.test(upper)){
+    const digits=upper.replace(/[^A-Z0-9]/g,'');
+    let sum=0;for(let i=0;i<digits.length;i++)sum=(sum*31+digits.charCodeAt(i))%100000;
+    const installDigits=installId.replace(/[^A-Z0-9]/g,'');
+    let installSum=0;for(let i=0;i<installDigits.length;i++)installSum=(installSum*17+installDigits.charCodeAt(i))%100000;
+    if(sum===installSum||(sum%1000)===(installSum%1000))return {ok:true,type:'STD',centre:'Client comercial',expires:'ANUAL'};
+    return {ok:false,reason:'Clau no vàlida per aquesta instal·lació'};
+  }
+  return {ok:false,reason:'Format incorrecte. Introdueix una clau JWT (xxx.yyy.zzz) o MB-XXXX-XXXX-XXXX-XXXX'};
+}
+// Verificació online al servidor (Fase 4/5). Retorna promesa amb {ok, revoked, expired, reason}.
+async function verifyOnline(key,installId){
+  if(!LIC.VERIFY_URL)return {ok:true,skipped:true};
+  const r=await fetch(LIC.VERIFY_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({install_id:installId,key})});
+  return await r.json();
 }
 function isLicenseActive(){
   const lic=loadLicense();if(!lic)return false;
   if(lic.type==='MASTER')return true;
-  // Comprovem que la clau segueixi sent vàlida (per si els bits s'han corromput)
+  // 1) Validació local (format + checksum / JWT decode)
   const installId=getInstallId();
   const v=validateKey(lic.key,installId);
   if(!v.ok)return false;
-  // Verificació online periòdica (si tenim VERIFY_URL configurada)
+  // 2) Verificació online periòdica per JWT (font de veritat: servidor)
   const lastCheck=parseInt(localStorage.getItem(LIC.LAST_CHECK)||'0');
   const daysSinceCheck=(Date.now()-lastCheck)/(1000*60*60*24);
-  if(LIC.VERIFY_URL&&daysSinceCheck>LIC.CHECK_INTERVAL_DAYS){
-    fetch(LIC.VERIFY_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({installId,key:lic.key})})
-      .then(r=>r.json()).then(res=>{
-        if(res.revoked){localStorage.removeItem(LIC.KEY);location.reload()}
-        else localStorage.setItem(LIC.LAST_CHECK,Date.now().toString());
-      }).catch(()=>{});
+  const needsCheck=LIC.VERIFY_URL&&lic.type==='JWT'&&daysSinceCheck>LIC.CHECK_INTERVAL_DAYS;
+  if(needsCheck){
+    verifyOnline(lic.key,installId).then(res=>{
+      if(res.revoked||res.expired||res.ok===false){
+        console.warn('Llicència invalidada pel servidor:',res.reason);
+        localStorage.removeItem(LIC.KEY);
+        location.reload();
+      }else{
+        localStorage.setItem(LIC.LAST_CHECK,Date.now().toString());
+      }
+    }).catch(()=>{/* offline: tolerem fins a MAX_OFFLINE_DAYS */});
   }
-  // Bloqueig si portem >MAX_OFFLINE_DAYS sense poder verificar (només si VERIFY_URL està activa)
-  if(LIC.VERIFY_URL&&daysSinceCheck>LIC.MAX_OFFLINE_DAYS)return false;
+  // 3) Bloqueig si portem massa temps sense poder verificar (només JWT)
+  if(LIC.VERIFY_URL&&lic.type==='JWT'&&daysSinceCheck>LIC.MAX_OFFLINE_DAYS)return false;
   return true;
 }
 function showActivationModal(){
@@ -1663,48 +1714,73 @@ function showActivationModal(){
     </div>
     <div style="margin-bottom:20px">
       <label style="display:block;font-size:12px;color:#f5b301;letter-spacing:1.5px;font-weight:700;margin-bottom:8px">CLAU DE LLICÈNCIA</label>
-      <input id="licInput" type="text" placeholder="MB-XXXX-XXXX-XXXX-XXXX" style="width:100%;padding:12px;background:#0f172a;border:2px solid #475569;border-radius:8px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:16px;letter-spacing:2px;text-transform:uppercase" autocomplete="off" />
+      <textarea id="licInput" placeholder="Enganxa aquí la teva clau (JWT xxx.yyy.zzz o MB-XXXX-XXXX-XXXX-XXXX)" rows="3" style="width:100%;padding:12px;background:#0f172a;border:2px solid #475569;border-radius:8px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:12px;line-height:1.5;letter-spacing:0.5px;resize:vertical;word-break:break-all;box-sizing:border-box" autocomplete="off" spellcheck="false"></textarea>
       <div id="licError" style="color:#ef4444;font-size:12px;margin-top:8px;display:none"></div>
+      <div id="licStatus" style="color:#38bdf8;font-size:12px;margin-top:8px;display:none"></div>
     </div>
     <button id="licBtn" style="width:100%;padding:14px;background:linear-gradient(135deg,#f5b301,#d97706);color:#0f172a;border:none;border-radius:10px;font-family:Georgia,serif;font-size:16px;font-weight:700;letter-spacing:2px;cursor:pointer;text-transform:uppercase">✓ Activar Llicència</button>
     <div style="text-align:center;margin-top:24px;padding-top:20px;border-top:1px solid #334155">
-      <p style="color:#64748b;font-size:11px;margin:0;line-height:1.6">Per obtenir una llicència, contacta amb <b style="color:#f5b301">Marc Brugulat Lopez</b><br>Instal·lació: ${new Date(installDate).toLocaleDateString('ca-ES')}</p>
+      <p style="color:#64748b;font-size:11px;margin:0;line-height:1.6">No tens llicència? <a href="${LIC.REQUEST_URL}" target="_blank" style="color:#f5b301;text-decoration:underline">Demana-la aquí</a><br>o contacta amb <b style="color:#f5b301">Marc Brugulat Lopez</b><br>Instal·lació: ${new Date(installDate).toLocaleDateString('ca-ES')}</p>
     </div>
   </div>`;
   document.body.appendChild(back);
   const inp=back.querySelector('#licInput');
   const err=back.querySelector('#licError');
+  const info=back.querySelector('#licStatus');
   const btn=back.querySelector('#licBtn');
   inp.focus();
-  const tryActivate=()=>{
-    const v=validateKey(inp.value,installId);
-    if(v.ok){
-      saveLicense({key:inp.value.trim().toUpperCase(),type:v.type,centre:v.centre,expires:v.expires,activated:new Date().toISOString(),installId});
-      back.innerHTML=`<div style="text-align:center;color:#22c55e;font-family:Georgia,serif"><div style="font-size:60px;margin-bottom:12px">✓</div><h2 style="margin:0">Llicència activada!</h2><p style="color:#94a3b8">Recarregant l'app...</p></div>`;
-      setTimeout(()=>location.reload(),1200);
-    }else{
-      err.textContent='✗ '+v.reason;err.style.display='block';
-      inp.style.borderColor='#ef4444';setTimeout(()=>inp.style.borderColor='#475569',2000);
+  const showErr=(msg)=>{err.textContent='✗ '+msg;err.style.display='block';info.style.display='none';inp.style.borderColor='#ef4444';setTimeout(()=>inp.style.borderColor='#475569',2000)};
+  const showInfo=(msg)=>{info.textContent=msg;info.style.display='block';err.style.display='none'};
+  const tryActivate=async()=>{
+    const rawKey=inp.value.trim();
+    const v=validateKey(rawKey,installId);
+    if(!v.ok){showErr(v.reason);return}
+    // Per JWT: verificació online al servidor (font de veritat). Si el servidor
+    // no és accessible, permetem l'activació offline i el proper cicle de 15 dies
+    // el validarà.
+    let centre=v.centre,plan=v.plan||v.type,expires=v.expires;
+    if(v.type==='JWT'&&LIC.VERIFY_URL){
+      btn.disabled=true;btn.textContent='Verificant al servidor…';showInfo('Contactant servidor de llicències…');
+      try{
+        const res=await verifyOnline(rawKey,installId);
+        if(res.ok===false){showErr(res.reason||'Rebutjada pel servidor');btn.disabled=false;btn.textContent='✓ Activar Llicència';return}
+        if(res.client_name)centre=res.client_name;
+        if(res.plan)plan=res.plan;
+        showInfo('✓ Verificada pel servidor');
+      }catch(e){
+        console.warn('Activació offline (servidor no accessible):',e);
+        showInfo('⚠ Activada offline (es re-verificarà quan hi hagi connexió)');
+      }
+      btn.disabled=false;btn.textContent='✓ Activar Llicència';
     }
+    saveLicense({key:rawKey,type:v.type,centre,plan,expires,activated:new Date().toISOString(),installId});
+    back.innerHTML=`<div style="text-align:center;color:#22c55e;font-family:Georgia,serif"><div style="font-size:60px;margin-bottom:12px">✓</div><h2 style="margin:0">Llicència activada!</h2><p style="color:#94a3b8">Recarregant l'app...</p></div>`;
+    setTimeout(()=>location.reload(),1200);
   };
   btn.onclick=tryActivate;
-  inp.onkeydown=(e)=>{if(e.key==='Enter')tryActivate()};
+  inp.onkeydown=(e)=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();tryActivate()}};
 }
 // Botó "Info llicència" al header (opcional)
 function showLicenseInfo(){
   const lic=loadLicense();const installId=getInstallId();
+  // Per JWT, mostrem el key truncat (són molt llargs) i els claims decodificats
+  const keyDisplay=lic?.key?(lic.key.length>40?lic.key.slice(0,20)+'…'+lic.key.slice(-8):lic.key):'—';
+  const lastCheck=parseInt(localStorage.getItem(LIC.LAST_CHECK)||'0');
+  const lastCheckLabel=lastCheck?new Date(lastCheck).toLocaleDateString('ca-ES'):'mai';
   const back=document.createElement('div');back.className='modal-back';
-  back.innerHTML=`<div class="modal" style="max-width:500px;padding:24px">
+  back.innerHTML=`<div class="modal" style="max-width:520px;padding:24px">
     <h3 style="margin:0 0 14px 0;color:#f5b301;font-family:Georgia,serif">🔐 Informació de llicència</h3>
-    <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;margin-bottom:12px;font-family:'Courier New',monospace;font-size:12px;color:#cbd5e1">
+    <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;margin-bottom:12px;font-family:'Courier New',monospace;font-size:12px;color:#cbd5e1;line-height:1.8">
       <div><b style="color:#f5b301">ID Instal·lació:</b> ${installId}</div>
-      <div style="margin-top:8px"><b style="color:#f5b301">Clau:</b> ${lic?.key||'—'}</div>
-      <div><b style="color:#f5b301">Tipus:</b> ${lic?.type||'—'}</div>
+      <div><b style="color:#f5b301">Clau:</b> <span style="word-break:break-all">${keyDisplay}</span></div>
+      <div><b style="color:#f5b301">Tipus:</b> ${lic?.type||'—'}${lic?.plan?' · '+lic.plan:''}</div>
       <div><b style="color:#f5b301">Centre:</b> ${lic?.centre||'—'}</div>
       <div><b style="color:#f5b301">Expira:</b> ${lic?.expires||'—'}</div>
       <div><b style="color:#f5b301">Activada:</b> ${lic?.activated?new Date(lic.activated).toLocaleDateString('ca-ES'):'—'}</div>
+      <div><b style="color:#f5b301">Última verif.:</b> ${lastCheckLabel}</div>
     </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end">
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+      ${lic?.type==='JWT'&&LIC.VERIFY_URL?`<button class="btn" id="btnVerifyNow" style="background:#0891b2;color:#fff;border-color:#0891b2">↻ Verificar ara</button>`:''}
       <button class="btn" onclick="if(confirm('Desactivar la llicència? Hauràs de tornar-la a introduir.')){localStorage.removeItem('caja.license.v1');location.reload()}" style="background:#b91c1c;color:#fff;border-color:#b91c1c">↺ Desactivar</button>
       <button class="btn" data-no>Tancar</button>
     </div>
@@ -1712,6 +1788,26 @@ function showLicenseInfo(){
   document.body.appendChild(back);
   back.querySelector('[data-no]').onclick=()=>back.remove();
   back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
+  const verifyBtn=back.querySelector('#btnVerifyNow');
+  if(verifyBtn){
+    verifyBtn.onclick=async()=>{
+      verifyBtn.disabled=true;verifyBtn.textContent='Verificant…';
+      try{
+        const res=await verifyOnline(lic.key,installId);
+        if(res.ok===false){
+          alert('✗ El servidor ha rebutjat la llicència: '+(res.reason||'desconegut')+'\n\nEs desactivarà l\'app.');
+          localStorage.removeItem(LIC.KEY);location.reload();
+        }else{
+          localStorage.setItem(LIC.LAST_CHECK,Date.now().toString());
+          alert('✓ Llicència confirmada pel servidor.');
+          back.remove();
+        }
+      }catch(e){
+        alert('⚠ No s\'ha pogut contactar el servidor: '+e.message);
+        verifyBtn.disabled=false;verifyBtn.textContent='↻ Verificar ara';
+      }
+    };
+  }
 }
 // Inicialització: bloqueja l'app si no hi ha llicència
 if(!isLicenseActive()){showActivationModal()}

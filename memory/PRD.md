@@ -50,6 +50,7 @@ Aplicació standalone (`caja_del_dia.html`) que substitueix una llibreta de comp
 - 2026-02-01: Llibreta rediseñada como libro Debe/Haber clásico (pergamino, Georgia serif). Selector empresa dentro modal. Balanç per comptes con saldos PGC. Fix crítico cascada 'Cannot set properties of null' (referencia a #btnDownloadApp inexistente que rompía handlers IA/Auditoría/Restaurar). Añadido commutador ES/CA con data-i18n. applyLang() protegido para no borrar hijos.
 - 2026-02-07: **Fase 4 completada** — License server FastAPI + MongoDB con JWT. Nueva estructura `/app/backend/routes/` + `/app/backend/models/`. 8 tests pytest passing.
 - 2026-02-07: **Fase 5 completada** — Admin panel + portal públic. Backend afegeix 4 endpoints (requests/approve/reject). React `/admin` (login gate + dashboard amb stats + taula amb Copy JWT/Revoke + tab de sol·licituds amb Approve/Reject) i `/request-license` (formulari públic). Resend mailer amb graceful fallback. 24/24 pytest OK + 25/25 E2E OK.
+- 2026-02-07: **Fase 6 completada** — `v2.html` accepta 3 formats de clau (MASTER offline · JWT verificable online · MB-XXXX legacy). Nou input textarea (JWTs són llargs, no majúsculing automàtic). Activació JWT contacta `VERIFY_URL` (font de veritat) i degrada elegantment offline. Re-check periòdic cada 15 dies invalidat si el servidor diu revoked/expired. Botó "↻ Verificar ara" al modal d'info. Nou link "Demana-la aquí" al portal públic. Els 3 fitxers `/app/frontend/public/v2.html`, `/app/commercial/caja_del_dia_v2.html` i `/app/commercial/electron/index.html` sincronitzats (mateix MD5). Smoke tests E2E OK: MASTER + JWT + 3 casos de rebuig.
 
 ## Test Coverage
 - iteration_1: bug detectado (Cannot set properties of null) → root cause: línia 781 `$('#btnDownloadApp').onclick` (elemento inexistente) → FIXED
@@ -61,9 +62,9 @@ Aplicació standalone (`caja_del_dia.html`) que substitueix una llibreta de comp
 - **License requests + Admin panel (iteration_5)**: 24/24 pytest + 25/25 E2E Playwright. Cobreix: 401 sense token, format Install ID validation, duplicate pending 409, mailer graceful fallback amb RESEND_API_KEY buida, revoke marca REVOCADA i desactiva botons, aprovació auto-copia JWT.
 
 ## Roadmap
-- **Fase 6 (P1)**: Actualitzar `v2.html` per acceptar JWT (`MB-XXXX` mode + JWT mode) i configurar `VERIFY_URL = ${REACT_APP_BACKEND_URL}/api/licenses/verify` per ping cada 15 dies
 - **Fase 7 (P2)**: Ofuscació JS de `v2.html` amb `javascript-obfuscator`
 - **Follow-up**: quan tinguis el compte Resend a punt, omplir `RESEND_API_KEY` i `SENDER_EMAIL` al `.env` i l'aprovació enviarà emails automàticament sense canvis de codi
+- **Follow-up**: quan tinguis un domini definitiu, substituir `VERIFY_URL` a v2.html (3 llocs: `/app/frontend/public/v2.html`, `/app/commercial/caja_del_dia_v2.html`, `/app/commercial/electron/index.html`) i re-empaquetar l'Electron
 
 ## Known Limitations
 - `showSaveFilePicker` (File System Access API) solo funciona en Chrome/Edge. Firefox/Safari usan `<a download>` fallback automático (ya implementado).
