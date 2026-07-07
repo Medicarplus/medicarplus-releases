@@ -29,9 +29,18 @@ Aplicació standalone (`caja_del_dia.html`) que substitueix una llibreta de comp
 ## Backend
 - `/api/download-app` - descarga del HTML
 - `/api/ai-ask` - endpoint IA con Gemini/Emergent LLM fallback + auditSummary
+- **License server (Fase 4 · 2026-02-07)**:
+  - `POST /api/licenses/generate` (admin) — HS256 JWT, durada configurable, plans (STD/PREMIUM/TRIAL/MASTER)
+  - `POST /api/licenses/verify` (public) — valida JWT + install_id, marca `last_verified_at` i `verify_count`
+  - `POST /api/licenses/revoke` (admin) — passa a `status=revoked`, guarda raó
+  - `GET /api/licenses` + `GET /api/licenses/{install_id}` (admin)
+  - Auth admin: capçalera `X-Admin-Token` = `LICENSE_ADMIN_TOKEN`
+  - MongoDB collection: `licenses`
+  - Compat total amb Master Key offline (`v2.html` continua funcionant sense servidor)
 
 ## Changelog
 - 2026-02-01: Llibreta rediseñada como libro Debe/Haber clásico (pergamino, Georgia serif). Selector empresa dentro modal. Balanç per comptes con saldos PGC. Fix crítico cascada 'Cannot set properties of null' (referencia a #btnDownloadApp inexistente que rompía handlers IA/Auditoría/Restaurar). Añadido commutador ES/CA con data-i18n. applyLang() protegido para no borrar hijos.
+- 2026-02-07: **Fase 4 completada** — License server FastAPI + MongoDB con JWT. Nueva estructura `/app/backend/routes/` + `/app/backend/models/`. 8 tests pytest passing.
 
 ## Test Coverage
 - iteration_1: bug detectado (Cannot set properties of null) → root cause: línia 781 `$('#btnDownloadApp').onclick` (elemento inexistente) → FIXED
@@ -39,6 +48,12 @@ Aplicació standalone (`caja_del_dia.html`) que substitueix una llibreta de comp
 - Todos los botones del header con handler onclick asignado
 - Llibreta con balance por cuenta y toggle empresa verificado en ambos idiomas
 - Persistencia F5 verificada
+- **License server**: 8/8 pytest tests passing (`backend/tests/test_licenses.py`) — generate/verify/revoke/perpetual/regenerate/list/detail/auth
+
+## Roadmap
+- **Fase 5 (P0)**: Panell admin React (login amb `X-Admin-Token`, taula de clients, botó “generar llicència” amb copiar-al-porta-retalls, botó revocar)
+- **Fase 6 (P1)**: Actualitzar `v2.html` per acceptar JWT (`MB-XXXX` mode + JWT mode) i configurar `VERIFY_URL` per ping cada 15 dies
+- **Fase 7 (P2)**: Ofuscació JS de `v2.html` amb `javascript-obfuscator`
 
 ## Known Limitations
 - `showSaveFilePicker` (File System Access API) solo funciona en Chrome/Edge. Firefox/Safari usan `<a download>` fallback automático (ya implementado).

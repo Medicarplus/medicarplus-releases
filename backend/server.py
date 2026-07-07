@@ -11,6 +11,8 @@ from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
 
+from routes.licenses import build_router as build_license_router
+
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -154,6 +156,9 @@ async def get_status_checks():
 
 # Include the router in the main app
 app.include_router(api_router)
+
+# Mount the licenses subrouter under /api/licenses
+app.include_router(build_license_router(db), prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
