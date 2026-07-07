@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guia · Auto-updates amb GitHub Releases · MediCar Plus</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: #e2e8f0;
+    line-height: 1.65;
+    padding: 32px 20px;
+  }
+  .container {
+    max-width: 880px;
+    margin: 0 auto;
+    background: #1e293b;
+    border: 2px solid #24292e;
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  h1 { color: #e2e8f0; margin-top: 0; font-size: 28px; display: flex; align-items: center; gap: 12px; }
+  h2 { color: #a5b4fc; margin-top: 40px; padding-bottom: 8px; border-bottom: 1px solid #334155; font-size: 20px; }
+  h3 { color: #f5b301; margin-top: 26px; font-size: 16px; }
+  code {
+    background: #0f172a; color: #7ee3aa; padding: 2px 7px;
+    border-radius: 4px; font-size: 13px; border: 1px solid #334155;
+  }
+  pre {
+    background: #0b1220; border: 1px solid #334155; border-radius: 8px;
+    padding: 16px; color: #e2e8f0; overflow-x: auto; font-size: 13px;
+    line-height: 1.6;
+  }
+  pre code { background: transparent; border: none; padding: 0; color: #7ee3aa; }
+  a { color: #a5b4fc; }
+  .step {
+    background: #0f172a; border-left: 4px solid #f5b301;
+    padding: 16px 20px; border-radius: 8px; margin: 16px 0;
+  }
+  .step-title { color: #f5b301; font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+  .warn {
+    background: linear-gradient(135deg, #78350f, #0f172a);
+    border: 1px solid #f5b301; border-radius: 8px;
+    padding: 16px 20px; margin: 16px 0; color: #fde68a;
+  }
+  .ok {
+    background: linear-gradient(135deg, #065f46, #0f172a);
+    border: 1px solid #22c55e; border-radius: 8px;
+    padding: 16px 20px; margin: 16px 0; color: #bbf7d0;
+  }
+  ul { padding-left: 22px; }
+  li { margin-bottom: 6px; }
+  .footer {
+    margin-top: 40px; padding-top: 20px;
+    border-top: 1px solid #334155; color: #64748b;
+    font-size: 12px; text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🚀 Auto-updates amb GitHub Releases</h1>
+  <p style="color: #94a3b8;">
+    Aquesta guia configura el sistema perquè, quan tu facis una nova versió,
+    <b>tots els clients rebin l'actualització automàticament</b> sense reinstal·lar res.
+  </p>
+
+  <div class="ok">
+    <b>✅ Ja tens tot preparat al codi:</b><br>
+    · <code>main.js</code> conté <code>electron-updater</code> configurat<br>
+    · <code>package.json</code> ja té la secció <code>build.publish</code> amb provider GitHub<br>
+    · <code>.github/workflows/release.yml</code> està creat i llest per compilar a Windows<br>
+    <br>
+    Només falta que creïs el repo, hi pugis el codi i configuris el token.
+  </div>
+
+  <h2>📋 Passos</h2>
+
+  <div class="step">
+    <div class="step-title">1️⃣ Crear el repositori privat a GitHub</div>
+    <ul>
+      <li>Ves a <a href="https://github.com/new" target="_blank">github.com/new</a></li>
+      <li><b>Repository name:</b> <code>medicar-plus-releases</code> (o el nom que vulguis)</li>
+      <li><b>Visibility:</b> Private ⚠️ (el codi és teu)</li>
+      <li>Clica <b>Create repository</b></li>
+    </ul>
+  </div>
+
+  <div class="step">
+    <div class="step-title">2️⃣ Actualitzar package.json amb el teu usuari</div>
+    <p>Edita <code>/app/commercial/electron/package.json</code> i canvia:</p>
+<pre><code>"publish": [
+  {
+    "provider": "github",
+    "owner": "TEU_USUARI_GITHUB",     ← posa aquí el teu usuari real
+    "repo": "medicar-plus-releases"    ← nom del repo que has creat
+  }
+]</code></pre>
+  </div>
+
+  <div class="step">
+    <div class="step-title">3️⃣ Pujar el codi al repositori</div>
+    <p>Des de PowerShell (dins la carpeta del projecte Electron):</p>
+<pre><code>cd C:\ruta\a\medicar-plus\electron
+
+git init
+git add .
+git commit -m "MediCar Plus v2.0.0 initial"
+git branch -M main
+git remote add origin https://github.com/TEU_USUARI/medicar-plus-releases.git
+git push -u origin main</code></pre>
+  </div>
+
+  <div class="step">
+    <div class="step-title">4️⃣ Crear un Personal Access Token</div>
+    <p>Necessari perquè GitHub Actions pugui publicar les Releases:</p>
+    <ul>
+      <li>Ves a <a href="https://github.com/settings/tokens/new" target="_blank">github.com/settings/tokens/new</a></li>
+      <li><b>Note:</b> <code>MediCar Plus - electron-builder</code></li>
+      <li><b>Expiration:</b> No expiration (o 1 any i renoves)</li>
+      <li><b>Select scopes:</b> marca només <code>repo</code> (tots els sub-checks)</li>
+      <li>Clica <b>Generate token</b> i <b>copia el token</b> (només es veu una vegada!)</li>
+    </ul>
+  </div>
+
+  <div class="step">
+    <div class="step-title">5️⃣ Guardar el token com a secret al repo</div>
+    <ul>
+      <li>Ves al teu repo → <b>Settings → Secrets and variables → Actions</b></li>
+      <li>Clica <b>New repository secret</b></li>
+      <li><b>Name:</b> <code>GH_TOKEN</code></li>
+      <li><b>Secret:</b> enganxa el token que has copiat</li>
+      <li>Clica <b>Add secret</b></li>
+    </ul>
+  </div>
+
+  <div class="step">
+    <div class="step-title">6️⃣ Publicar una nova versió</div>
+    <p>Quan vulguis alliberar una nova versió:</p>
+<pre><code># 1. Actualitza la versió a package.json
+#    per exemple: "version": "2.0.1"
+
+# 2. Commit + tag + push
+git add package.json
+git commit -m "Release v2.0.1"
+git tag v2.0.1
+git push origin main --tags</code></pre>
+    <p>Automàticament:</p>
+    <ol>
+      <li>GitHub Actions detecta el tag <code>v2.0.1</code></li>
+      <li>Compila l'installer NSIS + versió portable a Windows</li>
+      <li>Puja els <code>.exe</code> i el <code>latest.yml</code> a GitHub Releases</li>
+      <li>Els clients existents, en obrir l'app, reben notificació automàtica</li>
+    </ol>
+  </div>
+
+  <div class="step">
+    <div class="step-title">7️⃣ Verificar que ha funcionat</div>
+    <ul>
+      <li>Ves al teu repo → pestanya <b>Actions</b> — has de veure el workflow verd (~5 min)</li>
+      <li>Ves a <b>Releases</b> — has de veure la v2.0.1 amb els .exe adjunts</li>
+      <li>Obre MediCar Plus en un ordinador amb versió antiga — al cap d'uns 5s
+        apareixerà un diàleg <i>"MediCar Plus v2.0.1 està llest per instal·lar"</i></li>
+    </ul>
+  </div>
+
+  <h2>🔄 Com funciona per dins</h2>
+  <ol>
+    <li>App arrenca → electron-updater consulta <code>github.com/TEU_USUARI/medicar-plus-releases/releases/latest</code></li>
+    <li>Compara la versió instal·lada amb l'última publicada</li>
+    <li>Si n'hi ha una nova → descarrega el <code>.exe</code> en background</li>
+    <li>Un cop descarregat → mostra diàleg "Reiniciar i actualitzar ara / Més tard"</li>
+    <li>Al reiniciar, s'instal·la la nova versió sobre l'antiga</li>
+  </ol>
+
+  <div class="warn">
+    <b>⚠️ Repo privat vs públic</b><br>
+    Si el repo és <b>privat</b>, electron-updater necessita un token dins l'app per llegir
+    les releases. Això és més segur però requereix afegir <code>GH_TOKEN</code> al preload.
+    Per començar, la solució més senzilla és fer el repo <b>públic</b> — el codi ja va
+    obfuscat al .exe, així que ningú podrà llegir-lo, i les Releases són simplement
+    els binaris compilats.
+  </div>
+
+  <h2>📌 Regles de versionat</h2>
+  <ul>
+    <li><b>Patch</b> (bugs): <code>2.0.0 → 2.0.1</code></li>
+    <li><b>Minor</b> (features): <code>2.0.1 → 2.1.0</code></li>
+    <li><b>Major</b> (canvis grans/incompatibles): <code>2.1.0 → 3.0.0</code></li>
+  </ul>
+  <p>El tag ha de coincidir amb la <code>version</code> del <code>package.json</code>
+    (però amb la <code>v</code> davant): <code>2.0.1</code> a package.json → tag <code>v2.0.1</code>.</p>
+
+  <div class="footer">
+    MediCar Plus · M.Brugulat Lopez · © 2026<br>
+    Suport: <a href="mailto:brugulatmarc@gmail.com">brugulatmarc@gmail.com</a>
+  </div>
+</div>
+</body>
+</html>

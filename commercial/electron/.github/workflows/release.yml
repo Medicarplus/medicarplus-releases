@@ -1,0 +1,51 @@
+name: Build & Publish MediCar Plus (Windows)
+
+# ============================================================================
+# Auto-build i publicació al GitHub Releases quan es fa un tag "v*"
+# (per exemple `v2.0.1`). electron-updater als clients detectarà la nova
+# versió automàticament i preguntarà si volen actualitzar.
+#
+# Requereix:
+#   1. Secret GH_TOKEN a Settings → Secrets and variables → Actions
+#      (un Personal Access Token amb permís `repo`).
+#   2. Que package.json > build.publish.owner i .repo coincideixin amb
+#      aquest repositori de GitHub.
+# ============================================================================
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:  # permet llançar-lo manualment des de la web de GitHub
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write   # cal per crear la Release i pujar els .exe
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Build & publish Windows installer + portable
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npx electron-builder --win nsis portable --x64 --publish always
+
+      - name: Upload artifacts (backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: MediCarPlus-Windows-${{ github.ref_name }}
+          path: |
+            dist/*.exe
+            dist/latest.yml

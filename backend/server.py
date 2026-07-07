@@ -202,23 +202,210 @@ from routes.payments import router as payments_router
 app.include_router(payments_router, prefix="/api")
 
 # Stripe webhook (obligatori per playbook: /api/webhook/stripe)
+# Gestiona tant one-off (via emergentintegrations) com subscriptions (via stripe SDK)
 from fastapi import Request as _FastReq
+import stripe as _stripe_sdk
 from emergentintegrations.payments.stripe.checkout import StripeCheckout as _StripeCK
+
+# Events de subscripció que ens interessen (auto-renewal + cancel·lació)
+_SUBSCRIPTION_EVENTS = {
+    "checkout.session.completed",
+    "invoice.paid",
+    "invoice.payment_failed",
+    "customer.subscription.updated",
+    "customer.subscription.deleted",
+}
+
+
+async def _sync_license_from_subscription(sub: dict, install_id: str | None,
+                                          package_id: str | None, client_email: str | None,
+                                          company_name: str | None):
+    """
+    Crea/actualitza una llicència JWT que reflecteix l'estat de la subscripció Stripe.
+    - Si status='active' → llicència active amb expires_at = current_period_end
+    - Si status='canceled'/'unpaid' → llicència marcada com 'revoked'
+    """
+    import jwt as _jwt
+    import uuid as _uuid
+    from datetime import datetime as _dt, timezone as _tz
+
+    if not install_id or install_id == "":
+        install_id = f"CD-STRIPE-{sub['id'][:16].upper()}"
+
+    plan_key = package_id or "STD_ANY"
+    plan_family = "PREMIUM" if plan_key.startswith("PREMIUM") else "STD"
+    sub_status = sub.get("status", "unknown")
+    period_end = sub.get("current_period_end")
+    expires_at = _dt.fromtimestamp(period_end, tz=_tz.utc) if period_end else None
+
+    # Guarda/actualitza la subscripció al seu registre propi
+    await db.subscriptions.update_one(
+        {"stripe_subscription_id": sub["id"]},
+        {"$set": {
+            "stripe_subscription_id": sub["id"],
+            "stripe_customer_id": sub.get("customer"),
+            "install_id": install_id,
+            "customer_email": client_email or "",
+            "company_name": company_name or "",
+            "package_id": plan_key,
+            "plan": plan_family,
+            "status": sub_status,
+            "current_period_end": period_end,
+            "cancel_at_period_end": sub.get("cancel_at_period_end", False),
+            "updated_at": _dt.now(_tz.utc).isoformat(),
+        },
+         "$setOnInsert": {"created_at": _dt.now(_tz.utc).isoformat()}},
+        upsert=True,
+    )
+
+    # Sync llicència JWT
+    if sub_status in ("active", "trialing"):
+        # Renova/crea llicència: expires_at = current_period_end
+        existing = await db.licenses.find_one({
+            "install_id": install_id, "status": "active"
+        })
+        license_id = existing["id"] if existing else str(_uuid.uuid4())
+
+        secret = os.environ.get("LICENSE_SECRET", "")
+        issuer = os.environ.get("LICENSE_ISSUER", "caja-del-dia-license-server")
+        payload = {
+            "iss": issuer,
+            "sub": install_id,
+            "jti": license_id,
+            "plan": plan_family,
+            "iat": int(_dt.now(_tz.utc).timestamp()),
+        }
+        if expires_at:
+            payload["exp"] = int(expires_at.timestamp())
+        jwt_key = _jwt.encode(payload, secret, algorithm="HS256")
+
+        doc = {
+            "id": license_id,
+            "install_id": install_id,
+            "client_name": company_name or "",
+            "client_email": client_email or None,
+            "plan": plan_family,
+            "status": "active",
+            "duration_days": None,
+            "notes": f"Auto-generada per Stripe Subscription {sub['id']}",
+            "created_at": _dt.now(_tz.utc).isoformat(),
+            "expires_at": expires_at.isoformat() if expires_at else None,
+            "revoked_at": None,
+            "revoked_reason": None,
+            "last_verified_at": None,
+            "verify_count": 0,
+            "license_key": jwt_key,
+            "stripe_subscription_id": sub["id"],
+        }
+        if existing:
+            await db.licenses.update_one({"id": license_id}, {"$set": doc})
+        else:
+            # Revoca llicències actives anteriors d'aquest install_id
+            await db.licenses.update_many(
+                {"install_id": install_id, "status": "active"},
+                {"$set": {"status": "revoked",
+                          "revoked_at": _dt.now(_tz.utc).isoformat(),
+                          "revoked_reason": "replaced_by_subscription"}},
+            )
+            await db.licenses.insert_one(doc)
+        logger.info("License synced from subscription %s → install_id=%s exp=%s",
+                    sub["id"], install_id, expires_at)
+
+    elif sub_status in ("canceled", "unpaid", "incomplete_expired"):
+        # Revoca la llicència associada
+        await db.licenses.update_many(
+            {"stripe_subscription_id": sub["id"], "status": "active"},
+            {"$set": {"status": "revoked",
+                      "revoked_at": _dt.now(_tz.utc).isoformat(),
+                      "revoked_reason": f"stripe_subscription_{sub_status}"}},
+        )
+        logger.info("License revoked for subscription %s (status=%s)", sub["id"], sub_status)
+
 
 @app.post("/api/webhook/stripe")
 async def stripe_webhook(request: _FastReq):
-    api_key = os.environ.get("STRIPE_API_KEY", "")
+    api_key = os.environ.get("STRIPE_API_KEY", "").strip()
     if not api_key:
         return {"received": False, "error": "not configured"}
-    host_url = str(request.base_url).rstrip("/")
-    stripe_ck = _StripeCK(api_key=api_key, webhook_url=f"{host_url}/api/webhook/stripe")
+
     body = await request.body()
     signature = request.headers.get("Stripe-Signature", "")
+
+    # 1) Intentem parsejar amb Stripe SDK (necessari per events de Subscription)
+    webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
+    event = None
+    if webhook_secret:
+        try:
+            _stripe_sdk.api_key = api_key
+            event = _stripe_sdk.Webhook.construct_event(body, signature, webhook_secret)
+        except Exception as e:
+            logger.warning("Stripe webhook signature invalid: %s", e)
+            # No retornem 400 encara — provem el path emergent per compatibilitat
+            event = None
+
+    # 2) Si és un event de subscripció, gestiona'l aquí
+    if event and event["type"] in _SUBSCRIPTION_EVENTS:
+        etype = event["type"]
+        data = event["data"]["object"]
+        try:
+            if etype == "checkout.session.completed" and data.get("mode") == "subscription":
+                sub_id = data.get("subscription")
+                if sub_id:
+                    _stripe_sdk.api_key = api_key
+                    sub = _stripe_sdk.Subscription.retrieve(sub_id)
+                    md = data.get("metadata", {}) or {}
+                    await _sync_license_from_subscription(
+                        sub,
+                        install_id=md.get("install_id"),
+                        package_id=md.get("package_id"),
+                        client_email=data.get("customer_email") or md.get("customer_email"),
+                        company_name=md.get("company_name"),
+                    )
+                    # Marca la request com paid si té request_id
+                    req_id = md.get("request_id")
+                    if req_id:
+                        await db.license_requests.update_one(
+                            {"id": req_id},
+                            {"$set": {"payment_status": "paid",
+                                      "paid_at": datetime.now(timezone.utc).isoformat(),
+                                      "paid_via": "stripe_subscription",
+                                      "stripe_subscription_id": sub_id}},
+                        )
+            elif etype in ("invoice.paid", "invoice.payment_failed"):
+                sub_id = data.get("subscription")
+                if sub_id:
+                    _stripe_sdk.api_key = api_key
+                    sub = _stripe_sdk.Subscription.retrieve(sub_id)
+                    md = sub.get("metadata", {}) or {}
+                    await _sync_license_from_subscription(
+                        sub,
+                        install_id=md.get("install_id"),
+                        package_id=md.get("package_id"),
+                        client_email=md.get("customer_email"),
+                        company_name=md.get("company_name"),
+                    )
+            elif etype in ("customer.subscription.updated", "customer.subscription.deleted"):
+                sub = data  # aquest event ja porta l'objecte Subscription
+                md = sub.get("metadata", {}) or {}
+                await _sync_license_from_subscription(
+                    sub,
+                    install_id=md.get("install_id"),
+                    package_id=md.get("package_id"),
+                    client_email=md.get("customer_email"),
+                    company_name=md.get("company_name"),
+                )
+        except Exception as e:
+            logger.exception("Error handling subscription webhook: %s", e)
+        return {"received": True, "event_type": etype, "handled": "subscription"}
+
+    # 3) Fallback: gestiona events one-off amb emergentintegrations (legacy)
+    host_url = str(request.base_url).rstrip("/")
+    stripe_ck = _StripeCK(api_key=api_key, webhook_url=f"{host_url}/api/webhook/stripe")
     try:
         resp = await stripe_ck.handle_webhook(body, signature)
     except Exception as e:
         return {"received": False, "error": str(e)}
-    # Actualitza payment_transactions + license_requests si s'ha pagat
+
     if resp.session_id and resp.payment_status == "paid":
         tx = await db.payment_transactions.find_one({"session_id": resp.session_id})
         if tx and tx.get("payment_status") != "paid":
@@ -235,7 +422,7 @@ async def stripe_webhook(request: _FastReq):
                               "paid_at": datetime.now(timezone.utc).isoformat(),
                               "paid_via": "stripe"}},
                 )
-    return {"received": True, "event_type": resp.event_type}
+    return {"received": True, "event_type": resp.event_type, "handled": "one_off"}
 
 app.add_middleware(
     CORSMiddleware,

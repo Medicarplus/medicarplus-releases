@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guia · Configurar Stripe Subscriptions · MediCar Plus</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: #e2e8f0;
+    line-height: 1.65;
+    padding: 32px 20px;
+  }
+  .container {
+    max-width: 880px;
+    margin: 0 auto;
+    background: #1e293b;
+    border: 2px solid #635bff;
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  h1 {
+    color: #635bff;
+    margin-top: 0;
+    font-size: 28px;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  h2 {
+    color: #a5b4fc;
+    margin-top: 40px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #334155;
+    font-size: 20px;
+  }
+  h3 {
+    color: #f5b301;
+    margin-top: 26px;
+    font-size: 16px;
+  }
+  code {
+    background: #0f172a;
+    color: #7ee3aa;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 13px;
+    border: 1px solid #334155;
+  }
+  pre {
+    background: #0b1220;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 16px;
+    color: #e2e8f0;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  pre code { background: transparent; border: none; padding: 0; color: #7ee3aa; }
+  a { color: #a5b4fc; }
+  .step {
+    background: #0f172a;
+    border-left: 4px solid #635bff;
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin: 16px 0;
+  }
+  .step-title {
+    color: #a5b4fc;
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 6px;
+  }
+  .warn {
+    background: linear-gradient(135deg, #78350f, #0f172a);
+    border: 1px solid #f5b301;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    color: #fde68a;
+  }
+  .ok {
+    background: linear-gradient(135deg, #065f46, #0f172a);
+    border: 1px solid #22c55e;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    color: #bbf7d0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    background: #0f172a;
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 13px;
+  }
+  th, td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid #334155;
+  }
+  th {
+    background: #1e293b;
+    color: #a5b4fc;
+    letter-spacing: 0.5px;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+  ul { padding-left: 22px; }
+  li { margin-bottom: 6px; }
+  .footer {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid #334155;
+    color: #64748b;
+    font-size: 12px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>💳 Configurar Stripe Subscriptions</h1>
+  <p style="color: #94a3b8;">
+    Guia pas a pas per activar els pagaments recurrents automàtics a MediCar Plus.
+    Segueix-la <b>quan tinguis empresa constituïda</b> i compte bancari a nom de l'empresa.
+  </p>
+
+  <div class="warn">
+    <b>⚠️ ABANS DE COMENÇAR</b><br>
+    Per rebre pagaments recurrents cal <b>empresa constituïda</b> (autònom o SL) amb
+    activitat econòmica declarada a Hisenda, i <b>compte bancari a nom de l'empresa</b>
+    (no personal). Sense això, cobrar seria frau fiscal.
+  </div>
+
+  <h2>🎯 Objectiu</h2>
+  <p>Els clients paguen automàticament cada mes/any amb targeta, i la seva llicència JWT
+    es renova sola via webhooks quan Stripe confirma el cobrament. Si algú cancel·la
+    (o falla el cobrament), la llicència queda inactiva automàticament.</p>
+
+  <h2>📋 Passos</h2>
+
+  <div class="step">
+    <div class="step-title">1️⃣ Crear compte a Stripe</div>
+    <ul>
+      <li>Ves a <a href="https://dashboard.stripe.com/register" target="_blank">dashboard.stripe.com/register</a></li>
+      <li>Registra't amb l'email de l'empresa</li>
+      <li><b>Mode Test</b> queda activat per defecte — ideal per proves sense diners reals</li>
+      <li>Per activar Mode Live cal introduir el NIF/CIF de l'empresa, IBAN i verificar identitat</li>
+    </ul>
+  </div>
+
+  <div class="step">
+    <div class="step-title">2️⃣ Crear els 4 productes/preus</div>
+    <p>Al Dashboard → <b>Products</b> → <b>Add product</b>. Crea un producte "MediCar Plus" i
+      afegeix aquests 4 preus recurrents:</p>
+    <table>
+      <thead>
+        <tr><th>Nom del preu</th><th>Import</th><th>Facturació</th><th>Divisa</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>STD Mensual</td><td>29,90 €</td><td>Cada 1 mes</td><td>EUR</td></tr>
+        <tr><td>STD Anual</td><td>299,90 €</td><td>Cada 1 any</td><td>EUR</td></tr>
+        <tr><td>PREMIUM Mensual</td><td>39,90 €</td><td>Cada 1 mes</td><td>EUR</td></tr>
+        <tr><td>PREMIUM Anual</td><td>399,90 €</td><td>Cada 1 any</td><td>EUR</td></tr>
+      </tbody>
+    </table>
+    <p>Quan crees cada preu, Stripe genera un <b>Price ID</b> tipus <code>price_1AbCdEf...</code>.
+      <b>Copia'ls tots quatre.</b></p>
+  </div>
+
+  <div class="step">
+    <div class="step-title">3️⃣ Copiar les claus API</div>
+    <p>Dashboard → <b>Developers → API keys</b>. Copia la <b>Secret key</b>:</p>
+    <ul>
+      <li>Mode Test: comença per <code>sk_test_...</code></li>
+      <li>Mode Live: comença per <code>sk_live_...</code></li>
+    </ul>
+    <div class="warn">
+      <b>NO COMPARTEIXIS mai la Secret Key en públic</b> (repos git, chats, screenshots).
+      Si es filtra, revoca-la immediatament des del mateix Dashboard.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-title">4️⃣ Configurar el Webhook</div>
+    <p>Dashboard → <b>Developers → Webhooks → Add endpoint</b>:</p>
+    <ul>
+      <li><b>Endpoint URL:</b> <code>https://api.medicarplus.com/api/webhook/stripe</code>
+        (substitueix pel domini real del teu backend)</li>
+      <li><b>Events to send:</b> selecciona aquests 5:
+        <ul>
+          <li><code>checkout.session.completed</code></li>
+          <li><code>invoice.paid</code></li>
+          <li><code>invoice.payment_failed</code></li>
+          <li><code>customer.subscription.updated</code></li>
+          <li><code>customer.subscription.deleted</code></li>
+        </ul>
+      </li>
+    </ul>
+    <p>Un cop creat, clica al webhook i copia el <b>Signing secret</b> (comença per
+      <code>whsec_...</code>).</p>
+  </div>
+
+  <div class="step">
+    <div class="step-title">5️⃣ Configurar les variables al servidor</div>
+    <p>Edita <code>/app/backend/.env</code> i afegeix (o passa'ls al teu proveïdor de hosting):</p>
+<pre><code>STRIPE_API_KEY=sk_test_51AbCdEf...       # o sk_live_ a producció
+STRIPE_WEBHOOK_SECRET=whsec_ABC123...
+STRIPE_PRICE_STD_MES=price_1AbCdEf...
+STRIPE_PRICE_STD_ANY=price_1GhIjKl...
+STRIPE_PRICE_PREMIUM_MES=price_1MnOpQr...
+STRIPE_PRICE_PREMIUM_ANY=price_1StUvWx...</code></pre>
+    <p>Reinicia el backend perquè carregui les variables noves:</p>
+<pre><code>sudo supervisorctl restart backend</code></pre>
+  </div>
+
+  <div class="step">
+    <div class="step-title">6️⃣ Verificar que està tot bé</div>
+    <p>Fes una petició GET a:</p>
+<pre><code>curl https://api.medicarplus.com/api/payments/subscription/enabled</code></pre>
+    <p>Ha de retornar:</p>
+<pre><code>{
+  "enabled": true,
+  "stripe_api_key_present": true,
+  "packages": {
+    "STD_MES": true,
+    "STD_ANY": true,
+    "PREMIUM_MES": true,
+    "PREMIUM_ANY": true
+  }
+}</code></pre>
+    <p>Si algun paquet apareix com <code>false</code>, revisa el <code>.env</code>.</p>
+  </div>
+
+  <h2>🧪 Provar amb targeta de test</h2>
+  <p>En Mode Test, Stripe accepta targetes falses:</p>
+  <ul>
+    <li><b>Èxit:</b> <code>4242 4242 4242 4242</code> · Data futura · CVC qualsevol</li>
+    <li><b>Requereix autenticació 3DS:</b> <code>4000 0025 0000 3155</code></li>
+    <li><b>Cobrament rebutjat:</b> <code>4000 0000 0000 9995</code></li>
+  </ul>
+  <p>Més targetes: <a href="https://stripe.com/docs/testing" target="_blank">stripe.com/docs/testing</a></p>
+
+  <h2>🔄 Com funciona la renovació automàtica</h2>
+  <ol>
+    <li>Client paga la primera vegada → Stripe crea <code>Customer</code> + <code>Subscription</code></li>
+    <li>Webhook <code>checkout.session.completed</code> → backend genera JWT amb <code>expires_at = ara + 30 dies</code> (o 365)</li>
+    <li>Cada mes/any, Stripe cobra automàticament → webhook <code>invoice.paid</code> → backend estén <code>expires_at</code> +30/+365 dies</li>
+    <li>Si el client cancel·la o falla el cobrament → webhook <code>customer.subscription.deleted</code> → llicència marcada com <code>cancelled</code></li>
+  </ol>
+
+  <div class="ok">
+    <b>✅ Portal del client (self-service)</b><br>
+    Stripe ofereix un portal on el client pot canviar targeta, veure factures i cancel·lar.
+    S'activa a <b>Settings → Billing → Customer portal</b>. L'endpoint per generar sessions
+    ja està preparat al backend com a <code>/api/payments/portal</code> (pendent d'exposar quan el
+    tinguis actiu).
+  </div>
+
+  <h2>💰 Comissions de Stripe</h2>
+  <p>Stripe cobra <b>1,4% + 0,25 €</b> per targetes europees, i <b>2,9% + 0,25 €</b> per no-europees.
+    Amb el pla STD Anual (299,90€) pagaries uns <b>4,45 €</b> de comissió (~1,48%).</p>
+  <p>La resta va directe al teu compte bancari (payout automàtic setmanal o diari, configurable).</p>
+
+  <div class="footer">
+    MediCar Plus · M.Brugulat Lopez · © 2026<br>
+    Suport: <a href="mailto:brugulatmarc@gmail.com">brugulatmarc@gmail.com</a>
+  </div>
+</div>
+</body>
+</html>

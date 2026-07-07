@@ -22,21 +22,39 @@ Transició d'una app HTML offline estable ("Caja del Día") a una app comercial 
 - ✅ Testing: 43/43 backend pytest passing + frontend ~95%
 - ✅ Guia HTML completa a `/guia-medicar-plus.html`
 
+## Implemented (2026-07-07 · segona sessió · fork continuat)
+- ✅ **Stripe Subscriptions preparat en mode Test** (Opció A recurrent)
+  - `POST /api/payments/create-subscription` (mode=subscription via stripe SDK 14.4.1)
+  - `GET /api/payments/subscription/enabled` (feature-flag: només actiu quan STRIPE_PRICE_* configurat)
+  - `GET /api/payments/subscription/status/{session_id}` (polling)
+  - `GET /api/payments/subscription/list` (admin)
+  - Webhook `/api/webhook/stripe` amplia gestió d'events: `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated/.deleted`
+  - Auto-renewal JWT: on `invoice.paid` → `expires_at = current_period_end`; on `cancel/unpaid` → llicència `revoked`
+  - Nova col·lecció Mongo `subscriptions` (stripe_subscription_id, stripe_customer_id, install_id, status, current_period_end)
+  - `.env` amb variables buides: `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STD_MES/ANY`, `STRIPE_PRICE_PREMIUM_MES/ANY`
+  - Guia HTML pas-a-pas: `/guia-stripe-setup.html`
+- ✅ **Auto-updates GitHub Actions** (Fase 10)
+  - Workflow `/app/commercial/electron/.github/workflows/release.yml` — build Windows NSIS + portable + publish a GitHub Releases al fer tag `v*`
+  - main.js + package.json ja tenien electron-updater configurat
+  - Guia HTML pas-a-pas: `/guia-github-releases.html`
+- ✅ Enllaços afegits a `guia-medicar-plus.html` cap a les dues guies noves
+
 ## Roadmap
-### P1 (imminent)
+### P1 (imminent — bloquejat per usuari)
+- Constituir empresa + obrir Stripe account → llavors seguir `/guia-stripe-setup.html` (Price IDs, webhook, sk_live)
 - Configuració Twilio (usuari ha de crear compte + passar credencials)
-- Configuració Stripe live (usuari ha de passar sk_live_)
 - Column Telefono al CSV DGT (el proveïdor de trànsit ho ha d'afegir)
 
 ### P2
 - Admin panel: secció "Configuració de pagaments" (IBAN + Stripe keys editables)
-- Admin panel: workflow "Marcar com pagat" per requests de transferència
+- Botó "Pagar amb targeta" al formulari públic de sol·licitud (només visible quan `/api/payments/subscription/enabled` retorna `enabled:true`)
+- Portal Stripe self-service per clients (canvi de targeta, veure factures)
 - Enviament automàtic de JWT per email via Resend
 
 ### P3
-- GitHub Releases + electron-updater auto-publicació
 - Landing page pública MediCar Plus
 - Historial d'ingressos + facturació automàtica
+- Suport crypto (USDC/stablecoins) via Stripe crypto
 
 ## Architecture
 ```
