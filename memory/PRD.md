@@ -21,17 +21,17 @@ Transició d'una app HTML offline estable ("Caja del Día") a una app comercial 
 
 ## Implemented (2026-07-07 fork)
 - ✅ **Reset v2 = v1** — v2.html reconstruïda com a còpia exacta de v1 amb capes comercials
-- ✅ Preus dels chips preservats (C.Oficial 20€, Certificado 66.5€, splits 45-45-10, etc.)
-- ✅ Wizard inicial ampliat: noms d'empreses (obligatori) + socis opcionals (0 a 5 amb % configurables)
-- ✅ Tots els noms hardcoded eliminats: CEMPLA C.B/ESPORT → "Empresa 1"/"Empresa 2" per defecte
-- ✅ IRPF_DEFAULTS buit (JOSEP BRUGULAT/RAFART/MELLADO eliminats de defaults)
-- ✅ Neteja automàtica `commercialCleanupV3()` que treu els metges pre-cargats de localStorage si són sense dades
-- ✅ Toasts d'importació utilitzen CFG.company2 en lloc de "Cempla Esport"
-- ✅ Sobre IRPF: "no afecta C.B ni Esport" → "no afecta la comptabilitat"
-- ✅ Tooltip ℹ️ al costat de l'input "manual" del datàfon
-- ✅ Obfuscador arregla `</script>` bleeding
-- ✅ ZIP Electron regenerat i disponible a `/api/download-electron`
-- ✅ TOTS els botons testejats: PrevDay/NextDay/Today, Historial, Llibreta, IRPF, Auditoria, Asesor IA, Imprimir, ⚙️ Config, CA/ES, canvi empresa
+- ✅ Preus dels chips preservats + splits configurables
+- ✅ Wizard: 2 empreses obligatòries + socis opcionals (0-5, % validats a 100)
+- ✅ Tots els noms hardcoded eliminats
+- ✅ Neteja automàtica `commercialCleanupV3()` de metges pre-cargats a localStorage
+- ✅ Popup "Datàfon manual" clicable amb explicació visual
+- ✅ Botó 🔓 Logout al header
+- ✅ Cercador de clients per nom/cognom al costat de "Deure/Haver" amb resultats en dropdown i navegació al dia
+- ✅ Botó 📱 Avisos SMS/WhatsApp: import CSV DGT, plantilla amb variables {NOM}{DNI}{DATA_CADUCITAT}{ADRECA}, preview, canals SMS+WhatsApp, exportar CSV, enviar via Twilio
+- ✅ Backend `/api/notifications/send` amb Twilio (SMS + WhatsApp), retorna resultat per contacte
+- ✅ **Theme "Colorful Pill"**: botons arrodonits, gradients suaus als panells, hover amb elevation, focus animats, scrollbar personalitzada
+- ✅ ZIP Electron regenerat (616 KB, `/api/download-electron`)
 
 ## Previous session work
 - Admin panel React + `/request-license` portal

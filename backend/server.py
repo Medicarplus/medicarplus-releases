@@ -193,6 +193,10 @@ app.include_router(api_router)
 # Mount the licenses subrouter under /api/licenses
 app.include_router(build_license_router(db, limiter=limiter), prefix="/api")
 
+# Notifications (SMS/WhatsApp via Twilio) — mòdul aïllat
+from routes.notifications import router as notifications_router
+app.include_router(notifications_router, prefix="/api")
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
