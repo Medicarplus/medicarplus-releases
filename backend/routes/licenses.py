@@ -375,6 +375,141 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         updated = await coll.find_one({"_id": doc["_id"]})
         return _doc_to_record(updated)
 
+    # ---------- Stats (admin dashboard) ----------
+    @router.get(
+        "/stats",
+        dependencies=[Depends(require_admin)],
+    )
+    async def get_stats() -> dict:
+        """
+        Retorna estadístiques agregades per al panel admin:
+        - Comptadors llicències per estat i pla
+        - Projecció d'ingressos MRR/ARR
+        - Estat de sol·licituds + taxa de conversió
+        - Activitat (noves llicències 7d/30d, top clients per verify)
+        - Estadístiques HWID lock
+        """
+        from datetime import timedelta as _td
+        now = _now()
+        cutoff_7d = (now - _td(days=7)).isoformat()
+        cutoff_30d = (now - _td(days=30)).isoformat()
+
+        # Preus per plan × duració (han de coincidir amb PACKAGES a payments.py)
+        PRICES = {
+            ("STD", 30): 29.90, ("STD", 365): 299.90,
+            ("PREMIUM", 30): 39.90, ("PREMIUM", 365): 399.90,
+        }
+
+        licenses_docs = await coll.find({}, {"_id": 0}).to_list(5000)
+        requests_docs = await req_coll.find({}, {"_id": 0}).to_list(5000)
+
+        # Llicències
+        by_status = {"active": 0, "revoked": 0, "expired": 0}
+        by_plan = {}
+        with_hwid_lock = 0
+        hwid_resets_total = 0
+        new_7d = 0
+        new_30d = 0
+        verify_total = 0
+        top_clients = []
+
+        for lic in licenses_docs:
+            st = lic.get("status", "active")
+            by_status[st] = by_status.get(st, 0) + 1
+            plan = lic.get("plan", "STD")
+            by_plan[plan] = by_plan.get(plan, 0) + 1
+            if lic.get("hwid_lock"):
+                with_hwid_lock += 1
+            hwid_resets_total += int(lic.get("hwid_reset_count", 0) or 0)
+            created = str(lic.get("created_at") or "")
+            if created >= cutoff_7d:
+                new_7d += 1
+            if created >= cutoff_30d:
+                new_30d += 1
+            vc = int(lic.get("verify_count", 0) or 0)
+            verify_total += vc
+            if lic.get("status") == "active":
+                top_clients.append({
+                    "install_id": lic.get("install_id"),
+                    "client_name": lic.get("client_name", ""),
+                    "plan": plan,
+                    "verify_count": vc,
+                    "last_verified_at": lic.get("last_verified_at"),
+                })
+        top_clients.sort(key=lambda x: x["verify_count"], reverse=True)
+        top_clients = top_clients[:5]
+
+        # Ingressos projectats (nomes actives)
+        mrr = 0.0
+        by_plan_revenue = {}
+        for lic in licenses_docs:
+            if lic.get("status") != "active":
+                continue
+            plan = lic.get("plan", "STD")
+            if plan not in ("STD", "PREMIUM"):
+                continue  # TRIAL / MASTER no compten com a ingressos
+            dur = int(lic.get("duration_days") or 0)
+            # Determinem si es mensual o anual pels dies
+            if dur == 30 or (25 <= dur <= 45):
+                period = 30
+            elif dur == 365 or (350 <= dur <= 380):
+                period = 365
+            else:
+                continue  # TRIAL / perpetual → sense projecció
+            price = PRICES.get((plan, period), 0.0)
+            monthly_equiv = price if period == 30 else round(price / 12, 2)
+            mrr += monthly_equiv
+            key = f"{plan}_{'MES' if period == 30 else 'ANY'}"
+            if key not in by_plan_revenue:
+                by_plan_revenue[key] = {"count": 0, "monthly_equiv": 0.0, "unit_price": price}
+            by_plan_revenue[key]["count"] += 1
+            by_plan_revenue[key]["monthly_equiv"] = round(
+                by_plan_revenue[key]["monthly_equiv"] + monthly_equiv, 2
+            )
+        mrr = round(mrr, 2)
+        arr = round(mrr * 12, 2)
+
+        # Sol·licituds
+        req_by_status = {"pending": 0, "approved": 0, "rejected": 0}
+        for r in requests_docs:
+            st = r.get("status", "pending")
+            req_by_status[st] = req_by_status.get(st, 0) + 1
+        total_processed = req_by_status["approved"] + req_by_status["rejected"]
+        conversion_rate = (
+            round(req_by_status["approved"] / total_processed, 3)
+            if total_processed > 0 else None
+        )
+
+        return {
+            "generated_at": now.isoformat(),
+            "licenses": {
+                "total": len(licenses_docs),
+                "active": by_status.get("active", 0),
+                "revoked": by_status.get("revoked", 0),
+                "expired": by_status.get("expired", 0),
+                "by_plan": by_plan,
+                "with_hwid_lock": with_hwid_lock,
+                "hwid_resets_total": hwid_resets_total,
+                "verify_total": verify_total,
+            },
+            "revenue": {
+                "mrr_eur": mrr,
+                "arr_eur": arr,
+                "by_plan": by_plan_revenue,
+                "currency": "EUR",
+            },
+            "requests": {
+                **req_by_status,
+                "total": len(requests_docs),
+                "conversion_rate": conversion_rate,
+            },
+            "activity": {
+                "new_last_7d": new_7d,
+                "new_last_30d": new_30d,
+            },
+            "top_clients": top_clients,
+        }
+
     # ---------- Reset HWID lock (admin) ----------
     @router.post(
         "/{install_id}/reset-hwid",

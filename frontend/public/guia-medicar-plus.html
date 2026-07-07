@@ -52,10 +52,11 @@
 <a href="#pagaments">4. Pagaments (transferència · targeta única · subscripcions)</a>
 <a href="#enviar-app">5. Distribució de l'app + auto-updates</a>
 <a href="#sms">6. Mòdul SMS/WhatsApp</a>
-<a href="#preus">7. Preus i plans</a>
-<a href="#proteccio">8. Protecció del codi (anti-clonació)</a>
-<a href="#faq">9. Preguntes freqüents</a>
-<a href="#guies">10. Guies tècniques enllaçades</a>
+<a href="#estadistiques">7. Panell d'estadístiques (MRR / ARR / activitat)</a>
+<a href="#preus">8. Preus i plans</a>
+<a href="#proteccio">9. Protecció del codi (anti-clonació + HWID lock)</a>
+<a href="#faq">10. Preguntes freqüents</a>
+<a href="#guies">11. Guies tècniques enllaçades</a>
 </div>
 
 <h1 id="estat">0. Estat actual del sistema</h1>
@@ -372,7 +373,31 @@ Ambdós accepten CSV amb 2 columnes: telèfon + missatge.
 
 <hr>
 
-<h1 id="preus">7. Preus i plans configurats</h1>
+<h1 id="estadistiques">7. Panell d'estadístiques</h1>
+
+<div class="callout callout-green">
+<b>Novetat 07/2026:</b> nova pestanya <b>📊 Estadístiques</b> al admin panel amb tota la telemetria del negoci.
+</div>
+
+<h3>Què hi trobaràs</h3>
+<ul>
+<li>💰 <b>MRR</b> (Monthly Recurring Revenue) — ingressos mensuals projectats sumant totes les llicències actives</li>
+<li>💰 <b>ARR</b> (Annual Recurring Revenue) — MRR × 12, per veure el potencial anual</li>
+<li>👥 <b>Clients de pagament</b> — quants STD + PREMIUM actius tens ara</li>
+<li>📈 <b>Desglossament per pla</b> — STD_MES, STD_ANY, PREMIUM_MES, PREMIUM_ANY amb comptador i equivalent mensual</li>
+<li>🎫 <b>Estat de llicències</b> — total, actives, revocades, expirades, verifies totals</li>
+<li>🔒 <b>Vinculades a HWID</b> — quantes tens amb candau + total de resets fets</li>
+<li>📮 <b>Sol·licituds</b> — pendents/aprovades/rebutjades + <b>taxa de conversió</b></li>
+<li>📈 <b>Activitat</b> — noves llicències els últims 7 i 30 dies</li>
+<li>🏆 <b>Top 5 clients</b> per número de verificacions (útil per detectar comportaments anòmals)</li>
+</ul>
+
+<h3>Endpoint tècnic</h3>
+<code>GET /api/licenses/stats</code> (X-Admin-Token). Retorna tot en JSON per si vols exportar-ho o connectar-ho a un Excel/Notion.
+
+<div class="callout callout-blue">
+<b>💡 Idea d'ús:</b> revisa el MRR cada dilluns. Si veus que baixa, mira sol·licituds pendents que potser has oblidat de processar. Si puja, celebra-ho 🎉.
+</div>
 
 <table>
 <tr><th>Pla</th><th>Mensual</th><th>Anual</th><th>Estalvi</th><th>Inclou</th></tr>
@@ -466,7 +491,7 @@ Preus definits al backend: <code>/app/backend/routes/payments.py</code> constant
 
 <hr>
 
-<h1 id="faq">9. Preguntes freqüents</h1>
+<h1 id="faq">10. Preguntes freqüents</h1>
 
 <h3>Un client canvia d'ordinador, què faig?</h3>
 Al nou PC, l'app genera un <b>Install ID diferent</b>. El client te l'ha de passar. Entres al admin, generes un JWT nou lligat al nou ID i li envies. L'antic queda inutilitzat.
@@ -496,7 +521,7 @@ Totes les llicències existents deixen de verificar-se. Cal <b>regenerar el secr
 
 <hr>
 
-<h1 id="guies">10. Guies tècniques enllaçades</h1>
+<h1 id="guies">11. Guies tècniques enllaçades</h1>
 <ul style="line-height:2">
 <li>💳 <a href="/guia-stripe-setup.html" target="_blank"><b>Configurar Stripe Subscriptions</b></a> — 6 passos per activar pagaments recurrents</li>
 <li>🚀 <a href="/guia-github-releases.html" target="_blank"><b>Auto-updates amb GitHub Releases</b></a> — 7 passos per publicació automàtica</li>

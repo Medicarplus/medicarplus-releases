@@ -30,6 +30,7 @@ export const revokeLicense = async (installId, reason) =>
   (await licenseApi.post("/revoke", { install_id: installId, reason })).data;
 export const resetHwid = async (installId) =>
   (await licenseApi.post(`/${installId}/reset-hwid`)).data;
+export const getStats = async () => (await licenseApi.get("/stats")).data;
 
 export const listRequests = async () =>
   (await licenseApi.get("/requests")).data;

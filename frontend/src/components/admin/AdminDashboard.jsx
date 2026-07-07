@@ -4,6 +4,7 @@ import {
   AdminTokenStore,
   approveRequest,
   generateLicense,
+  getStats,
   listLicenses,
   listRequests,
   rejectRequest,
@@ -488,14 +489,16 @@ export default function AdminDashboard({ onLogout }) {
   const [showNew, setShowNew] = useState(false);
   const [keyModal, setKeyModal] = useState(null);
   const [query, setQuery] = useState("");
+  const [statsData, setStatsData] = useState(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [lic, req] = await Promise.all([listLicenses(), listRequests()]);
+      const [lic, req, st] = await Promise.all([listLicenses(), listRequests(), getStats().catch(() => null)]);
       setLicenses(lic.items || []);
       setRequests(req.items || []);
       setPendingCount(req.pending || 0);
+      setStatsData(st);
     } catch (ex) {
       if (ex?.response?.status === 401) {
         toast.error("Sessió expirada");
@@ -778,6 +781,13 @@ export default function AdminDashboard({ onLogout }) {
             </span>
           )}
         </TabBtn>
+        <TabBtn
+          testid="tab-stats"
+          active={tab === "stats"}
+          onClick={() => setTab("stats")}
+        >
+          📊 Estadístiques
+        </TabBtn>
       </div>
 
       {/* Content */}
@@ -1009,6 +1019,8 @@ export default function AdminDashboard({ onLogout }) {
             </div>
           </div>
         )}
+
+        {tab === "stats" && <StatsPanel data={statsData} onRefresh={refresh} />}
       </div>
 
       <NewLicenseModal
@@ -1092,4 +1104,149 @@ const TabBtn = ({ children, active, onClick, testid }) => (
   >
     {children}
   </button>
+);
+
+// =============================================================================
+// StatsPanel — Panell d'estadístiques agregades
+// =============================================================================
+const StatsPanel = ({ data, onRefresh }) => {
+  if (!data) {
+    return (
+      <div data-testid="stats-empty" style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>
+        Carregant estadístiques…{" "}
+        <button onClick={onRefresh} style={{ marginLeft: 12, padding: "6px 14px", background: "#1e293b", color: "#f5b301", border: "1px solid #f5b301", borderRadius: 6, cursor: "pointer" }}>Reintentar</button>
+      </div>
+    );
+  }
+  const { licenses, revenue, requests, activity, top_clients } = data;
+  const eur = (n) => new Intl.NumberFormat("ca-ES", { style: "currency", currency: "EUR" }).format(n || 0);
+  const pct = (n) => n == null ? "—" : `${Math.round(n * 100)}%`;
+
+  return (
+    <div data-testid="stats-panel" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Ingressos projectats */}
+      <section>
+        <SectionTitle icon="💰" title="Ingressos projectats" subtitle="Estimació basada en llicències actives" />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+          <BigStat label="MRR" value={eur(revenue.mrr_eur)} hint="Ingressos mensuals recurrents" color="#22c55e" />
+          <BigStat label="ARR" value={eur(revenue.arr_eur)} hint="Anualitzat (MRR × 12)" color="#3b82f6" />
+          <BigStat label="Clients de pagament" value={Object.values(revenue.by_plan || {}).reduce((a, b) => a + (b.count || 0), 0)} hint="Actives STD + PREMIUM" color="#f5b301" />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, marginTop: 12 }}>
+          {Object.entries(revenue.by_plan || {}).map(([k, v]) => (
+            <div key={k} style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", fontFamily: "Georgia, serif" }}>
+              <div style={{ fontSize: 11, color: "#94a3b8", letterSpacing: 1, textTransform: "uppercase" }}>{k.replace("_", " ")}</div>
+              <div style={{ fontSize: 22, color: "#e2e8f0", fontWeight: 700, marginTop: 4 }}>{v.count} <span style={{ fontSize: 12, color: "#64748b" }}>clients</span></div>
+              <div style={{ fontSize: 12, color: "#22c55e", marginTop: 4 }}>{eur(v.monthly_equiv)}/mes equiv.</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Llicències */}
+      <section>
+        <SectionTitle icon="🎫" title="Estat de llicències" />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+          <MiniStat label="Total" value={licenses.total} color="#e2e8f0" />
+          <MiniStat label="Actives" value={licenses.active} color="#22c55e" />
+          <MiniStat label="Revocades" value={licenses.revoked} color="#ef4444" />
+          <MiniStat label="Expirades" value={licenses.expired} color="#f59e0b" />
+          <MiniStat label="🔒 Amb HWID" value={licenses.with_hwid_lock} color="#a78bfa" hint={`${licenses.hwid_resets_total} resets totals`} />
+          <MiniStat label="Verifies totals" value={licenses.verify_total} color="#38bdf8" />
+        </div>
+        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {Object.entries(licenses.by_plan || {}).map(([plan, count]) => (
+            <span key={plan} style={{ background: "#0f172a", border: "1px solid #334155", color: "#e2e8f0", padding: "6px 12px", borderRadius: 20, fontSize: 12, fontFamily: "Georgia, serif" }}>
+              <b style={{ color: "#f5b301" }}>{plan}</b>: {count}
+            </span>
+          ))}
+        </div>
+      </section>
+
+      {/* Sol·licituds + activitat */}
+      <section style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div>
+          <SectionTitle icon="📮" title="Sol·licituds" />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <MiniStat label="Total" value={requests.total} color="#e2e8f0" />
+            <MiniStat label="Pendents" value={requests.pending} color={requests.pending > 0 ? "#3b82f6" : "#64748b"} />
+            <MiniStat label="Aprovades" value={requests.approved} color="#22c55e" />
+            <MiniStat label="Rebutjades" value={requests.rejected} color="#ef4444" />
+          </div>
+          <div style={{ marginTop: 10, background: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: 12 }}>
+            <div style={{ fontSize: 11, color: "#94a3b8", letterSpacing: 1, textTransform: "uppercase" }}>Taxa de conversió</div>
+            <div style={{ fontSize: 26, color: "#22c55e", fontWeight: 700, marginTop: 4 }}>{pct(requests.conversion_rate)}</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>aprovades / (aprovades + rebutjades)</div>
+          </div>
+        </div>
+        <div>
+          <SectionTitle icon="📈" title="Activitat" />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <MiniStat label="Noves (7 dies)" value={activity.new_last_7d} color="#f5b301" />
+            <MiniStat label="Noves (30 dies)" value={activity.new_last_30d} color="#f5b301" />
+          </div>
+        </div>
+      </section>
+
+      {/* Top clients */}
+      {top_clients && top_clients.length > 0 && (
+        <section>
+          <SectionTitle icon="🏆" title="Top clients per verificacions" subtitle="Els més actius (útil per detectar comportaments anòmals)" />
+          <div style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 10, overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, fontFamily: "Georgia, serif" }}>
+              <thead>
+                <tr style={{ background: "#1e293b" }}>
+                  <th style={{ padding: 10, textAlign: "left", color: "#f5b301", fontSize: 11, letterSpacing: 1 }}>#</th>
+                  <th style={{ padding: 10, textAlign: "left", color: "#f5b301", fontSize: 11, letterSpacing: 1 }}>Client</th>
+                  <th style={{ padding: 10, textAlign: "left", color: "#f5b301", fontSize: 11, letterSpacing: 1 }}>Install ID</th>
+                  <th style={{ padding: 10, textAlign: "left", color: "#f5b301", fontSize: 11, letterSpacing: 1 }}>Plan</th>
+                  <th style={{ padding: 10, textAlign: "right", color: "#f5b301", fontSize: 11, letterSpacing: 1 }}>Verifies</th>
+                </tr>
+              </thead>
+              <tbody>
+                {top_clients.map((c, i) => (
+                  <tr key={c.install_id} style={{ borderTop: "1px solid #1e293b" }}>
+                    <td style={{ padding: 10, color: "#94a3b8" }}>{i + 1}</td>
+                    <td style={{ padding: 10, color: "#e2e8f0" }}>{c.client_name || "—"}</td>
+                    <td style={{ padding: 10, color: "#94a3b8", fontFamily: "'Courier New', monospace", fontSize: 12 }}>{c.install_id}</td>
+                    <td style={{ padding: 10, color: "#f5b301" }}>{c.plan}</td>
+                    <td style={{ padding: 10, color: "#22c55e", textAlign: "right", fontWeight: 700 }}>{c.verify_count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      <div style={{ textAlign: "center", color: "#475569", fontSize: 11, paddingTop: 6 }}>
+        Generat: {new Date(data.generated_at).toLocaleString("ca-ES")}
+      </div>
+    </div>
+  );
+};
+
+const SectionTitle = ({ icon, title, subtitle }) => (
+  <div style={{ marginBottom: 10 }}>
+    <div style={{ color: "#f5b301", fontSize: 16, fontFamily: "Georgia, serif", fontWeight: 700 }}>
+      {icon} {title}
+    </div>
+    {subtitle && <div style={{ color: "#64748b", fontSize: 12, marginTop: 2 }}>{subtitle}</div>}
+  </div>
+);
+
+const BigStat = ({ label, value, hint, color }) => (
+  <div style={{ background: "linear-gradient(135deg,#1e293b 0%,#0f172a 100%)", border: `1.5px solid ${color}55`, borderRadius: 14, padding: "18px 22px", fontFamily: "Georgia, serif", boxShadow: `0 4px 18px ${color}18` }}>
+    <div style={{ fontSize: 11, color: "#94a3b8", letterSpacing: 1.2, textTransform: "uppercase" }}>{label}</div>
+    <div style={{ fontSize: 30, color, fontWeight: 700, marginTop: 6 }}>{value}</div>
+    {hint && <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{hint}</div>}
+  </div>
+);
+
+const MiniStat = ({ label, value, color, hint }) => (
+  <div style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", fontFamily: "Georgia, serif" }}>
+    <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: 1.2, textTransform: "uppercase" }}>{label}</div>
+    <div style={{ fontSize: 22, color, fontWeight: 700, marginTop: 4 }}>{value}</div>
+    {hint && <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>{hint}</div>}
+  </div>
 );
