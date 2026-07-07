@@ -432,15 +432,29 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             raise HTTPException(status_code=400, detail="Sol·licitud invàlida")
         if not body.consent:
             raise HTTPException(status_code=400, detail="Has d'acceptar la política de privacitat")
-        # Rate limit implícit: una sol·licitud pendent per install_id.
-        existing = await req_coll.find_one(
-            {"install_id": body.install_id, "status": "pending"}
-        )
-        if existing:
-            raise HTTPException(
-                status_code=409,
-                detail="Ja hi ha una sol·licitud pendent per aquest Install ID. Espera resposta o contacta amb el proveïdor.",
+        # Rate limit implícit: una sol·licitud pendent per install_id (només si l'usuari n'ha aportat un).
+        # Si no hi ha install_id (client encara no té l'app), fem la comprovació per email.
+        if body.install_id:
+            existing = await req_coll.find_one(
+                {"install_id": body.install_id, "status": "pending"}
             )
+            if existing:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Ja hi ha una sol·licitud pendent per aquest Install ID. Espera resposta o contacta amb el proveïdor.",
+                )
+        else:
+            # Sense install_id: comprovem duplicat per email en les últimes 24h
+            from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+            cutoff = (_dt.now(_tz.utc) - _td(hours=24)).isoformat()
+            existing = await req_coll.find_one(
+                {"email": body.email.strip().lower(), "status": "pending", "created_at": {"$gte": cutoff}}
+            )
+            if existing:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Ja hi ha una sol·licitud pendent amb aquest email en les últimes 24h. Espera resposta o contacta amb el proveïdor.",
+                )
         req_id = str(uuid.uuid4())
         doc = {
             "id": req_id,
