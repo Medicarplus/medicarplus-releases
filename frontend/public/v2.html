@@ -185,8 +185,13 @@
     <button class="btn" id="btnImportJson" data-i18n="restore_copy">📂 Restaurar copia</button>
     <input type="file" id="jsonInput" accept=".json" style="display:none" />
     <button class="btn" id="btnHistory" style="background:#1f3a2e;border-color:#2a5e44;color:#bff0d6;font-weight:600" data-i18n="history">🛡️ Historial</button>
-    <button class="btn" id="btnLedger" style="background:#2a1f3a;border-color:#5e2a5e;color:#e0bff0;font-weight:600" data-i18n="ledger">📖 Llibreta</button>
-    <button class="btn" id="btnIrpf" style="background:#3a2a1f;border-color:#8b5e2a;color:#f0d6bf;font-weight:600">📋 IRPF</button>
+    <div class="btn-dropdown" id="btnAccounting" style="position:relative;display:inline-block">
+      <button class="btn" id="btnAccountingToggle" style="background:linear-gradient(90deg,#5e2a5e 0%,#8b5e2a 100%);border-color:transparent;color:#fff;font-weight:700" data-testid="btn-accounting">🔧 <span data-i18n="accounting">Contabilidad</span> <span style="font-size:9px;margin-left:4px">▼</span></button>
+      <div id="btnAccountingMenu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid #475569;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.5);z-index:1000;min-width:180px;padding:6px;flex-direction:column;gap:4px">
+        <button class="btn" id="btnLedger" style="background:#2a1f3a;border-color:#5e2a5e;color:#e0bff0;font-weight:600;width:100%;text-align:left" data-i18n="ledger">📖 Llibreta</button>
+        <button class="btn" id="btnIrpf" style="background:#3a2a1f;border-color:#8b5e2a;color:#f0d6bf;font-weight:600;width:100%;text-align:left">📋 IRPF</button>
+      </div>
+    </div>
     <button class="btn" id="btnSms" style="background:linear-gradient(90deg,#059669 0%,#10b981 100%);color:#fff;border-color:transparent;font-weight:700" title="Avisos SMS / WhatsApp de renovació">📱 Avisos</button>
     <span id="autosaveBadge" style="display:none;padding:5px 10px;border-radius:6px;background:#1f3a2e;color:#7ee3aa;font-size:11px;font-family:'Consolas',monospace;letter-spacing:.3px;border:1px solid #2a5e44"></span>
     <button class="btn traffic-only" id="btnAudit" style="background:linear-gradient(90deg,#ea580c 0%,#f97316 100%);color:#fff;border-color:transparent;font-weight:700" data-i18n="audit">🔎 Auditoría</button>
@@ -313,12 +318,14 @@
 const STORE_KEY='caja.v1';const $=s=>document.querySelector(s);const $$=s=>document.querySelectorAll(s);
 // ============ i18n ============
 const I18N={
-  es:{app_title:'MediCar Plus',app_sub:'Cierre diario · Importación CSV/Excel · Debe / Haber',stats:'📊 ESTADÍSTICAS',date:'FECHA',today:'Hoy',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar copia',restore_copy:'📂 Restaurar copia',history:'🛡️ Historial',ledger:'📖 Libreta',audit:'🔎 Auditoría',ai_advisor:'🤖 Asesor IA',print:'🖨️ Imprimir',tab_traffic:'Tráfico (Renov/Exped)',tab_reviews:'Revisiones / Certificados / Otros',tab_dh:'Debe / Haber',concept:'Concepto',group:'Grupo',name:'Nombre',amount:'Importe (€)',dgt_fee:'Tasa DGT (€)',payment:'F. Pago',cash:'Efectivo',card:'Tarjeta',transfer:'Transferencia',renewal:'Renovación',issue:'Expedición',duplicate:'Duplicado',exchange:'Canje',other:'Otro',driving:'Conducir',moped:'Ciclomotor',ph_name:'Apellidos, Nombre',add_entry:'+ Añadir entrada',entries_of_day:'Entradas del día',clear_day:'🗑️ Vaciar día',type:'Tipo',name_concept:'Nombre / Concepto',amount_short:'Importe',disc:'Dto',fee_short:'Tasa',fp_fee:'FP Tasa',actions:'Acciones',empty_entries:'No hay entradas. Importa CSV/Excel o añade manualmente arriba.',day_close:'Cierre del día',month_split:'Reparto mes actual',by_concept:'Resumen por concepto',history_title:'Histórico'},
-  ca:{app_title:'MediCar Plus',app_sub:'Tancament diari · Importació CSV/Excel · Deure / Haver',stats:'📊 ESTADÍSTIQUES',date:'DATA',today:'Avui',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar còpia',restore_copy:'📂 Restaurar còpia',history:'🛡️ Historial',ledger:'📖 Llibreta',audit:'🔎 Auditoria',ai_advisor:'🤖 Assessor IA',print:'🖨️ Imprimir',tab_traffic:'Trànsit (Renov/Exped)',tab_reviews:'Revisions / Certificats / Altres',tab_dh:'Deure / Haver',concept:'Concepte',group:'Grup',name:'Nom',amount:'Import (€)',dgt_fee:'Taxa DGT (€)',payment:'F. Pagament',cash:'Efectiu',card:'Targeta',transfer:'Transferència',renewal:'Renovació',issue:'Expedició',duplicate:'Duplicat',exchange:'Canvi',other:'Altres',driving:'Conduir',moped:'Ciclomotor',ph_name:'Cognoms, Nom',add_entry:'+ Afegir entrada',entries_of_day:'Entrades del dia',clear_day:'🗑️ Buidar dia',type:'Tipus',name_concept:'Nom / Concepte',amount_short:'Import',disc:'Dte',fee_short:'Taxa',fp_fee:'FP Taxa',actions:'Accions',empty_entries:"No hi ha entrades. Importa CSV/Excel o afegeix manualment a dalt.",day_close:'Tancament del dia',month_split:'Repartiment mes actual',by_concept:'Resum per concepte',history_title:'Històric'}
+  es:{app_title:'MediCar Plus',app_sub:'Cierre diario · Importación CSV/Excel · Debe / Haber',stats:'📊 ESTADÍSTICAS',date:'FECHA',today:'Hoy',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar copia',restore_copy:'📂 Restaurar copia',history:'🛡️ Historial',ledger:'📖 Libreta',accounting:'Contabilidad',audit:'🔎 Auditoría',ai_advisor:'🤖 Asesor IA',print:'🖨️ Imprimir',tab_traffic:'Tráfico (Renov/Exped)',tab_reviews:'Revisiones / Certificados / Otros',tab_dh:'Debe / Haber',concept:'Concepto',group:'Grupo',name:'Nombre',amount:'Importe (€)',dgt_fee:'Tasa DGT (€)',payment:'F. Pago',cash:'Efectivo',card:'Tarjeta',transfer:'Transferencia',renewal:'Renovación',issue:'Expedición',duplicate:'Duplicado',exchange:'Canje',other:'Otro',driving:'Conducir',moped:'Ciclomotor',ph_name:'Apellidos, Nombre',add_entry:'+ Añadir entrada',entries_of_day:'Entradas del día',clear_day:'🗑️ Vaciar día',type:'Tipo',name_concept:'Nombre / Concepto',amount_short:'Importe',disc:'Dto',fee_short:'Tasa',fp_fee:'FP Tasa',actions:'Acciones',empty_entries:'No hay entradas. Importa CSV/Excel o añade manualmente arriba.',day_close:'Cierre del día',month_split:'Reparto mes actual',by_concept:'Resumen por concepto',history_title:'Histórico'},
+  ca:{app_title:'MediCar Plus',app_sub:'Tancament diari · Importació CSV/Excel · Deure / Haver',stats:'📊 ESTADÍSTIQUES',date:'DATA',today:'Avui',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar còpia',restore_copy:'📂 Restaurar còpia',history:'🛡️ Historial',ledger:'📖 Llibreta',accounting:'Comptabilitat',audit:'🔎 Auditoria',ai_advisor:'🤖 Assessor IA',print:'🖨️ Imprimir',tab_traffic:'Trànsit (Renov/Exped)',tab_reviews:'Revisions / Certificats / Altres',tab_dh:'Deure / Haver',concept:'Concepte',group:'Grup',name:'Nom',amount:'Import (€)',dgt_fee:'Taxa DGT (€)',payment:'F. Pagament',cash:'Efectiu',card:'Targeta',transfer:'Transferència',renewal:'Renovació',issue:'Expedició',duplicate:'Duplicat',exchange:'Canvi',other:'Altres',driving:'Conduir',moped:'Ciclomotor',ph_name:'Cognoms, Nom',add_entry:'+ Afegir entrada',entries_of_day:'Entrades del dia',clear_day:'🗑️ Buidar dia',type:'Tipus',name_concept:'Nom / Concepte',amount_short:'Import',disc:'Dte',fee_short:'Taxa',fp_fee:'FP Taxa',actions:'Accions',empty_entries:"No hi ha entrades. Importa CSV/Excel o afegeix manualment a dalt.",day_close:'Tancament del dia',month_split:'Repartiment mes actual',by_concept:'Resum per concepte',history_title:'Històric'}
 };
-let currentLang=localStorage.getItem('caja.lang')||'ca';
+let currentLang=localStorage.getItem('caja.lang')||'es';
 function t(key){return (I18N[currentLang]||I18N.ca)[key]||key}
 function applyLang(){document.documentElement.lang=currentLang;const dict=I18N[currentLang]||I18N.ca;$$('[data-i18n]').forEach(el=>{const k=el.getAttribute('data-i18n');if(dict[k]!==undefined&&el.children.length===0)el.textContent=dict[k]});$$('[data-i18n-ph]').forEach(el=>{const k=el.getAttribute('data-i18n-ph');if(dict[k]!==undefined)el.placeholder=dict[k]});const lbl=$('#langLabel');if(lbl)lbl.textContent=currentLang.toUpperCase()}
+// Helper: retorna text segons idioma actual (per strings hardcodejats a modals)
+function L(ca,es){return currentLang==='es'?es:ca}
 function toggleLang(){currentLang=currentLang==='ca'?'es':'ca';localStorage.setItem('caja.lang',currentLang);applyLang();if(typeof render==='function')render()}
 let currentCompany=localStorage.getItem('caja.company')||'trafic';
 const KEYS={trafic:'caja.v1',cempla:'caja.cempla.v1'};
@@ -441,7 +448,7 @@ function openBackupHistory(){
   });
 }
 function switchCompany(c){currentCompany=c;localStorage.setItem('caja.company',c);state=loadState();applyCompanyUI();render()}
-function applyCompanyUI(){const isC=currentCompany==='cempla';const c1=(window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1';const c2=(window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2';document.body.classList.toggle('cempla',isC);$('#cTrafic').classList.toggle('active',!isC);$('#cCempla').classList.toggle('active',isC);document.querySelectorAll('[data-cfg-name="1"]').forEach(el=>el.textContent=c1);document.querySelectorAll('[data-cfg-name="2"]').forEach(el=>el.textContent=c2);$('#appTitle').firstChild.nodeValue=isC?c2+' ':'MediCar Plus ';$('#appSub').textContent=isC?('Revisions · '+c2):'Cierre diario · Importación CSV/Excel · Debe / Haber';
+function applyCompanyUI(){const hasC2=!!(window.CFG&&CFG.company2&&CFG.company2.name);const isC=hasC2&&currentCompany==='cempla';const c1=(window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1';const c2=(window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2';document.body.classList.toggle('cempla',isC);$('#cTrafic').classList.toggle('active',!isC);$('#cCempla').classList.toggle('active',isC);$('#cCempla').style.display=hasC2?'':'none';document.querySelectorAll('[data-cfg-name="1"]').forEach(el=>el.textContent=c1);document.querySelectorAll('[data-cfg-name="2"]').forEach(el=>el.textContent=c2);$('#appTitle').firstChild.nodeValue=isC?c2+' ':'MediCar Plus ';$('#appSub').textContent=isC?('Revisions · '+c2):'Cierre diario · Importación CSV/Excel · Debe / Haber';
   // Socis (opcionals): mostra tants inputs de % com socis configurats. Si no n'hi ha, s'amaga.
   const parts=(window.CFG&&Array.isArray(CFG.partners))?CFG.partners:[];
   document.querySelectorAll('.partner-input').forEach(el=>{
@@ -793,8 +800,10 @@ function renderHistory(){const dates=Object.keys(state.byDate).filter(d=>entries
 function actEntry(act,id){const list=entriesOf(currentDate);const i=list.findIndex(x=>x.id===id);if(i<0)return;if(act==='del'){confirmModal('Eliminar entrada',`¿Eliminar <b>${escapeHtml(list[i].nombre)}</b>?`,()=>{list.splice(i,1);saveState();render()},'Eliminar');return}if(act==='ret'){list[i].retorno=!list[i].retorno;saveState();render();return}if(act==='edit'){const e=list[i];const isDh=e.kind==='DH';const nN=prompt(isDh?'Concepto:':'Nombre / concepto:',e.nombre);if(nN===null)return;const nI=prompt('Importe (€):',e.importe);if(nI===null)return;const nT=isDh?'0':prompt('Tasa DGT (€):',e.tasa);if(nT===null)return;const nF=prompt('Forma de pago (E/T/B/X):',e.fp)||e.fp;e.nombre=nN.trim()||e.nombre;e.importe=num(nI);e.tasa=num(nT);e.fp=nF.toUpperCase()[0];e.fpTasa=e.fp;saveState();render()}}
 function confirmModal(title,message,onYes,yesLabel='Sí, borrar',danger=true,extraBtn=null){const back=document.createElement('div');back.className='modal-back';let extraHTML=extraBtn?`<button class="btn btn-primary" data-extra>${extraBtn.label}</button>`:'';back.innerHTML=`<div class="modal"><h3>${title}</h3><p>${message}</p><div class="row"><button class="btn" data-no>Cancelar</button>${extraHTML}<button class="btn ${danger?'btn-danger':'btn-primary'}" data-yes>${yesLabel}</button></div></div>`;document.body.appendChild(back);back.querySelector('[data-no]').focus();back.addEventListener('click',ev=>{if(ev.target===back)back.remove();if(ev.target.matches('[data-no]'))back.remove();if(ev.target.matches('[data-yes]')){back.remove();onYes()}if(ev.target.matches('[data-extra]')&&extraBtn){back.remove();extraBtn.onClick()}});document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){back.remove();document.removeEventListener('keydown',esc)}})}
 $('#btnHistory').onclick=()=>openBackupHistory();
-$('#btnLedger').onclick=()=>openLedger();
-$('#btnIrpf').onclick=()=>openIRPF();
+$('#btnLedger').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLedger()};
+$('#btnIrpf').onclick=()=>{$('#btnAccountingMenu').style.display='none';openIRPF()};
+$('#btnAccountingToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnAccountingMenu');m.style.display=(m.style.display==='none'||!m.style.display)?'flex':'none'};
+document.addEventListener('click',(e)=>{const box=$('#btnAccounting');const menu=$('#btnAccountingMenu');if(menu&&box&&!box.contains(e.target))menu.style.display='none'});
 
 // ============ LLIBRETA (LIBRO DIARIO CONTABLE) ============
 function generateLedgerEntries(dateFrom,dateTo,company){
@@ -2236,23 +2245,23 @@ function showActivationModal(){
   back.innerHTML='<div style="background:linear-gradient(135deg,#1e293b,#0f172a);border:2px solid #f5b301;border-radius:16px;padding:40px;max-width:600px;width:100%;color:#e2e8f0;font-family:Georgia,serif;box-shadow:0 20px 60px rgba(0,0,0,0.5)">'
     +'<div style="text-align:center;margin-bottom:30px">'
     +'<div style="font-size:48px;margin-bottom:10px">🔐</div>'
-    +'<h1 style="margin:0;color:#f5b301;font-size:28px;letter-spacing:1px">Activació de llicència</h1>'
-    +'<p style="color:#94a3b8;margin:8px 0 0;font-size:13px">MediCar Plus · Software comercial · M.Brugulat Lopez</p>'
+    +'<h1 style="margin:0;color:#f5b301;font-size:28px;letter-spacing:1px">'+L('Activació de llicència','Activación de licencia')+'</h1>'
+    +'<p style="color:#94a3b8;margin:8px 0 0;font-size:13px">MediCar Plus · '+L('Software comercial','Software comercial')+' · M.Brugulat Lopez</p>'
     +'</div>'
     +'<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:16px;margin-bottom:20px">'
-    +'<div style="font-size:11px;color:#f5b301;letter-spacing:2px;margin-bottom:6px">ID D\'INSTAL·LACIÓ</div>'
+    +'<div style="font-size:11px;color:#f5b301;letter-spacing:2px;margin-bottom:6px">'+L('ID D\'INSTAL·LACIÓ','ID DE INSTALACIÓN')+'</div>'
     +'<div style="font-family:\'Courier New\',monospace;font-size:16px;font-weight:700;color:#e2e8f0;letter-spacing:2px;user-select:all">'+installId+'</div>'
-    +'<div style="font-size:10px;color:#64748b;margin-top:6px;font-style:italic">Envia aquest ID al proveïdor per obtenir la teva llicència</div>'
+    +'<div style="font-size:10px;color:#64748b;margin-top:6px;font-style:italic">'+L('Envia aquest ID al proveïdor per obtenir la teva llicència','Envía este ID al proveedor para obtener tu licencia')+'</div>'
     +'</div>'
     +'<div style="margin-bottom:20px">'
-    +'<label style="display:block;font-size:12px;color:#f5b301;letter-spacing:1.5px;font-weight:700;margin-bottom:8px">CLAU DE LLICÈNCIA</label>'
-    +'<textarea id="licInput" placeholder="Enganxa aquí la teva clau (JWT xxx.yyy.zzz o MB-XXXX-XXXX-XXXX-XXXX)" rows="3" style="width:100%;padding:12px;background:#0f172a;border:2px solid #475569;border-radius:8px;color:#e2e8f0;font-family:\'Courier New\',monospace;font-size:12px;line-height:1.5;letter-spacing:0.5px;resize:vertical;word-break:break-all;box-sizing:border-box" autocomplete="off" spellcheck="false"></textarea>'
+    +'<label style="display:block;font-size:12px;color:#f5b301;letter-spacing:1.5px;font-weight:700;margin-bottom:8px">'+L('CLAU DE LLICÈNCIA','CLAVE DE LICENCIA')+'</label>'
+    +'<textarea id="licInput" placeholder="'+L('Enganxa aquí la teva clau (JWT xxx.yyy.zzz o MB-XXXX-XXXX-XXXX-XXXX)','Pega aquí tu clave (JWT xxx.yyy.zzz o MB-XXXX-XXXX-XXXX-XXXX)')+'" rows="3" style="width:100%;padding:12px;background:#0f172a;border:2px solid #475569;border-radius:8px;color:#e2e8f0;font-family:\'Courier New\',monospace;font-size:12px;line-height:1.5;letter-spacing:0.5px;resize:vertical;word-break:break-all;box-sizing:border-box" autocomplete="off" spellcheck="false"></textarea>'
     +'<div id="licError" style="color:#ef4444;font-size:12px;margin-top:8px;display:none"></div>'
     +'<div id="licStatus" style="color:#38bdf8;font-size:12px;margin-top:8px;display:none"></div>'
     +'</div>'
-    +'<button id="licBtn" style="width:100%;padding:14px;background:linear-gradient(135deg,#f5b301,#d97706);color:#0f172a;border:none;border-radius:10px;font-family:Georgia,serif;font-size:16px;font-weight:700;letter-spacing:2px;cursor:pointer;text-transform:uppercase">✓ Activar Llicència</button>'
+    +'<button id="licBtn" style="width:100%;padding:14px;background:linear-gradient(135deg,#f5b301,#d97706);color:#0f172a;border:none;border-radius:10px;font-family:Georgia,serif;font-size:16px;font-weight:700;letter-spacing:2px;cursor:pointer;text-transform:uppercase">'+L('✓ Activar Llicència','✓ Activar Licencia')+'</button>'
     +'<div style="text-align:center;margin-top:24px;padding-top:20px;border-top:1px solid #334155">'
-    +'<p style="color:#64748b;font-size:11px;margin:0;line-height:1.6">No tens llicència? <a href="'+LIC.REQUEST_URL+'" target="_blank" style="color:#f5b301;text-decoration:underline">Demana-la aquí</a><br>o contacta amb <b style="color:#f5b301">M.Brugulat Lopez</b> · <a href="mailto:brugulatmarc@gmail.com" style="color:#f5b301;text-decoration:underline">brugulatmarc@gmail.com</a><br>Instal·lació: '+new Date(installDate).toLocaleDateString('ca-ES')+'</p>'
+    +'<p style="color:#64748b;font-size:11px;margin:0;line-height:1.6">'+L('No tens llicència? ','¿No tienes licencia? ')+'<a href="'+LIC.REQUEST_URL+'" target="_blank" style="color:#f5b301;text-decoration:underline">'+L('Demana-la aquí','Solicítala aquí')+'</a><br>'+L('o contacta amb ','o contacta con ')+'<b style="color:#f5b301">M.Brugulat Lopez</b> · <a href="mailto:brugulatmarc@gmail.com" style="color:#f5b301;text-decoration:underline">brugulatmarc@gmail.com</a><br>'+L('Instal·lació: ','Instalación: ')+new Date(installDate).toLocaleDateString(currentLang==='es'?'es-ES':'ca-ES')+'</p>'
     +'</div>'
     +'</div>';
   document.body.appendChild(back);
@@ -2331,7 +2340,7 @@ function showLicenseInfo(){
 const CFG_KEY='caja.config.v1';
 window.CFG=(function(){try{return JSON.parse(localStorage.getItem(CFG_KEY))||{}}catch(e){return {}}})();
 function saveCFG(){localStorage.setItem(CFG_KEY,JSON.stringify(window.CFG))}
-function isConfigured(){return !!(CFG.configured&&CFG.company1&&CFG.company1.name&&CFG.company2&&CFG.company2.name)}
+function isConfigured(){return !!(CFG.configured&&CFG.company1&&CFG.company1.name)}
 function showConfigWizard(isFirstRun){
   const back=document.createElement('div');
   back.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,0.98);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(10px)';
@@ -2341,32 +2350,32 @@ function showConfigWizard(isFirstRun){
   back.innerHTML='<div style="background:linear-gradient(135deg,#1e293b,#0f172a);border:2px solid #f5b301;border-radius:16px;padding:40px;max-width:640px;width:100%;max-height:92vh;overflow:auto;color:#e2e8f0;font-family:Georgia,serif;box-shadow:0 20px 60px rgba(0,0,0,0.5)">'
     +'<div style="text-align:center;margin-bottom:28px">'
     +'<div style="font-size:48px;margin-bottom:8px">⚙️</div>'
-    +'<h1 style="margin:0;color:#f5b301;font-size:26px;letter-spacing:1px">'+(isFirstRun?'Configuració inicial':'Configuració')+'</h1>'
-    +'<p style="color:#94a3b8;margin:8px 0 0;font-size:13px">'+(isFirstRun?'Personalitza l\'app amb el nom de les teves empreses i, opcionalment, els socis que reparteixen ingressos.':'Edita els noms de les empreses i els socis.')+'</p>'
+    +'<h1 style="margin:0;color:#f5b301;font-size:26px;letter-spacing:1px">'+(isFirstRun?L('Configuració inicial','Configuración inicial'):L('Configuració','Configuración'))+'</h1>'
+    +'<p style="color:#94a3b8;margin:8px 0 0;font-size:13px">'+(isFirstRun?L('Personalitza l\'app amb el nom de les teves empreses i, opcionalment, els socis que reparteixen ingressos.','Personaliza la app con el nombre de tus empresas y, opcionalmente, los socios que reparten ingresos.'):L('Edita els noms de les empreses i els socis.','Edita los nombres de las empresas y los socios.'))+'</p>'
     +'</div>'
     +'<div style="display:grid;gap:16px;margin-bottom:22px">'
     +'<div>'
-    +'<label style="display:block;font-size:11px;color:#f5b301;letter-spacing:1.5px;font-weight:700;margin-bottom:8px">🚗 EMPRESA 1 · Tràfic / Gestoria</label>'
-    +'<input id="cfgC1" type="text" value="'+c1.replace(/"/g,'&quot;')+'" placeholder="Ex: Centre Mèdic Tarragona, Autoescola Bcn, Gestoria Trànsit…" style="width:100%;padding:12px;background:#0f172a;border:2px solid #475569;border-radius:8px;color:#e2e8f0;font-family:Georgia,serif;font-size:15px;box-sizing:border-box" maxlength="60" />'
+    +'<label style="display:block;font-size:11px;color:#f5b301;letter-spacing:1.5px;font-weight:700;margin-bottom:8px">🚗 '+L('EMPRESA 1 · Tràfic / Gestoria','EMPRESA 1 · Tráfico / Gestoría')+'</label>'
+    +'<input id="cfgC1" type="text" value="'+c1.replace(/"/g,'&quot;')+'" placeholder="'+L('Ex: Centre Mèdic Tarragona, Autoescola Bcn, Gestoria Trànsit…','Ej: Centro Médico Madrid, Autoescuela Bcn, Gestoría Tráfico…')+'" style="width:100%;padding:12px;background:#0f172a;border:2px solid #475569;border-radius:8px;color:#e2e8f0;font-family:Georgia,serif;font-size:15px;box-sizing:border-box" maxlength="60" />'
     +'</div>'
     +'<div>'
-    +'<label style="display:block;font-size:11px;color:#f5b301;letter-spacing:1.5px;font-weight:700;margin-bottom:8px">🩺 EMPRESA 2 · Revisions / Esport <span style="color:#64748b;font-weight:400">(opcional)</span></label>'
-    +'<input id="cfgC2" type="text" value="'+c2.replace(/"/g,'&quot;')+'" placeholder="Ex: Revisions Mèdiques, Esport…" style="width:100%;padding:12px;background:#0f172a;border:2px solid #475569;border-radius:8px;color:#e2e8f0;font-family:Georgia,serif;font-size:15px;box-sizing:border-box" maxlength="60" />'
+    +'<label style="display:block;font-size:11px;color:#f5b301;letter-spacing:1.5px;font-weight:700;margin-bottom:8px">🩺 '+L('EMPRESA 2 · Revisions / Esport','EMPRESA 2 · Revisiones / Deporte')+' <span style="color:#64748b;font-weight:400">('+L('opcional','opcional')+')</span></label>'
+    +'<input id="cfgC2" type="text" value="'+c2.replace(/"/g,'&quot;')+'" placeholder="'+L('Ex: Revisions Mèdiques, Esport…','Ej: Revisiones Médicas, Deporte…')+'" style="width:100%;padding:12px;background:#0f172a;border:2px solid #475569;border-radius:8px;color:#e2e8f0;font-family:Georgia,serif;font-size:15px;box-sizing:border-box" maxlength="60" />'
     +'</div>'
     +'</div>'
     +'<div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;margin-bottom:22px">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
-    +'<label style="font-size:11px;color:#f5b301;letter-spacing:1.5px;font-weight:700">🤝 SOCIS (opcional · repartiment revisions)</label>'
-    +'<button id="cfgAddPartner" type="button" style="padding:5px 10px;background:#f5b301;color:#0f172a;border:none;border-radius:6px;font-family:Georgia,serif;font-size:11px;font-weight:700;cursor:pointer">+ Afegir soci</button>'
+    +'<label style="font-size:11px;color:#f5b301;letter-spacing:1.5px;font-weight:700">🤝 '+L('SOCIS (opcional · repartiment revisions)','SOCIOS (opcional · reparto revisiones)')+'</label>'
+    +'<button id="cfgAddPartner" type="button" style="padding:5px 10px;background:#f5b301;color:#0f172a;border:none;border-radius:6px;font-family:Georgia,serif;font-size:11px;font-weight:700;cursor:pointer">+ '+L('Afegir soci','Añadir socio')+'</button>'
     +'</div>'
     +'<div id="cfgPartnersList" style="display:grid;gap:8px"></div>'
-    +'<div id="cfgPartnersEmpty" style="color:#64748b;font-size:12px;font-style:italic;margin-top:4px">Sense socis configurats. Deixa-ho així si no reparteixes els ingressos amb ningú.</div>'
-    +'<div style="color:#94a3b8;font-size:11px;margin-top:10px;line-height:1.5">Els % de tots els socis han de sumar 100. Si no vols usar aquest sistema, deixa la llista buida.</div>'
+    +'<div id="cfgPartnersEmpty" style="color:#64748b;font-size:12px;font-style:italic;margin-top:4px">'+L('Sense socis configurats. Deixa-ho així si no reparteixes els ingressos amb ningú.','Sin socios configurados. Déjalo así si no repartes los ingresos con nadie.')+'</div>'
+    +'<div style="color:#94a3b8;font-size:11px;margin-top:10px;line-height:1.5">'+L('Els % de tots els socis han de sumar 100. Si no vols usar aquest sistema, deixa la llista buida.','Los % de todos los socios deben sumar 100. Si no quieres usar este sistema, deja la lista vacía.')+'</div>'
     +'</div>'
     +'<div id="cfgErr" style="color:#ef4444;font-size:12px;margin-bottom:12px;display:none"></div>'
     +'<div style="display:flex;gap:10px;justify-content:'+(isFirstRun?'center':'flex-end')+'">'
-    +(!isFirstRun?'<button id="cfgCancel" style="padding:12px 22px;background:transparent;border:1.5px solid #64748b;border-radius:8px;color:#cbd5e1;cursor:pointer;font-family:Georgia,serif">Cancel·la</button>':'')
-    +'<button id="cfgSave" style="padding:12px 30px;background:linear-gradient(135deg,#f5b301,#d97706);color:#0f172a;border:none;border-radius:10px;font-family:Georgia,serif;font-size:15px;font-weight:700;letter-spacing:2px;cursor:pointer;text-transform:uppercase">'+(isFirstRun?'✓ Començar':'✓ Desar')+'</button>'
+    +(!isFirstRun?'<button id="cfgCancel" style="padding:12px 22px;background:transparent;border:1.5px solid #64748b;border-radius:8px;color:#cbd5e1;cursor:pointer;font-family:Georgia,serif">'+L('Cancel·la','Cancelar')+'</button>':'')
+    +'<button id="cfgSave" style="padding:12px 30px;background:linear-gradient(135deg,#f5b301,#d97706);color:#0f172a;border:none;border-radius:10px;font-family:Georgia,serif;font-size:15px;font-weight:700;letter-spacing:2px;cursor:pointer;text-transform:uppercase">'+(isFirstRun?L('✓ Començar','✓ Empezar'):L('✓ Desar','✓ Guardar'))+'</button>'
     +'</div>'
     +'</div>';
   document.body.appendChild(back);
@@ -2381,9 +2390,9 @@ function showConfigWizard(isFirstRun){
     workingPartners.forEach((p,i)=>{
       const row=document.createElement('div');
       row.style.cssText='display:grid;grid-template-columns:1fr 90px 32px;gap:6px;align-items:center';
-      row.innerHTML='<input type="text" placeholder="Nom del soci" value="'+String(p.name).replace(/"/g,'&quot;')+'" data-p-name="'+i+'" style="padding:8px 10px;background:#141821;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:13px" maxlength="40" />'
+      row.innerHTML='<input type="text" placeholder="'+L('Nom del soci','Nombre del socio')+'" value="'+String(p.name).replace(/"/g,'&quot;')+'" data-p-name="'+i+'" style="padding:8px 10px;background:#141821;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:13px" maxlength="40" />'
         +'<input type="number" min="0" max="100" step="1" value="'+(p.pct||0)+'" data-p-pct="'+i+'" style="padding:8px 10px;background:#141821;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:13px;text-align:right" placeholder="%" />'
-        +'<button type="button" data-p-del="'+i+'" title="Eliminar soci" style="padding:6px 8px;background:#7f1d1d;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">🗑</button>';
+        +'<button type="button" data-p-del="'+i+'" title="'+L('Eliminar soci','Eliminar socio')+'" style="padding:6px 8px;background:#7f1d1d;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">🗑</button>';
       listEl.appendChild(row);
     });
     listEl.querySelectorAll('[data-p-name]').forEach(el=>el.oninput=e=>{workingPartners[parseInt(e.target.dataset.pName)].name=e.target.value});
@@ -2391,7 +2400,7 @@ function showConfigWizard(isFirstRun){
     listEl.querySelectorAll('[data-p-del]').forEach(el=>el.onclick=e=>{workingPartners.splice(parseInt(e.currentTarget.dataset.pDel),1);renderPartners()});
   };
   back.querySelector('#cfgAddPartner').onclick=()=>{
-    if(workingPartners.length>=5){err.textContent='✗ Màxim 5 socis.';err.style.display='block';return}
+    if(workingPartners.length>=5){err.textContent=L('✗ Màxim 5 socis.','✗ Máximo 5 socios.');err.style.display='block';return}
     workingPartners.push({name:'',pct:0});renderPartners();
   };
   renderPartners();
@@ -2399,15 +2408,19 @@ function showConfigWizard(isFirstRun){
   const save=()=>{
     const n1=back.querySelector('#cfgC1').value.trim();
     const n2=back.querySelector('#cfgC2').value.trim();
-    if(!n1||!n2){err.textContent='✗ Has d\'omplir els noms de les 2 empreses.';err.style.display='block';return}
+    if(!n1){err.textContent='✗ Has d\'omplir el nom de l\'Empresa 1.';err.style.display='block';return}
     // Validació socis: si n'hi ha, tots han de tenir nom i la suma dels % ha de ser 100
     const partners=workingPartners.filter(p=>p.name.trim()!==''||p.pct>0).map(p=>({name:p.name.trim()||'Soci',pct:p.pct||0}));
     if(partners.length){
       const totalPct=partners.reduce((s,p)=>s+p.pct,0);
       if(Math.abs(totalPct-100)>0.01){err.textContent='✗ La suma dels % dels socis és '+totalPct+' i ha de ser 100. Ajusta els valors o elimina els socis si no vols usar aquest sistema.';err.style.display='block';return}
     }
-    window.CFG=Object.assign({},window.CFG,{company1:{name:n1},company2:{name:n2},partners,configured:true,configuredAt:new Date().toISOString()});
+    // Empresa 2 és opcional. Si l'usuari la deixa buida, la guardem com null i s'amaga a la UI.
+    const company2Value=n2?{name:n2}:null;
+    window.CFG=Object.assign({},window.CFG,{company1:{name:n1},company2:company2Value,partners,configured:true,configuredAt:new Date().toISOString()});
     saveCFG();
+    // Si ja no hi ha empresa 2, força que estem a l'empresa 1 (evita quedar-se atrapat)
+    if(!company2Value&&typeof currentCompany!=='undefined'&&currentCompany==='cempla'){currentCompany='cbTrafic'}
     back.remove();
     applyCompanyUI();
     if(typeof render==='function')render();
