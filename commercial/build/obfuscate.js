@@ -92,7 +92,11 @@ const obfuscated = originalHtml.replace(inlineRe, (full, code) => {
   blockCount++;
   inputSizeJs += Buffer.byteLength(code, "utf8");
   const t0 = Date.now();
-  const result = JavaScriptObfuscator.obfuscate(code, options).getObfuscatedCode();
+  let result = JavaScriptObfuscator.obfuscate(code, options).getObfuscatedCode();
+  // CRITICAL: escape any </script> inside the obfuscated JS so it doesn't
+  // prematurely close the <script> block (the app has `w.document.write` calls
+  // with nested script tags whose backslash gets removed by the obfuscator).
+  result = result.replace(/<\/script>/gi, "<\\/script>");
   outputSizeJs += Buffer.byteLength(result, "utf8");
   console.log(
     `[obfuscate] Block ${blockCount}: ${code.length} → ${result.length} chars (${((Date.now() - t0) / 1000).toFixed(2)}s)`,
