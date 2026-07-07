@@ -162,7 +162,7 @@ class LicenseRequestRecord(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     id: str
-    install_id: str
+    install_id: Optional[str] = None
     company_name: str
     contact_name: Optional[str] = None
     email: str
