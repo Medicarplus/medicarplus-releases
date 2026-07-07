@@ -93,7 +93,37 @@ async def send_bulk(payload: SendPayload):
         results.append(r)
 
     ok_count = sum(1 for r in results if r["ok"])
+    # Registra al historial (a MongoDB) — a través de l'app principal
+    try:
+        from server import db
+        from datetime import datetime as _dt, timezone as _tz
+        await db.sms_history.insert_one({
+            "sent_at": _dt.now(_tz.utc).isoformat(),
+            "channels_sms": payload.channels.sms,
+            "channels_wa": payload.channels.whatsapp,
+            "total": len(results),
+            "ok": ok_count,
+            "failed": len(results) - ok_count,
+            "recipients_count": len(results),
+            "sample_names": [m.nom for m in payload.messages[:5]],
+        })
+    except Exception:
+        pass  # no bloqueja l'enviament si falla el log
     return {"total": len(results), "ok": ok_count, "failed": len(results) - ok_count, "results": results}
+
+
+@router.get("/history")
+async def get_history(limit: int = 50):
+    """Retorna els últims enviaments massius."""
+    try:
+        from server import db
+        cursor = db.sms_history.find().sort("sent_at", -1).limit(limit)
+        docs = await cursor.to_list(length=limit)
+        for d in docs:
+            d.pop("_id", None)
+        return {"history": docs}
+    except Exception as e:
+        return {"history": [], "error": str(e)}
 
 
 @router.get("/status")

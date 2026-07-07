@@ -1852,6 +1852,7 @@ applyLang();
     back.innerHTML='<div class="modal" style="max-width:1200px;width:97%;max-height:96vh;display:flex;flex-direction:column;padding:0;background:#0f1115;color:#e8ecf2;border:1px solid #1f3a2e">'
       +'<div style="padding:14px 18px;background:linear-gradient(90deg,#065f46 0%,#059669 100%);border-radius:12px 12px 0 0;display:flex;align-items:center;gap:10px">'
       +'<h3 style="margin:0;color:#fff;font-family:Georgia,serif;flex:1">📱 Avisos SMS / WhatsApp · Recordatoris de renovació</h3>'
+      +'<button class="btn" id="notifHistBtn" style="background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.3);margin-right:6px">📜 Historial</button>'
       +'<button class="btn" id="notifCloseBtn" style="background:rgba(0,0,0,.3);color:#fff;border:1px solid rgba(255,255,255,.2)">✕ Tancar</button>'
       +'</div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px;overflow:auto;flex:1">'
@@ -1923,6 +1924,43 @@ applyLang();
     // Handlers
     const $q=s=>back.querySelector(s);
     $q('#notifCloseBtn').onclick=()=>back.remove();
+    $q('#notifHistBtn').onclick=async()=>{
+      try{
+        const r=await fetch(BACKEND_URL+'/api/notifications/history?limit=50');
+        const data=await r.json();
+        const hist=data.history||[];
+        const backH=document.createElement('div');backH.className='modal-back';backH.style.zIndex='99000';
+        let rowsHtml='';
+        if(!hist.length){rowsHtml='<div style="padding:30px;text-align:center;color:#64748b;font-style:italic">Encara no has enviat cap avís massiu</div>'}
+        else{
+          rowsHtml=hist.map(h=>{
+            const dt=new Date(h.sent_at);
+            const dtFmt=dt.toLocaleDateString('ca-ES')+' '+dt.toLocaleTimeString('ca-ES',{hour:'2-digit',minute:'2-digit'});
+            const ch=[];if(h.channels_sms)ch.push('📱 SMS');if(h.channels_wa)ch.push('💬 WhatsApp');
+            const tickColor=h.failed===0?'#22c55e':(h.ok>0?'#f5b301':'#ef4444');
+            const tickIcon=h.failed===0?'✓':(h.ok>0?'⚠':'✗');
+            const samples=(h.sample_names||[]).slice(0,3).join(', ')+(h.recipients_count>3?', +'+(h.recipients_count-3)+' més':'');
+            return '<div style="padding:12px 14px;border-bottom:1px solid #262b36;display:grid;grid-template-columns:32px 1fr auto;gap:12px;align-items:center">'
+              +'<div style="font-size:22px;color:'+tickColor+';font-weight:700;text-align:center">'+tickIcon+'</div>'
+              +'<div><div style="color:#e8ecf2;font-weight:700;font-size:13px">'+dtFmt+' · '+ch.join(' + ')+'</div>'
+              +'<div style="color:#94a3b8;font-size:11px;margin-top:2px">'+String(samples).replace(/</g,'&lt;')+'</div></div>'
+              +'<div style="text-align:right"><div style="color:#7ee3aa;font-weight:700">✓ '+h.ok+'</div>'+(h.failed>0?'<div style="color:#ef4444;font-size:11px">✗ '+h.failed+' errors</div>':'')+'</div>'
+              +'</div>';
+          }).join('');
+        }
+        backH.innerHTML='<div class="modal" style="max-width:700px;width:96%;max-height:88vh;display:flex;flex-direction:column;padding:0;background:#0f1115;color:#e8ecf2">'
+          +'<div style="padding:14px 18px;background:linear-gradient(90deg,#1e3a5f,#065f46);border-radius:12px 12px 0 0;display:flex;align-items:center;gap:10px">'
+          +'<h3 style="margin:0;color:#fff;font-family:Georgia,serif;flex:1">📜 Historial d\'enviaments massius</h3>'
+          +'<button class="btn" data-close="1" style="background:rgba(0,0,0,.3);color:#fff;border:1px solid rgba(255,255,255,.2)">✕</button>'
+          +'</div>'
+          +'<div style="flex:1;overflow:auto">'+rowsHtml+'</div>'
+          +'<div style="padding:10px 14px;background:#0e1117;border-top:1px solid #262b36;font-size:11px;color:#64748b;text-align:center">Mostrant els últims '+hist.length+' enviaments</div>'
+          +'</div>';
+        document.body.appendChild(backH);
+        backH.querySelector('[data-close]').onclick=()=>backH.remove();
+        backH.addEventListener('click',ev=>{if(ev.target===backH)backH.remove()});
+      }catch(e){toast('✗ Error carregant historial: '+e.message,5000)}
+    };
     const templateInput=$q('#notifTemplate');
     const updateCharCount=()=>{
       const l=templateInput.value.length;

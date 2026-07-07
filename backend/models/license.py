@@ -116,7 +116,7 @@ class LicenseListResponse(BaseModel):
 class LicenseRequestCreate(BaseModel):
     """Payload públic que envia un client des del portal /request-license."""
 
-    install_id: str
+    install_id: Optional[str] = None
     company_name: str = Field(..., min_length=1, max_length=200)
     contact_name: Optional[str] = Field(None, max_length=200)
     email: str = Field(..., max_length=200)
@@ -130,7 +130,11 @@ class LicenseRequestCreate(BaseModel):
 
     @field_validator("install_id")
     @classmethod
-    def _norm_install_id(cls, v: str) -> str:
+    def _norm_install_id(cls, v):
+        # Install ID és opcional al portal públic (el client encara pot no tenir l'app).
+        # Només validem si l'usuari l'ha introduit realment.
+        if not v or not v.strip():
+            return None
         return _validate_install_id(v)
 
     @field_validator("email")

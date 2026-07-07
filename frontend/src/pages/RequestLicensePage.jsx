@@ -36,7 +36,7 @@ export default function RequestLicensePage() {
     setBusy(true);
     try {
       await createLicenseRequest({
-        install_id: installId || "CD-PENDING-0000-0000-0000",
+        install_id: installId || null,
         company_name: form.company_name.trim(),
         contact_name: form.contact_name.trim() || null,
         email: form.email.trim(),
@@ -51,7 +51,18 @@ export default function RequestLicensePage() {
       toast.success("Sol·licitud enviada");
     } catch (ex) {
       const msg = ex?.response?.data?.detail;
-      setErr(typeof msg === "string" ? msg : JSON.stringify(msg) || ex.message);
+      let humanMsg = ex.message || "Error enviant la sol·licitud";
+      if (Array.isArray(msg)) {
+        // Pydantic error blob → convert to human message
+        const first = msg[0];
+        if (first) {
+          const field = (first.loc || []).slice(1).join(".") || "camp";
+          humanMsg = `Error al camp "${field}": ${first.msg || "no vàlid"}`;
+        }
+      } else if (typeof msg === "string") {
+        humanMsg = msg;
+      }
+      setErr(humanMsg);
     } finally {
       setBusy(false);
     }
