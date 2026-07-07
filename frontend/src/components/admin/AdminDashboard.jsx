@@ -514,9 +514,17 @@ export default function AdminDashboard({ onLogout }) {
   };
 
   const handleApprove = async (req) => {
+    // Default de durada segons el pla sol·licitat
+    const plan = (req.plan_requested || "").toUpperCase();
+    let defaultDays = "365";
+    let planLabel = plan;
+    if (plan === "TRIAL") { defaultDays = "30"; planLabel = "TRIAL 30 dies"; }
+    else if (plan === "STD_MES" || plan === "PREMIUM_MES") { defaultDays = "30"; planLabel = plan + " (mensual)"; }
+    else if (plan === "STD_ANY" || plan === "PREMIUM_ANY") { defaultDays = "365"; planLabel = plan + " (anual)"; }
+    const installLbl = req.install_id || "(sense Install ID · s'usarà PENDING)";
     const durationRaw = prompt(
-      `Aprovar sol·licitud de "${req.company_name}" (${req.install_id}).\nDurada en dies (buit = perpètua):`,
-      "365",
+      `Aprovar "${req.company_name}"\nPla: ${planLabel}\nInstall ID: ${installLbl}\n\nDurada en dies (buit = perpètua):`,
+      defaultDays,
     );
     if (durationRaw === null) return;
     const payload = { send_email: true };

@@ -519,8 +519,11 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             )
 
         plan = (body.plan or doc.get("plan_requested") or "STD").upper()
+        # Si no hi ha install_id (client encara no té l'app · pla TRIAL o similar),
+        # usem un placeholder que després el client farà servir per activar TRIAL localment.
+        install_id_final = doc.get("install_id") or "CD-TRIAL-PENDING-0000-0000"
         lic_doc = await _create_license(
-            install_id=doc["install_id"],
+            install_id=install_id_final,
             client_name=doc.get("company_name", ""),
             client_email=doc.get("email"),
             duration_days=body.duration_days,
@@ -536,7 +539,7 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             ok, info = await mailer.send_license_email(
                 to_email=doc["email"],
                 client_name=doc.get("company_name", ""),
-                install_id=doc["install_id"],
+                install_id=install_id_final,
                 license_key=lic_doc["license_key"],
                 plan=plan,
                 expires_at=expires_at,
