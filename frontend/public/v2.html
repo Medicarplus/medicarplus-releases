@@ -1861,6 +1861,18 @@ applyLang();
           +'<div style="font-size:11px;color:#7ee3aa;letter-spacing:1.5px;font-weight:700;margin-bottom:8px">1️⃣ IMPORTAR LLISTA</div>'
           +'<input type="file" id="notifFile" accept=".csv,.xlsx,.xls" style="width:100%;color:#e8ecf2;font-size:12px" />'
           +'<div id="notifImportInfo" style="margin-top:8px;font-size:11px;color:#94a3b8;font-style:italic">Exporta la llista des del teu programa DGT (Nom, DNI, Telèfon, Data caducitat, Adreça).</div>'
+          +'<div style="margin-top:12px;padding-top:12px;border-top:1px dashed #262b36">'
+            +'<div style="font-size:10px;color:#f5b301;letter-spacing:1.5px;font-weight:700;margin-bottom:8px">➕ AFEGIR MANUALMENT (per proves)</div>'
+            +'<div style="display:grid;grid-template-columns:1fr 130px;gap:6px;margin-bottom:6px">'
+              +'<input type="text" id="notifManName" placeholder="Nom (ex: JO MATEIX)" style="padding:6px 10px;background:#0e1117;border:1px solid #2a3040;border-radius:6px;color:#e8ecf2;font-size:12px" />'
+              +'<input type="text" id="notifManPhone" placeholder="+34 600 111 222" style="padding:6px 10px;background:#0e1117;border:1px solid #2a3040;border-radius:6px;color:#e8ecf2;font-size:12px;font-family:monospace" />'
+            +'</div>'
+            +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'
+              +'<input type="text" id="notifManCad" placeholder="Data caducitat (opcional)" style="padding:6px 10px;background:#0e1117;border:1px solid #2a3040;border-radius:6px;color:#e8ecf2;font-size:12px" />'
+              +'<input type="text" id="notifManDni" placeholder="DNI (opcional)" style="padding:6px 10px;background:#0e1117;border:1px solid #2a3040;border-radius:6px;color:#e8ecf2;font-size:12px" />'
+            +'</div>'
+            +'<button type="button" id="notifManAdd" style="width:100%;padding:8px;background:#f5b301;color:#0f172a;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px">➕ Afegir a la llista</button>'
+          +'</div>'
         +'</div>'
         +'<div style="background:#171a21;border:1px solid #262b36;border-radius:10px;padding:14px">'
           +'<div style="font-size:11px;color:#7ee3aa;letter-spacing:1.5px;font-weight:700;margin-bottom:8px">2️⃣ MISSATGE A ENVIAR</div>'
@@ -2025,6 +2037,15 @@ applyLang();
           alert('⚠ Twilio no està configurat al servidor.\n\nPer poder enviar directament des de l\'app, has de configurar les credencials Twilio.\n\nMentrestant, pots exportar el CSV amb el botó "📤 Exportar CSV" i pujar-lo a qualsevol servei SMS.');
         }else{toast('✗ Error: '+e.message,6000)}
       }finally{btn.disabled=false;btn.textContent='🚀 Enviar avisos'}
+    };
+    $q('#notifManAdd').onclick=()=>{
+      const name=$q('#notifManName').value.trim();
+      const phoneRaw=$q('#notifManPhone').value.trim();
+      if(!name||!phoneRaw){toast('✗ Cal nom i telèfon');return}
+      contacts.push({nom:name,telefon:cleanPhone(phoneRaw),dni:$q('#notifManDni').value.trim(),dataCad:$q('#notifManCad').value.trim(),adreca:'',selected:true});
+      $q('#notifManName').value='';$q('#notifManPhone').value='';$q('#notifManDni').value='';$q('#notifManCad').value='';
+      $q('#notifImportInfo').innerHTML='✓ <b style="color:#7ee3aa">'+contacts.length+' contactes</b> (afegit manualment)';
+      renderList();toast('➕ Contacte afegit');
     };
     renderList();
   }
