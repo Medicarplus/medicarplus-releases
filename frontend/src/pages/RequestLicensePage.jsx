@@ -193,10 +193,10 @@ export default function RequestLicensePage() {
             <PricingCard
               title="STD"
               subtitle="Estàndard"
-              price="30€"
+              price="29,90€"
               period="/mes"
-              altPrice="299€/any"
-              savings="17% descompte"
+              altPrice="299,90€/any"
+              savings="16% descompte"
               features={["✓ Caixa del dia", "✓ IRPF + Llibreta", "✓ Estadístiques", "✓ Suport email"]}
               accent="#f5b301"
               hasBillingToggle
@@ -209,10 +209,10 @@ export default function RequestLicensePage() {
             <PricingCard
               title="PREMIUM"
               subtitle="Ampliat"
-              price="45€"
+              price="39,90€"
               period="/mes"
-              altPrice="499€/any"
-              savings="7% descompte"
+              altPrice="399,90€/any"
+              savings="17% descompte"
               features={["✓ Tot STD +", "✓ SMS / WhatsApp", "✓ Cercador clients", "✓ Suport prioritari"]}
               accent="#3ddc97"
               badge="POPULAR"
@@ -331,10 +331,10 @@ export default function RequestLicensePage() {
               <label style={labelStyle}>PLAN SELECCIONAT</label>
               <div style={{ padding: "10px 14px", background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#f5b301", fontFamily: "Georgia,serif", fontSize: 13 }}>
                 {form.plan_requested === "TRIAL" && "🆓 TRIAL — Prova gratuïta 30 dies"}
-                {form.plan_requested === "STD_MES" && "📦 STD Mensual — 30€/mes"}
-                {form.plan_requested === "STD_ANY" && "📦 STD Anual — 299€/any (estalvies 17%)"}
-                {form.plan_requested === "PREMIUM_MES" && "⭐ PREMIUM Mensual — 45€/mes"}
-                {form.plan_requested === "PREMIUM_ANY" && "⭐ PREMIUM Anual — 499€/any (estalvies 7%)"}
+                {form.plan_requested === "STD_MES" && "📦 STD Mensual — 29,90€/mes"}
+                {form.plan_requested === "STD_ANY" && "📦 STD Anual — 299,90€/any (estalvies 16%)"}
+                {form.plan_requested === "PREMIUM_MES" && "⭐ PREMIUM Mensual — 39,90€/mes"}
+                {form.plan_requested === "PREMIUM_ANY" && "⭐ PREMIUM Anual — 399,90€/any (estalvies 17%)"}
                 <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, fontStyle: "italic" }}>
                   Selecciona un altre pla clicant les targetes de dalt.
                 </div>

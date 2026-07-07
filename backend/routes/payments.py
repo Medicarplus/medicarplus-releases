@@ -19,10 +19,10 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 # FIXED PACKAGES · defined on backend only (security: never trust frontend prices)
 # ---------------------------------------------------------------------------
 PACKAGES = {
-    "STD_MES":     {"amount": 30.00,  "currency": "eur", "label": "STD Mensual",     "period": "month"},
-    "STD_ANY":     {"amount": 299.00, "currency": "eur", "label": "STD Anual",       "period": "year"},
-    "PREMIUM_MES": {"amount": 45.00,  "currency": "eur", "label": "PREMIUM Mensual", "period": "month"},
-    "PREMIUM_ANY": {"amount": 499.00, "currency": "eur", "label": "PREMIUM Anual",   "period": "year"},
+    "STD_MES":     {"amount": 29.90,  "currency": "eur", "label": "STD Mensual",     "period": "month"},
+    "STD_ANY":     {"amount": 299.90, "currency": "eur", "label": "STD Anual",       "period": "year"},
+    "PREMIUM_MES": {"amount": 39.90,  "currency": "eur", "label": "PREMIUM Mensual", "period": "month"},
+    "PREMIUM_ANY": {"amount": 399.90, "currency": "eur", "label": "PREMIUM Anual",   "period": "year"},
 }
 
 
