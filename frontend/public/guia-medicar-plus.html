@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<title>MediCar Plus · Guia del sistema de llicències</title>
+<style>
+  body{font-family:'Segoe UI',Calibri,Arial,sans-serif;max-width:820px;margin:40px auto;padding:0 30px;color:#1a1a1a;line-height:1.6}
+  h1{color:#0f172a;border-bottom:3px solid #f5b301;padding-bottom:10px;font-size:28px}
+  h2{color:#0f172a;margin-top:35px;padding:8px 12px;background:linear-gradient(90deg,#f5b301 0%,#fef9c3 100%);border-left:5px solid #f5b301;font-size:20px}
+  h3{color:#065f46;font-size:16px;margin-top:22px;border-bottom:1px dashed #94a3b8;padding-bottom:4px}
+  table{border-collapse:collapse;width:100%;margin:12px 0;box-shadow:0 2px 6px rgba(0,0,0,0.08)}
+  th{background:#0f172a;color:#f5b301;padding:10px;text-align:left;letter-spacing:1px;font-size:13px}
+  td{padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:14px}
+  tr:nth-child(even) td{background:#f8fafc}
+  code{background:#0f172a;color:#f5b301;padding:3px 8px;border-radius:5px;font-family:'Courier New',monospace;font-size:13px;word-break:break-all}
+  ul,ol{margin:8px 0 12px 0;padding-left:26px}
+  li{margin-bottom:6px}
+  b,strong{color:#0f172a}
+  .callout{background:#fef3c7;border-left:5px solid #f59e0b;padding:12px 16px;margin:14px 0;border-radius:4px;font-size:13.5px}
+  .callout-blue{background:#dbeafe;border-left:5px solid #2563eb}
+  .callout-green{background:#dcfce7;border-left:5px solid #16a34a}
+  .callout-red{background:#fee2e2;border-left:5px solid #dc2626}
+  .step{background:#f0f9ff;border:1px solid #93c5fd;border-radius:10px;padding:16px 20px;margin:14px 0}
+  .step-title{color:#1e40af;font-weight:700;font-size:15px;margin-bottom:6px;letter-spacing:.5px}
+  a{color:#2563eb;text-decoration:none;font-weight:600}
+  a:hover{text-decoration:underline}
+  hr{border:none;border-top:2px dashed #cbd5e1;margin:32px 0}
+  .footer{text-align:center;color:#64748b;font-size:12px;margin-top:60px;padding-top:20px;border-top:1px solid #e5e7eb}
+  @media print{body{max-width:none;margin:0;padding:20px}h2{page-break-after:avoid}h3{page-break-after:avoid}.step{page-break-inside:avoid}}
+</style>
+</head>
+<body>
+
+<h1>🎛️ Sistema de llicències MediCar Plus · Guia completa</h1>
+
+<h2>🔗 Els 4 links que has de conèixer</h2>
+
+<table>
+<tr><th>Qui l'usa</th><th>URL</th><th>Per què</th></tr>
+<tr><td>🔴 <b>Tu (admin)</b></td><td><a href="https://project-helper-47.preview.emergentagent.com/admin">/admin</a></td><td>Gestionar llicències, veure sol·licituds, generar JWTs</td></tr>
+<tr><td>🟢 <b>Clients potencials</b></td><td><a href="https://project-helper-47.preview.emergentagent.com/request-license">/request-license</a></td><td>Formulari públic per demanar llicència</td></tr>
+<tr><td>🔵 <b>App comercial (per clients)</b></td><td>Descarregable a <code>/api/download-electron</code></td><td>La <code>.exe</code> que els envies</td></tr>
+<tr><td>🟡 <b>App original (per tu)</b></td><td><a href="https://project-helper-47.preview.emergentagent.com/caja_del_dia.html">/caja_del_dia.html</a></td><td>La teva versió de sempre</td></tr>
+</table>
+
+<h2>🔐 Les teves claus</h2>
+<ul>
+<li><b>Admin panel:</b> <code>MB-ADMIN-BRUGULAT-2026-4F8E2A1C</code></li>
+<li><b>Master d'app (funciona a qualsevol instal·lació):</b> <code>MB-MASTER-BRUGULAT-2026-OWNER</code></li>
+</ul>
+
+<div class="callout callout-red">
+<b>⚠️ IMPORTANT:</b> No comparteixis mai la clau MASTER ni la d'ADMIN. Qui les tingui pot generar llicències gratis o entrar directament al teu panel.
+</div>
+
+<hr>
+
+<h1>🎬 Com funciona tot · flux complet</h1>
+
+<div class="step">
+<div class="step-title">PAS 1 · Un centre mèdic descobreix el teu producte</div>
+El client (una autoescola, un centre de revisions, etc.) arriba a la teva <b>landing page</b> (que farem a la Fase 2) o li envies el link directe:
+<br><br>
+👉 <a href="https://project-helper-47.preview.emergentagent.com/request-license">https://project-helper-47.preview.emergentagent.com/request-license</a>
+<br><br>
+Allà troba un formulari amb:
+<ul>
+<li>Nom del centre / NIF</li>
+<li>Persona de contacte / email / telèfon</li>
+<li>Pla que vol (bàsic / anual / perpetu)</li>
+<li>Acceptació de política de privacitat (GDPR)</li>
+<li>Captcha invisible (honeypot anti-spam)</li>
+</ul>
+Quan clica "Sol·licitar" → <b>la petició queda pendent</b> al teu admin panel.
+</div>
+
+<div class="step">
+<div class="step-title">PAS 2 · Tu la reps al teu admin</div>
+Vas a <a href="https://project-helper-47.preview.emergentagent.com/admin">/admin</a> i introdueixes la teva clau d'admin.
+<br><br>
+Veuràs:
+<ul>
+<li><b>Comptador "Sol·licituds pendents"</b> en groc a dalt</li>
+<li>Llista de sol·licituds amb dades del client</li>
+<li>Botons: <b>✅ Aprovar</b> | <b>❌ Rebutjar</b></li>
+</ul>
+</div>
+
+<div class="step">
+<div class="step-title">PAS 3 · Aprovar i enviar la clau al client</div>
+Quan cliques <b>"✅ Aprovar"</b> en una sol·licitud:
+<ol>
+<li>Automàticament genera un <b>JWT únic</b> vinculat al client</li>
+<li>Marca la petició com "aprovada"</li>
+<li>Copia el JWT al teu portapapers (o el pots copiar del panel)</li>
+</ol>
+Ara has de:
+<ul>
+<li><b>Contactar el client</b> (per email o WhatsApp)</li>
+<li>Enviar-li:
+  <ul>
+    <li>La <b>clau JWT</b> (<code>eyJhbGci...</code>)</li>
+    <li>El <b>link de descàrrega</b> de l'app</li>
+    <li>Instruccions bàsiques</li>
+  </ul>
+</li>
+</ul>
+<div class="callout callout-blue"><b>Nota:</b> hi ha integració de Resend preparada per enviar-ho automàticament per email, però està desactivada perquè no s'ha configurat la key encara.</div>
+</div>
+
+<div class="step">
+<div class="step-title">PAS 4 · El client instal·la l'app</div>
+El client rep un email/missatge amb:
+<ol>
+<li>La seva clau JWT</li>
+<li>Link de descàrrega (o li envies directament l'<code>.exe</code> per WeTransfer)</li>
+</ol>
+Instal·la el <code>MediCar Plus Setup 1.0.0.exe</code> que li has generat.
+</div>
+
+<div class="step">
+<div class="step-title">PAS 5 · El client activa la seva llicència</div>
+En obrir l'app per primer cop:
+<ol>
+<li>Veu la pantalla d'activació</li>
+<li>Copia i enganxa el <b>JWT</b> que li has enviat</li>
+<li>L'app <b>verifica online</b> al teu servidor que el JWT sigui vàlid</li>
+<li>Un cop activat, entra al <b>wizard de configuració</b>:
+  <ul>
+    <li>Nom d'Empresa 1</li>
+    <li>Nom d'Empresa 2</li>
+    <li>Socis (opcional)</li>
+  </ul>
+</li>
+<li><b>Ja pot començar a treballar!</b></li>
+</ol>
+</div>
+
+<div class="step">
+<div class="step-title">PAS 6 · Verificació periòdica automàtica</div>
+Cada 15 dies, l'app fa un ping al teu servidor per revalidar la llicència. Si tu la <b>revoques</b> al admin panel (ex: el client no paga), la propera vegada que faci el ping l'app es bloqueja i li apareix el missatge d'activació de nou.
+<br><br>
+<div class="callout"><b>Sense connexió:</b> l'app funciona fins a 30 dies offline. Passat aquest temps, exigeix un check online.</div>
+</div>
+
+<hr>
+
+<h2>🔥 Diferències entre els 3 tipus de llicència</h2>
+
+<table>
+<tr><th>Tipus</th><th>Comportament</th><th>Per a qui</th></tr>
+<tr><td><b>MASTER</b><br><code>MB-MASTER-BRUGULAT-2026-OWNER</code></td><td>Perpètua, universal, offline forever</td><td>Només per tu, no la comparteixis mai</td></tr>
+<tr><td><b>JWT</b><br>(les que generes al admin)</td><td>Anual/perpètua segons pla, vinculada al centre, revocable</td><td>Els teus clients de pagament</td></tr>
+<tr><td><b>Legacy</b><br><code>MB-XXXX-XXXX-XXXX-XXXX</code></td><td>Compatibilitat antiga, checksum offline</td><td>Sistemes de proves</td></tr>
+</table>
+
+<hr>
+
+<h2>🧪 Provar el flux ara mateix</h2>
+<div class="callout callout-green">
+<b>Simulació completa en 5 minuts:</b>
+<ol>
+<li>Obre en una finestra: <a href="https://project-helper-47.preview.emergentagent.com/request-license">https://project-helper-47.preview.emergentagent.com/request-license</a></li>
+<li>Omple una sol·licitud amb dades inventades (ex: "Autoescola Prova SL")</li>
+<li>Obre en una altra finestra: <a href="https://project-helper-47.preview.emergentagent.com/admin">https://project-helper-47.preview.emergentagent.com/admin</a>
+  <ul>
+    <li>Introdueix la clau d'admin (només el primer cop)</li>
+    <li>Refresca (botó a dalt a la dreta)</li>
+  </ul>
+</li>
+<li>Veuràs la sol·licitud → clica <b>"✅ Aprovar"</b></li>
+<li>Copia el JWT que et surti</li>
+<li>Obre la teva app portable (<code>MediCar Plus 1.0.0.exe</code>)</li>
+<li>Clica el botó <b>🔓</b> vermell per sortir de la master key</li>
+<li>A la pantalla d'activació, enganxa el JWT del pas 5</li>
+<li>L'app entrarà com un client normal, i el veuràs a l'admin panel amb estat "ACTIVA"</li>
+</ol>
+</div>
+
+<hr>
+
+<h2>❓ Preguntes freqüents</h2>
+
+<h3>Puc canviar la clau d'admin?</h3>
+Sí, digue-m'ho i te la canvio a una que triïs tu.
+
+<h3>I si el client vol reinstal·lar en un altre PC?</h3>
+Cada instal·lació té un <b>install ID</b> únic. Si canvia de PC, l'ID canvia i el JWT no li funcionarà. Ho pots resoldre al admin regenerant un JWT nou per al seu nou install ID (li pots demanar via email).
+
+<h3>Cost de tenir el servidor actiu?</h3>
+Ara mateix està en preview d'Emergent (gratuït). Quan facis el deploy real, cal domini + hosting. Podem parlar-ho quan estiguis a punt de vendre.
+
+<h3>Puc oferir un pla de prova de 30 dies?</h3>
+Sí, al generar el JWT tries la durada. Fes-lo amb <code>exp</code> de 30 dies i, si el client vol continuar, en generes un altre a canvi del pagament.
+
+<div class="footer">
+Guia MediCar Plus · Marc Brugulat Lopez · 2026<br>
+Document generat automàticament per la plataforma
+</div>
+
+</body>
+</html>
