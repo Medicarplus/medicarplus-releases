@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Caja del Día — obfuscation build step (Fase 7)
+ * MediCar Plus — obfuscation build step (Fase 7)
  *
  * Reads the source HTML, obfuscates the inline <script> block(s) with sensible
  * defaults, and writes the result to the Electron packaging directory.
@@ -102,7 +102,7 @@ const obfuscated = originalHtml.replace(inlineRe, (full, code) => {
 
 // Add a build-time banner comment right before </head> so we know an HTML is
 // the obfuscated variant.
-const banner = `<!-- Caja del Día · commercial build · obfuscated ${new Date().toISOString()} -->`;
+const banner = `<!-- MediCar Plus · commercial build · obfuscated ${new Date().toISOString()} -->`;
 const finalHtml = obfuscated.replace(/<\/head>/i, `${banner}\n</head>`);
 
 fs.mkdirSync(path.dirname(output), { recursive: true });

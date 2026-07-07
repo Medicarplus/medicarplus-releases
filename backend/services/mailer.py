@@ -43,7 +43,7 @@ def _render_html(
   <tr><td align="center">
     <table width="600" cellpadding="0" cellspacing="0" style="background:#1e293b;border:2px solid #f5b301;border-radius:14px;padding:32px;color:#e2e8f0">
       <tr><td>
-        <h1 style="margin:0 0 6px 0;color:#f5b301;font-size:24px;letter-spacing:1px">Caja del Día · Llicència activada</h1>
+        <h1 style="margin:0 0 6px 0;color:#f5b301;font-size:24px;letter-spacing:1px">MediCar Plus · Llicència activada</h1>
         <p style="margin:0 0 20px 0;color:#94a3b8;font-size:13px">Software comercial · Marc Brugulat Lopez</p>
 
         <p style="color:#e2e8f0;font-size:15px;line-height:1.55">Hola <b>{client_name}</b>,<br>
@@ -60,7 +60,7 @@ def _render_html(
 
         <p style="color:#cbd5e1;font-size:14px;margin-top:22px;line-height:1.55">
           <b style="color:#f5b301">Com activar-la:</b><br>
-          1. Obre l'aplicació <b>Caja del Día</b>.<br>
+          1. Obre l'aplicació <b>MediCar Plus</b>.<br>
           2. Al modal de "Activació de llicència", enganxa la clau completa i prem <b>Activar</b>.<br>
           3. L'app quedarà desbloquejada per aquesta instal·lació.
         </p>
@@ -101,7 +101,7 @@ async def send_license_email(
         params = {
             "from": _sender(),
             "to": [to_email],
-            "subject": f"Caja del Día · Llicència activada ({plan})",
+            "subject": f"MediCar Plus · Llicència activada ({plan})",
             "html": _render_html(
                 client_name=client_name,
                 install_id=install_id,

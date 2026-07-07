@@ -64,7 +64,7 @@ export default function AdminLogin({ onLogin }) {
             Panell d'administració
           </h1>
           <p style={{ color: "#94a3b8", fontSize: 13, margin: "8px 0 0" }}>
-            Caja del Día · License Server
+            MediCar Plus · License Server
           </p>
         </div>
         <label

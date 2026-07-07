@@ -113,7 +113,7 @@ export default function RequestLicensePage() {
             Et contactarem aviat per email amb la teva clau d'activació.
           </p>
           <p style={{ color: "#94a3b8", fontSize: 12, marginTop: 24 }}>
-            Marc Brugulat Lopez · Caja del Día
+            Marc Brugulat Lopez · MediCar Plus
           </p>
         </div>
       </div>
@@ -150,7 +150,7 @@ export default function RequestLicensePage() {
               Sol·licitar llicència
             </h1>
             <p style={{ color: "#94a3b8", fontSize: 13, margin: "8px 0 0" }}>
-              Caja del Día · Software comercial · Marc Brugulat Lopez
+              MediCar Plus · Software comercial · Marc Brugulat Lopez
             </p>
           </div>
 
@@ -167,7 +167,7 @@ export default function RequestLicensePage() {
             }}
           >
             <b style={{ color: "#f5b301" }}>Com trobar l'Install ID:</b> obre l'aplicació{" "}
-            <b>Caja del Día</b> · al modal d'activació apareixerà un codi amb el format{" "}
+            <b>MediCar Plus</b> · al modal d'activació apareixerà un codi amb el format{" "}
             <code style={{ color: "#e2e8f0" }}>CD-XXXX-XXXX-XXXX-XXXX</code>. Copia'l i
             enganxa'l aquí sota.
           </div>

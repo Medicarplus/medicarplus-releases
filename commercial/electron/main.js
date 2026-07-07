@@ -1,5 +1,5 @@
 // ============================================================================
-// Caja del Día · v2 COMERCIAL · Electron Main Process
+// MediCar Plus · v2 COMERCIAL · Electron Main Process
 // Marc Brugulat Lopez · 2026
 // ============================================================================
 const { app, BrowserWindow, Menu, shell, dialog } = require('electron');
@@ -31,7 +31,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     icon: path.join(__dirname, 'assets', 'icon.ico'),
-    title: 'Caja del Día',
+    title: 'MediCar Plus',
     backgroundColor: '#0f172a',
     show: false, // no mostrem fins que estigui carregada (evita flash blanc)
     autoHideMenuBar: true, // amaga la barra de menús per defecte
@@ -137,7 +137,7 @@ function setupAutoUpdater() {
       defaultId: 0,
       cancelId: 1,
       title: 'Actualització disponible',
-      message: `Caja del Día v${info.version} està llest per instal·lar`,
+      message: `MediCar Plus v${info.version} està llest per instal·lar`,
       detail: 'La nova versió s\'ha descarregat i s\'instal·larà al reiniciar. Vols reiniciar ara?'
     }).then(result => {
       if (result.response === 0) {
@@ -203,12 +203,12 @@ function setupMenu() {
         },
         { type: 'separator' },
         {
-          label: 'Sobre Caja del Día',
+          label: 'Sobre MediCar Plus',
           click: () => {
             dialog.showMessageBox({
               type: 'info',
-              title: 'Sobre Caja del Día',
-              message: `Caja del Día · v${app.getVersion()}`,
+              title: 'Sobre MediCar Plus',
+              message: `MediCar Plus · v${app.getVersion()}`,
               detail: 'Software comercial per centres mèdics i autoescoles.\n\n' +
                       'Creat per Marc Brugulat Lopez\n' +
                       '© 2026 · Tots els drets reservats\n\n' +

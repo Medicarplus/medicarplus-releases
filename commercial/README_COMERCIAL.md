@@ -1,4 +1,4 @@
-# 🔐 Caja del Día · v2 COMERCIAL
+# 🔐 MediCar Plus · v2 COMERCIAL
 
 **Autor**: Marc Brugulat Lopez
 **Versió**: 2.0.0-alpha

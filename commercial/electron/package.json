@@ -1,8 +1,8 @@
 {
-  "name": "caja-del-dia",
-  "productName": "Caja del Día",
+  "name": "medicar-plus",
+  "productName": "MediCar Plus",
   "version": "2.0.0",
-  "description": "Caixa registradora comercial per centres mèdics i autoescoles",
+  "description": "MediCar Plus · Registre diari de caixa per centres mèdics de reconeixement de conductors",
   "author": {
     "name": "Marc Brugulat Lopez",
     "email": "info@example.com"
@@ -24,8 +24,8 @@
     "electron-builder": "^25.0.0"
   },
   "build": {
-    "appId": "com.brugulat.cajadeldia",
-    "productName": "Caja del Día",
+    "appId": "com.brugulat.medicarplus",
+    "productName": "MediCar Plus",
     "copyright": "Copyright © 2026 Marc Brugulat Lopez",
     "directories": {
       "output": "dist",
@@ -63,14 +63,14 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Caja del Día",
+      "shortcutName": "MediCar Plus",
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
       "license": "LICENSE.txt",
       "runAfterFinish": true
     },
     "portable": {
-      "artifactName": "CajaDelDia-Portable-${version}.exe"
+      "artifactName": "MediCarPlus-Portable-${version}.exe"
     }
   }
 }

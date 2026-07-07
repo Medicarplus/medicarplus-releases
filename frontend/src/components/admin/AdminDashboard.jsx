@@ -607,7 +607,7 @@ export default function AdminDashboard({ onLogout }) {
       >
         <div>
           <h1 style={{ margin: 0, color: "#f5b301", fontSize: 22, letterSpacing: 1 }}>
-            🔐 Caja del Día · License Admin
+            🔐 MediCar Plus · License Admin
           </h1>
           <p style={{ margin: "3px 0 0", color: "#94a3b8", fontSize: 12 }}>
             Marc Brugulat Lopez

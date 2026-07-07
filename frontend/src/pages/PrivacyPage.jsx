@@ -57,7 +57,7 @@ export default function PrivacyPage() {
         </ul>
         <p>
           <b>Les dades comptables i dels teus clients gestionades dins de
-          l'aplicació Caja del Día es queden 100% al teu ordinador</b> — no
+          l'aplicació MediCar Plus es queden 100% al teu ordinador</b> — no
           s'envien mai al nostre servidor.
         </p>
 

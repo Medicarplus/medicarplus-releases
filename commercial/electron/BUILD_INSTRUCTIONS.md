@@ -1,4 +1,4 @@
-# 📦 Empaquetar Caja del Día com aplicació Windows (.exe)
+# 📦 Empaquetar MediCar Plus com aplicació Windows (.exe)
 
 **Marc Brugulat Lopez** · Juliol 2026
 
@@ -98,7 +98,7 @@ Ha d'obrir-se una finestra amb el modal d'activació de llicència. Introdueix l
 npm run build
 ```
 Trigarà 3-5 minuts. Al final trobaràs a la carpeta `dist/`:
-- **`Caja del Día Setup 2.0.0.exe`** → instal·lador NSIS (recomanat per clients)
+- **`MediCar Plus Setup 2.0.0.exe`** → instal·lador NSIS (recomanat per clients)
 - **`CajaDelDia-Portable-2.0.0.exe`** → versió portable (no cal instal·lar)
 
 ### 7. Prova l'instal·lador
@@ -166,7 +166,7 @@ L'app ja té **electron-updater** integrat. Els clients rebran actualitzacions a
 3. **Què veuen els clients:**
    - Al arrencar l'app, comprova en background si hi ha una versió més nova (5s de retard perquè no bloquegi la UI)
    - Si en troba una: la descarrega **en silenci** en background
-   - Un cop descarregada, apareix un diàleg: *"Caja del Día v2.0.1 està llest per instal·lar. Reiniciar ara?"*
+   - Un cop descarregada, apareix un diàleg: *"MediCar Plus v2.0.1 està llest per instal·lar. Reiniciar ara?"*
    - Clic a **Reiniciar i actualitzar** → l'app es tanca, s'instal·la la nova versió, i es reobre sola
    - Clic a **Més tard** → s'instal·larà automàticament la propera vegada que tanqui l'app
 
