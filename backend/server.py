@@ -58,6 +58,26 @@ async def download_app():
     )
 
 
+@api_router.get("/download-electron")
+async def download_electron():
+    """Force-download the Electron packaging bundle (v2 commercial, obfuscated JS).
+
+    Contents: main.js, preload.js, package.json, index.html (obfuscated),
+    assets/, BUILD_INSTRUCTIONS.md, LICENSE.txt. Excludes node_modules and
+    yarn.lock — `npm install` regenerates them cleanly on the target PC.
+    """
+    file_path = Path(__file__).parent.parent / "commercial" / "caja_del_dia_electron.zip"
+    if not file_path.exists():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Electron ZIP not generated yet")
+    return FileResponse(
+        path=str(file_path),
+        media_type="application/zip",
+        filename="caja_del_dia_electron.zip",
+        headers={"Content-Disposition": 'attachment; filename="caja_del_dia_electron.zip"'},
+    )
+
+
 class AiAskBody(BaseModel):
     question: str
     data: dict
