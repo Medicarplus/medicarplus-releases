@@ -141,6 +141,41 @@ Doble-clic al `.exe`, segueix l'assistent, i comprova que:
 
 ## 📤 Distribució al client
 
+**Opció A · Auto-update (recomanat, ja configurat)** 🆕
+
+L'app ja té **electron-updater** integrat. Els clients rebran actualitzacions automàtiques via GitHub Releases:
+
+1. **Configuració inicial (una sola vegada):**
+   - Crea un repo a GitHub (pot ser privat): p.ex. `caja-del-dia-releases`
+   - Edita `package.json` → busca `"TEU_USUARI_GITHUB"` a la secció `build.publish` i posa el teu usuari GitHub real
+   - Crea un [Personal Access Token](https://github.com/settings/tokens) amb permís `repo`
+   - Al PC on facis els builds, defineix la variable d'entorn:
+     ```powershell
+     # Windows PowerShell
+     $env:GH_TOKEN = "el_teu_token_aqui"
+     ```
+
+2. **Publicar una nova versió (cada cop que actualitzis l'app):**
+   ```bash
+   # 1. Puja el número de versió a package.json (2.0.0 → 2.0.1)
+   # 2. Fes el build i publica automàticament al GitHub:
+   npm run release
+   ```
+   Això compila l'instal·lador NSIS i el puja com a Release al teu repo GitHub, incloent el fitxer `latest.yml` que electron-updater necessita.
+
+3. **Què veuen els clients:**
+   - Al arrencar l'app, comprova en background si hi ha una versió més nova (5s de retard perquè no bloquegi la UI)
+   - Si en troba una: la descarrega **en silenci** en background
+   - Un cop descarregada, apareix un diàleg: *"Caja del Día v2.0.1 està llest per instal·lar. Reiniciar ara?"*
+   - Clic a **Reiniciar i actualitzar** → l'app es tanca, s'instal·la la nova versió, i es reobre sola
+   - Clic a **Més tard** → s'instal·larà automàticament la propera vegada que tanqui l'app
+
+4. **Comprovació manual:** al menú **Ajuda → Comprovar actualitzacions** el client pot forçar-ho quan vulgui.
+
+> **Nota:** si el repo GitHub NO està configurat (queda `TEU_USUARI_GITHUB` al package.json), l'auto-update fallarà silenciosament sense afectar l'app. Perfect per desenvolupament abans de la primera publicació.
+
+**Opció B · Manual (per als primers clients de proves)**
+
 1. Puges el `.exe` a un servidor propi o a WeTransfer/Dropbox
 2. Envies el link al client + les seves credencials de llicència
 3. El client descarrega, instal·la, i introdueix la clau que li has generat

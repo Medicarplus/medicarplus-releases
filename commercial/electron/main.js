@@ -5,6 +5,15 @@
 const { app, BrowserWindow, Menu, shell, dialog } = require('electron');
 const path = require('path');
 
+// Auto-updater (Opció A: GitHub Releases). Fallar silenciosament si el repo
+// no està configurat, així el dev local no peta.
+let autoUpdater = null;
+try {
+  ({ autoUpdater } = require('electron-updater'));
+} catch (e) {
+  console.warn('electron-updater no disponible:', e.message);
+}
+
 // Bloqueja segona instància (evita obrir l'app dos cops)
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -13,6 +22,7 @@ if (!gotTheLock) {
 }
 
 let mainWindow;
+let updateAvailable = false;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -87,7 +97,95 @@ function createWindow() {
   });
 }
 
-// Menú buit (només amb "Sortir" i "Sobre")
+// ============================================================================
+// AUTO-UPDATE (electron-updater + GitHub Releases)
+// ----------------------------------------------------------------------------
+// Requereix haver publicat una Release al repo GitHub configurat a package.json
+// (build.publish). Quan detecta versió nova, la descarrega en background i
+// pregunta al client si vol reiniciar per instal·lar-la.
+//
+// Trigger:
+//   · Automàtic al arrencar (checkForUpdatesAndNotify)
+//   · Manual des del menú Ajuda → Comprovar actualitzacions
+// ============================================================================
+function setupAutoUpdater() {
+  if (!autoUpdater) return;
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.logger = null; // desactivat en producció
+
+  autoUpdater.on('update-available', (info) => {
+    updateAvailable = true;
+    console.log('Nova versió disponible:', info.version);
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    updateAvailable = false;
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.warn('Auto-update error:', err.message);
+    // Silenciós — el client no ha de veure errors de update si el repo encara
+    // no està configurat o si no hi ha internet.
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      buttons: ['Reiniciar i actualitzar ara', 'Més tard'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Actualització disponible',
+      message: `Caja del Día v${info.version} està llest per instal·lar`,
+      detail: 'La nova versió s\'ha descarregat i s\'instal·larà al reiniciar. Vols reiniciar ara?'
+    }).then(result => {
+      if (result.response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+    }).catch(() => {});
+  });
+
+  // Comprovació silenciosa a l'arrencada (espera 5s perquè no bloquegi UI)
+  setTimeout(() => {
+    try { autoUpdater.checkForUpdatesAndNotify(); }
+    catch (e) { console.warn('checkForUpdates failed:', e.message); }
+  }, 5000);
+}
+
+// Comprovació manual (des del menú)
+function checkForUpdatesManual() {
+  if (!autoUpdater) {
+    dialog.showMessageBox(mainWindow, {
+      type: 'warning',
+      title: 'Actualitzacions no disponibles',
+      message: 'El sistema d\'actualitzacions no està disponible en aquesta versió.',
+      buttons: ['D\'acord']
+    });
+    return;
+  }
+  autoUpdater.checkForUpdates().then(result => {
+    if (!result || !result.updateInfo || result.updateInfo.version === app.getVersion()) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Ja estàs al dia',
+        message: `Tens la última versió instal·lada (v${app.getVersion()}).`,
+        buttons: ['D\'acord']
+      });
+    }
+    // Si n'hi ha nova, el listener 'update-downloaded' ja mostrarà el diàleg.
+  }).catch(err => {
+    dialog.showMessageBox(mainWindow, {
+      type: 'error',
+      title: 'Error comprovant actualitzacions',
+      message: 'No s\'ha pogut connectar amb el servidor.',
+      detail: err.message,
+      buttons: ['D\'acord']
+    });
+  });
+}
+
+// Menú amb "Sortir" + "Comprovar actualitzacions" + "Sobre"
 function setupMenu() {
   const template = [
     {
@@ -100,12 +198,17 @@ function setupMenu() {
       label: 'Ajuda',
       submenu: [
         {
+          label: 'Comprovar actualitzacions',
+          click: () => checkForUpdatesManual()
+        },
+        { type: 'separator' },
+        {
           label: 'Sobre Caja del Día',
           click: () => {
             dialog.showMessageBox({
               type: 'info',
               title: 'Sobre Caja del Día',
-              message: 'Caja del Día · v2.0.0',
+              message: `Caja del Día · v${app.getVersion()}`,
               detail: 'Software comercial per centres mèdics i autoescoles.\n\n' +
                       'Creat per Marc Brugulat Lopez\n' +
                       '© 2026 · Tots els drets reservats\n\n' +
@@ -123,6 +226,7 @@ function setupMenu() {
 app.whenReady().then(() => {
   setupMenu();
   createWindow();
+  setupAutoUpdater();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

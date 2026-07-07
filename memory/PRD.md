@@ -56,8 +56,15 @@ Aplicació standalone (`caja_del_dia.html`) que substitueix una llibreta de comp
 - 2026-02-07: **Fase 9 (Auditoria comercial) completada** — Hardening seguretat + RGPD + UX centres mèdics:
   - **Backend:** eliminat fallback hardcoded `EMERGENT_LLM_KEY` (C7). Índexs MongoDB creats a l'startup (C3): licenses{install_id, id-unique, status+created_at}, license_requests{install_id+status, status+created_at}, audit_logs{target+timestamp}. Rate limiter global slowapi (300/min per IP). Nova col·lecció `audit_logs` amb totes les accions admin (generate/revoke/delete/export/approve). Endpoint `DELETE /api/licenses/{install_id}` (RGPD C6) i `GET /api/licenses/{install_id}/export` (RGPD C5). Camp `consent` obligatori + honeypot `website` al `POST /api/licenses/requests` (C4, I8).
   - **Frontend:** nova pàgina pública `/privacy` amb 9 seccions RGPD completes. Portal públic `/request-license` amb checkbox obligatori de consentiment (submit deshabilitat fins marcar) + camp honeypot invisible.
-  - **v2.html:** nou botó **🧾 Arqueig** al header. Modal d'arqueig fi de dia amb comparativa "efectiu teòric vs físic" i alerta visual quadrat/sobra/falta (dades pràctiques que administratives fan cada dia).
+  - **v2.html:** ⚠️ RETURN a paritat funcional amb la v1 original — l'Arqueig afegit i revertit. **v2 = v1 idèntic + capa comercial (llicència + wizard + botó ⚙️ + link portal). Res més.**
   - Tests: 24/24 pytest passing + smoke E2E OK.
+- 2026-02-07: **Fase 10 (Auto-update Opció A) completada** — Electron amb `electron-updater@6.3` + GitHub Releases:
+  - `main.js` amb `setupAutoUpdater()` que comprova nova versió a l'arrencada (5s delay), descarrega en background, i mostra diàleg "Reiniciar ara?" quan està llest
+  - Nou menú **Ajuda → Comprovar actualitzacions** per force check manual
+  - `package.json` amb `publish: github` + nou script `npm run release` que compila i puja al repo automàticament
+  - Fallada silenciosa si el repo no està configurat (placeholder `TEU_USUARI_GITHUB`) — dev local no peta
+  - `BUILD_INSTRUCTIONS.md` ampliat amb pas complet: crear repo, configurar `GH_TOKEN`, publicar releases
+  - ZIP regenerat: 152 KB amb tot dins
 
 ## Test Coverage
 - iteration_1: bug detectado (Cannot set properties of null) → root cause: línia 781 `$('#btnDownloadApp').onclick` (elemento inexistente) → FIXED

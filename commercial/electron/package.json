@@ -13,7 +13,11 @@
     "build": "electron-builder --win --x64",
     "build:portable": "electron-builder --win portable --x64",
     "build:installer": "electron-builder --win nsis --x64",
-    "build:all": "electron-builder --win nsis portable --x64"
+    "build:all": "electron-builder --win nsis portable --x64",
+    "release": "electron-builder --win nsis --x64 --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
   },
   "devDependencies": {
     "electron": "^33.0.0",
@@ -32,6 +36,13 @@
       "preload.js",
       "index.html",
       "assets/**/*"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "TEU_USUARI_GITHUB",
+        "repo": "caja-del-dia-releases"
+      }
     ],
     "win": {
       "icon": "assets/icon.ico",
