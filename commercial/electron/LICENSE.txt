@@ -1,0 +1,29 @@
+LLICÈNCIA COMERCIAL — CAJA DEL DÍA
+=====================================
+
+Copyright © 2026 Marc Brugulat Lopez
+Tots els drets reservats.
+
+Aquest software és propietat exclusiva de Marc Brugulat Lopez.
+El seu ús requereix una llicència comercial vàlida per a cada instal·lació.
+
+CONDICIONS D'ÚS:
+
+1. La llicència és personal i intransferible.
+2. No es permet la còpia, modificació, distribució o enginyeria inversa.
+3. No es permet la venda a tercers.
+4. El propietari es reserva el dret de revocar la llicència en qualsevol moment
+   en cas d'incompliment de les condicions d'ús.
+5. El proveïdor no assumeix responsabilitat per danys derivats del mal ús del
+   software o de la pèrdua accidental de dades. Es recomana fer còpies de
+   seguretat regulars mitjançant les funcions integrades a l'aplicació.
+6. Aquesta llicència inclou:
+   - Ús del software en una instal·lació única
+   - Actualitzacions de manteniment durant el període contractat
+   - Suport tècnic segons el pla contractat
+
+CONTACTE:
+Marc Brugulat Lopez
+
+Data de publicació: Juliol 2026
+Versió: 2.0.0

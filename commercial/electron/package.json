@@ -1,0 +1,65 @@
+{
+  "name": "caja-del-dia",
+  "productName": "Caja del Día",
+  "version": "2.0.0",
+  "description": "Caixa registradora comercial per centres mèdics i autoescoles",
+  "author": {
+    "name": "Marc Brugulat Lopez",
+    "email": "info@example.com"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64",
+    "build:portable": "electron-builder --win portable --x64",
+    "build:installer": "electron-builder --win nsis --x64",
+    "build:all": "electron-builder --win nsis portable --x64"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.brugulat.cajadeldia",
+    "productName": "Caja del Día",
+    "copyright": "Copyright © 2026 Marc Brugulat Lopez",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "assets/**/*"
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "publisherName": "Marc Brugulat Lopez"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Caja del Día",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "license": "LICENSE.txt",
+      "runAfterFinish": true
+    },
+    "portable": {
+      "artifactName": "CajaDelDia-Portable-${version}.exe"
+    }
+  }
+}
