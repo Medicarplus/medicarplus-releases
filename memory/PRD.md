@@ -37,10 +37,19 @@ Aplicació standalone (`caja_del_dia.html`) que substitueix una llibreta de comp
   - Auth admin: capçalera `X-Admin-Token` = `LICENSE_ADMIN_TOKEN`
   - MongoDB collection: `licenses`
   - Compat total amb Master Key offline (`v2.html` continua funcionant sense servidor)
+- **License requests + Admin panel (Fase 5 · 2026-02-07)**:
+  - `POST /api/licenses/requests` (públic) — el client demana llicència des del portal
+  - `GET /api/licenses/requests` (admin) — llista + comptador de pendents
+  - `POST /api/licenses/requests/{id}/approve` (admin) — genera llicència + email opcional via Resend + retorna JWT
+  - `POST /api/licenses/requests/{id}/reject` (admin) — marca com a rebutjada
+  - Portal públic React a `/request-license` (sense preus, format Install ID validat client-side)
+  - Panell admin React a `/admin` amb login per X-Admin-Token, stats (Total/Actives/Revocades/Expirades/**Pendents**), taula amb Copy JWT + Revoke, aprovació amb auto-copy JWT
+  - Mailer opcional: `RESEND_API_KEY` buida ⇒ es genera la llicència igualment i l'admin l'envia manualment
 
 ## Changelog
 - 2026-02-01: Llibreta rediseñada como libro Debe/Haber clásico (pergamino, Georgia serif). Selector empresa dentro modal. Balanç per comptes con saldos PGC. Fix crítico cascada 'Cannot set properties of null' (referencia a #btnDownloadApp inexistente que rompía handlers IA/Auditoría/Restaurar). Añadido commutador ES/CA con data-i18n. applyLang() protegido para no borrar hijos.
 - 2026-02-07: **Fase 4 completada** — License server FastAPI + MongoDB con JWT. Nueva estructura `/app/backend/routes/` + `/app/backend/models/`. 8 tests pytest passing.
+- 2026-02-07: **Fase 5 completada** — Admin panel + portal públic. Backend afegeix 4 endpoints (requests/approve/reject). React `/admin` (login gate + dashboard amb stats + taula amb Copy JWT/Revoke + tab de sol·licituds amb Approve/Reject) i `/request-license` (formulari públic). Resend mailer amb graceful fallback. 24/24 pytest OK + 25/25 E2E OK.
 
 ## Test Coverage
 - iteration_1: bug detectado (Cannot set properties of null) → root cause: línia 781 `$('#btnDownloadApp').onclick` (elemento inexistente) → FIXED
@@ -49,11 +58,12 @@ Aplicació standalone (`caja_del_dia.html`) que substitueix una llibreta de comp
 - Llibreta con balance por cuenta y toggle empresa verificado en ambos idiomas
 - Persistencia F5 verificada
 - **License server**: 8/8 pytest tests passing (`backend/tests/test_licenses.py`) — generate/verify/revoke/perpetual/regenerate/list/detail/auth
+- **License requests + Admin panel (iteration_5)**: 24/24 pytest + 25/25 E2E Playwright. Cobreix: 401 sense token, format Install ID validation, duplicate pending 409, mailer graceful fallback amb RESEND_API_KEY buida, revoke marca REVOCADA i desactiva botons, aprovació auto-copia JWT.
 
 ## Roadmap
-- **Fase 5 (P0)**: Panell admin React (login amb `X-Admin-Token`, taula de clients, botó “generar llicència” amb copiar-al-porta-retalls, botó revocar)
-- **Fase 6 (P1)**: Actualitzar `v2.html` per acceptar JWT (`MB-XXXX` mode + JWT mode) i configurar `VERIFY_URL` per ping cada 15 dies
+- **Fase 6 (P1)**: Actualitzar `v2.html` per acceptar JWT (`MB-XXXX` mode + JWT mode) i configurar `VERIFY_URL = ${REACT_APP_BACKEND_URL}/api/licenses/verify` per ping cada 15 dies
 - **Fase 7 (P2)**: Ofuscació JS de `v2.html` amb `javascript-obfuscator`
+- **Follow-up**: quan tinguis el compte Resend a punt, omplir `RESEND_API_KEY` i `SENDER_EMAIL` al `.env` i l'aprovació enviarà emails automàticament sense canvis de codi
 
 ## Known Limitations
 - `showSaveFilePicker` (File System Access API) solo funciona en Chrome/Edge. Firefox/Safari usan `<a download>` fallback automático (ya implementado).
