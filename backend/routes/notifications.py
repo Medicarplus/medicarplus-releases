@@ -113,17 +113,23 @@ async def send_bulk(payload: SendPayload):
 
 
 @router.get("/history")
-async def get_history(limit: int = 50):
-    """Retorna els últims enviaments massius."""
+async def get_history(limit: int = 200, offset: int = 0, since: str = ""):
+    """Retorna enviaments massius. Sense límit real, guarda TOT indefinidament a la BD.
+    Params: limit (max 5000), offset (paginació), since (ISO date filter opcional).
+    """
     try:
         from server import db
-        cursor = db.sms_history.find().sort("sent_at", -1).limit(limit)
-        docs = await cursor.to_list(length=limit)
+        query = {}
+        if since:
+            query["sent_at"] = {"$gte": since}
+        total = await db.sms_history.count_documents(query)
+        cursor = db.sms_history.find(query).sort("sent_at", -1).skip(offset).limit(min(limit, 5000))
+        docs = await cursor.to_list(length=min(limit, 5000))
         for d in docs:
             d.pop("_id", None)
-        return {"history": docs}
+        return {"history": docs, "total": total, "shown": len(docs), "offset": offset}
     except Exception as e:
-        return {"history": [], "error": str(e)}
+        return {"history": [], "total": 0, "shown": 0, "error": str(e)}
 
 
 @router.get("/status")

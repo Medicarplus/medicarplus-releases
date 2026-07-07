@@ -1925,15 +1925,19 @@ applyLang();
     const $q=s=>back.querySelector(s);
     $q('#notifCloseBtn').onclick=()=>back.remove();
     $q('#notifHistBtn').onclick=async()=>{
+      const openHist=async(sinceIso,offset)=>{
+        const params=new URLSearchParams({limit:'200',offset:String(offset||0)});
+        if(sinceIso)params.set('since',sinceIso);
+        const r=await fetch(BACKEND_URL+'/api/notifications/history?'+params.toString());
+        return await r.json();
+      };
       try{
-        const r=await fetch(BACKEND_URL+'/api/notifications/history?limit=50');
-        const data=await r.json();
-        const hist=data.history||[];
+        let data=await openHist('',0);
+        let hist=data.history||[],total=data.total||0,offset=hist.length;
         const backH=document.createElement('div');backH.className='modal-back';backH.style.zIndex='99000';
-        let rowsHtml='';
-        if(!hist.length){rowsHtml='<div style="padding:30px;text-align:center;color:#64748b;font-style:italic">Encara no has enviat cap avís massiu</div>'}
-        else{
-          rowsHtml=hist.map(h=>{
+        const renderRows=(arr)=>{
+          if(!arr.length)return '<div style="padding:30px;text-align:center;color:#64748b;font-style:italic">Cap enviament al període</div>';
+          return arr.map(h=>{
             const dt=new Date(h.sent_at);
             const dtFmt=dt.toLocaleDateString('ca-ES')+' '+dt.toLocaleTimeString('ca-ES',{hour:'2-digit',minute:'2-digit'});
             const ch=[];if(h.channels_sms)ch.push('📱 SMS');if(h.channels_wa)ch.push('💬 WhatsApp');
@@ -1947,17 +1951,50 @@ applyLang();
               +'<div style="text-align:right"><div style="color:#7ee3aa;font-weight:700">✓ '+h.ok+'</div>'+(h.failed>0?'<div style="color:#ef4444;font-size:11px">✗ '+h.failed+' errors</div>':'')+'</div>'
               +'</div>';
           }).join('');
-        }
-        backH.innerHTML='<div class="modal" style="max-width:700px;width:96%;max-height:88vh;display:flex;flex-direction:column;padding:0;background:#0f1115;color:#e8ecf2">'
-          +'<div style="padding:14px 18px;background:linear-gradient(90deg,#1e3a5f,#065f46);border-radius:12px 12px 0 0;display:flex;align-items:center;gap:10px">'
-          +'<h3 style="margin:0;color:#fff;font-family:Georgia,serif;flex:1">📜 Historial d\'enviaments massius</h3>'
-          +'<button class="btn" data-close="1" style="background:rgba(0,0,0,.3);color:#fff;border:1px solid rgba(255,255,255,.2)">✕</button>'
+        };
+        const buildHtml=()=>('<div class="modal" style="max-width:800px;width:96%;max-height:88vh;display:flex;flex-direction:column;padding:0;background:#0f1115;color:#e8ecf2">'
+          +'<div style="padding:14px 18px;background:linear-gradient(90deg,#1e3a5f,#065f46);border-radius:12px 12px 0 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+            +'<h3 style="margin:0;color:#fff;font-family:Georgia,serif;flex:1">📜 Historial d\'enviaments · Total: '+total+'</h3>'
+            +'<button class="btn" data-close="1" style="background:rgba(0,0,0,.3);color:#fff;border:1px solid rgba(255,255,255,.2)">✕</button>'
           +'</div>'
-          +'<div style="flex:1;overflow:auto">'+rowsHtml+'</div>'
-          +'<div style="padding:10px 14px;background:#0e1117;border-top:1px solid #262b36;font-size:11px;color:#64748b;text-align:center">Mostrant els últims '+hist.length+' enviaments</div>'
-          +'</div>';
+          +'<div style="padding:10px 14px;background:#0e1117;border-bottom:1px solid #262b36;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+            +'<span style="color:#94a3b8;font-size:11px">Des de:</span>'
+            +'<input type="date" id="histDateFrom" style="background:#141821;color:#e8ecf2;border:1px solid #2a3040;border-radius:5px;padding:4px 6px;font-size:12px" />'
+            +'<button id="histApplyFilter" class="btn" style="padding:4px 12px;font-size:11px;background:#f5b301;color:#0f172a;border:none">Filtrar</button>'
+            +'<button id="histClearFilter" class="btn" style="padding:4px 12px;font-size:11px;background:transparent;color:#94a3b8;border:1px solid #3a4050">Netejar</button>'
+            +'<span style="flex:1"></span>'
+            +'<span id="histCounter" style="color:#94a3b8;font-size:11px">Mostrant '+hist.length+' de '+total+'</span>'
+          +'</div>'
+          +'<div id="histRows" style="flex:1;overflow:auto">'+renderRows(hist)+'</div>'
+          +(hist.length<total?'<div style="padding:10px;text-align:center;background:#0e1117;border-top:1px solid #262b36"><button id="histLoadMore" class="btn" style="background:#1e3a5f;color:#86b6ff;border:1px solid #2a5285;padding:6px 14px;font-size:12px">↓ Carregar més (queden '+(total-hist.length)+')</button></div>':'')
+          +'</div>');
+        backH.innerHTML=buildHtml();
         document.body.appendChild(backH);
-        backH.querySelector('[data-close]').onclick=()=>backH.remove();
+        const bindEvents=()=>{
+          backH.querySelector('[data-close]').onclick=()=>backH.remove();
+          const loadMore=backH.querySelector('#histLoadMore');
+          if(loadMore)loadMore.onclick=async()=>{
+            const more=await openHist(backH.querySelector('#histDateFrom').value?new Date(backH.querySelector('#histDateFrom').value).toISOString():'',offset);
+            hist=hist.concat(more.history||[]);offset=hist.length;
+            backH.querySelector('#histRows').innerHTML=renderRows(hist);
+            backH.querySelector('#histCounter').textContent='Mostrant '+hist.length+' de '+total;
+            if(hist.length>=total&&loadMore.parentElement)loadMore.parentElement.remove();
+          };
+          backH.querySelector('#histApplyFilter').onclick=async()=>{
+            const d=backH.querySelector('#histDateFrom').value;
+            const iso=d?new Date(d).toISOString():'';
+            const filtered=await openHist(iso,0);
+            hist=filtered.history||[];total=filtered.total||0;offset=hist.length;
+            backH.innerHTML=buildHtml();bindEvents();
+            if(d)backH.querySelector('#histDateFrom').value=d;
+          };
+          backH.querySelector('#histClearFilter').onclick=async()=>{
+            backH.querySelector('#histDateFrom').value='';
+            const fresh=await openHist('',0);hist=fresh.history||[];total=fresh.total||0;offset=hist.length;
+            backH.innerHTML=buildHtml();bindEvents();
+          };
+        };
+        bindEvents();
         backH.addEventListener('click',ev=>{if(ev.target===backH)backH.remove()});
       }catch(e){toast('✗ Error carregant historial: '+e.message,5000)}
     };
@@ -2000,21 +2037,27 @@ applyLang();
         }
         if(!rows||rows.length<2){toast('✗ CSV buit o mal format');return}
         const headers=rows[0].map(h=>String(h).trim());
-        const iNom=detectCol(headers,['nombre','nom','nombreapellidos','cliente','name','apellidosnombre','apellidos']);
+        const iNom=detectCol(headers,['nombre','nom','nombreapellidos','cliente','name','apellidosnombre']);
+        const iApe1=detectCol(headers,['apellido1','primerapellido','apellido']);
+        const iApe2=detectCol(headers,['apellido2','segundoapellido']);
         const iDni=detectCol(headers,['dni','nie','documento']);
         const iTel=detectCol(headers,['telefono','telefon','tel','movil','mobile','phone']);
-        const iCad=detectCol(headers,['fechacaducidad','datacaducitat','caducidad','caducitat','vencimiento','expiry']);
+        const iCad=detectCol(headers,['fecharevision','fechacaducidad','datacaducitat','caducidad','caducitat','vencimiento','expiry']);
         const iAdr=detectCol(headers,['direccion','adreca','address','domicilio']);
-        if(iNom<0||iTel<0){toast('✗ El CSV ha de tenir com a mínim columnes de Nom i Telèfon',6000);return}
-        contacts=rows.slice(1).map(r=>({
-          nom:String(r[iNom]||'').trim(),
-          dni:iDni>=0?String(r[iDni]||'').trim():'',
-          telefon:cleanPhone(r[iTel]),
-          dataCad:iCad>=0?String(r[iCad]||'').trim():'',
-          adreca:iAdr>=0?String(r[iAdr]||'').trim():'',
-          selected:true
-        })).filter(c=>c.nom&&c.telefon);
-        $q('#notifImportInfo').innerHTML='✓ <b style="color:#7ee3aa">'+contacts.length+' contactes importats</b> (cols detectades: nom, telèfon'+(iDni>=0?', DNI':'')+(iCad>=0?', caducitat':'')+(iAdr>=0?', adreça':'')+')';
+        if(iNom<0){toast('✗ Falta la columna de nom al CSV',6000);return}
+        if(iTel<0){toast('⚠ Aquest CSV no té columna Telèfon. Afegeix-la al teu programa DGT abans d\'exportar.',8000)}
+        contacts=rows.slice(1).map(r=>{
+          const nombre=String(r[iNom]||'').trim();
+          const ap1=iApe1>=0?String(r[iApe1]||'').trim():'';
+          const ap2=iApe2>=0?String(r[iApe2]||'').trim():'';
+          const fullNom=[ap1,ap2,nombre].filter(Boolean).join(' ').trim()||nombre;
+          return {nom:fullNom,dni:iDni>=0?String(r[iDni]||'').trim():'',telefon:iTel>=0?cleanPhone(r[iTel]):'',dataCad:iCad>=0?String(r[iCad]||'').trim():'',adreca:iAdr>=0?String(r[iAdr]||'').trim():'',selected:true};
+        }).filter(c=>c.nom&&c.telefon);
+        if(!contacts.length&&rows.length>1){
+          $q('#notifImportInfo').innerHTML='⚠ <b style="color:#ef4444">S\'han detectat '+(rows.length-1)+' línies però cap té telèfon.</b> Afegeix la columna \'Telefono\' al teu CSV.';
+          return;
+        }
+        $q('#notifImportInfo').innerHTML='✓ <b style="color:#7ee3aa">'+contacts.length+' contactes importats</b> (cols: nom'+(iApe1>=0?'+cognoms':'')+', telèfon'+(iDni>=0?', DNI':'')+(iCad>=0?', caducitat':'')+(iAdr>=0?', adreça':'')+')';
         renderList();
       }catch(e){toast('✗ Error llegint fitxer: '+e.message,6000);console.error(e)}
     };

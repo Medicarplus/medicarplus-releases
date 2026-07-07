@@ -1862,14 +1862,27 @@ applyLang();
         }else{const text=await f.text();rows=parseCSV(text)}
         if(!rows||rows.length<2){toast('✗ CSV buit o mal format');return}
         const headers=rows[0].map(h=>String(h).trim());
-        const iNom=detectCol(headers,['nombre','nom','nombreapellidos','cliente','name','apellidosnombre','apellidos']);
+        const iNom=detectCol(headers,['nombre','nom','nombreapellidos','cliente','name','apellidosnombre']);
+        const iApe1=detectCol(headers,['apellido1','primerapellido','apellido']);
+        const iApe2=detectCol(headers,['apellido2','segundoapellido']);
         const iDni=detectCol(headers,['dni','nie','documento']);
         const iTel=detectCol(headers,['telefono','telefon','tel','movil','mobile','phone']);
-        const iCad=detectCol(headers,['fechacaducidad','datacaducitat','caducidad','caducitat','vencimiento','expiry']);
+        const iCad=detectCol(headers,['fecharevision','fechacaducidad','datacaducitat','caducidad','caducitat','vencimiento','expiry']);
         const iAdr=detectCol(headers,['direccion','adreca','address','domicilio']);
-        if(iNom<0||iTel<0){toast('✗ El CSV ha de tenir com a mínim columnes de Nom i Telèfon',6000);return}
-        contacts=rows.slice(1).map(r=>({nom:String(r[iNom]||'').trim(),dni:iDni>=0?String(r[iDni]||'').trim():'',telefon:cleanPhone(r[iTel]),dataCad:iCad>=0?String(r[iCad]||'').trim():'',adreca:iAdr>=0?String(r[iAdr]||'').trim():'',selected:true})).filter(c=>c.nom&&c.telefon);
-        $q('#notifImportInfo').innerHTML='✓ <b style="color:#7ee3aa">'+contacts.length+' contactes importats</b> (cols: nom, telèfon'+(iDni>=0?', DNI':'')+(iCad>=0?', caducitat':'')+(iAdr>=0?', adreça':'')+')';
+        if(iNom<0){toast('✗ Falta la columna de nom al CSV',6000);return}
+        if(iTel<0){toast('⚠ Aquest CSV no té columna Telèfon. Afegeix-la al teu programa DGT abans d\'exportar.',8000)}
+        contacts=rows.slice(1).map(r=>{
+          const nombre=String(r[iNom]||'').trim();
+          const ap1=iApe1>=0?String(r[iApe1]||'').trim():'';
+          const ap2=iApe2>=0?String(r[iApe2]||'').trim():'';
+          const fullNom=[ap1,ap2,nombre].filter(Boolean).join(' ').trim()||nombre;
+          return {nom:fullNom,dni:iDni>=0?String(r[iDni]||'').trim():'',telefon:iTel>=0?cleanPhone(r[iTel]):'',dataCad:iCad>=0?String(r[iCad]||'').trim():'',adreca:iAdr>=0?String(r[iAdr]||'').trim():'',selected:true};
+        }).filter(c=>c.nom&&c.telefon);
+        if(!contacts.length&&rows.length>1){
+          $q('#notifImportInfo').innerHTML='⚠ <b style="color:#ef4444">S\'han detectat '+(rows.length-1)+' línies però cap té telèfon.</b> Afegeix la columna \'Telefono\' al teu CSV.';
+          return;
+        }
+        $q('#notifImportInfo').innerHTML='✓ <b style="color:#7ee3aa">'+contacts.length+' contactes importats</b> (cols: nom'+(iApe1>=0?'+cognoms':'')+', telèfon'+(iDni>=0?', DNI':'')+(iCad>=0?', caducitat':'')+(iAdr>=0?', adreça':'')+')';
         renderList();
       }catch(e){toast('✗ Error: '+e.message,6000);console.error(e)}
     };
