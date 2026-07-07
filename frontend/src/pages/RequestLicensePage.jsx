@@ -109,9 +109,21 @@ export default function RequestLicensePage() {
             Sol·licitud enviada!
           </h1>
           <p style={{ color: "#cbd5e1", lineHeight: 1.6, fontSize: 15 }}>
-            Hem rebut la teva sol·licitud correctament.
-            <br />
-            Et contactarem aviat per email amb la teva clau d'activació.
+            Hem rebut la teva sol·licitud correctament. Et contactarem al teu email amb els <b>detalls de pagament</b>.
+          </p>
+
+          <div style={{ background: "#0f172a", border: "1px solid #f5b301", borderRadius: 10, padding: 18, margin: "22px 0", textAlign: "left" }}>
+            <div style={{ color: "#f5b301", fontSize: 11, letterSpacing: 1.5, fontWeight: 700, marginBottom: 10 }}>📋 PROPERS PASSOS</div>
+            <ol style={{ color: "#cbd5e1", fontSize: 13, lineHeight: 1.8, margin: 0, paddingLeft: 20 }}>
+              <li>Revisarem la teva sol·licitud en <b>menys de 24h</b></li>
+              <li>T'enviarem un email amb la <b>factura proforma</b> i les dades de transferència bancària</li>
+              <li>Un cop <b>rebem el pagament</b>, t'enviem la clau d'activació i el link de descàrrega de l'app</li>
+              <li>Instal·les l'app, enganxes la clau i ja pots començar a treballar</li>
+            </ol>
+          </div>
+
+          <p style={{ color: "#94a3b8", fontSize: 11, marginTop: 8 }}>
+            💬 Dubtes? Escriu a <a href="mailto:brugulatmarc@gmail.com" style={{ color: "#f5b301" }}>brugulatmarc@gmail.com</a>
           </p>
           <p style={{ color: "#94a3b8", fontSize: 12, marginTop: 24 }}>
             M.Brugulat Lopez · MediCar Plus
@@ -218,6 +230,27 @@ export default function RequestLicensePage() {
             Si <b>encara no tens l'app</b>, deixa aquest camp buit — quan aprovem la teva sol·licitud t'enviarem l'app perquè el generi.
             Si <b>ja tens l'app instal·lada</b>, obre-la, ves al modal d'activació i copia el codi{" "}
             <code style={{ color: "#e2e8f0" }}>CD-XXXX-XXXX-XXXX-XXXX</code>.
+          </div>
+
+          <div
+            style={{
+              background: "linear-gradient(135deg,#065f46 0%,#0f172a 100%)",
+              border: "1px solid #059669",
+              borderRadius: 8,
+              padding: 14,
+              marginBottom: 22,
+              fontSize: 12,
+              color: "#cbd5e1",
+              lineHeight: 1.55,
+            }}
+          >
+            <b style={{ color: "#7ee3aa", fontSize: 13 }}>💰 Forma de pagament: Transferència bancària</b>
+            <div style={{ marginTop: 6 }}>
+              Un cop rebem la teva sol·licitud, t'enviarem un <b>email amb la factura proforma</b> i les dades bancàries per fer la transferència. Un cop confirmat el pagament, rebràs la clau d'activació.
+            </div>
+            <div style={{ marginTop: 6, fontSize: 11, color: "#94a3b8", fontStyle: "italic" }}>
+              Sense compromís: només pagues si acceptes l'oferta que et fem.
+            </div>
           </div>
 
           <div style={{ display: "grid", gap: 14 }}>

@@ -1,0 +1,55 @@
+{
+  "summary": "Fase 6 — Full E2E validation of MediCar Plus after visual refresh + SMS + Stripe + pricing cards changes. Backend: 43/43 pytest cases pass (24 legacy + 10 new Fase 6 for Notifications/Payments/Verify + 9 requests). Frontend: V1 loads without JS errors with new Colorful Pill visual + working SMS modal; V2 activation gate + wizard + logout + Datàfon popup + configurable company names all working; Admin panel loads with both tabs; Request-license page shows 3 pricing cards with mensual/anual toggle. ONE FUNCTIONAL BUG FOUND: empty Install ID on /request-license produces 422 because frontend sends 'CD-PENDING-0000-0000-0000' (invalid per backend regex).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/licenses/requests",
+        "issue": "Empty Install ID from the public form causes 422. Frontend sends the sentinel 'CD-PENDING-0000-0000-0000' when the user leaves the (opcional) field blank, but backend Pydantic validator INSTALL_ID_RE = ^CD-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$ rejects 'PENDING' (7 chars, not 4). Directly contradicts the spec 'Install ID és opcional (es pot enviar buit sense error)'. Users cannot submit the form without an Install ID.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Request license submission",
+        "issue": "The 422 response above surfaces a red raw Pydantic error blob under the form ('[{\"type\":\"value_error\",\"loc\":[\"body\",\"install_id\"]...}]'). Even after backend fix, the frontend should render a human-friendly error message, not the raw JSON validation payload.",
+        "affected_selectors": ["form.request-license", "the red error box below plan-seleccionat"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_licenses.py",
+    "/app/backend/tests/test_license_requests.py",
+    "/app/backend/tests/test_notifications_payments.py",
+    "/app/test_reports/pytest/fase6_results.xml"
+  ],
+  "action_items": [
+    "Fix Install ID optionality in the LicenseRequestCreate flow. Recommended: make install_id: Optional[str] in /app/backend/models/license.py (allow None/empty and skip regex validation when falsy) AND change the frontend to omit install_id or send null instead of the invalid 'CD-PENDING-0000-0000-0000' sentinel (/app/frontend/src/pages/RequestLicensePage.jsx line 39).",
+    "Improve error UX on /request-license: replace the raw Pydantic JSON blob with a plain Catalan/Spanish message per validation error (target the red error container under 'PLAN SELECCIONAT').",
+    "Optional cosmetic: 'Nova llicència' button in AdminDashboard uses window.prompt() sequences (per iteration_5 notes) — consider replacing with a proper modal form for better UX; but this is out of scope for the current review."
+  ],
+  "critical_code_review_comments": [
+    "Backend /api/notifications/send correctly returns 503 with a Catalan message when Twilio env vars are missing — matches the mocked_api expectation. Guard order is fine.",
+    "Backend /api/payments/create-checkout hardcodes prices in PACKAGES dict on the server (playbook-compliant). Frontend never trusts prices. Metadata passes package_id + request_id + customer_email so the webhook can update the request row.",
+    "Stripe webhook /api/webhook/stripe correctly guards against double-processing via tx.payment_status == 'paid' check, so amount is not credited twice on duplicate deliveries.",
+    "v2.html LIC.MASTER_KEY (client-side only) is intentional — never sent to backend. This is documented as the design boundary and the backend correctly rejects the master key string via /api/licenses/verify.",
+    "v1 (caja_del_dia.html) untouched functionally — new SMS button and Colorful Pill theme layered non-destructively, all original controls (Historial, Llibreta, IRPF, Auditoria, Assessor IA, Imprimir, CEMPLA C.B / CEMPLA ESPORT chips) present. No JS errors on load.",
+    "v2 commercialCleanupV3 verified working: banned pre-loaded contacts JOSEP BRUGULAT, JOSEP Mª RAFART, JOSE ANT. MELLADO are NOT present in localStorage after a fresh activation + wizard.",
+    "v2 SORTIR logout confirmed to clear license and return to activation screen (a NEW install_id is generated, which is expected for a clean reset; if the intent is to preserve the same install_id across activations, that would need separate handling — flagging as INFO not BUG).",
+    "The RequestLicensePage inline validation error UI is fragile: it directly prints server response text into the DOM, which is a small XSS / UX risk. Wrap error rendering with a proper message mapper."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_notifications_payments.py (new — 10 tests)"
+  ],
+  "success_rate": {"backend": "100% (43/43 pytest)", "frontend": "~95% (all core flows OK; 1 blocking bug on request-license empty Install ID)"},
+  "test_credentials": "Master Key v2: MB-MASTER-BRUGULAT-2026-OWNER · X-Admin-Token: MB-ADMIN-BRUGULAT-2026-4F8E2A1C",
+  "seed_data_creation": "During E2E: created one Stripe checkout session (STD_ANY) via /api/payments/create-checkout — the payment_transactions row is cleaned up in the test teardown. Multiple test license_requests + licenses created and torn down via mongo cleanup in fixtures.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The 'CD-PENDING-0000-0000-0000' sentinel in RequestLicensePage.jsx line 39 is the root cause of the empty-Install-ID 422. When main agent fixes it (either make backend install_id Optional[str] with validator that only runs when value is truthy, OR frontend omits the field/sends null), re-run pytest /app/backend/tests/test_license_requests.py adding a new test case 'test_create_pending_request_ok_without_install_id' to lock the fix. Full backend regression suite: cd /app/backend && pytest tests/ -v (43 passing today). Frontend flows verified working: /caja_del_dia.html loads clean, /v2.html activation→wizard→configured names→SMS modal→Datàfon popup→SORTIR all fine, /admin loads with token, /request-license shows pricing cards + toggle. Master key MB-MASTER-BRUGULAT-2026-OWNER is client-side only (v2.html LIC.MASTER_KEY at line 2069); do not expect /api/licenses/verify to accept it.",
+  "rca of the issue": "Root cause: /app/frontend/src/pages/RequestLicensePage.jsx line 39 defaults empty install_id to the literal 'CD-PENDING-0000-0000-0000'. The backend Pydantic regex ^CD-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$ rejects the 7-char 'PENDING' block, returning HTTP 422 with a Pydantic error blob that is then rendered raw as red text under the form. Reproduction: open /request-license, leave Install ID empty, fill required fields (empresa + email + consent), click 'Enviar sol·licitud' → red raw JSON error appears, submission blocked. Mitigation options in order of preference: (a) Backend: make install_id Optional[str] and skip validation when None/empty (also removes need for frontend sentinel); (b) Frontend: send install_id: null (or omit the field entirely from the JSON body) when the input is blank; (c) minimum fix: change the sentinel to 'CD-0000-0000-0000-0000' which passes the regex — but this creates duplicate-pending collisions across users, so option (a) is strongly preferred."
+}

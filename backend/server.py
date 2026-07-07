@@ -197,6 +197,46 @@ app.include_router(build_license_router(db, limiter=limiter), prefix="/api")
 from routes.notifications import router as notifications_router
 app.include_router(notifications_router, prefix="/api")
 
+# Payments (Stripe Checkout) — mòdul aïllat
+from routes.payments import router as payments_router
+app.include_router(payments_router, prefix="/api")
+
+# Stripe webhook (obligatori per playbook: /api/webhook/stripe)
+from fastapi import Request as _FastReq
+from emergentintegrations.payments.stripe.checkout import StripeCheckout as _StripeCK
+
+@app.post("/api/webhook/stripe")
+async def stripe_webhook(request: _FastReq):
+    api_key = os.environ.get("STRIPE_API_KEY", "")
+    if not api_key:
+        return {"received": False, "error": "not configured"}
+    host_url = str(request.base_url).rstrip("/")
+    stripe_ck = _StripeCK(api_key=api_key, webhook_url=f"{host_url}/api/webhook/stripe")
+    body = await request.body()
+    signature = request.headers.get("Stripe-Signature", "")
+    try:
+        resp = await stripe_ck.handle_webhook(body, signature)
+    except Exception as e:
+        return {"received": False, "error": str(e)}
+    # Actualitza payment_transactions + license_requests si s'ha pagat
+    if resp.session_id and resp.payment_status == "paid":
+        tx = await db.payment_transactions.find_one({"session_id": resp.session_id})
+        if tx and tx.get("payment_status") != "paid":
+            await db.payment_transactions.update_one(
+                {"session_id": resp.session_id},
+                {"$set": {"payment_status": "paid", "status": "complete",
+                          "updated_at": datetime.now(timezone.utc).isoformat()}},
+            )
+            req_id = (resp.metadata or {}).get("request_id")
+            if req_id:
+                await db.license_requests.update_one(
+                    {"id": req_id},
+                    {"$set": {"payment_status": "paid",
+                              "paid_at": datetime.now(timezone.utc).isoformat(),
+                              "paid_via": "stripe"}},
+                )
+    return {"received": True, "event_type": resp.event_type}
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
