@@ -1,0 +1,13 @@
+{
+  "name": "caja-del-dia-obfuscate",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Obfuscation build script for Caja del Día v2 (Electron packaging)",
+  "scripts": {
+    "obfuscate": "node obfuscate.js",
+    "obfuscate:preview": "node obfuscate.js --preview"
+  },
+  "dependencies": {
+    "javascript-obfuscator": "^4.1.1"
+  }
+}

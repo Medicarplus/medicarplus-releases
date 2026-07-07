@@ -51,6 +51,7 @@ Aplicació standalone (`caja_del_dia.html`) que substitueix una llibreta de comp
 - 2026-02-07: **Fase 4 completada** — License server FastAPI + MongoDB con JWT. Nueva estructura `/app/backend/routes/` + `/app/backend/models/`. 8 tests pytest passing.
 - 2026-02-07: **Fase 5 completada** — Admin panel + portal públic. Backend afegeix 4 endpoints (requests/approve/reject). React `/admin` (login gate + dashboard amb stats + taula amb Copy JWT/Revoke + tab de sol·licituds amb Approve/Reject) i `/request-license` (formulari públic). Resend mailer amb graceful fallback. 24/24 pytest OK + 25/25 E2E OK.
 - 2026-02-07: **Fase 6 completada** — `v2.html` accepta 3 formats de clau (MASTER offline · JWT verificable online · MB-XXXX legacy). Nou input textarea (JWTs són llargs, no majúsculing automàtic). Activació JWT contacta `VERIFY_URL` (font de veritat) i degrada elegantment offline. Re-check periòdic cada 15 dies invalidat si el servidor diu revoked/expired. Botó "↻ Verificar ara" al modal d'info. Nou link "Demana-la aquí" al portal públic. Els 3 fitxers `/app/frontend/public/v2.html`, `/app/commercial/caja_del_dia_v2.html` i `/app/commercial/electron/index.html` sincronitzats (mateix MD5). Smoke tests E2E OK: MASTER + JWT + 3 casos de rebuig.
+- 2026-02-07: **Fase 7 completada** — Build script d'obfuscació JS a `/app/commercial/build/obfuscate.js` amb `javascript-obfuscator`. Regenera `commercial/electron/index.html` amb: string array base64 (MASTER_KEY + VERIFY_URL amagats de Ctrl+F), identifierNamesGenerator hexadecimal, selfDefending anti-tampering, splitStrings. JS creix 2.6x (154→398 KB) però la lògica és opaca. Testejat E2E: MASTER + JWT + servidor verify + app completa carrega sense errors. `BUILD_INSTRUCTIONS.md` actualitzat amb el nou pas 3.5.
 
 ## Test Coverage
 - iteration_1: bug detectado (Cannot set properties of null) → root cause: línia 781 `$('#btnDownloadApp').onclick` (elemento inexistente) → FIXED
@@ -60,11 +61,13 @@ Aplicació standalone (`caja_del_dia.html`) que substitueix una llibreta de comp
 - Persistencia F5 verificada
 - **License server**: 8/8 pytest tests passing (`backend/tests/test_licenses.py`) — generate/verify/revoke/perpetual/regenerate/list/detail/auth
 - **License requests + Admin panel (iteration_5)**: 24/24 pytest + 25/25 E2E Playwright. Cobreix: 401 sense token, format Install ID validation, duplicate pending 409, mailer graceful fallback amb RESEND_API_KEY buida, revoke marca REVOCADA i desactiva botons, aprovació auto-copia JWT.
+- **v2.html obfuscat (Fase 7)**: smoke test manual — MASTER key desbloqueja, JWT amb verificació online funciona, `plan`/`centre` guardats des del servidor, 0 pageerrors, 0 warnings.
 
 ## Roadmap
-- **Fase 7 (P2)**: Ofuscació JS de `v2.html` amb `javascript-obfuscator`
 - **Follow-up**: quan tinguis el compte Resend a punt, omplir `RESEND_API_KEY` i `SENDER_EMAIL` al `.env` i l'aprovació enviarà emails automàticament sense canvis de codi
-- **Follow-up**: quan tinguis un domini definitiu, substituir `VERIFY_URL` a v2.html (3 llocs: `/app/frontend/public/v2.html`, `/app/commercial/caja_del_dia_v2.html`, `/app/commercial/electron/index.html`) i re-empaquetar l'Electron
+- **Follow-up**: quan tinguis un domini definitiu, substituir `VERIFY_URL` a v2.html (`/app/frontend/public/v2.html` és la font; re-executar `node /app/commercial/build/obfuscate.js` sincronitza `commercial/electron/index.html`) i re-empaquetar l'Electron
+- **Follow-up post-build**: signatura digital del `.exe` amb certificat Sectigo/Comodo (~90€/any) per evitar avís SmartScreen a Windows
+- **Backlog**: rate limiting a `/api/licenses/verify`, exportació CSV de llicències, dashboard de mètriques (verify_count per client), plantilla d'email personalitzable, auto-update amb `electron-updater`
 
 ## Known Limitations
 - `showSaveFilePicker` (File System Access API) solo funciona en Chrome/Edge. Firefox/Safari usan `<a download>` fallback automático (ya implementado).

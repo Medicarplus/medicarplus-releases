@@ -53,6 +53,34 @@ Suggeriment de disseny: fons blau fosc + "€" o "CD" en groc daurat (colors app
 cd C:\ruta\a\electron
 ```
 
+### 3.5. (opcional però recomanat) ⚡ Regenera l'HTML obfuscat (Fase 7)
+
+Abans del primer build, o cada cop que canviïs la lògica de llicència, torna a **obfuscar el JavaScript**. Això reemplaça `electron/index.html` amb la versió amb:
+
+- `MB-MASTER-BRUGULAT-2026-OWNER` **invisible** amb Ctrl+F
+- `VERIFY_URL` amagada al string array (no es pot llegir directament)
+- Signatura anti-tampering (`selfDefending: true`): si algú beautifica el codi, entra en bucle infinit
+- Noms de variables i paràmetres substituïts per `_0xNNNNNN`
+
+**Com executar-ho (a la teva màquina Linux/dev, NO al Windows del client):**
+```bash
+cd /app/commercial/build
+yarn install        # només el primer cop (~5s)
+node obfuscate.js   # llegeix v2.html, escriu commercial/electron/index.html
+```
+
+Sortida típica:
+```
+[obfuscate] Reading   : /app/frontend/public/v2.html
+[obfuscate] Block 1: 156021 → 407439 chars (2.01s)
+[obfuscate] Wrote     : /app/commercial/electron/index.html
+[obfuscate] JS size   : 153.4 KB → 398.2 KB (260%)
+```
+
+L'HTML obfuscat continua tenint TOTA la funcionalitat idèntica: MASTER key, JWT, re-check online, etc. Només que ara costa molt més fer reverse-engineering. **Aquest és el fitxer que has de copiar al PC Windows abans de fer `npm run build`.**
+
+> **NOTA**: si estàs iterant a `v2.html` (dev), executa `node obfuscate.js` DESPRÉS de cada canvi per mantenir sincronitzat l'HTML de l'Electron. Si oblides d'obfuscar, la copia a `electron/index.html` quedarà desactualitzada. La font de veritat per dev és sempre `/app/frontend/public/v2.html`.
+
 ### 4. Instal·la dependències
 ```bash
 npm install
@@ -106,7 +134,7 @@ Doble-clic al `.exe`, segueix l'assistent, i comprova que:
 ### Pendent (opcional, més endavant)
 - **Signatura digital del `.exe`** amb certificat Sectigo/Comodo (~90€/any)  
   Sense això, Windows Defender pot mostrar "SmartScreen" el primer cop
-- **Ofuscació JavaScript** (Fase 6 del roadmap) per fer molt més difícil llegir el codi
+- ~~**Ofuscació JavaScript**~~ ✅ **FET (Fase 7)** — vegeu el pas 3.5 més amunt
 - **Xifrat de l'`app.asar`** — cal desxifrat runtime, hi ha llibreries com `asarmor`
 
 ---
