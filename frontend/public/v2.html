@@ -522,6 +522,7 @@ function openStats(){
       <button class="btn btn-primary" id="stImport">📥 Importar CSV</button>
       <input type="file" id="stFile" accept=".csv,.txt" style="display:none" />
       <button class="btn" id="stAdd">+ Autoescola</button>
+      <button class="btn" id="stClearAll" style="background:#7f1d1d;color:#fecaca;border-color:#b91c1c" title="Elimina totes les autoescoles i les seves dades">🗑 Buidar tot</button>
       <button class="btn btn-primary" id="stPrint">🖨️ Imprimir</button>
       <button class="btn" data-no>✕ Tancar</button>
     </div>
@@ -577,6 +578,7 @@ function openStats(){
   back.querySelector('#stPrev').onclick=()=>{const y=$('#stYear');y.value=+y.value-1;renderTable()};
   back.querySelector('#stNext').onclick=()=>{const y=$('#stYear');y.value=+y.value+1;renderTable()};
   back.querySelector('#stAdd').onclick=()=>{const n=prompt('Nom de la nova autoescola:');if(!n)return;const st=loadStats();if(st.autoescoles.includes(n.trim())){toast('Ja existeix');return}st.autoescoles.push(n.trim());saveStats(st);renderTable()};
+  back.querySelector('#stClearAll').onclick=()=>{if(!confirm('⚠️ Esborrar TOTES les autoescoles i les seves dades?\n\nAquesta acció NO es pot desfer. Es recomana només al primer arrencament o si vols començar de zero.'))return;saveStats({autoescoles:[],data:{}});renderTable();toast('🗑 Autoescoles esborrades')};
   // Alias mapping CSV → canonical name
   const STAT_ALIAS={
     'TRAFIC':'TRÀFIC','TRÀFIC':'TRÀFIC',
