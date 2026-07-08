@@ -107,3 +107,6 @@ Transició d'una app HTML offline estable ("Caja del Día") a una app comercial 
 
 ## Changelog recent
 - **2026-02-07**: Fix "Reserva de Cambio" — afegit botó `#btnCambio` al dropdown Contabilidad (faltava). Total reserva ara repercuteix a: `Saldo anterior caja`, `Saldo anterior`, header pill `#saldoAntNum` i `CAJA FÍSICA`. Modal es re-renderitza vista principal al tancar. Build Electron regenerat.
+- **2026-02-07**: Fix panell mestre (`index-guies.html`) — tret `target="_blank"` per evitar bloqueig popups. Afegit auto-detect de `file://` amb reescriptura d'enllaços a URL absoluta.
+- **2026-02-07**: **IRPF % configurable per empresa** — nou input al modal IRPF amb presets 7%/15%/19% (autònoms nous / general / capital). Cada empresa (Empresa 1 i 2) desa el seu % independentment. Header taula, càlculs mensual/trimestral/anual i impressió tots dinàmics. `irpfCalc(e,pct)` accepta paràmetre.
+

@@ -1163,11 +1163,15 @@ function loadIrpf(){
 }
 function saveIrpf(o){localStorage.setItem('caja.irpf.v1',JSON.stringify(o));pushSnapshot('auto');scheduleFileAutoSave()}
 function seedIrpfMonth(comp){return {totalCertificats:0,totalCertfBombers:0,entries:IRPF_DEFAULTS[comp].map(n=>({nom:n,cert:0,brut:0,ss:0,netSS:0}))}}
-function irpfCalc(e){
+// Retorna el % IRPF actual d'una empresa (per defecte 15%). Configurable per usuari.
+function irpfPct(comp){const all=loadIrpf();const p=all&&all[comp]&&all[comp].pct;const n=Number(p);return (isFinite(n)&&n>=0&&n<=100)?n:15}
+function setIrpfPct(comp,pct){const all=loadIrpf();if(!all[comp])all[comp]={months:{},quarters:{}};all[comp].pct=Math.max(0,Math.min(100,Number(pct)||0));saveIrpf(all);return all[comp].pct}
+function irpfCalc(e,pct){
   const brut=Number(e.brut)||0,ss=Number(e.ss)||0;
   const hasSs=ss>0;
   const total=hasSs?(brut-ss):brut;
-  const irpf=total*0.15;
+  const rate=(pct==null?15:Number(pct))/100;
+  const irpf=total*rate;
   const net=total-irpf;
   const netSS=Number(e.netSS)||0;
   const totalFinal=hasSs?(net+netSS):net;
@@ -1198,6 +1202,16 @@ function openIRPF(){
       <button class="btn" id="irpfPrev" style="background:#78350f;color:#fff;border-color:#78350f;padding:6px 12px">◀</button>
       <input type="month" id="irpfMonth" value="${currentMonth}" style="background:#fff;color:#1a1a1a;border:1px solid #b45309;border-radius:4px;padding:6px 10px" />
       <button class="btn" id="irpfNext" style="background:#78350f;color:#fff;border-color:#78350f;padding:6px 12px">▶</button>
+      <div style="margin-left:20px;display:flex;align-items:center;gap:6px;padding:4px 10px;background:#fef3c7;border:2px solid #b45309;border-radius:6px" title="Escull el % IRPF que t'aplica Hisenda. Cada empresa pot tenir un % diferent (típic: 7% autònoms nous, 15% general, 19% altres).">
+        <label class="small" style="margin:0;color:#78350f;font-weight:700">IRPF:</label>
+        <input type="number" id="irpfPctInp" min="0" max="100" step="0.01" value="${irpfPct(irpfComp)}" data-testid="irpf-pct-input" style="width:70px;background:#fff;color:#78350f;border:1px solid #b45309;border-radius:4px;padding:5px 6px;font-family:'Courier New',monospace;font-weight:700;text-align:right" />
+        <span style="color:#78350f;font-weight:700">%</span>
+        <div style="display:flex;gap:3px;margin-left:6px">
+          <button class="btn" data-pct="7" style="padding:3px 8px;background:#fff;color:#78350f;border:1px solid #b45309;font-size:11px;font-weight:700" title="Autònoms nous (2 primers anys)">7%</button>
+          <button class="btn" data-pct="15" style="padding:3px 8px;background:#fff;color:#78350f;border:1px solid #b45309;font-size:11px;font-weight:700" title="Tipus general professional">15%</button>
+          <button class="btn" data-pct="19" style="padding:3px 8px;background:#fff;color:#78350f;border:1px solid #b45309;font-size:11px;font-weight:700" title="Rendiments capital">19%</button>
+        </div>
+      </div>
       <div style="flex:1"></div>
       <button class="btn btn-primary" id="irpfPrint" style="background:#78350f;color:#fff;border-color:#78350f">🖨️ Imprimir mes</button>
     </div>
@@ -1230,13 +1244,15 @@ function openIRPF(){
     // Seed automàtic: si el mes no existeix, precarreguem les persones per defecte de l'empresa activa.
     if(!cd.months[m]){cd.months[m]=seedIrpfMonth(irpfComp);saveIrpf(data)}
     const md=cd.months[m];
+    // % IRPF configurable per empresa (default 15%)
+    const pct=irpfPct(irpfComp);
     // Total IRPF acumulat del trimestre (només mesos no ingressats)
     const q=quarterOf(m);
     const monthsQ=monthsOfQuarter(q);
     let pendentIRPF=0,pendentBrut=0;const perMonth=[];
     monthsQ.forEach(ym=>{
       const md2=cd.months[ym];if(!md2)return;
-      const irpfMonth=(md2.entries||[]).reduce((a,e)=>a+irpfCalc(e).irpf,0);
+      const irpfMonth=(md2.entries||[]).reduce((a,e)=>a+irpfCalc(e,pct).irpf,0);
       const brutMonth=(md2.entries||[]).reduce((a,e)=>a+(Number(e.brut)||0),0);
       perMonth.push({ym,irpf:irpfMonth,brut:brutMonth,entries:(md2.entries||[]).length});
       pendentIRPF+=irpfMonth;pendentBrut+=brutMonth;
@@ -1251,7 +1267,7 @@ function openIRPF(){
     const diff=sobreTotal-pendentIRPF;
     // Files de la taula del mes
     const entriesHTML=(md.entries||[]).map((e,i)=>{
-      const c=irpfCalc(e);
+      const c=irpfCalc(e,pct);
       return `<tr>
         <td style="padding:4px 6px;border:1px solid #b45309"><input data-i="${i}" data-f="nom" value="${escapeHtml(e.nom||'')}" placeholder="Nom cognoms" style="width:180px;background:transparent;border:none;font-weight:700;color:#78350f;padding:4px" /></td>
         <td style="padding:4px 6px;border:1px solid #b45309;text-align:right"><input data-i="${i}" data-f="cert" type="number" step="1" value="${e.cert||''}" style="width:70px;background:transparent;border:none;text-align:right;font-family:'Courier New',monospace;padding:4px" /></td>
@@ -1266,7 +1282,7 @@ function openIRPF(){
       </tr>`;
     }).join('');
     // Totals mes
-    const totals=(md.entries||[]).reduce((a,e)=>{const c=irpfCalc(e);a.brut+=Number(e.brut)||0;a.ss+=Number(e.ss)||0;if(c.hasSs){a.total+=c.total;a.netSS+=c.netSS;a.totalFinal+=c.totalFinal;a.net+=c.net;}else{a.net+=c.net;}a.irpf+=c.irpf;return a},{brut:0,ss:0,total:0,irpf:0,net:0,netSS:0,totalFinal:0});
+    const totals=(md.entries||[]).reduce((a,e)=>{const c=irpfCalc(e,pct);a.brut+=Number(e.brut)||0;a.ss+=Number(e.ss)||0;if(c.hasSs){a.total+=c.total;a.netSS+=c.netSS;a.totalFinal+=c.totalFinal;a.net+=c.net;}else{a.net+=c.net;}a.irpf+=c.irpf;return a},{brut:0,ss:0,total:0,irpf:0,net:0,netSS:0,totalFinal:0});
     back.querySelector('#irpfBody').innerHTML=`
       <div style="display:flex;gap:20px;margin-bottom:14px;padding:12px;background:#fff8e6;border:2px solid #b45309;border-radius:8px">
         <div style="flex:1"><label style="font-weight:700;color:#78350f;display:block;margin-bottom:4px">TOTAL CERTIFICATS del mes</label><input id="irpfTC" type="number" step="1" value="${md.totalCertificats||''}" style="width:100%;padding:8px;border:1px solid #b45309;border-radius:4px;font-size:14px;font-family:'Courier New',monospace" /></div>
@@ -1281,7 +1297,7 @@ function openIRPF(){
             <th style="padding:8px;border:1px solid #78350f;width:100px">BRUT</th>
             <th style="padding:8px;border:1px solid #78350f;width:100px">S.S.</th>
             <th style="padding:8px;border:1px solid #78350f;width:100px">TOTAL</th>
-            <th style="padding:8px;border:1px solid #78350f;width:100px;background:#b45309">IRPF 15%</th>
+            <th style="padding:8px;border:1px solid #78350f;width:100px;background:#b45309">IRPF ${pct}%</th>
             <th style="padding:8px;border:1px solid #78350f;width:100px">NET</th>
             <th style="padding:8px;border:1px solid #78350f;width:100px">NET S.S.</th>
             <th style="padding:8px;border:1px solid #78350f;width:100px">TOTAL</th>
@@ -1333,6 +1349,13 @@ function openIRPF(){
         ${!qData.paid?`<div style="margin-top:12px;padding:10px;background:${diff>=0?'#dcfce7':'#fef2f2'};border-left:4px solid ${diff>=0?'#166534':'#b91c1c'};border-radius:4px;font-family:Georgia,serif"><b style="color:${diff>=0?'#166534':'#b91c1c'}">${diff>=0?'✓ Ja tens prou al sobre':'⚠ Encara falta al sobre'}</b> · Sobre: <b>${fmt(sobreTotal)}</b> · Pendent Hisenda: <b>${fmt(pendentIRPF)}</b> · Diferència: <b style="color:${diff>=0?'#166534':'#b91c1c'}">${diff>=0?'+':''}${fmt(diff)}</b></div>`:''}
       </div>`;
     // Handlers — tots operen sobre l'empresa activa (irpfComp)
+    // Sincronitzar input % IRPF (està a la barra fixa, fora d'#irpfBody, però l'actualitzem a cada render)
+    const pctInp=back.querySelector('#irpfPctInp');
+    if(pctInp){
+      pctInp.value=pct;
+      pctInp.onchange=()=>{setIrpfPct(irpfComp,pctInp.value);render()};
+    }
+    back.querySelectorAll('[data-pct]').forEach(b=>b.onclick=(ev)=>{ev.preventDefault();setIrpfPct(irpfComp,b.dataset.pct);render()});
     back.querySelectorAll('input[data-i]').forEach(inp=>{
       inp.oninput=()=>{const i=parseInt(inp.dataset.i),f=inp.dataset.f;const val=f==='nom'?inp.value:parseFloat(inp.value)||0;const d2=loadIrpf();if(!d2[irpfComp].months[m])d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);d2[irpfComp].months[m].entries[i][f]=val;saveIrpf(d2)};
       inp.onblur=()=>render();
@@ -1383,10 +1406,11 @@ function openIRPF(){
   back.querySelector('#irpfMonth').onchange=render;
   back.querySelector('#irpfPrint').onclick=()=>{
     const data=loadIrpf();const md=data[irpfComp].months[currentMonth]||{entries:[]};
-    const rows=(md.entries||[]).map(e=>{const c=irpfCalc(e);return `<tr><td><b>${escapeHtml(e.nom||'')}</b></td><td class="num">${e.cert||''}</td><td class="num">${fmt(Number(e.brut)||0)}</td><td class="num">${fmt(Number(e.ss)||0)}</td><td class="num">${c.hasSs?fmt(c.total):''}</td><td class="num" style="background:#fef3c7">${fmt(c.irpf)}</td><td class="num">${fmt(c.net)}</td><td class="num">${c.hasSs?fmt(c.netSS):''}</td><td class="num">${c.hasSs?fmt(c.totalFinal):''}</td></tr>`}).join('');
-    const totals=(md.entries||[]).reduce((a,e)=>{const c=irpfCalc(e);a.brut+=Number(e.brut)||0;a.ss+=Number(e.ss)||0;if(c.hasSs){a.total+=c.total;a.netSS+=c.netSS;a.totalFinal+=c.totalFinal;a.net+=c.net;}else{a.net+=c.net;}a.irpf+=c.irpf;return a},{brut:0,ss:0,total:0,irpf:0,net:0,netSS:0,totalFinal:0});
+    const pct=irpfPct(irpfComp);
+    const rows=(md.entries||[]).map(e=>{const c=irpfCalc(e,pct);return `<tr><td><b>${escapeHtml(e.nom||'')}</b></td><td class="num">${e.cert||''}</td><td class="num">${fmt(Number(e.brut)||0)}</td><td class="num">${fmt(Number(e.ss)||0)}</td><td class="num">${c.hasSs?fmt(c.total):''}</td><td class="num" style="background:#fef3c7">${fmt(c.irpf)}</td><td class="num">${fmt(c.net)}</td><td class="num">${c.hasSs?fmt(c.netSS):''}</td><td class="num">${c.hasSs?fmt(c.totalFinal):''}</td></tr>`}).join('');
+    const totals=(md.entries||[]).reduce((a,e)=>{const c=irpfCalc(e,pct);a.brut+=Number(e.brut)||0;a.ss+=Number(e.ss)||0;if(c.hasSs){a.total+=c.total;a.netSS+=c.netSS;a.totalFinal+=c.totalFinal;a.net+=c.net;}else{a.net+=c.net;}a.irpf+=c.irpf;return a},{brut:0,ss:0,total:0,irpf:0,net:0,netSS:0,totalFinal:0});
     const w=window.open('','_blank');
-    w.document.write(`<html><head><title>IRPF ${compName(irpfComp)} · ${monthLabel(currentMonth)}</title><style>body{font-family:Georgia,serif;padding:10mm;font-size:11px}h1{text-align:center;color:#78350f}h2{text-align:center;color:#78350f;margin:6px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border:1px solid #333;padding:5px 7px}th{background:#78350f;color:#fff}td.num{text-align:right;font-family:'Courier New',monospace;font-weight:700}.tot{background:#fef3c7;font-weight:700}.hd{font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>IRPF · ${compName(irpfComp)}</h1><h2>${monthLabel(currentMonth).toUpperCase()}</h2><div style="margin:10px 0"><b>TOTAL CERTIFICATS:</b> ${md.totalCertificats||0} &nbsp;&nbsp;·&nbsp;&nbsp; <b>TOTAL CERTF. BOMBERS:</b> ${md.totalCertfBombers||0}</div><table><thead><tr><th>NOM</th><th>CERT.</th><th>BRUT</th><th>S.S.</th><th>TOTAL</th><th style="background:#b45309">IRPF 15%</th><th>NET</th><th>NET S.S.</th><th>TOTAL</th></tr></thead><tbody>${rows}<tr class="tot"><td colspan="2" style="text-align:right">TOTALS:</td><td class="num">${fmt(totals.brut)}</td><td class="num">${fmt(totals.ss)}</td><td class="num">${fmt(totals.total)}</td><td class="num" style="background:#b45309;color:#fff">${fmt(totals.irpf)}</td><td class="num">${fmt(totals.net)}</td><td class="num">${fmt(totals.netSS)}</td><td class="num">${fmt(totals.totalFinal)}</td></tr></tbody></table><div style="margin-top:16px;text-align:right;font-size:14px"><b>TOTAL IRPF DEL MES:</b> ${fmt(totals.irpf)} €</div><script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
+    w.document.write(`<html><head><title>IRPF ${compName(irpfComp)} · ${monthLabel(currentMonth)}</title><style>body{font-family:Georgia,serif;padding:10mm;font-size:11px}h1{text-align:center;color:#78350f}h2{text-align:center;color:#78350f;margin:6px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border:1px solid #333;padding:5px 7px}th{background:#78350f;color:#fff}td.num{text-align:right;font-family:'Courier New',monospace;font-weight:700}.tot{background:#fef3c7;font-weight:700}.hd{font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>IRPF · ${compName(irpfComp)}</h1><h2>${monthLabel(currentMonth).toUpperCase()}</h2><div style="margin:10px 0"><b>TOTAL CERTIFICATS:</b> ${md.totalCertificats||0} &nbsp;&nbsp;·&nbsp;&nbsp; <b>TOTAL CERTF. BOMBERS:</b> ${md.totalCertfBombers||0}</div><table><thead><tr><th>NOM</th><th>CERT.</th><th>BRUT</th><th>S.S.</th><th>TOTAL</th><th style="background:#b45309">IRPF ${pct}%</th><th>NET</th><th>NET S.S.</th><th>TOTAL</th></tr></thead><tbody>${rows}<tr class="tot"><td colspan="2" style="text-align:right">TOTALS:</td><td class="num">${fmt(totals.brut)}</td><td class="num">${fmt(totals.ss)}</td><td class="num">${fmt(totals.total)}</td><td class="num" style="background:#b45309;color:#fff">${fmt(totals.irpf)}</td><td class="num">${fmt(totals.net)}</td><td class="num">${fmt(totals.netSS)}</td><td class="num">${fmt(totals.totalFinal)}</td></tr></tbody></table><div style="margin-top:16px;text-align:right;font-size:14px"><b>TOTAL IRPF DEL MES:</b> ${fmt(totals.irpf)} €</div><script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
   };
 
   render();
@@ -1475,12 +1499,14 @@ function _buildAnnualReport(year){
       </table>`;
   }
 
-  // Trimestres (IRPF)
+  // Trimestres (IRPF) — usa el % configurat de l'empresa actual
+  const arPct=irpfPct(currentCompany==='cempla'?'cempla':'trafic');
+  const arRate=arPct/100;
   html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">📋 ${L('Resum trimestral (IRPF)','Resumen trimestral (IRPF)')}</h4>
     <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
-      <thead><tr style="background:#0f172a;color:#f5b301"><th style="padding:8px;text-align:left">${L('Trimestre','Trimestre')}</th><th style="padding:8px;text-align:right">${L('Facturació neta','Facturación neta')}</th><th style="padding:8px;text-align:right">${L('Entrades','Entradas')}</th><th style="padding:8px;text-align:right">${L('IRPF (15%)','IRPF (15%)')}</th></tr></thead>
-      <tbody>${TRIM.map((meses,i)=>{const t=meses.reduce((s,m)=>s+grandTotals.byMonth[m],0);const c=meses.reduce((s,m)=>s+grandTotals.byMonthCnt[m],0);const irpf=t*0.15;return `<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px"><b>${TRIM_LABEL[i]}</b></td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(t)}</td><td style="padding:8px;text-align:right">${c}</td><td style="padding:8px;text-align:right;color:#dc2626;font-family:'Courier New',monospace">${fmt(irpf)}</td></tr>`}).join('')}
-      <tr style="border-top:2px solid #0f172a;background:#fef3c7"><td style="padding:10px;font-weight:700">${L('TOTAL ANY','TOTAL AÑO')}</td><td style="padding:10px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(grandTotals.neto)}</td><td style="padding:10px;text-align:right;font-weight:700">${grandTotals.cnt}</td><td style="padding:10px;text-align:right;font-weight:700;color:#dc2626">${fmt(grandTotals.neto*0.15)}</td></tr>
+      <thead><tr style="background:#0f172a;color:#f5b301"><th style="padding:8px;text-align:left">${L('Trimestre','Trimestre')}</th><th style="padding:8px;text-align:right">${L('Facturació neta','Facturación neta')}</th><th style="padding:8px;text-align:right">${L('Entrades','Entradas')}</th><th style="padding:8px;text-align:right">${L('IRPF ('+arPct+'%)','IRPF ('+arPct+'%)')}</th></tr></thead>
+      <tbody>${TRIM.map((meses,i)=>{const t=meses.reduce((s,m)=>s+grandTotals.byMonth[m],0);const c=meses.reduce((s,m)=>s+grandTotals.byMonthCnt[m],0);const irpf=t*arRate;return `<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px"><b>${TRIM_LABEL[i]}</b></td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(t)}</td><td style="padding:8px;text-align:right">${c}</td><td style="padding:8px;text-align:right;color:#dc2626;font-family:'Courier New',monospace">${fmt(irpf)}</td></tr>`}).join('')}
+      <tr style="border-top:2px solid #0f172a;background:#fef3c7"><td style="padding:10px;font-weight:700">${L('TOTAL ANY','TOTAL AÑO')}</td><td style="padding:10px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(grandTotals.neto)}</td><td style="padding:10px;text-align:right;font-weight:700">${grandTotals.cnt}</td><td style="padding:10px;text-align:right;font-weight:700;color:#dc2626">${fmt(grandTotals.neto*arRate)}</td></tr>
       </tbody>
     </table>`;
 
