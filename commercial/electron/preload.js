@@ -6,7 +6,10 @@
 // no te acces directe a Node.js APIs (contextIsolation + sandbox actius).
 // ============================================================================
 
-const { contextBridge } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
+const pkg = (() => {
+  try { return require('./package.json'); } catch (e) { return { version: '2.0.0' }; }
+})();
 const os = require('os');
 const crypto = require('crypto');
 
@@ -43,7 +46,7 @@ function computeHwid() {
 }
 
 contextBridge.exposeInMainWorld('appInfo', {
-  version: '2.0.0',
+  version: pkg.version || '2.0.0',
   platform: 'electron',
   isDesktop: true,
   hwid: computeHwid(),
