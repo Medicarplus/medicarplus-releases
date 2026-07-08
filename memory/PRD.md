@@ -107,6 +107,7 @@ Transició d'una app HTML offline estable ("Caja del Día") a una app comercial 
 
 ## Changelog recent
 - **2026-02-07**: Fix "Reserva de Cambio" — afegit botó `#btnCambio` al dropdown Contabilidad (faltava). Total reserva ara repercuteix a: `Saldo anterior caja`, `Saldo anterior`, header pill `#saldoAntNum` i `CAJA FÍSICA`. Modal es re-renderitza vista principal al tancar. Build Electron regenerat.
-- **2026-02-07**: Fix panell mestre (`index-guies.html`) — tret `target="_blank"` per evitar bloqueig popups. Afegit auto-detect de `file://` amb reescriptura d'enllaços a URL absoluta.
-- **2026-02-07**: **IRPF % configurable per empresa** — nou input al modal IRPF amb presets 7%/15%/19% (autònoms nous / general / capital). Cada empresa (Empresa 1 i 2) desa el seu % independentment. Header taula, càlculs mensual/trimestral/anual i impressió tots dinàmics. `irpfCalc(e,pct)` accepta paràmetre.
+- **2026-02-07**: Fix panell mestre (`index-guies.html`) — tret `target="_blank"` per evitar bloqueig popups. Afegit auto-redirect si es detecta `file://` (redirigeix a la URL online en 1s per no tornar a tenir ERR_FILE_NOT_FOUND).
+- **2026-02-07**: **IRPF % configurable per empresa** — nou input al modal IRPF amb presets 7%/15%/19% + input lliure. Cada empresa (Empresa 1 i 2) desa el seu % independentment.
+- **2026-02-07**: **Reserva Cambio v2 — Paquets** — Monedes es compten per PAQUETS amb valors (1c=0,5€ · 2c=1€ · 5c=2,5€ · 10c=4€ · 20c=8€ · 50c=20€ · 1€=25€ · 2€=50€). Suporten mitges peces (step 0.5) i input € manual per quantitats soltes. Bitllets segueixen per unitat. Migració automàtica v1→v2 (dades antigues es converteixen a manual €).
 
