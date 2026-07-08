@@ -14,7 +14,7 @@
     "build:portable": "electron-builder --win portable --x64",
     "build:installer": "electron-builder --win nsis --x64",
     "build:all": "electron-builder --win nsis portable --x64",
-    "release": "electron-builder --win nsis portable --x64 --publish always",
+    "release": "npm version patch --no-git-tag-version && electron-builder --win nsis portable --x64 --publish always",
     "publish": "electron-builder --win nsis portable --x64 --publish always"
   },
   "dependencies": {

@@ -247,8 +247,53 @@
 
 <div style="background:linear-gradient(135deg,#0f172a,#1e293b);border:2px solid #22c55e;border-radius:14px;padding:24px;margin:16px 0">
 <p style="color:#e2e8f0;font-size:14px;line-height:1.7;margin:0 0 16px">
-Cada cop que vulguis publicar una nova versió (correcció de bugs, nova funcionalitat, canvi de textos...), fes aquests <b>5 passos</b>. Els teus clients rebran l'actualització automàticament al obrir el seu programa.
+Cada cop que vulguis publicar una nova versió, fes aquests <b>3 passos ràpids</b> (2 minuts). La versió puja sola (2.0.3 → 2.0.4 → 2.0.5...), no cal tocar cap número.
 </p>
+
+<h4 style="color:#f5b301;margin:14px 0 8px;font-family:Georgia,serif">📥 PAS 1 — Baixa i descomprimeix el ZIP amb els últims canvis</h4>
+<p style="color:#94a3b8;font-size:13px;margin:0 0 8px">Des del navegador: <a href="/downloads/medicar-plus-electron.zip" style="color:#7ee3aa">/downloads/medicar-plus-electron.zip</a></p>
+<p style="color:#94a3b8;font-size:13px;margin:0 0 8px">Després al PowerShell (assegura't que MediCar Plus està tancat):</p>
+<div style="background:#0f172a;padding:12px;border-radius:8px;margin:0 0 12px">
+<code style="color:#7ee3aa;font-size:12px;white-space:pre-wrap;display:block">cd C:\medicarplus
+Remove-Item -Recurse -Force electron
+Expand-Archive "$HOME\Downloads\medicar-plus-electron.zip" -DestinationPath C:\medicarplus -Force
+cd C:\medicarplus\electron
+npm install</code>
+</div>
+
+<h4 style="color:#f5b301;margin:14px 0 8px;font-family:Georgia,serif">🔑 PAS 2 — Estableix el token (si no ho vas fer abans)</h4>
+<div style="background:#0f172a;padding:12px;border-radius:8px;margin:0 0 12px">
+<code style="color:#7ee3aa;font-size:11px;white-space:pre-wrap;display:block;word-break:break-all">$env:GH_TOKEN="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"</code>
+</div>
+
+<h4 style="color:#f5b301;margin:14px 0 8px;font-family:Georgia,serif">🚀 PAS 3 — Publica automàticament</h4>
+<div style="background:#0f172a;padding:12px;border-radius:8px;margin:0 0 12px">
+<code style="color:#7ee3aa;font-size:14px;font-weight:700;display:block">npm run release</code>
+</div>
+<p style="color:#a7f3d0;font-size:12px;margin:0 0 12px;line-height:1.6">
+<b>✨ Automàticament fa:</b><br>
+· Puja la versió del package.json en 1 (ex: 2.0.3 → 2.0.4)<br>
+· Compila l'instal·lador + portable<br>
+· Puja tot a GitHub Releases amb el tag nou<br>
+· Els clients existents ho detecten al obrir el programa i s'actualitzen sols
+</p>
+
+<button class="btn-copy" onclick="navigator.clipboard.writeText('cd C:\\medicarplus\\electron\n$env:GH_TOKEN=\'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\'\nnpm run release');this.textContent='✓ Comanda copiada'">📋 Copiar comanda ràpida</button>
+
+<p style="color:#e2e8f0;font-size:14px;line-height:1.7;margin:20px 0 0;padding:12px;background:#0f172a;border-radius:8px;border-left:3px solid #7ee3aa">
+<b style="color:#7ee3aa">💡 Actualització futura (2 minuts):</b><br>
+Si ja tens el zip nou instal·lat i el token establert una vegada, la propera actualització és <b>només 1 comanda</b>:<br><br>
+<code style="background:#1e293b;color:#7ee3aa;padding:4px 8px;border-radius:4px;display:inline-block;margin-top:4px">npm run release</code>
+</p>
+
+<p style="color:#f97316;font-size:12px;margin:16px 0 0;padding:10px;background:rgba(249,115,22,.08);border-radius:8px;border:1px solid rgba(249,115,22,.3)">
+<b>⚠️ Errors comuns i solucions:</b><br>
+· <b>"Remove-Item: file in use"</b> → Tanca el programa MediCar Plus abans<br>
+· <b>"404 Not Found"</b> → package.json té l'owner/repo incorrecte (aviseu-me)<br>
+· <b>"Bad credentials"</b> → El <code>$env:GH_TOKEN</code> ha caducat, torna a establir-lo<br>
+· <b>"file in use" al compilar</b> → Tanca el programa MediCar Plus (o mata el procés amb <code>Stop-Process -Name "MediCar Plus" -Force</code>)
+</p>
+</div>
 
 <h4 style="color:#f5b301;margin:14px 0 8px;font-family:Georgia,serif">📥 PAS 1 — Descarrega el ZIP amb els últims canvis</h4>
 <p style="color:#94a3b8;font-size:13px;margin:0 0 8px">Des del navegador, descarrega el zip actualitzat que Emergent hagi preparat:</p>
@@ -266,37 +311,6 @@ Remove-Item -Recurse -Force electron
 Expand-Archive "$HOME\Downloads\medicar-plus-electron.zip" -DestinationPath C:\medicarplus -Force
 cd C:\medicarplus\electron
 npm install</code>
-</div>
-
-<h4 style="color:#f5b301;margin:14px 0 8px;font-family:Georgia,serif">🔢 PAS 4 — Puja la versió al package.json</h4>
-<p style="color:#94a3b8;font-size:13px;margin:0 0 8px">Substitueix <code>X.X.X</code> per la versió actual + 1 (ex: si tens 2.0.3, posa 2.0.4):</p>
-<div style="background:#0f172a;padding:12px;border-radius:8px;margin:0 0 12px">
-<code style="color:#7ee3aa;font-size:12px;white-space:pre-wrap;display:block">(Get-Content package.json -Raw) -replace '"version": "2.0.3"', '"version": "2.0.4"' | Set-Content package.json -NoNewline</code>
-</div>
-
-<h4 style="color:#f5b301;margin:14px 0 8px;font-family:Georgia,serif">🚀 PAS 5 — Publica el nou release</h4>
-<div style="background:#0f172a;padding:12px;border-radius:8px;margin:0 0 12px">
-<code style="color:#7ee3aa;font-size:12px;white-space:pre-wrap;display:block">$env:GH_TOKEN="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"
-npm run release</code>
-</div>
-<button class="btn-copy" onclick="navigator.clipboard.writeText('$env:GH_TOKEN=\'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\'\nnpm run release');this.textContent='✓ Copiat al portapapers'">📋 Copiar comandes PAS 5</button>
-
-<p style="color:#e2e8f0;font-size:14px;line-height:1.7;margin:20px 0 0;padding:12px;background:#0f172a;border-radius:8px;border-left:3px solid #7ee3aa">
-<b style="color:#7ee3aa">✨ Què passa després:</b><br>
-<b>1)</b> ElectroBuilder compila i genera els <code>.exe</code> nous a <code>C:\medicarplus\electron\dist\</code><br>
-<b>2)</b> Els puja automàticament a <a href="https://github.com/Medicarplus/medicarplus-releases/releases" target="_blank" style="color:#7ee3aa">github.com/Medicarplus/medicarplus-releases/releases</a><br>
-<b>3)</b> Crea el tag <code>vX.X.X</code> a GitHub<br>
-<b>4)</b> Els <b>clients existents</b> reben l'update automàticament al obrir el programa (2-5 min de descàrrega en segon pla)<br>
-<b>5)</b> Els <b>nous clients</b> baixaran l'última versió des del link de compra
-</p>
-
-<p style="color:#f97316;font-size:12px;margin:16px 0 0;padding:10px;background:rgba(249,115,22,.08);border-radius:8px;border:1px solid rgba(249,115,22,.3)">
-<b>⚠️ Errors comuns i solucions:</b><br>
-· <b>"Remove-Item: file in use"</b> → Tanca el programa MediCar Plus abans<br>
-· <b>"404 Not Found"</b> → El package.json té l'owner o repo incorrecte<br>
-· <b>"Bad credentials"</b> → El <code>$env:GH_TOKEN</code> ha caducat, torna a establir-lo<br>
-· <b>"version already exists"</b> → Puja la versió (2.0.3 → 2.0.4)
-</p>
 </div>
 
 <!-- Credencials -->
