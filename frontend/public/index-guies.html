@@ -44,6 +44,24 @@
 </head>
 <body>
 
+<!-- Fix per obertura local (file://): reescriu links relatius a URL absoluta del servidor -->
+<script>
+(function(){
+  var BASE = 'https://project-helper-47.preview.emergentagent.com';
+  if(location.protocol === 'file:'){
+    document.addEventListener('DOMContentLoaded', function(){
+      document.querySelectorAll('a[href^="/"]').forEach(function(a){
+        a.href = BASE + a.getAttribute('href');
+      });
+      var banner = document.createElement('div');
+      banner.style.cssText='background:#78350f;color:#fde68a;padding:12px 18px;border-radius:8px;margin:14px auto;max-width:960px;text-align:center;font-size:13px;border:1px solid #f5b301';
+      banner.innerHTML='⚠️ Estàs veient aquest arxiu <b>local</b>. Els enllaços apuntaran al servidor online. <br>Per obrir sempre l\'última versió actualitzada, ves a: <br><a href="'+BASE+'/index-guies.html" style="color:#fde68a;font-weight:700">'+BASE+'/index-guies.html</a>';
+      document.body.insertBefore(banner, document.body.firstChild);
+    });
+  }
+})();
+</script>
+
 <div class="wrap">
 
 <div class="header">
