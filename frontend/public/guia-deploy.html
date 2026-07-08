@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guia · Deploy MediCar Plus a producció</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Calibri, Arial, sans-serif;
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: #e2e8f0;
+    line-height: 1.65;
+    padding: 32px 20px;
+  }
+  .container {
+    max-width: 920px;
+    margin: 0 auto;
+    background: #1e293b;
+    border: 2px solid #22c55e;
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  h1 {
+    color: #22c55e;
+    margin-top: 0;
+    font-size: 28px;
+    letter-spacing: 0.5px;
+    text-align: center;
+  }
+  h2 {
+    color: #86efac;
+    margin-top: 40px;
+    padding: 8px 12px;
+    background: linear-gradient(90deg, rgba(34,197,94,0.2), transparent);
+    border-left: 5px solid #22c55e;
+    font-size: 20px;
+  }
+  h3 {
+    color: #f5b301;
+    margin-top: 28px;
+    font-size: 16px;
+    border-bottom: 1px dashed #334155;
+    padding-bottom: 6px;
+  }
+  code {
+    background: #0b1220;
+    color: #7ee3aa;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    border: 1px solid #334155;
+    font-family: 'Courier New', monospace;
+    word-break: break-all;
+  }
+  pre {
+    background: #0b1220;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 16px;
+    color: #e2e8f0;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  pre code { background: transparent; border: none; padding: 0; color: #7ee3aa; }
+  a { color: #86efac; font-weight: 600; }
+  a:hover { text-decoration: underline; }
+  .step {
+    background: #0f172a;
+    border-left: 4px solid #22c55e;
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin: 16px 0;
+  }
+  .step-title {
+    color: #86efac;
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 6px;
+    letter-spacing: 0.3px;
+  }
+  .warn {
+    background: linear-gradient(135deg, #78350f, #0f172a);
+    border: 1px solid #f5b301;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    color: #fde68a;
+  }
+  .ok {
+    background: linear-gradient(135deg, #065f46, #0f172a);
+    border: 1px solid #22c55e;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    color: #bbf7d0;
+  }
+  .red {
+    background: linear-gradient(135deg, #7f1d1d, #0f172a);
+    border: 1px solid #ef4444;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    color: #fecaca;
+  }
+  .blue {
+    background: linear-gradient(135deg, #1e3a8a, #0f172a);
+    border: 1px solid #3b82f6;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    color: #bfdbfe;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    background: #0f172a;
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 13.5px;
+  }
+  th, td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid #334155;
+    vertical-align: top;
+  }
+  th {
+    background: #1e293b;
+    color: #86efac;
+    letter-spacing: 0.5px;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+  ul, ol { padding-left: 22px; }
+  li { margin-bottom: 6px; }
+  .toc {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 20px 0;
+  }
+  .toc h3 { margin-top: 0; color: #86efac; border: none; }
+  .toc a { display: block; padding: 4px 0; font-weight: 500; }
+  .footer {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid #334155;
+    color: #64748b;
+    font-size: 12px;
+    text-align: center;
+  }
+  .num-badge {
+    display: inline-block;
+    background: #22c55e;
+    color: #0f172a;
+    font-weight: 700;
+    width: 26px;
+    height: 26px;
+    line-height: 26px;
+    text-align: center;
+    border-radius: 50%;
+    margin-right: 8px;
+    font-size: 14px;
+  }
+  .price {
+    display: inline-block;
+    background: #0f172a;
+    color: #f5b301;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🚀 Deploy de MediCar Plus a producció</h1>
+<p style="text-align:center;color:#94a3b8">
+  Guia pas a pas per passar de <b>preview</b> (sandbox de desenvolupament) a <b>producció</b> (servidor real amb domini propi).<br>
+  Escrita per a tu i per al teu informàtic — no cal ser expert.
+</p>
+
+<div class="ok">
+<b>📋 En resum, què farem aquí:</b>
+<ol style="margin-top:6px">
+<li>Deploy a Emergent (~15€/mes) → tindrem URL estable tipus <code>medicarplus.emergent.host</code></li>
+<li>Comprar domini propi (~10€/any) → <code>medicarplus.com</code> o similar</li>
+<li>Configurar DNS perquè <code>medicarplus.com</code> apunti a Emergent</li>
+<li>Configurar emails d'empresa <code>info@medicarplus.com</code></li>
+<li>Actualitzar l'app perquè els clients verifiquin llicència contra el nou domini</li>
+</ol>
+Temps total: ~2 hores. Un informàtic ho fa en 30-45 minuts.
+</div>
+
+<div class="toc">
+<h3>📚 Índex</h3>
+<a href="#part1">Part 1 — Fer clic al botó Deploy d'Emergent</a>
+<a href="#part2">Part 2 — Comprar el domini propi</a>
+<a href="#part3">Part 3 — Configurar el DNS (apuntar domini a Emergent)</a>
+<a href="#part4">Part 4 — Configurar emails d'empresa</a>
+<a href="#part5">Part 5 — Actualitzar l'app amb la URL de producció</a>
+<a href="#part6">Part 6 — Verificacions post-deploy (checklist)</a>
+<a href="#faq">Preguntes freqüents</a>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="part1"><span class="num-badge">1</span>Fer clic al botó Deploy d'Emergent</h2>
+
+<h3>Què és Emergent Deploy</h3>
+<p>Emergent és la plataforma on hem construït MediCar Plus. Actualment tot està en un <b>entorn de preview</b> que s'adorm després d'uns minuts sense visites (per això a vegades veus la pantalla amb flashos). Amb el Deploy, el codi passa a un <b>servidor real que sempre està despert</b>.</p>
+
+<div class="step">
+<div class="step-title">Pas 1.1 · Localitzar el botó</div>
+Obre el xat d'Emergent (on parles amb l'assistent). A la barra inferior del xat hi ha un botó anomenat <b>"Deploy"</b> o <b>"Publish"</b>. Fes-hi clic.
+</div>
+
+<div class="step">
+<div class="step-title">Pas 1.2 · Triar el pla</div>
+Emergent oferirà diferents plans. Tria:
+<ul>
+<li><b>Producció Standard</b> (~15€/mes)</li>
+<li>Amb domini personalitzat activat</li>
+<li>Amb SSL/HTTPS automàtic</li>
+</ul>
+<div class="warn" style="margin-top:8px">
+<b>NO triïs</b> el "Free" o "Preview" — s'adormen com l'actual.
+</div>
+</div>
+
+<div class="step">
+<div class="step-title">Pas 1.3 · Triar el subdomini d'Emergent</div>
+Et demanaran un nom per la teva URL a Emergent. Recomanat: <code>medicarplus</code>.<br>
+Això generarà una URL tipus: <code>https://medicarplus.emergent.host</code> (o similar segons el domini que usi Emergent).
+<br><br>
+Aquesta URL <b>sempre funcionarà</b>, encara que després tinguis el teu domini propi.
+</div>
+
+<div class="step">
+<div class="step-title">Pas 1.4 · Afegir mètode de pagament</div>
+Introdueix una targeta (personal per ara, quan tinguis empresa la canvies). Emergent cobra mensualment.
+</div>
+
+<div class="step">
+<div class="step-title">Pas 1.5 · Esperar el deploy (2-5 min)</div>
+Emergent copia tot el codi al servidor de producció, configura la base de dades i activa el SSL. Veuràs una barra de progrés.<br>
+Quan acabi, et donarà les URLs de producció.
+</div>
+
+<div class="ok">
+<b>✅ Fitxa el que has de guardar d'aquest pas:</b>
+<ul style="margin-top:6px">
+<li>URL admin de producció: <code>https://medicarplus.emergent.host/admin</code></li>
+<li>URL formulari clients: <code>https://medicarplus.emergent.host/request-license</code></li>
+<li>Contrasenya admin (segueix sent la mateixa: <code>MB-ADMIN-BRUGULAT-2026-4F8E2A1C</code>)</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="part2"><span class="num-badge">2</span>Comprar el domini propi</h2>
+
+<h3>Per què cal un domini propi</h3>
+<p>Ara la URL és <code>medicarplus.emergent.host</code>. Amb un domini propi seria <code>medicarplus.com</code>, més professional i memoritzable. També et permet crear emails personalitzats (<code>info@medicarplus.com</code>).</p>
+
+<h3>On comprar-lo (registrars recomanats)</h3>
+<table>
+<tr><th>Registrar</th><th>Preu .com</th><th>Preu .cat</th><th>Facilitat</th></tr>
+<tr><td><b>Porkbun</b> ⭐</td><td>~10€/any</td><td>~15€/any</td><td>Molt fàcil, sense sorpreses</td></tr>
+<tr><td><b>Namecheap</b></td><td>~9€/any</td><td>~14€/any</td><td>Popular, interfície en anglès</td></tr>
+<tr><td><b>Cloudflare Registrar</b></td><td>~9€/any</td><td>N/A</td><td>Millor preu, més tècnic</td></tr>
+<tr><td><b>DonDominio</b></td><td>~10€/any</td><td>~15€/any</td><td>Espanyol, factura amb IVA</td></tr>
+</table>
+
+<div class="blue">
+<b>💡 Recomanació:</b> per començar, <b>Porkbun</b> o <b>DonDominio</b> (aquest últim si vols factura amb IVA d'empresa espanyola).
+</div>
+
+<div class="step">
+<div class="step-title">Pas 2.1 · Triar el nom exacte</div>
+Idees:
+<ul>
+<li><code>medicarplus.com</code> — el més directe</li>
+<li><code>medicarplus.cat</code> — versió catalana</li>
+<li><code>medicarplus.es</code> — versió Espanya</li>
+<li><code>medicarplus-app.com</code> — si els anteriors estan agafats</li>
+</ul>
+Comprova disponibilitat directament al web del registrar.
+</div>
+
+<div class="step">
+<div class="step-title">Pas 2.2 · Comprar per 1 o 2 anys</div>
+Millor pagar 1-2 anys de cop (evites haver de recordar-ho cada any). Molts registrars fan descompte el primer any.
+</div>
+
+<div class="step">
+<div class="step-title">Pas 2.3 · Activar Privacy Protection (WHOIS Privacy)</div>
+Marca l'opció <b>"Privacy Protection"</b> o <b>"WHOIS Privacy"</b>. Sol ser gratis. Evita que les teves dades personals apareguin públiques a bases de dades d'internet.
+</div>
+
+<div class="warn">
+<b>⚠️ Compte amb ofertes trucades:</b> alguns registrars fan el primer any barat (~1€) i després renoven a 20€/any. Llegeix la lletra petita.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="part3"><span class="num-badge">3</span>Configurar el DNS (apuntar domini a Emergent)</h2>
+
+<h3>Què és el DNS</h3>
+<p>Quan algú escriu <code>medicarplus.com</code> al navegador, Internet ha de saber a quin servidor enviar-lo. El DNS és la <b>llibreta de contactes d'Internet</b> que fa aquesta traducció. Cal configurar-la perquè apunti al servidor d'Emergent.</p>
+
+<div class="red">
+<b>👨‍💻 IMPORTANT:</b> aquesta part és millor que la faci el teu informàtic. Enganxa-li aquesta secció sencera i ell entendrà tot.
+</div>
+
+<div class="step">
+<div class="step-title">Pas 3.1 · Obtenir la IP o CNAME d'Emergent</div>
+Al panell d'Emergent, secció <b>Deploy → Custom Domain</b>, hi ha una opció per afegir domini. Emergent et donarà una de dues coses:
+<ul>
+<li>Una <b>IP</b> tipus <code>34.117.XXX.XXX</code> → cal crear un registre <b>A</b></li>
+<li>O un <b>CNAME target</b> tipus <code>medicarplus.emergent.host</code> → cal crear un registre <b>CNAME</b></li>
+</ul>
+Copia el que et donin.
+</div>
+
+<div class="step">
+<div class="step-title">Pas 3.2 · Anar al panell DNS del registrar</div>
+Al registrar on has comprat el domini (Porkbun, DonDominio, etc.), busca la secció <b>"DNS Management"</b> o <b>"Gestió de zona DNS"</b>.
+</div>
+
+<div class="step">
+<div class="step-title">Pas 3.3 · Afegir els registres necessaris</div>
+
+<b>Si Emergent t'ha donat una IP (registre A):</b>
+<pre><code>Tipus:  A
+Nom:    @             (o deixa buit, significa "medicarplus.com" sencer)
+Valor:  34.117.XXX.XXX   (la IP que t'ha donat Emergent)
+TTL:    3600  (o "Auto")</code></pre>
+
+I un segon registre per <code>www.medicarplus.com</code>:
+<pre><code>Tipus:  CNAME
+Nom:    www
+Valor:  medicarplus.com     (o "@")
+TTL:    3600</code></pre>
+
+<b>Si Emergent t'ha donat un CNAME target:</b>
+<pre><code>Tipus:  CNAME
+Nom:    @             (o "medicarplus")
+Valor:  medicarplus.emergent.host    (el que t'ha donat Emergent)
+TTL:    3600</code></pre>
+
+<div class="warn" style="margin-top:8px">
+<b>Nota:</b> alguns registrars no permeten CNAME al domini arrel (<code>@</code>). En aquest cas usa "ALIAS" o "ANAME" (funcionen igual).
+</div>
+</div>
+
+<div class="step">
+<div class="step-title">Pas 3.4 · Esperar la propagació DNS (10 min - 24h)</div>
+Els canvis DNS triguen entre <b>10 minuts i 24 hores</b> a propagar-se per tot Internet. Normalment són 30-60 minuts.<br>
+Per verificar-ho, obre <a href="https://dnschecker.org" target="_blank">dnschecker.org</a>, escriu <code>medicarplus.com</code> i tria <b>A</b> o <b>CNAME</b>. Quan vegis punts verds a tot el mapamundi, ha propagat.
+</div>
+
+<div class="step">
+<div class="step-title">Pas 3.5 · Activar SSL (HTTPS) a Emergent</div>
+Un cop el DNS ha propagat, torna al panell Emergent → Custom Domain i clica <b>"Verify domain"</b> o <b>"Enable HTTPS"</b>.<br>
+Emergent generarà automàticament un certificat <b>Let's Encrypt</b> gratuït. Trigarà uns minuts. Un cop fet, tindràs:
+<ul>
+<li><code>https://medicarplus.com</code> — segur amb el candau verd</li>
+<li><code>https://www.medicarplus.com</code> — redirigeix a l'anterior</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="part4"><span class="num-badge">4</span>Configurar emails d'empresa</h2>
+
+<h3>Opcions per gestionar emails amb domini propi</h3>
+
+<table>
+<tr><th>Servei</th><th>Preu</th><th>Recomanat per</th></tr>
+<tr>
+  <td><b>Google Workspace</b> ⭐</td>
+  <td><span class="price">~5€/usuari/mes</span></td>
+  <td>Empreses serioses (Gmail + Calendar + Drive + Meet)</td>
+</tr>
+<tr>
+  <td><b>Zoho Mail</b></td>
+  <td><span class="price">Gratis fins 5 usuaris</span></td>
+  <td>Començar sense costos, funcional però menys polit</td>
+</tr>
+<tr>
+  <td><b>Fastmail</b></td>
+  <td><span class="price">~3€/mes/usuari</span></td>
+  <td>Privacitat, sense publicitat</td>
+</tr>
+<tr>
+  <td><b>Microsoft 365</b></td>
+  <td><span class="price">~6€/usuari/mes</span></td>
+  <td>Si ja uses Outlook/Office</td>
+</tr>
+</table>
+
+<div class="blue">
+<b>💡 Recomanació per començar:</b> <b>Zoho Mail (gratis)</b>. Un cop tinguis 3-5 clients pagant, migra a Google Workspace per la seva fiabilitat i integració.
+</div>
+
+<h3>Emails a crear</h3>
+<ul>
+<li><code>info@medicarplus.com</code> — bústia general, contacte principal</li>
+<li><code>suport@medicarplus.com</code> — atenció al client tècnica</li>
+<li><code>facturacio@medicarplus.com</code> — temes administratius i factures</li>
+<li><code>marc@medicarplus.com</code> — el teu email personal d'empresa</li>
+</ul>
+
+<div class="step">
+<div class="step-title">Pas 4.1 · Registrar-se al servei triat</div>
+Per exemple a <a href="https://www.zoho.com/mail/" target="_blank">zoho.com/mail</a>. Segueix el procés de "Sign up with custom domain".
+</div>
+
+<div class="step">
+<div class="step-title">Pas 4.2 · Configurar registres MX al DNS</div>
+El servei d'email et donarà uns <b>registres MX</b> per afegir al DNS del domini (mateix panell del pas 3.2). Exemple per Zoho:
+<pre><code>Tipus:  MX
+Nom:    @
+Valor:  mx.zoho.com
+Prioritat: 10
+
+Tipus:  MX
+Nom:    @
+Valor:  mx2.zoho.com
+Prioritat: 20</code></pre>
+</div>
+
+<div class="step">
+<div class="step-title">Pas 4.3 · Verificar el domini</div>
+Zoho/Google demanaran verificar que el domini és teu afegint un registre <b>TXT</b>:
+<pre><code>Tipus:  TXT
+Nom:    @
+Valor:  zoho-verification=zbXXXXXXXXXX.zmverify.zoho.com</code></pre>
+Un cop propagat, cliques "Verify" al panell del servei d'email.
+</div>
+
+<div class="step">
+<div class="step-title">Pas 4.4 · Afegir SPF, DKIM i DMARC (anti-spam)</div>
+Perquè els teus emails no vagin a Spam als clients, cal afegir tres registres més al DNS. El servei d'email te'ls dóna:
+<pre><code>SPF:    v=spf1 include:zoho.com ~all
+DKIM:   (llarg, copia'l tal qual del panell del servei)
+DMARC:  v=DMARC1; p=quarantine; rua=mailto:info@medicarplus.com</code></pre>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="part5"><span class="num-badge">5</span>Actualitzar l'app amb la URL de producció</h2>
+
+<div class="warn">
+<b>⚠️ AIXÒ HO FAIG JO (l'assistent).</b> Un cop tinguis el domini funcionant amb HTTPS, avisa'm i actualitzo l'app en 5 minuts perquè:
+<ul style="margin-top:6px">
+<li>Els clients verifiquin llicència contra <code>medicarplus.com</code> en comptes de la URL preview</li>
+<li>Els emails de contacte apuntin al domini nou</li>
+<li>Les guies tinguin els links actualitzats</li>
+<li>Es regeneri el ZIP Electron amb la nova URL</li>
+</ul>
+Digue'm només <b>"El domini està actiu, actualitza l'app"</b> i ho faig tot.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="part6"><span class="num-badge">6</span>Verificacions post-deploy (checklist)</h2>
+
+<p>Un cop el deploy està fet i el domini configurat, comprova aquests 10 punts:</p>
+
+<table>
+<tr><th>#</th><th>Prova</th><th>Resultat esperat</th></tr>
+<tr><td>1</td><td>Obre <code>https://medicarplus.com</code></td><td>Es carrega la home amb HTTPS (candau verd)</td></tr>
+<tr><td>2</td><td>Obre <code>https://medicarplus.com/admin</code> i entra amb el teu token</td><td>Es veu el dashboard admin</td></tr>
+<tr><td>3</td><td>Genera una llicència de prova</td><td>Es crea correctament, apareix a la llista</td></tr>
+<tr><td>4</td><td>Obre <code>/request-license</code> des d'un altre navegador</td><td>Es veu el formulari públic</td></tr>
+<tr><td>5</td><td>Envia una sol·licitud de prova</td><td>Apareix al panell admin</td></tr>
+<tr><td>6</td><td>Obre la guia <code>/guia-medicar-plus.html</code></td><td>Es carrega correctament</td></tr>
+<tr><td>7</td><td>Envia'ns un email des de <code>info@medicarplus.com</code> a Gmail</td><td>Arriba a la bústia principal (no spam)</td></tr>
+<tr><td>8</td><td>Instal·la l'.exe al PC i activa amb una llicència generada</td><td>Verifica online amb èxit</td></tr>
+<tr><td>9</td><td>Obre l'app en un altre PC amb la mateixa llicència (test HWID lock)</td><td>Es bloqueja amb missatge en català/castellà</td></tr>
+<tr><td>10</td><td>Al admin panel, revoca la llicència de prova</td><td>L'.exe es bloqueja al següent ping (15 dies o forçat)</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="faq">Preguntes freqüents</h2>
+
+<h3>Quant costa tot mensualment?</h3>
+<ul>
+<li>Emergent Deploy: <span class="price">~15€/mes</span></li>
+<li>Domini: <span class="price">~1€/mes</span> (10-12€/any)</li>
+<li>Emails (Zoho gratis o Google Workspace ~5€/mes)</li>
+<li><b>TOTAL: entre 16€ i 25€/mes</b></li>
+</ul>
+Amb 1 client STD anual (299,90€) ja tens la despesa coberta 15 mesos.
+
+<h3>Puc anar enrere si algo peta?</h3>
+Sí. Emergent guarda snapshots. Podem tornar a la versió preview en 5 min si trobem un bug important.
+
+<h3>Es perden les llicències actuals al fer deploy?</h3>
+<b>NO.</b> Les llicències migren automàticament del preview al servidor de producció. La base de dades es clona sencera.
+
+<h3>Què passa si em passo mesos sense pagar?</h3>
+Emergent avisa per email 2 vegades abans de suspendre el servei. Si no pagues, la app s'atura però NO es perden dades (queden en pausa). Un cop pagues, torna a funcionar exactament com era.
+
+<h3>Puc canviar de proveïdor de deploy més tard?</h3>
+Sí. El codi és teu i pot migrar-se a AWS/Google/Azure. Però Emergent és el més fàcil per començar.
+
+<h3>El meu informàtic necessita accés al codi?</h3>
+Només si vol fer canvis. Per la configuració DNS + domini + emails NO cal accés al codi. Aquesta guia li és suficient.
+
+<div class="footer">
+Guia Deploy · MediCar Plus · M.Brugulat Lopez · Actualitzada 07/2026<br>
+Suport: <a href="mailto:brugulatmarc@gmail.com">brugulatmarc@gmail.com</a>
+</div>
+</div>
+</body>
+</html>
