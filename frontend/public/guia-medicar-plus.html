@@ -226,6 +226,18 @@ Sense BBVA hardcodejat. Funciona per qualsevol banc.
 <h3>🐛 Fix anti-flashos <span class="badge badge-new">NOU</span></h3>
 La protecció anti-loop de <code>location.reload()</code> evita que l'app entri en bucle infinit de recàrregues quan el servidor està adormit (cold start). Els cold starts es solucionaran del tot amb el <b>deploy a producció</b>.
 
+<h3>🔎 Auditoria millorada amb 3 categories + filtre <span class="badge badge-new">NOU</span></h3>
+El botó 🔎 Auditoría ara categoritza automàticament els clients repetits en 3 nivells:
+<ul>
+<li>🔴 <b>Mismo grupo (duplicado o interrumpido)</b> — revisa manualment: pot ser un duplicat real (mateix tràmit 2 cops) o un interromput (venir dies diferents per completar el tràmit)</li>
+<li>⚠️ <b>Posible error (0€)</b> — fitxa a 0€ sense compensació Debe/Haber (probable descuadre)</li>
+<li>🟡 <b>Info (varios grupos)</b> — mateix nom en grups diferents (normal, ha fet varis serveis)</li>
+</ul>
+<b>Barra de filtres</b> amb 3 checkboxes + botons "Todo" i "Solo problemas". Cards ordenades per severitat. Columna GRUPO destacada amb pill de color taronja quan hi ha duplicació dins el mateix grup.
+
+<h3>💡 Tooltips instantanis amb CSS <span class="badge badge-new">NOU</span></h3>
+El símbol <code>?</code> al costat de "Saldo anterior caja" ara mostra la seva explicació <b>al moment</b> quan passes el ratolí per sobre (abans el <code>title=</code> nadiu triga 1-2 segons a aparèixer o no funciona bé al Windows). Tooltip amb fons negre, text groc i fletxa direccional.
+
 <hr>
 
 <h1 id="flux">5. Flux complet de venda pas a pas</h1>
