@@ -1,0 +1,128 @@
+{
+  "theme": "dark",
+  "design_context": "B2B SaaS Marketing Landing Page",
+  "target_audience": "Owners/managers of Spanish medical centers (40-65 years old), professional, trust-oriented, requiring high compliance (DGT, RGPD).",
+  "typography": {
+    "strategy": "Old Money Tech / Trustworthy Authority",
+    "headings": {
+      "family": "Georgia, serif",
+      "weights": ["400", "700"],
+      "tracking": "tracking-tight",
+      "usage": "Use for all main headings (H1, H2, H3). It establishes immediate trust and traditional authority suitable for medical/legal contexts."
+    },
+    "body": {
+      "family": "IBM Plex Sans, sans-serif",
+      "weights": ["400", "500", "600"],
+      "tracking": "tracking-normal",
+      "usage": "Use for all body text, feature descriptions, and UI elements. Provides high legibility and a modern 'software' feel to contrast the classic headings."
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tighter text-white",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-white",
+      "h3": "text-xl sm:text-2xl font-medium text-slate-100",
+      "body": "text-base lg:text-lg text-slate-300 leading-relaxed",
+      "labels": "text-xs font-semibold uppercase tracking-[0.2em] text-gold-500"
+    }
+  },
+  "colors": {
+    "strategy": "High-Contrast Authority",
+    "backgrounds": {
+      "page": "#0a0f1a",
+      "card_default": "#0f172a",
+      "card_hover": "#1e293b",
+      "glass": "rgba(15, 23, 42, 0.7)"
+    },
+    "brand": {
+      "primary": "#f5b301",
+      "primary_hover": "#d99e00",
+      "success": "#22c55e",
+      "success_hover": "#16a34a"
+    },
+    "text": {
+      "primary": "#ffffff",
+      "secondary": "#94a3b8",
+      "accent": "#f5b301"
+    },
+    "borders": {
+      "subtle": "rgba(255, 255, 255, 0.1)",
+      "active": "rgba(245, 179, 1, 0.3)"
+    }
+  },
+  "visual_enhancers": {
+    "surfaces": {
+      "glassmorphism": "backdrop-blur-xl bg-[#0f172a]/70 border-b border-white/10 (Use for sticky nav and overlays)",
+      "neumorphism_crisp": "bg-[#0f172a] border border-white/5 shadow-2xl shadow-black/50 (Use for Pricing cards)",
+      "bento_cards": "bg-gradient-to-br from-[#0f172a] to-[#0a0f1a] border border-white/5 rounded-2xl hover:border-gold-500/30 transition-colors duration-300"
+    },
+    "textures": {
+      "noise": "Subtle SVG noise overlay over the hero background to reduce digital flatness and add a premium matte feel."
+    },
+    "glows": {
+      "ambient": "Use radial gradients in the background (e.g., a very soft, massive 1000px radial blur of #f5b301 at 5% opacity behind the hero section)."
+    }
+  },
+  "grids_and_layouts": {
+    "spacing_scale": "Generous (p-8 to p-16 for internal card padding, py-24 to py-32 for section spacing).",
+    "hero": "Two-column asymmetric on desktop. Left: Text content (60%). Right: Abstract dashboard/software visual (40%).",
+    "features_bento": "CSS Grid (grid-cols-1 md:grid-cols-3). Feature cards should span different rows/cols to avoid a boring uniform grid. Example: The 'DGT CSV import' feature should span 2 columns.",
+    "pricing": "3-column CSS grid (grid-cols-1 md:grid-cols-3). Middle card (Standard) scaled up by 1.05 with a gold border and 'Most Popular' badge."
+  },
+  "motion": {
+    "scroll_reveals": "Use framer-motion for smooth, subtle fade-up transitions on scroll (y: 20, opacity: 0 to 1, duration: 0.6s, ease: 'easeOut').",
+    "micro_interactions": "Hover states on cards should slightly lift (-translate-y-1) and increase border opacity.",
+    "pricing_toggle": "Smooth layout animation using Framer Motion's layoutId for the monthly/annual toggle pill."
+  },
+  "accessibility": {
+    "contrast": "Ensure all text against the dark navy background meets APCA/WCAG AAA standards. Use text-slate-300 for body text to reduce eye strain against pure black.",
+    "focus_states": "focus:ring-2 focus:ring-[#f5b301] focus:ring-offset-2 focus:ring-offset-[#0a0f1a]",
+    "reduced_motion": "Wrap all framer-motion animations in a check for prefers-reduced-motion."
+  },
+  "media": {
+    "image_urls": {
+      "hero_abstract": {
+        "url": "https://images.pexels.com/photos/27141307/pexels-photo-27141307.jpeg",
+        "description": "Sleek futuristic digital interface, use on the right side of the hero section as an abstract representation of the software."
+      },
+      "doctor_trust": {
+        "url": "https://images.unsplash.com/photo-1758691461990-03b49d969495",
+        "description": "Doctor writing on a chart, use in the testimonials or about section to reinforce the professional medical target audience."
+      },
+      "driving_license_context": {
+        "url": "https://images.unsplash.com/photo-1623795457671-600b1223c2db",
+        "description": "Person holding an ID card, use near the DGT feature block."
+      }
+    },
+    "icon_strategy": "Use 'lucide-react'. Use gold (#f5b301) or green (#22c55e) for icon colors depending on the context (green for compliance/security, gold for premium features). Do NOT use emojis."
+  },
+  "copy_suggestions": {
+    "hero_tagline": "El programa especializado para centros de reconocimientos de carnet de conducir y certificados médicos",
+    "cta_primary": "Prova gratuïta 30 dies",
+    "cta_secondary": "Ver planes y precios",
+    "trust_badges": ["Homologado por la DGT", "100% Cumplimiento RGPD", "Soporte Técnico en España"]
+  },
+  "instructions_to_main_agent": [
+    "Build a single-page React app (LandingPage.js) using the established Tailwind configuration.",
+    "Inject IBM Plex Sans via Google Fonts in the HTML/CSS, and use standard Georgia for headings.",
+    "Create a sticky Navigation bar with crystal glassmorphism (`backdrop-blur-xl bg-[#0a0f1a]/80`).",
+    "Build the Hero section with the 'hero_abstract' image subtly fading into the dark background.",
+    "Build a Features section using a Bento grid layout (asymmetric sizes). Cover the 9 features provided in the prompt.",
+    "Build a Pricing section with a Monthly/Annual toggle (use Framer Motion for the toggle animation). Show Trial, Standard (highlighted), and Premium tiers.",
+    "Build an FAQ section using Shadcn UI Accordion.",
+    "Build a Footer with legal links.",
+    "Always use 'data-testid' on interactive elements.",
+    "Do not use generic 'Vercel' black/white aesthetics. Stick strictly to the Navy/Gold/Green palette."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Do not make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur) where content scrolls underneath.",
+    "You MUST NOT apply universal transition. Eg: `transition: all`. Always add transitions for specific interactive elements.",
+    "You MUST NOT center align the app container, ie do not add `.App { text-align: center; }` in the css file.",
+    "Always use modern button styles (pill-shaped, slight gradient or sharp interactions).",
+    "NEVER use AI assistant Emoji characters (🤖🧠💭💡🔮🎯) for icons. Use lucide-react.",
+    "Every interaction needs micro-animations - hover states, transitions, and entrance animations.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Missing image categories = main agent will use placeholder text which is FORBIDDEN. Use the provided image URLs."
+  ]
+}
