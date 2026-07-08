@@ -173,7 +173,9 @@
 <div class="creds-box">
 <b>⚠️ NO COMPARTIR MAI</b> aquestes claus. Apunta-les al gestor de contrasenyes.
 
-<div class="cred-row" style="margin-top:12px">
+<h3 style="color:#f5b301;font-size:14px;margin:14px 0 6px 0;letter-spacing:1px">🔐 LLICÈNCIES</h3>
+
+<div class="cred-row" style="margin-top:8px">
   <div>
     <b>Admin Panel Token</b><br>
     <code id="c1">MB-ADMIN-BRUGULAT-2026-4F8E2A1C</code>
@@ -183,30 +185,155 @@
 
 <div class="cred-row">
   <div>
-    <b>Master Key universal</b><br>
+    <b>Master Key universal (obre qualsevol PC)</b><br>
     <code id="c2">MB-MASTER-BRUGULAT-2026-OWNER</code>
   </div>
   <button class="btn-copy" onclick="navigator.clipboard.writeText('MB-MASTER-BRUGULAT-2026-OWNER');this.textContent='✓ Copiat'">📋 Copiar</button>
 </div>
 
+<h3 style="color:#f5b301;font-size:14px;margin:18px 0 6px 0;letter-spacing:1px">🌐 DOMINI I EMAILS (IONOS)</h3>
+
 <div class="cred-row">
   <div>
-    <b>Email de contacte</b><br>
+    <b>Domini principal</b><br>
+    <code>medicarplus.es</code> <span style="color:#f97316">(propagant DNS)</span>
+  </div>
+  <button class="btn-copy" onclick="navigator.clipboard.writeText('medicarplus.es');this.textContent='✓ Copiat'">📋 Copiar</button>
+</div>
+
+<div class="cred-row">
+  <div>
+    <b>Bústia principal (Correo Profesional 50GB)</b><br>
     <code>info@medicarplus.es</code>
   </div>
   <button class="btn-copy" onclick="navigator.clipboard.writeText('info@medicarplus.es');this.textContent='✓ Copiat'">📋 Copiar</button>
 </div>
+
+<div class="cred-row">
+  <div>
+    <b>Àlies (tots reenvien a info@)</b><br>
+    <code>suport@medicarplus.es · factures@medicarplus.es · marc@medicarplus.es · no-reply@medicarplus.es</code>
+  </div>
+</div>
+
+<div class="cred-row">
+  <div>
+    <b>SMTP (enviament)</b><br>
+    <code>smtp.ionos.es:587 (TLS)</code>
+  </div>
+</div>
+
+<div class="cred-row">
+  <div>
+    <b>IMAP (rebuda)</b><br>
+    <code>imap.ionos.es:993 (SSL)</code>
+  </div>
+</div>
+
+<h3 style="color:#f5b301;font-size:14px;margin:18px 0 6px 0;letter-spacing:1px">💳 STRIPE (Test mode)</h3>
+
+<div class="cred-row">
+  <div>
+    <b>Compte Stripe</b><br>
+    <code>info@medicarplus.es · Mode TEST</code>
+  </div>
+</div>
+
+<div class="cred-row">
+  <div>
+    <b>API Key (test)</b><br>
+    <code style="font-size:10px;word-break:break-all">sk_test_51Tqx1KDICdnmKtZ3w7c8qFeJ4PICPSBv66fRqWj1faavuJ5PFJyobdVgrOXFT7iOtWM94tOYuLrzuty2byypuZMf004asf1tSX</code>
+  </div>
+</div>
+
+<div class="cred-row">
+  <div>
+    <b>Webhook signing secret</b><br>
+    <code>whsec_s46odSPlFWV0tHJIEt5pkn2b8N1Bkhp7</code>
+  </div>
+</div>
+
+<div class="cred-row">
+  <div>
+    <b>Webhook URL configurada</b><br>
+    <code style="font-size:10px">https://project-helper-47.preview.emergentagent.com/api/webhook/stripe</code>
+  </div>
+</div>
+
+<div class="cred-row">
+  <div>
+    <b>Preus (4 tarifes actives)</b><br>
+    <code style="font-size:11px">
+    STD_MES=price_1Tqx9iDICdnmKtZ3j0kwOfIH · 29.90 €/mes<br>
+    STD_ANY=price_1TqxAZDICdnmKtZ3qmcp1Mf0 · 299.90 €/any<br>
+    PREMIUM_MES=price_1TqxC3DICdnmKtZ3HvDPBovI · 39.90 €/mes<br>
+    PREMIUM_ANY=price_1TqxCTDICdnmKtZ30Tahx798 · 399.90 €/any
+    </code>
+  </div>
+</div>
+
+<div class="cred-row">
+  <div>
+    <b>Targeta test</b><br>
+    <code>4242 4242 4242 4242 · 12/34 · CVC 123 · CP 28001</code>
+  </div>
+  <button class="btn-copy" onclick="navigator.clipboard.writeText('4242 4242 4242 4242');this.textContent='✓ Copiat'">📋 Copiar</button>
+</div>
+
+<h3 style="color:#f5b301;font-size:14px;margin:18px 0 6px 0;letter-spacing:1px">🔄 GITHUB RELEASES (Auto-updater)</h3>
+
+<div class="cred-row">
+  <div>
+    <b>Usuari GitHub</b><br>
+    <code>Medicarplus</code>
+  </div>
+</div>
+
+<div class="cred-row">
+  <div>
+    <b>Repositori (privat)</b><br>
+    <code>Medicarplus/medicarplus-releases</code>
+  </div>
+  <a class="btn-copy" href="https://github.com/Medicarplus/medicarplus-releases/releases" target="_blank" style="text-decoration:none;text-align:center;padding-top:8px">🔗 Obrir</a>
+</div>
+
+<div class="cred-row">
+  <div>
+    <b>Personal Access Token (per publicar)</b><br>
+    <code style="font-size:10px;word-break:break-all">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</code>
+  </div>
+</div>
+
+<div class="cred-row">
+  <div>
+    <b>Releases publicats</b><br>
+    <code>v2.0.0 (initial) · v2.0.1 (portable + versió actual)</code>
+  </div>
+</div>
+
+<div class="cred-row">
+  <div>
+    <b>Publicar nova versió (des del teu PC)</b><br>
+    <code style="font-size:11px">cd C:\medicarplus\electron<br>$env:GH_TOKEN="github_pat_..."<br>npm run release</code>
+  </div>
+</div>
+
 </div>
 
 <!-- Estat -->
-<h2>📊 Estat actual del sistema</h2>
+<h2>📊 Estat actual del sistema · 08/07/2026</h2>
 
 <div class="stats">
-<div class="stat"><div class="stat-num">✅</div><div class="stat-label">App v1 · App v2 · Admin · SMS</div></div>
-<div class="stat"><div class="stat-num">✅</div><div class="stat-label">HWID Lock · Informe Anual · Auditoria</div></div>
-<div class="stat"><div class="stat-num">⏸️</div><div class="stat-label">Stripe · Twilio · GitHub · Deploy</div></div>
-<div class="stat"><div class="stat-num">4</div><div class="stat-label">Tasques pendents (esperant empresa)</div></div>
+<div class="stat"><div class="stat-num">✅</div><div class="stat-label">App v1 · v2 · Admin · SMS · HWID Lock · Auditoria · IRPF %</div></div>
+<div class="stat"><div class="stat-num">✅</div><div class="stat-label">Domini medicarplus.es · 5 emails IONOS · Landing page</div></div>
+<div class="stat"><div class="stat-num">✅</div><div class="stat-label">Stripe TEST · 4 preus · Webhook · Auto-renovació</div></div>
+<div class="stat"><div class="stat-num">✅</div><div class="stat-label">GitHub Releases · v2.0.1 · Auto-updater actiu</div></div>
+<div class="stat"><div class="stat-num">⏳</div><div class="stat-label">DNS propagació global (24-48h natural)</div></div>
+<div class="stat"><div class="stat-num">⏳</div><div class="stat-label">Deploy producció (clicar botó "Deploy" a Emergent)</div></div>
+<div class="stat"><div class="stat-num">⏳</div><div class="stat-label">Stripe LIVE mode (quan tinguis empresa+banc)</div></div>
+<div class="stat"><div class="stat-num">⏳</div><div class="stat-label">Twilio SMS/WhatsApp (quan compris número)</div></div>
 </div>
+
 
 <div class="warning">
 <b>🚨 Les 4 tasques que ens falten</b> (per quan tinguis empresa constituïda):
