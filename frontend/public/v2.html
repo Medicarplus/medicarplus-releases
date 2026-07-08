@@ -1615,19 +1615,38 @@ function computeAudit(dateFrom,dateTo){
   });
   return Object.entries(clients).filter(([k,v])=>v.entries.length>=2).map(([k,v])=>{
     let totalImp=0,totalTasa=0,zeroCount=0,dhCount=0,dhSum=0,trafCount=0;
+    // Agrupació per "grupo" (Conducir/Marina/Armas/...) per detectar duplicats reals dins el mateix grup
+    const byGroup={};
     v.entries.forEach(({e})=>{
       if(e.retorno)return;
       if(e.kind==='DH'){dhCount++;dhSum+=(e.tipo==='HABER'?1:-1)*(e.importe||0);return}
       trafCount++;totalImp+=e.importe||0;totalTasa+=e.tasa||0;
       if((e.importe||0)===0&&(e.tasa||0)===0)zeroCount++;
+      const g=(e.grupo||'—').toString().trim();
+      byGroup[g]=(byGroup[g]||0)+1;
     });
     v.entries.sort((a,b)=>a.date.localeCompare(b.date));
-    const suspicious=zeroCount>0&&dhCount===0;
-    // Compute days between first and last entry (useful to spot long gaps)
+    // GRUPS DUPLICATS: dins d'un mateix grup hi ha 2+ entrades del mateix nom → alarma FORTA
+    const duplicatedGroups=Object.entries(byGroup).filter(([g,c])=>c>=2).map(([g,c])=>({group:g,count:c}));
+    const hasSameGroupDup=duplicatedGroups.length>0;
+    // GRUPS DIFERENTS: mateix nom apareix en 2+ grups diferents → info SUAU (normal)
+    const distinctGroups=Object.keys(byGroup);
+    const hasDiffGroups=distinctGroups.length>=2;
+    // Sospitós de descuadre real: fitxa a 0€ sense contrapartida D/H, O duplicat en el mateix grup
+    const zeroWithoutDh=zeroCount>0&&dhCount===0;
+    const suspicious=hasSameGroupDup||zeroWithoutDh;
+    // Nivell de severitat: 2=roja (grup duplicat o zero sense compensació), 1=groga (grups diferents), 0=info
+    let severity=0;
+    if(hasSameGroupDup||zeroWithoutDh)severity=2;
+    else if(hasDiffGroups&&trafCount>=2)severity=1;
     const dFirst=new Date(v.entries[0].date),dLast=new Date(v.entries[v.entries.length-1].date);
     const daySpan=Math.round((dLast-dFirst)/86400000);
-    return {key:k,display:v.display,entries:v.entries,totalImp,totalTasa,zeroCount,dhCount,dhSum,trafCount,suspicious,daySpan};
-  }).sort((a,b)=>{if(a.suspicious!==b.suspicious)return a.suspicious?-1:1;return b.entries.length-a.entries.length});
+    return {key:k,display:v.display,entries:v.entries,totalImp,totalTasa,zeroCount,dhCount,dhSum,trafCount,suspicious,severity,hasSameGroupDup,duplicatedGroups,distinctGroups,daySpan};
+  }).sort((a,b)=>{
+    // Ordre: severity DESC, després per número d'entrades DESC
+    if(a.severity!==b.severity)return b.severity-a.severity;
+    return b.entries.length-a.entries.length;
+  });
 }
 $('#btnAudit').onclick=()=>{
   // Default range: last 12 months (or all data if less)
@@ -1650,7 +1669,7 @@ $('#btnAudit').onclick=()=>{
         <button class="btn" data-preset="12m" style="padding:6px 10px;font-size:11px">1 año</button>
         <button class="btn" data-preset="all" style="padding:6px 10px;font-size:11px">Todo</button>
       </div>
-      <span class="small" style="margin-left:auto;color:#f97316">🚨 = Sospechoso · 📅 = varios días</span>
+      <span class="small" style="margin-left:auto;color:#f97316">🔴 Mismo grupo (revisar) · 🟡 Grupos diferentes (info) · 📅 varios días</span>
     </div>
     <div id="auBody" style="flex:1;overflow:auto;padding-right:6px"></div>
     <div class="row" style="margin-top:14px">
@@ -1675,27 +1694,47 @@ $('#btnAudit').onclick=()=>{
     const body=back.querySelector('#auBody');
     const rangeTxt=`${from.split('-').reverse().join('/')} → ${to.split('-').reverse().join('/')}`;
     if(!data.length){body.innerHTML=`<div class="empty" style="padding:40px">✅ Ningún cliente aparece más de una vez entre ${rangeTxt}.<br><br>Todo limpio en este rango.</div>`;return}
-    const suspCount=data.filter(x=>x.suspicious).length;
+    const suspCount=data.filter(x=>x.severity===2).length;
+    const infoCount=data.filter(x=>x.severity===1).length;
     body.innerHTML=`<div style="padding:10px 14px;background:${suspCount?'#3a1c22':'#1f3a2e'};border:1px solid ${suspCount?'#5e2a33':'#2a5e44'};border-radius:8px;margin-bottom:12px;font-size:13px">
-      Rango: <b>${rangeTxt}</b> · <b>${data.length}</b> cliente(s) repetido(s) · <b style="color:${suspCount?'#ff96a0':'#7ee3aa'}">${suspCount}</b> sospechoso(s) de descuadre
+      Rango: <b>${rangeTxt}</b> · <b>${data.length}</b> cliente(s) repetido(s) · <b style="color:#ff96a0">${suspCount}</b> con posible descuadre 🔴 · <b style="color:#ffd58a">${infoCount}</b> con varios servicios (normal) 🟡
     </div>`+
     data.map(c=>{
       const rows=c.entries.map(({date,e})=>{
         const isDh=e.kind==='DH';
         const isZero=!isDh&&(e.importe||0)===0&&(e.tasa||0)===0;
-        const bg=isZero?'background:#3a1c22':(isDh?'background:#1a2a3a':'');
+        // Ressalta files que pertanyen a un grup duplicat (mateix grup 2+ vegades)
+        const inDupGroup=!isDh&&c.duplicatedGroups.some(dg=>dg.group===(e.grupo||'—').toString().trim());
+        const bg=isZero?'background:rgba(255,150,160,.12)':(inDupGroup?'background:rgba(234,88,12,.10)':(isDh?'background:rgba(90,169,255,.08)':''));
         const label=isDh?`<span class="tag ${e.tipo==='HABER'?'haber':'debe'}">${e.tipo}</span>`:`<span class="tag">${e.tipo||'-'}</span>`;
+        const grupoBadge=isDh?'—':`<span class="pill" style="background:${inDupGroup?'#5e2e10':'#1f2937'};color:${inDupGroup?'#fed7aa':'#cbd5e1'};padding:2px 8px;font-size:11px">${escapeHtml(e.grupo||'—')}</span>`;
         const goto=`onclick="event.stopPropagation();document.querySelector('.modal-back').remove();setDate('${date}')" style="cursor:pointer;${bg}"`;
-        return `<tr ${goto}><td>${date.split('-').reverse().join('/')}</td><td>${label}</td><td class="num">${fmt(e.importe||0)}</td><td class="num">${e.tasa?fmt(e.tasa):'—'}</td><td>${e.fp||'-'}</td><td class="small">${isZero?'⚠️ TRÁMITE 0€':(isDh?'💰 Debe/Haber libre':'')}</td></tr>`;
+        const flag=isZero?'⚠️ TRÁMITE 0€':(inDupGroup?'🔴 MISMO GRUPO':(isDh?'💰 Debe/Haber libre':''));
+        return `<tr ${goto}><td>${date.split('-').reverse().join('/')}</td><td>${label}</td><td>${grupoBadge}</td><td class="num">${fmt(e.importe||0)}</td><td class="num">${e.tasa?fmt(e.tasa):'—'}</td><td>${e.fp||'-'}</td><td class="small">${flag}</td></tr>`;
       }).join('');
       const gap=c.daySpan>60?`<span class="pill" style="background:#3a2a1c;color:#ffd58a;border-color:#5e4a2a">⏱ ${c.daySpan} días entre visitas</span>`:'';
-      return `<div style="background:#141821;border:1px solid ${c.suspicious?'#ff5d6c':'#2a3040'};border-radius:10px;padding:12px;margin-bottom:10px">
+      // Badges per etiquetes de grups
+      const grpBadges=c.duplicatedGroups.map(dg=>`<span class="pill" style="background:#5e2e10;color:#fed7aa;border-color:#ea580c;font-weight:700">🔴 ${escapeHtml(dg.group)} ×${dg.count}</span>`).join(' ');
+      const diffGrpBadge=c.severity===1?`<span class="pill" style="background:#3a2a1c;color:#ffd58a;border-color:#a16207">🟡 ${c.distinctGroups.length} grupos: ${c.distinctGroups.map(g=>escapeHtml(g)).join(' + ')}</span>`:'';
+      // Colors card segons severitat
+      const borderColor=c.severity===2?'#ea580c':(c.severity===1?'#a16207':'#2a3040');
+      const nameColor=c.severity===2?'#fed7aa':(c.severity===1?'#ffd58a':'#e8ecf2');
+      const icon=c.severity===2?'🔴 ':(c.severity===1?'🟡 ':'');
+      // Missatge final segons severitat
+      let footer='';
+      if(c.severity===2){
+        if(c.hasSameGroupDup)footer=`<div class="small" style="margin-top:8px;color:#fed7aa">🔴 Mismo cliente repetido en el mismo grupo → probable duplicado, interrumpido o devolución pendiente. Revisa aquí.</div>`;
+        else footer=`<div class="small" style="margin-top:8px;color:#ff96a0">⚠️ Ficha a 0€ sin compensación en Debe/Haber. Probablemente aquí está el descuadre.</div>`;
+      }else if(c.severity===1){
+        footer=`<div class="small" style="margin-top:8px;color:#ffd58a">🟡 Cliente en varios grupos diferentes (${c.distinctGroups.join(', ')}) — normal, sólo informativo.</div>`;
+      }
+      return `<div style="background:#141821;border:1.5px solid ${borderColor};border-radius:10px;padding:12px;margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
-          <b style="font-size:15px;color:${c.suspicious?'#ff96a0':'#e8ecf2'}">${c.suspicious?'🚨 ':''}${escapeHtml(c.display)} <span class="pill">📅 ${c.entries.length} fichas</span> ${gap}</b>
+          <b style="font-size:15px;color:${nameColor}">${icon}${escapeHtml(c.display)} <span class="pill">📅 ${c.entries.length} fichas</span> ${grpBadges} ${diffGrpBadge} ${gap}</b>
           <div class="small">Total imp: <b class="num">${fmt(c.totalImp)}</b> · Tasa: <b class="num">${fmt(c.totalTasa)}</b>${c.dhCount?` · D/H: <b class="num" style="color:${c.dhSum>=0?'#7ee3aa':'#ff96a0'}">${fmt(c.dhSum)}</b>`:''}</div>
         </div>
-        <table style="width:100%;font-size:12px"><thead><tr><th>Día</th><th>Tipo</th><th class="num">Importe</th><th class="num">Tasa</th><th>FP</th><th></th></tr></thead><tbody>${rows}</tbody></table>
-        ${c.suspicious?'<div class="small" style="margin-top:8px;color:#ff96a0">⚠️ Hay una ficha a 0€ pero NO hay entrada Debe/Haber que compense (devolución o cobro extra). Revisa este cliente — probablemente aquí está el descuadre.</div>':''}
+        <table style="width:100%;font-size:12px"><thead><tr><th>Día</th><th>Tipo</th><th>Grupo</th><th class="num">Importe</th><th class="num">Tasa</th><th>FP</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+        ${footer}
       </div>`;
     }).join('');
   };
