@@ -425,7 +425,7 @@ function LicenseKeyModal({ data, onClose }) {
                 `3. Un cop instal·lada, obri l'app i enganxi la clau de dalt\n` +
                 `4. Segueixi el wizard per configurar els noms de les seves empreses\n` +
                 `5. Ja pot començar a treballar!\n\n` +
-                `Dubtes? Escrigui'm a brugulatmarc@gmail.com\n\n` +
+                `Dubtes? Escrigui'm a info@medicarplus.es\n\n` +
                 `Salutacions,\nM. Brugulat Lopez\nMediCar Plus`,
               );
               window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;

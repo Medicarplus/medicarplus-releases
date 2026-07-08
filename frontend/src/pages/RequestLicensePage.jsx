@@ -134,7 +134,7 @@ export default function RequestLicensePage() {
           </div>
 
           <p style={{ color: "#94a3b8", fontSize: 11, marginTop: 8 }}>
-            💬 Dubtes? Escriu a <a href="mailto:brugulatmarc@gmail.com" style={{ color: "#f5b301" }}>brugulatmarc@gmail.com</a>
+            💬 Dubtes? Escriu a <a href="mailto:info@medicarplus.es" style={{ color: "#f5b301" }}>info@medicarplus.es</a>
           </p>
           <p style={{ color: "#94a3b8", fontSize: 12, marginTop: 24 }}>
             M.Brugulat Lopez · MediCar Plus

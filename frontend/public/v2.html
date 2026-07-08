@@ -199,6 +199,7 @@
       </div>
     </div>
     <button class="btn" id="btnSms" style="background:linear-gradient(90deg,#059669 0%,#10b981 100%);color:#fff;border-color:transparent;font-weight:700" title="Avisos SMS / WhatsApp de renovació">📱 Avisos</button>
+    <a id="btnWebsite" href="https://medicarplus.es" target="_blank" rel="noopener" title="Obrir medicarplus.es · Compte, ajuda, actualitzacions" style="background:linear-gradient(90deg,#0f172a 0%,#1e293b 100%);color:#f5b301;border:1px solid #f5b301;border-radius:6px;padding:8px 14px;font-weight:700;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:'Segoe UI',sans-serif" data-testid="btn-website">🌐 medicarplus.es</a>
     <span id="autosaveBadge" style="display:none;padding:5px 10px;border-radius:6px;background:#1f3a2e;color:#7ee3aa;font-size:11px;font-family:'Consolas',monospace;letter-spacing:.3px;border:1px solid #2a5e44"></span>
     <button class="btn traffic-only" id="btnAudit" style="background:linear-gradient(90deg,#ea580c 0%,#f97316 100%);color:#fff;border-color:transparent;font-weight:700" data-i18n="audit">🔎 Auditoría</button>
     <button class="btn" id="btnAiAsk" style="background:linear-gradient(90deg,#7c3aed 0%,#a855f7 100%);color:#fff;border-color:transparent;font-weight:700" data-i18n="ai_advisor">🤖 Asesor IA</button>
@@ -2594,7 +2595,9 @@ const LIC={
   CHECK_INTERVAL_DAYS:15,
   MAX_OFFLINE_DAYS:30,
   VERIFY_URL:'https://project-helper-47.preview.emergentagent.com/api/licenses/verify',
-  REQUEST_URL:'https://project-helper-47.preview.emergentagent.com/request-license',
+  REQUEST_URL:'https://medicarplus.es/request-license',
+  WEBSITE_URL:'https://medicarplus.es',
+  SUPPORT_EMAIL:'info@medicarplus.es',
   MASTER_KEY:'MB-MASTER-BRUGULAT-2026-OWNER',
 };
 function getInstallId(){
@@ -2714,7 +2717,7 @@ function showActivationModal(){
     +'</div>'
     +'<button id="licBtn" style="width:100%;padding:14px;background:linear-gradient(135deg,#f5b301,#d97706);color:#0f172a;border:none;border-radius:10px;font-family:Georgia,serif;font-size:16px;font-weight:700;letter-spacing:2px;cursor:pointer;text-transform:uppercase">'+L('✓ Activar Llicència','✓ Activar Licencia')+'</button>'
     +'<div style="text-align:center;margin-top:24px;padding-top:20px;border-top:1px solid #334155">'
-    +'<p style="color:#64748b;font-size:11px;margin:0;line-height:1.6">'+L('No tens llicència? ','¿No tienes licencia? ')+'<a href="'+LIC.REQUEST_URL+'" target="_blank" style="color:#f5b301;text-decoration:underline">'+L('Demana-la aquí','Solicítala aquí')+'</a><br>'+L('o contacta amb ','o contacta con ')+'<b style="color:#f5b301">M.Brugulat Lopez</b> · <a href="mailto:brugulatmarc@gmail.com" style="color:#f5b301;text-decoration:underline">brugulatmarc@gmail.com</a><br>'+L('Instal·lació: ','Instalación: ')+new Date(installDate).toLocaleDateString(currentLang==='es'?'es-ES':'ca-ES')+'</p>'
+    +'<p style="color:#64748b;font-size:11px;margin:0;line-height:1.6">'+L('No tens llicència? ','¿No tienes licencia? ')+'<a href="'+LIC.REQUEST_URL+'" target="_blank" style="color:#f5b301;text-decoration:underline">'+L('Demana-la aquí','Solicítala aquí')+'</a><br>'+L('o contacta amb ','o contacta con ')+'<b style="color:#f5b301">MediCar Plus</b> · <a href="mailto:'+LIC.SUPPORT_EMAIL+'" style="color:#f5b301;text-decoration:underline">'+LIC.SUPPORT_EMAIL+'</a> · <a href="'+LIC.WEBSITE_URL+'" target="_blank" style="color:#f5b301;text-decoration:underline">medicarplus.es</a><br>'+L('Instal·lació: ','Instalación: ')+new Date(installDate).toLocaleDateString(currentLang==='es'?'es-ES':'ca-ES')+'</p>'
     +'</div>'
     +'</div>';
   document.body.appendChild(back);
