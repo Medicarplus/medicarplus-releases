@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MediCar Plus · Panell mestre · Tots els enllaços</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;line-height:1.6;padding:40px 20px;min-height:100vh}
+  .wrap{max-width:960px;margin:0 auto}
+  .header{text-align:center;margin-bottom:36px;padding-bottom:24px;border-bottom:2px solid #f5b301}
+  .header h1{margin:0;color:#f5b301;font-size:36px;letter-spacing:1px;font-family:Georgia,serif}
+  .header p{color:#94a3b8;font-size:14px;margin:6px 0 0}
+  h2{color:#a7f3d0;margin-top:36px;padding:10px 14px;background:linear-gradient(90deg,rgba(34,197,94,0.15),transparent);border-left:5px solid #22c55e;font-size:20px;font-family:Georgia,serif}
+  h2.blue{color:#bfdbfe;background:linear-gradient(90deg,rgba(59,130,246,0.15),transparent);border-left-color:#3b82f6}
+  h2.orange{color:#fed7aa;background:linear-gradient(90deg,rgba(234,88,12,0.15),transparent);border-left-color:#f97316}
+  h2.purple{color:#e9d5ff;background:linear-gradient(90deg,rgba(147,51,234,0.15),transparent);border-left-color:#9333ea}
+  h2.red{color:#fecaca;background:linear-gradient(90deg,rgba(220,38,38,0.15),transparent);border-left-color:#dc2626}
+  .card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:18px 22px;margin:12px 0;transition:all .2s;display:flex;align-items:center;gap:16px;text-decoration:none;color:#e2e8f0}
+  .card:hover{border-color:#f5b301;background:#243044;transform:translateX(4px);box-shadow:0 4px 20px rgba(245,179,1,0.2)}
+  .card-icon{font-size:32px;flex-shrink:0}
+  .card-content{flex:1;min-width:0}
+  .card-title{font-family:Georgia,serif;font-size:16px;font-weight:700;color:#f5b301;margin-bottom:4px}
+  .card-desc{color:#cbd5e1;font-size:13px;margin-bottom:6px}
+  .card-url{color:#7ee3aa;font-size:11px;font-family:'Courier New',monospace;word-break:break-all;opacity:0.7}
+  .creds-box{background:linear-gradient(135deg,#7f1d1d,#450a0a);border:1px solid #dc2626;border-radius:10px;padding:20px 24px;margin:14px 0;color:#fecaca}
+  .creds-box b{color:#fef2f2}
+  .creds-box code{background:#0f172a;color:#fca5a5;padding:4px 10px;border-radius:5px;font-family:'Courier New',monospace;font-size:13px;display:inline-block;margin:2px 0;letter-spacing:1px;user-select:all}
+  .cred-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed rgba(220,38,38,0.3)}
+  .cred-row:last-child{border:none}
+  .cred-row .btn-copy{background:#dc2626;color:#fff;border:none;border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:700}
+  .cred-row .btn-copy:hover{background:#ef4444}
+  .warning{background:linear-gradient(135deg,#78350f,#451a03);border:1px solid #f5b301;border-radius:8px;padding:14px 18px;margin:18px 0;color:#fde68a;font-size:13.5px}
+  .success{background:linear-gradient(135deg,#065f46,#022c22);border:1px solid #22c55e;border-radius:8px;padding:14px 18px;margin:18px 0;color:#a7f3d0;font-size:13.5px}
+  .footer{text-align:center;color:#64748b;font-size:11px;margin-top:60px;padding-top:20px;border-top:1px solid #334155}
+  .footer a{color:#f5b301}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:16px 0}
+  .stat{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;text-align:center}
+  .stat-num{font-size:24px;font-weight:700;color:#f5b301;font-family:Georgia,serif}
+  .stat-label{font-size:11px;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;margin-top:4px}
+  .search-box{width:100%;padding:14px 20px;background:#0f172a;border:2px solid #334155;border-radius:10px;color:#e2e8f0;font-size:14px;margin-bottom:20px;font-family:inherit}
+  .search-box:focus{outline:none;border-color:#f5b301}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<div class="header">
+  <h1>🎛️ MediCar Plus · Panell Mestre</h1>
+  <p>Punt central amb tots els links, credencials i accessos ràpids. <b>Marca aquesta pàgina als preferits.</b></p>
+  <p style="color:#f5b301;font-size:12px;margin-top:8px">M.Brugulat Lopez · Actualitzat 08/07/2026</p>
+</div>
+
+<!-- Panells principals -->
+<h2>🎯 Panells principals (ús diari)</h2>
+
+<a class="card" href="/admin" target="_blank">
+  <div class="card-icon">🎛️</div>
+  <div class="card-content">
+    <div class="card-title">Admin Panel</div>
+    <div class="card-desc">Gestió de llicències, sol·licituds, estadístiques MRR/ARR i desbloqueig HWID</div>
+    <div class="card-url">/admin</div>
+  </div>
+</a>
+
+<a class="card" href="/request-license" target="_blank">
+  <div class="card-icon">📝</div>
+  <div class="card-content">
+    <div class="card-title">Formulari públic de sol·licitud</div>
+    <div class="card-desc">Envia aquest link als teus futurs clients per demanar llicència amb pricing</div>
+    <div class="card-url">/request-license</div>
+  </div>
+</a>
+
+<a class="card" href="/v2.html" target="_blank">
+  <div class="card-icon">💻</div>
+  <div class="card-content">
+    <div class="card-title">App v2 (preview per proves)</div>
+    <div class="card-desc">Versió web de l'app comercial abans d'ofuscar. Per fer proves ràpides sense compilar</div>
+    <div class="card-url">/v2.html</div>
+  </div>
+</a>
+
+<a class="card" href="/caja_del_dia.html" target="_blank">
+  <div class="card-icon">📊</div>
+  <div class="card-content">
+    <div class="card-title">App v1 (personal, la teva de sempre)</div>
+    <div class="card-desc">Versió original inalterada. Amb pill design nou i mòdul SMS afegit</div>
+    <div class="card-url">/caja_del_dia.html</div>
+  </div>
+</a>
+
+<!-- Guies -->
+<h2 class="blue">📚 Guies del sistema (per compartir)</h2>
+
+<a class="card" href="/guia-medicar-plus.html" target="_blank">
+  <div class="card-icon">📖</div>
+  <div class="card-content">
+    <div class="card-title">Guia Admin completa (per tu)</div>
+    <div class="card-desc">Manual d'ús complet: flux de venda, pagaments, SMS, estadístiques, HWID lock, novetats, 4 tasques pendents</div>
+    <div class="card-url">/guia-medicar-plus.html</div>
+  </div>
+</a>
+
+<a class="card" href="/guia-client-installacio.html" target="_blank">
+  <div class="card-icon">👤</div>
+  <div class="card-content">
+    <div class="card-title">Guia Client (envia-la a cada client)</div>
+    <div class="card-desc">6 passos d'instal·lació, resolució de problemes, com fer servir Auditoría i Informe Anual</div>
+    <div class="card-url">/guia-client-installacio.html</div>
+  </div>
+</a>
+
+<!-- Guies tècniques -->
+<h2 class="orange">🔧 Guies tècniques (per quan tinguis empresa)</h2>
+
+<a class="card" href="/guia-deploy.html" target="_blank">
+  <div class="card-icon">🚀</div>
+  <div class="card-content">
+    <div class="card-title">Deploy a producció + domini propi ⭐</div>
+    <div class="card-desc">Pas a pas per passar del preview al servidor real. Passa-ho al teu informàtic. Elimina els flashos.</div>
+    <div class="card-url">/guia-deploy.html</div>
+  </div>
+</a>
+
+<a class="card" href="/guia-stripe-setup.html" target="_blank">
+  <div class="card-icon">💳</div>
+  <div class="card-content">
+    <div class="card-title">Configurar Stripe Subscriptions</div>
+    <div class="card-desc">Pagaments recurrents automàtics amb targeta. 6 passos: crear compte, 4 productes, webhook, .env</div>
+    <div class="card-url">/guia-stripe-setup.html</div>
+  </div>
+</a>
+
+<a class="card" href="/guia-github-releases.html" target="_blank">
+  <div class="card-icon">🔄</div>
+  <div class="card-content">
+    <div class="card-title">Auto-updates amb GitHub Releases</div>
+    <div class="card-desc">Perquè els teus clients rebin les noves versions automàticament sense reinstal·lar</div>
+    <div class="card-url">/guia-github-releases.html</div>
+  </div>
+</a>
+
+<!-- Descàrrega -->
+<h2 class="purple">💾 Descàrrega del programa</h2>
+
+<a class="card" href="/api/download-electron" target="_blank">
+  <div class="card-icon">📦</div>
+  <div class="card-content">
+    <div class="card-title">ZIP del projecte Electron (última versió)</div>
+    <div class="card-desc">Codi ofuscat + preload.js amb HWID + workflow GitHub Actions. Descarrega, descomprimeix i compila amb <code style="background:#0f172a;color:#7ee3aa;padding:2px 6px;border-radius:4px">npm install && npm run build:all</code></div>
+    <div class="card-url">/api/download-electron</div>
+  </div>
+</a>
+
+<!-- Credencials -->
+<h2 class="red">🔑 Credencials (CONFIDENCIAL)</h2>
+
+<div class="creds-box">
+<b>⚠️ NO COMPARTIR MAI</b> aquestes claus. Apunta-les al gestor de contrasenyes.
+
+<div class="cred-row" style="margin-top:12px">
+  <div>
+    <b>Admin Panel Token</b><br>
+    <code id="c1">MB-ADMIN-BRUGULAT-2026-4F8E2A1C</code>
+  </div>
+  <button class="btn-copy" onclick="navigator.clipboard.writeText('MB-ADMIN-BRUGULAT-2026-4F8E2A1C');this.textContent='✓ Copiat'">📋 Copiar</button>
+</div>
+
+<div class="cred-row">
+  <div>
+    <b>Master Key universal</b><br>
+    <code id="c2">MB-MASTER-BRUGULAT-2026-OWNER</code>
+  </div>
+  <button class="btn-copy" onclick="navigator.clipboard.writeText('MB-MASTER-BRUGULAT-2026-OWNER');this.textContent='✓ Copiat'">📋 Copiar</button>
+</div>
+
+<div class="cred-row">
+  <div>
+    <b>Email de contacte</b><br>
+    <code>brugulatmarc@gmail.com</code>
+  </div>
+  <button class="btn-copy" onclick="navigator.clipboard.writeText('brugulatmarc@gmail.com');this.textContent='✓ Copiat'">📋 Copiar</button>
+</div>
+</div>
+
+<!-- Estat -->
+<h2>📊 Estat actual del sistema</h2>
+
+<div class="stats">
+<div class="stat"><div class="stat-num">✅</div><div class="stat-label">App v1 · App v2 · Admin · SMS</div></div>
+<div class="stat"><div class="stat-num">✅</div><div class="stat-label">HWID Lock · Informe Anual · Auditoria</div></div>
+<div class="stat"><div class="stat-num">⏸️</div><div class="stat-label">Stripe · Twilio · GitHub · Deploy</div></div>
+<div class="stat"><div class="stat-num">4</div><div class="stat-label">Tasques pendents (esperant empresa)</div></div>
+</div>
+
+<div class="warning">
+<b>🚨 Les 4 tasques que ens falten</b> (per quan tinguis empresa constituïda):
+<ol style="margin:8px 0 0 20px;padding:0">
+<li><b>Deploy a producció</b> (~15€/mes) → domini propi + no més flashos</li>
+<li><b>Stripe Subscriptions</b> → cobraments recurrents automàtics</li>
+<li><b>Twilio SMS/WhatsApp</b> → enviament real (mentrestant funciona amb CSV)</li>
+<li><b>GitHub Releases</b> → auto-updates als clients</li>
+</ol>
+Detalls complets a la <a href="/guia-medicar-plus.html#pendents" target="_blank" style="color:#fde68a;text-decoration:underline"><b>Guia Admin</b></a>.
+</div>
+
+<div class="success">
+<b>💡 Un cop facis el deploy</b>, tots aquests links canviaran de <code style="background:#0f172a;padding:2px 6px;border-radius:4px;color:#7ee3aa">project-helper-47.preview.emergentagent.com</code> a <code style="background:#0f172a;padding:2px 6px;border-radius:4px;color:#7ee3aa">medicarplus.com</code> (o el domini que triïs). Les guies s'actualitzaran automàticament.
+</div>
+
+<div class="footer">
+MediCar Plus · M.Brugulat Lopez · Panell mestre v1.0<br>
+Suport: <a href="mailto:brugulatmarc@gmail.com">brugulatmarc@gmail.com</a><br>
+Actualitzat: 08/07/2026
+</div>
+
+</div>
+
+</body>
+</html>
