@@ -42,12 +42,39 @@ const Feature = ({ icon, title, children }) => (
   </div>
 );
 
-const PriceCard = ({ plan, monthlyPrice, annualPrice, period, features, highlighted, ctaHref }) => {
+const PriceCard = ({ plan, monthlyPrice, annualPrice, period, features, highlighted, ctaHref, packageId, apiBase }) => {
   const price = period === "annual" ? annualPrice : monthlyPrice;
   const suffix = period === "annual" ? "/año" : "/mes";
   const savings = period === "annual"
     ? (monthlyPrice * 12 - annualPrice).toFixed(2)
     : null;
+  const isTrial = plan === "Trial";
+  const [loading, setLoading] = useState(false);
+
+  const handleStripeCheckout = async () => {
+    if (isTrial || !packageId) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${apiBase}/api/payments/create-subscription`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          package_id: packageId,
+          origin_url: window.location.origin,
+        }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Error creando la sesión de pago. Intenta de nuevo o contacta con info@medicarplus.es");
+        setLoading(false);
+      }
+    } catch (e) {
+      alert("Error de conexión. Intenta de nuevo.");
+      setLoading(false);
+    }
+  };
   return (
     <div
       style={{
@@ -80,7 +107,7 @@ const PriceCard = ({ plan, monthlyPrice, annualPrice, period, features, highligh
             border: `1px solid ${C.gold}`,
           }}
         >
-          Més popular
+          Más popular
         </div>
       )}
       <h3
@@ -109,7 +136,7 @@ const PriceCard = ({ plan, monthlyPrice, annualPrice, period, features, highligh
             marginBottom: 8,
           }}
         >
-          Estalvia {savings} € · Equival a 2 mesos gratis
+          Ahorra {savings} € · Equivale a 2 meses gratis
         </div>
       )}
       <ul
@@ -136,30 +163,78 @@ const PriceCard = ({ plan, monthlyPrice, annualPrice, period, features, highligh
           </li>
         ))}
       </ul>
-      <a
-        href={ctaHref}
-        data-testid={`price-cta-${plan.toLowerCase()}`}
-        style={{
-          display: "block",
-          textAlign: "center",
-          background: highlighted ? "#0f172a" : C.gold,
-          color: highlighted ? C.gold : "#0f172a",
-          padding: "13px 18px",
-          borderRadius: 10,
-          textDecoration: "none",
-          fontWeight: 700,
-          fontSize: 14,
-          letterSpacing: 0.5,
-        }}
-      >
-        {plan === "Trial" ? "COMENÇAR PROVA GRATIS" : "COMPRAR AHORA"}
-      </a>
+      {isTrial ? (
+        <a
+          href={ctaHref}
+          data-testid={`price-cta-${plan.toLowerCase()}`}
+          style={{
+            display: "block",
+            textAlign: "center",
+            background: highlighted ? "#0f172a" : C.gold,
+            color: highlighted ? C.gold : "#0f172a",
+            padding: "13px 18px",
+            borderRadius: 10,
+            textDecoration: "none",
+            fontWeight: 700,
+            fontSize: 14,
+            letterSpacing: 0.5,
+          }}
+        >
+          COMENZAR PROVA GRATIS
+        </a>
+      ) : (
+        <>
+          <button
+            onClick={handleStripeCheckout}
+            disabled={loading}
+            data-testid={`price-cta-stripe-${plan.toLowerCase()}`}
+            style={{
+              display: "block",
+              width: "100%",
+              textAlign: "center",
+              background: highlighted ? "#0f172a" : C.gold,
+              color: highlighted ? C.gold : "#0f172a",
+              padding: "13px 18px",
+              borderRadius: 10,
+              border: "none",
+              cursor: loading ? "wait" : "pointer",
+              fontWeight: 700,
+              fontSize: 14,
+              letterSpacing: 0.5,
+              opacity: loading ? 0.6 : 1,
+              fontFamily: "'Segoe UI', system-ui, sans-serif",
+            }}
+          >
+            {loading ? "⏳ Redirigiendo..." : "💳 PAGAR CON TARJETA"}
+          </button>
+          <a
+            href={ctaHref}
+            data-testid={`price-cta-transfer-${plan.toLowerCase()}`}
+            style={{
+              display: "block",
+              marginTop: 10,
+              textAlign: "center",
+              background: "transparent",
+              color: highlighted ? "#0f172a" : C.textDim,
+              padding: "10px 18px",
+              borderRadius: 10,
+              textDecoration: "none",
+              fontWeight: 600,
+              fontSize: 12,
+              border: `1px solid ${highlighted ? "#0f172a30" : C.border}`,
+            }}
+          >
+            🏦 O paga por transferencia bancaria
+          </a>
+        </>
+      )}
     </div>
   );
 };
 
 export default function LandingPage() {
   const [period, setPeriod] = useState("annual"); // annual | monthly
+  const apiBase = process.env.REACT_APP_BACKEND_URL;
 
   useEffect(() => {
     document.title = "MediCar Plus · Software para centros de reconocimiento médico";
@@ -573,6 +648,7 @@ export default function LandingPage() {
               monthlyPrice={0}
               annualPrice={0}
               period={period}
+              apiBase={apiBase}
               ctaHref="/request-license?plan=TRIAL"
               features={[
                 "Programa completo 30 días",
@@ -590,6 +666,8 @@ export default function LandingPage() {
               annualPrice={299.9}
               period={period}
               highlighted
+              apiBase={apiBase}
+              packageId={period === "annual" ? "STD_ANY" : "STD_MES"}
               ctaHref={`/request-license?plan=STD&period=${period}`}
               features={[
                 "Importación DGT ilimitada",
@@ -609,6 +687,8 @@ export default function LandingPage() {
               monthlyPrice={39.9}
               annualPrice={399.9}
               period={period}
+              apiBase={apiBase}
+              packageId={period === "annual" ? "PREMIUM_ANY" : "PREMIUM_MES"}
               ctaHref={`/request-license?plan=PREMIUM&period=${period}`}
               features={[
                 "Todo lo de Standard",
