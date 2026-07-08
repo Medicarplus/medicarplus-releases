@@ -137,7 +137,7 @@ export default function RequestLicensePage() {
             💬 Dubtes? Escriu a <a href="mailto:info@medicarplus.es" style={{ color: "#f5b301" }}>info@medicarplus.es</a>
           </p>
           <p style={{ color: "#94a3b8", fontSize: 12, marginTop: 24 }}>
-            M.Brugulat Lopez · MediCar Plus
+            MediCar Plus
           </p>
         </div>
       </div>
@@ -174,7 +174,7 @@ export default function RequestLicensePage() {
               Sol·licitar llicència
             </h1>
             <p style={{ color: "#94a3b8", fontSize: 13, margin: "8px 0 0" }}>
-              MediCar Plus · Software comercial · M.Brugulat Lopez
+              MediCar Plus · Software comercial
             </p>
           </div>
 
@@ -458,7 +458,7 @@ export default function RequestLicensePage() {
             }}
           >
             En enviar, acceptes que rebis la teva clau de llicència a l'adreça de correu
-            indicada. M.Brugulat Lopez es reserva el dret d'aprovar o denegar
+            indicada. MediCar Plus es reserva el dret d'aprovar o denegar
             sol·licituds.
           </p>
         </form>
