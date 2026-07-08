@@ -4,8 +4,8 @@
   "version": "2.0.0",
   "description": "MediCar Plus · Registre diari de caixa per centres mèdics de reconeixement de conductors",
   "author": {
-    "name": "Marc Brugulat Lopez",
-    "email": "info@example.com"
+    "name": "MediCar Plus",
+    "email": "info@medicarplus.es"
   },
   "main": "main.js",
   "scripts": {
@@ -14,6 +14,7 @@
     "build:portable": "electron-builder --win portable --x64",
     "build:installer": "electron-builder --win nsis --x64",
     "build:all": "electron-builder --win nsis portable --x64",
+    "publish": "electron-builder --win nsis --x64 --publish always",
     "release": "electron-builder --win nsis --x64 --publish always"
   },
   "dependencies": {
@@ -40,8 +41,9 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "TEU_USUARI_GITHUB",
-        "repo": "caja-del-dia-releases"
+        "owner": "Medicarplus",
+        "repo": "medicarplus-releases",
+        "releaseType": "release"
       }
     ],
     "win": {
@@ -56,7 +58,7 @@
           "arch": ["x64"]
         }
       ],
-      "publisherName": "Marc Brugulat Lopez"
+      "publisherName": "MediCar Plus"
     },
     "nsis": {
       "oneClick": false,
