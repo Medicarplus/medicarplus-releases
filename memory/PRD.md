@@ -103,3 +103,7 @@ Transició d'una app HTML offline estable ("Caja del Día") a una app comercial 
 - `licenses`, `license_requests`, `audit_log` — sistema llicències
 - `sms_history` — historial d'enviaments massius (indefinit)
 - `payment_transactions` — transaccions Stripe (idempotents)
+
+
+## Changelog recent
+- **2026-02-07**: Fix "Reserva de Cambio" — afegit botó `#btnCambio` al dropdown Contabilidad (faltava). Total reserva ara repercuteix a: `Saldo anterior caja`, `Saldo anterior`, header pill `#saldoAntNum` i `CAJA FÍSICA`. Modal es re-renderitza vista principal al tancar. Build Electron regenerat.
