@@ -2,9 +2,10 @@
 <html lang="ca">
 <head>
 <meta charset="UTF-8">
-<title>MediCar Plus · Guia completa d'ús i vendes · v2</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MediCar Plus · Guia completa admin · v2026-07</title>
 <style>
-  body{font-family:'Segoe UI',Calibri,Arial,sans-serif;max-width:880px;margin:40px auto;padding:0 30px;color:#1a1a1a;line-height:1.65;background:#fff}
+  body{font-family:'Segoe UI',Calibri,Arial,sans-serif;max-width:920px;margin:40px auto;padding:0 30px;color:#1a1a1a;line-height:1.65;background:#fff}
   h1{color:#0f172a;border-bottom:3px solid #f5b301;padding-bottom:10px;font-size:28px;margin-top:44px}
   h2{color:#0f172a;margin-top:34px;padding:8px 12px;background:linear-gradient(90deg,#f5b301 0%,#fef9c3 100%);border-left:5px solid #f5b301;font-size:20px}
   h3{color:#065f46;font-size:16px;margin-top:22px;border-bottom:1px dashed #94a3b8;padding-bottom:4px}
@@ -34,29 +35,36 @@
   .badge{display:inline-block;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:.5px;margin-left:6px;vertical-align:middle}
   .badge-ok{background:#065f46;color:#a7f3d0}
   .badge-wait{background:#78350f;color:#fde68a}
+  .badge-new{background:#7f1d1d;color:#fecaca}
   pre{background:#0b1220;color:#e2e8f0;padding:14px 16px;border-radius:8px;font-size:12.5px;overflow-x:auto;line-height:1.55}
+  .pending-box{background:linear-gradient(135deg,#78350f,#451a03);color:#fde68a;padding:22px 26px;border-radius:14px;margin:24px 0;border:2px solid #f59e0b;box-shadow:0 4px 12px rgba(245,158,11,0.15)}
+  .pending-box h3{color:#fde68a;border:none;margin-top:0;font-size:20px}
+  .pending-item{background:rgba(0,0,0,0.25);padding:14px 18px;border-radius:8px;margin:12px 0;border-left:4px solid #f5b301}
+  .pending-item b{color:#fef3c7}
   @media print{body{max-width:none;margin:0;padding:20px}h1,h2{page-break-after:avoid}.step{page-break-inside:avoid}}
 </style>
 </head>
 <body>
 
 <h1 style="text-align:center;border:none;margin-top:0">🎛️ MediCar Plus · Guia Admin</h1>
-<p style="text-align:center;color:#64748b">Sistema complet · Llicències · Pagaments · SMS · Distribució · v2026-07</p>
+<p style="text-align:center;color:#64748b">Sistema complet · Llicències · Pagaments · SMS · Distribució · <b>Actualitzada 08/07/2026</b></p>
 
 <div class="toc">
 <h3>📚 Índex</h3>
-<a href="#estat">0. Estat actual del sistema</a>
-<a href="#links">1. Els teus links importants</a>
-<a href="#claus">2. Claus i credencials</a>
-<a href="#flux">3. Flux complet de venda</a>
-<a href="#pagaments">4. Pagaments (transferència · targeta única · subscripcions)</a>
-<a href="#enviar-app">5. Distribució de l'app + auto-updates</a>
-<a href="#sms">6. Mòdul SMS/WhatsApp</a>
-<a href="#estadistiques">7. Panell d'estadístiques (MRR / ARR / activitat)</a>
-<a href="#preus">8. Preus i plans</a>
-<a href="#proteccio">9. Protecció del codi (anti-clonació + HWID lock)</a>
-<a href="#faq">10. Preguntes freqüents</a>
-<a href="#guies">11. Guies tècniques enllaçades</a>
+<a href="#estat">0. Estat actual del sistema (visió general)</a>
+<a href="#pendents">🚨 1. Les 4 coses pendents (quan tinguis empresa)</a>
+<a href="#links">2. Els teus links importants</a>
+<a href="#claus">3. Claus i credencials</a>
+<a href="#novetats">4. Últimes novetats (juliol 2026)</a>
+<a href="#flux">5. Flux complet de venda pas a pas</a>
+<a href="#pagaments">6. Sistema de pagaments (3 mètodes)</a>
+<a href="#enviar-app">7. Distribució de l'app</a>
+<a href="#sms">8. Mòdul SMS/WhatsApp</a>
+<a href="#estadistiques">9. Panell d'estadístiques (MRR/ARR)</a>
+<a href="#preus">10. Preus i plans configurats</a>
+<a href="#proteccio">11. Protecció del codi + HWID lock</a>
+<a href="#faq">12. Preguntes freqüents</a>
+<a href="#guies">13. Guies tècniques enllaçades</a>
 </div>
 
 <h1 id="estat">0. Estat actual del sistema</h1>
@@ -64,37 +72,95 @@
 <table>
 <tr><th>Component</th><th>Estat</th><th>Acció pendent</th></tr>
 <tr><td>App v1 (personal)</td><td><span class="badge badge-ok">✅ ACTIU</span></td><td>Cap</td></tr>
-<tr><td>App v2 (comercial) + Electron</td><td><span class="badge badge-ok">✅ ACTIU</span></td><td>Cap</td></tr>
+<tr><td>App v2 comercial + Electron</td><td><span class="badge badge-ok">✅ ACTIU</span></td><td>Cap</td></tr>
 <tr><td>Admin panel + sol·licituds públiques</td><td><span class="badge badge-ok">✅ ACTIU</span></td><td>Cap</td></tr>
 <tr><td>Cercador clients + Debe/Haber</td><td><span class="badge badge-ok">✅ ACTIU</span></td><td>Cap</td></tr>
 <tr><td>Mòdul SMS/WhatsApp (frontend + export CSV)</td><td><span class="badge badge-ok">✅ ACTIU</span></td><td>Cap</td></tr>
 <tr><td>Historial SMS (5000 registres + filtre data)</td><td><span class="badge badge-ok">✅ ACTIU</span></td><td>Cap</td></tr>
+<tr><td>Panell d'estadístiques MRR/ARR</td><td><span class="badge badge-ok">✅ ACTIU</span></td><td>Cap</td></tr>
+<tr><td>🔒 HWID Lock anti-pirateig</td><td><span class="badge badge-ok">✅ ACTIU</span></td><td>Cap</td></tr>
+<tr><td>🔧 Dropdown Contabilidad + Informe Anual PDF</td><td><span class="badge badge-ok">✅ ACTIU</span></td><td>Cap</td></tr>
 <tr><td>Pagament transferència (manual)</td><td><span class="badge badge-ok">✅ ACTIU</span></td><td>Cap</td></tr>
-<tr><td>Stripe Checkout one-off (targeta única)</td><td><span class="badge badge-wait">⏸️ MODE TEST</span></td><td>Passar a mode LIVE quan tinguis empresa</td></tr>
+<tr><td>Stripe Checkout one-off (targeta única)</td><td><span class="badge badge-wait">⏸️ MODE TEST</span></td><td>Passar a LIVE quan tinguis empresa</td></tr>
 <tr><td>Stripe Subscriptions (recurrent auto)</td><td><span class="badge badge-wait">⏸️ CODI LLEST</span></td><td>Crear compte Stripe + 4 Price IDs</td></tr>
 <tr><td>Auto-updates GitHub Releases</td><td><span class="badge badge-wait">⏸️ CODI LLEST</span></td><td>Crear repo GitHub + token PAT</td></tr>
-<tr><td>🔒 <b>HWID Lock anti-pirateig</b></td><td><span class="badge badge-ok">✅ ACTIU</span></td><td>Cap · funciona sol</td></tr>
 <tr><td>Twilio SMS/WhatsApp (enviament automàtic)</td><td><span class="badge badge-wait">⏸️ ENDPOINT LLEST</span></td><td>Comprar número + credencials</td></tr>
-<tr><td>Enviament automàtic JWT per email (Resend)</td><td><span class="badge badge-wait">⏸️ PENDENT</span></td><td>API key Resend</td></tr>
+<tr><td>Deploy a producció (URL estable + domini propi)</td><td><span class="badge badge-wait">⏸️ PENDENT</span></td><td>Botó Deploy Emergent + comprar domini</td></tr>
 </table>
+
+<!-- ================================================================================ -->
+<div class="pending-box">
+<h3 id="pendents">🚨 Les 4 coses que ens falten (quan tinguis empresa constituïda)</h3>
+<p style="color:#fde68a;margin:8px 0 16px 0">Aquestes són les úniques peces que et falten per tenir un negoci 100% automàtic. Totes estan <b>bloquejades esperant a tu</b>: cap de les 4 la puc fer jo sol.</p>
+
+<div class="pending-item">
+<b>1️⃣ 🚀 DEPLOY A PRODUCCIÓ</b> · ~15€/mes<br>
+Passar del <i>preview sandbox</i> (que s'adorm i causa flashos) a un servidor real amb domini propi <code>medicarplus.com</code>.<br>
+<b>Requereix:</b> targeta de crèdit + comprar domini (~10€/any).<br>
+<b>Guia dedicada:</b> <a href="/guia-deploy.html" target="_blank" style="color:#f5b301;text-decoration:underline">/guia-deploy.html</a> (passa-la al teu informàtic).
+</div>
+
+<div class="pending-item">
+<b>2️⃣ 💳 STRIPE SUBSCRIPTIONS</b> · pagaments recurrents automàtics<br>
+Quan un client paga, Stripe li cobra <b>sol cada mes/any</b> i el JWT es renova sol via webhooks. Zero feina teva.<br>
+<b>Requereix:</b> empresa constituïda + IBAN empresa + compte Stripe verificat.<br>
+<b>Guia dedicada:</b> <a href="/guia-stripe-setup.html" target="_blank" style="color:#f5b301;text-decoration:underline">/guia-stripe-setup.html</a>
+</div>
+
+<div class="pending-item">
+<b>3️⃣ 📱 TWILIO SMS/WHATSAPP</b> · enviament automàtic<br>
+Els avisos de renovació carnet, revisions caducades, etc. s'envien amb 1 clic. Sense Twilio, ara mateix ja pots <b>exportar CSV</b> i pujar-lo a LabsMobile per ~0,03€/SMS.<br>
+<b>Requereix:</b> compte Twilio + número de telèfon (~1$/mes) + verificació.<br>
+<b>Cost SMS:</b> ~0,05€/SMS · WhatsApp ~0,05€/conversa.
+</div>
+
+<div class="pending-item">
+<b>4️⃣ 🔄 AUTO-UPDATES GITHUB RELEASES</b> · zero feina distribuir noves versions<br>
+Ara mateix, quan actualitzes l'app has d'enviar per WeTransfer a cada client. Amb això configurat: <code>git tag v2.0.1</code> → tots els clients reben l'update automàticament.<br>
+<b>Requereix:</b> compte GitHub (gratis) + Personal Access Token.<br>
+<b>Guia dedicada:</b> <a href="/guia-github-releases.html" target="_blank" style="color:#f5b301;text-decoration:underline">/guia-github-releases.html</a>
+</div>
+
+<div style="background:rgba(0,0,0,0.3);padding:12px 16px;border-radius:8px;margin-top:16px;color:#fef3c7">
+<b>📋 Ordre recomanat un cop tinguis empresa:</b>
+<ol style="margin:6px 0">
+<li>Deploy + domini + emails (prioritat màxima — sense això tot depèn del preview)</li>
+<li>Stripe Subscriptions (per cobrar automàtic des del dia 1)</li>
+<li>Twilio (quan tinguis 5+ clients i comenci a compensar el fix mensual)</li>
+<li>GitHub Releases (quan facis la 1a update important)</li>
+</ol>
+</div>
+
+<div style="text-align:center;margin-top:16px;color:#fef3c7;font-style:italic;font-size:13px">
+Cost mensual estimat un cop tot activat: <b>~30-45€/mes</b> (Deploy 15€ + Twilio 3€ + Google Workspace 5€ + variables Stripe/SMS).<br>
+Amb 2 clients pagant STD anual (299,90€×2 = 599,80€) ja tens el fix cobert un any sencer.
+</div>
+</div>
 
 <hr>
 
-<h1 id="links">1. Els teus links importants</h1>
+<h1 id="links">2. Els teus links importants</h1>
 
 <table>
-<tr><th>Qui l'usa</th><th>URL</th><th>Per què</th></tr>
-<tr><td>🔴 <b>Tu (admin)</b></td><td><code>/admin</code></td><td>Gestionar llicències, sol·licituds, generar JWTs</td></tr>
+<tr><th>Qui l'usa</th><th>URL (preview actual)</th><th>Per què</th></tr>
+<tr><td>🔴 <b>Tu (admin)</b></td><td><code>/admin</code></td><td>Gestionar llicències, sol·licituds, generar JWTs, veure MRR</td></tr>
 <tr><td>🟢 <b>Clients potencials</b></td><td><code>/request-license</code></td><td>Formulari públic per demanar llicència</td></tr>
 <tr><td>🟡 <b>App v1 (per tu)</b></td><td><code>/caja_del_dia.html</code></td><td>La teva versió de sempre, inalterada</td></tr>
-<tr><td>🔵 <b>App v2 comercial</b></td><td><code>/v2.html</code></td><td>Font de l'app comercial (abans d'ofuscar)</td></tr>
+<tr><td>🔵 <b>App v2 comercial</b></td><td><code>/v2.html</code></td><td>Preview de l'app comercial (abans d'ofuscar)</td></tr>
 <tr><td>📖 Guia admin (aquesta)</td><td><code>/guia-medicar-plus.html</code></td><td>La que estàs llegint</td></tr>
 <tr><td>📖 Guia client</td><td><code>/guia-client-installacio.html</code></td><td>Enviar al client quan compri</td></tr>
-<tr><td>💳 Guia Stripe Subscriptions</td><td><code>/guia-stripe-setup.html</code></td><td>Per quan tinguis empresa + compte bancari</td></tr>
+<tr><td>🚀 Guia deploy</td><td><code>/guia-deploy.html</code></td><td>Passar-la a l'informàtic quan facis el deploy</td></tr>
+<tr><td>💳 Guia Stripe Subscriptions</td><td><code>/guia-stripe-setup.html</code></td><td>Per quan tinguis empresa + IBAN</td></tr>
 <tr><td>🚀 Guia Auto-updates</td><td><code>/guia-github-releases.html</code></td><td>Per fer que els clients rebin updates sols</td></tr>
 </table>
 
-<h1 id="claus">2. Claus i credencials</h1>
+<div class="callout callout-blue">
+<b>💡 Un cop facis el deploy</b>, aquests links tots canviaran de <code>project-helper-47.preview.emergentagent.com</code> a <code>medicarplus.com</code> (o el domini que triïs). Els avisaré al xat i actualitzaré totes les guies automàticament.
+</div>
+
+<hr>
+
+<h1 id="claus">3. Claus i credencials</h1>
 
 <div class="callout callout-red">
 <b>⚠️ CONFIDENCIAL — NO COMPARTIR MAI</b>
@@ -105,196 +171,126 @@
 </div>
 
 <div class="callout callout-blue">
-<b>📌 Backups de les claus:</b> apunta-les a un gestor de contrasenyes (Bitwarden, 1Password) o al mòbil xifrat. Si les perds, cal regenerar-les i totes les llicències existents deixen de funcionar.
+<b>📌 Backup:</b> apunta-les a un gestor de contrasenyes (Bitwarden, 1Password) o al mòbil xifrat. Si les perds, cal regenerar-les i totes les llicències deixen de funcionar.
 </div>
 
 <hr>
 
-<h1 id="flux">3. Flux complet de venda · pas a pas</h1>
+<!-- ================================================================================ -->
+<h1 id="novetats">4. Últimes novetats (juliol 2026)</h1>
+
+<h3>🔒 HWID Lock anti-pirateig <span class="badge badge-new">NOU</span></h3>
+Cada llicència queda "casada" amb el maquinari del PC on s'activa per primera vegada. Si algú copia el JWT a un altre PC, l'app el bloqueja amb missatge en català/castellà.
+<ul>
+<li>Genera HWID via SHA-256(hostname + platform + arch + memòria + MAC)</li>
+<li>Binding automàtic a la 1a activació</li>
+<li>Botó admin 🔓 taronja per desbloquejar quan un client canvia de PC legítimament</li>
+<li>Comptador de resets per detectar abusos</li>
+</ul>
+
+<h3>🔧 Dropdown Contabilidad <span class="badge badge-new">NOU</span></h3>
+Llibreta i IRPF ara estan agrupats sota un botó Contabilidad que obre un menú desplegable. Més net i professional.
+
+<h3>📊 Informe Anual PDF <span class="badge badge-new">NOU</span></h3>
+Tercera opció al dropdown Contabilidad. Inclou:
+<ul>
+<li>💰 MRR/Facturació total, entrades, taxes, mitjana mensual</li>
+<li>🏢 Desglossament per empresa (si en té 2)</li>
+<li>📋 Resum trimestral IRPF (15%) per T1/T2/T3/T4</li>
+<li>📅 Facturació mensual (12 files)</li>
+<li>📝 Per concepte amb % del total</li>
+<li>💳 Per forma de pagament (Efectiu/Targeta/Bizum/Transferència)</li>
+<li>🤝 Repartiment entre socis</li>
+<li>🖨️ Botó "Imprimir/PDF" que aprofita el print del navegador</li>
+</ul>
+
+<h3>💰 Saldo Anterior separat <span class="badge badge-new">NOU</span></h3>
+Al panell "Cierre del día":
+<ul>
+<li><b>Saldo anterior caja</b> — només efectiu, amb tooltip "?" que explica que és per passar caixa</li>
+<li><b>Saldo anterior</b> — suma total caja + banc</li>
+</ul>
+
+<h3>🇪🇸 Castellà per defecte <span class="badge badge-new">NOU</span></h3>
+Els nous usuaris veuen l'app en castellà. El botó 🌐 permet canviar a català.
+
+<h3>🏢 Empresa 2 100% opcional <span class="badge badge-new">NOU</span></h3>
+Al wizard, l'Empresa 2 es pot deixar buida. L'app amaga automàticament la pestanya i el tab. Es pot afegir/treure des de ⚙️ Configuració.
+
+<h3>📊 Panell d'Estadístiques admin <span class="badge badge-new">NOU</span></h3>
+Nova pestanya al `/admin` amb MRR, ARR, breakdown per pla, taxa de conversió, activitat 7d/30d, top 5 clients.
+
+<h3>🏦 "COMPTE BANC" genèric <span class="badge badge-new">NOU</span></h3>
+Sense BBVA hardcodejat. Funciona per qualsevol banc.
+
+<h3>🐛 Fix anti-flashos <span class="badge badge-new">NOU</span></h3>
+La protecció anti-loop de <code>location.reload()</code> evita que l'app entri en bucle infinit de recàrregues quan el servidor està adormit (cold start). Els cold starts es solucionaran del tot amb el <b>deploy a producció</b>.
+
+<hr>
+
+<h1 id="flux">5. Flux complet de venda pas a pas</h1>
 
 <div class="step">
 <div class="step-title">PAS 1 · El client entra al teu formulari</div>
-Envies el link <code>/request-license</code> per email o el poses al peu del teu mail.
-<br><br>Al formulari veu:
-<ul>
-<li>Les <b>3 targetes de preu</b> (TRIAL gratis · STD 29,90€/mes o 299,90€/any · PREMIUM 39,90€/mes o 399,90€/any)</li>
-<li>Toggle <b>MENSUAL / ANUAL</b> per triar periodicitat</li>
-<li>Formulari amb dades del centre (Empresa, Contacte, Email, NIF, Telèfon)</li>
-<li><b>Install ID opcional</b> (si encara no té l'app, ho deixa buit)</li>
-<li>Consent GDPR obligatori</li>
-</ul>
+Envies el link <code>/request-license</code> per email. Al formulari veu 3 targetes de preu, toggle mensual/anual, dades del centre, Install ID opcional i consentiment GDPR.
 </div>
 
 <div class="step">
 <div class="step-title">PAS 2 · La sol·licitud arriba al teu admin</div>
-Entres a <code>/admin</code> amb la teva clau. Veuràs:
-<ul>
-<li>Comptador <b>"Sol·licituds"</b> amb badge blau si en tens de pendents</li>
-<li>Llista amb empresa, email, telèfon, pla demanat, data</li>
-<li>Botons per aprovar / rebutjar / veure detalls</li>
-<li>Botó <b>📧 Enviar per email</b> que genera un <code>mailto:</code> preformatat amb la clau i les instruccions</li>
-</ul>
+Al `/admin` veus el comptador "Sol·licituds" amb badge blau. Llista amb empresa, email, telèfon, pla, data. Botons per aprovar/rebutjar + <b>📧 Enviar per email</b> (genera <code>mailto:</code>).
 </div>
 
 <div class="step">
 <div class="step-title">PAS 3 · Cobres al client</div>
-Tens <b>3 opcions</b> (mira la <a href="#pagaments">secció 4</a>):
-<ol>
-<li>🏦 <b>Transferència bancària</b> (l'única disponible avui)</li>
-<li>💳 <b>Stripe Checkout one-off</b> (en mode test)</li>
-<li>🔄 <b>Stripe Subscriptions</b> (codi llest, activa-ho quan tinguis empresa)</li>
-</ol>
+<b>Ara mateix:</b> transferència bancària (l'única activa).<br>
+<b>Un cop actives Stripe:</b> pagament amb targeta automàtic recurrent.
 </div>
 
 <div class="step">
-<div class="step-title">PAS 4 · Aprovar i generar la llicència</div>
-Al admin panel, clica <b>"✅ Aprovar i generar llicència"</b>. Es genera un JWT únic (<code>eyJhbGci...</code>) vinculat al centre.
-<br><br>Envia'l per email al client amb:
-<ol>
-<li>La clau JWT</li>
-<li>El link de descàrrega de l'.exe (WeTransfer/Drive per ara, GitHub Releases quan l'activis)</li>
-<li>La <a href="/guia-client-installacio.html" target="_blank">guia d'instal·lació</a></li>
-</ol>
+<div class="step-title">PAS 4 · Aprovar i generar llicència</div>
+Cliques "✅ Aprovar i generar llicència". Es genera un JWT únic. Envia'l amb la <a href="/guia-client-installacio.html">guia d'instal·lació</a>.
 </div>
 
 <div class="step">
-<div class="step-title">PAS 5 · El client instal·la i activa</div>
-<ol>
-<li>Instal·la l'exe</li>
-<li>A la pantalla d'activació, enganxa el JWT</li>
-<li>L'app verifica online contra el teu servidor</li>
-<li>Un cop activat, apareix el <b>wizard</b> per configurar noms d'empreses + socis</li>
-<li>Ja pot treballar</li>
-</ol>
+<div class="step-title">PAS 5 · Client instal·la i activa</div>
+El client obre l'.exe, enganxa el JWT, l'app verifica online, apareix el wizard per configurar empreses+socis, i ja pot treballar. <b>El HWID queda vinculat al seu PC automàticament.</b>
 </div>
 
 <div class="step">
 <div class="step-title">PAS 6 · Verificació periòdica (auto)</div>
-L'app fa un ping al teu servidor cada 15 dies. Si tu revoques la llicència (per exemple no ha pagat la renovació), la propera vegada que faci ping es bloqueja i torna a la pantalla d'activació.
-<div class="callout" style="margin-top:8px">Si el client no té internet, l'app segueix funcionant fins a <b>30 dies offline</b>.</div>
+L'app fa ping cada 15 dies. Si tu revoques la llicència o el HWID no coincideix, es bloqueja. Sense internet: <b>fins a 30 dies offline</b>.
 </div>
 
 <hr>
 
-<h1 id="pagaments">4. Sistema de pagaments</h1>
-
-<h3>Comparativa dels 3 mètodes</h3>
+<h1 id="pagaments">6. Sistema de pagaments (3 mètodes)</h1>
 
 <table>
 <tr><th>Mètode</th><th>Ideal per</th><th>Renovació</th><th>Estat</th></tr>
-<tr>
-  <td>🏦 <b>Transferència</b></td>
-  <td>Anuals grans · empreses tradicionals</td>
-  <td>Manual (tu renoves el JWT)</td>
-  <td><span class="badge badge-ok">✅ ACTIU</span></td>
-</tr>
-<tr>
-  <td>💳 <b>Stripe one-off</b></td>
-  <td>Pagament únic amb targeta</td>
-  <td>Manual (com transferència però amb targeta)</td>
-  <td><span class="badge badge-wait">⏸️ Mode TEST</span></td>
-</tr>
-<tr>
-  <td>🔄 <b>Stripe Subscriptions</b></td>
-  <td>Recurrents mensuals/anuals · escalabilitat</td>
-  <td><b>Automàtica</b> (webhook renova JWT sol)</td>
-  <td><span class="badge badge-wait">⏸️ Codi llest</span></td>
-</tr>
+<tr><td>🏦 <b>Transferència</b></td><td>Anuals grans · empreses tradicionals</td><td>Manual</td><td><span class="badge badge-ok">✅ ACTIU</span></td></tr>
+<tr><td>💳 <b>Stripe one-off</b></td><td>Pagament únic amb targeta</td><td>Manual</td><td><span class="badge badge-wait">⏸️ Mode TEST</span></td></tr>
+<tr><td>🔄 <b>Stripe Subscriptions</b></td><td>Recurrents · escalabilitat</td><td><b>Automàtica</b></td><td><span class="badge badge-wait">⏸️ Codi llest</span></td></tr>
 </table>
 
-<h3>🏦 Transferència bancària (mètode actual)</h3>
-<ol>
-<li>El client envia el formulari</li>
-<li>Tu li respons amb <b>proforma + IBAN + concepte</b></li>
-<li>Fa la transferència</li>
-<li>Al teu banc la veus, entres al admin i cliques <b>"Aprovar i generar llicència"</b></li>
-<li>Envies el JWT per email</li>
-</ol>
-
 <div class="callout callout-purple">
-<b>Comissió:</b> 0% (o mínim del teu banc). <b>Renovació:</b> anual manual — quan caduqui li envies factura nova.
+<b>Comissió Stripe:</b> 1,4% + 0,25€ (Europa) · 2,9% + 0,25€ (fora Europa). Per un STD Anual de 299,90€: ~4,45€ de comissió (1,48%).
 </div>
-
-<h3>💳 Stripe Checkout one-off (mode TEST actiu)</h3>
-Endpoint: <code>POST /api/payments/create-checkout</code><br>
-Estat: funciona amb <code>sk_test_emergent</code>. Els pagaments són simulats (targetes test 4242 4242 4242 4242).<br>
-Per passar a LIVE cal <b>empresa constituïda + Stripe account</b>.
-
-<h3>🔄 Stripe Subscriptions (Opció A — auto-renewal) <span class="badge badge-wait">CODI LLEST</span></h3>
-
-<div class="callout callout-green">
-<b>Novetat 07/2026:</b> El sistema ja té preparats <b>4 endpoints</b> i el <b>webhook</b> per gestionar subscripcions:
-<ul style="margin-top:6px">
-<li><code>POST /api/payments/create-subscription</code> — crea checkout mode subscripció</li>
-<li><code>GET /api/payments/subscription/enabled</code> — feature-flag que retorna false fins configurar Price IDs</li>
-<li><code>GET /api/payments/subscription/status/{id}</code> — polling</li>
-<li><code>GET /api/payments/subscription/list</code> — llista admin</li>
-</ul>
-<b>El webhook</b> escolta <code>invoice.paid</code>, <code>customer.subscription.deleted</code>, etc. i <b>renova/revoca el JWT automàticament</b> sense que hagis de fer res.
-</div>
-
-<b>Com funciona quan el client paga per subscripció:</b>
-<ol>
-<li>Client clica "Pagar amb targeta" (botó que apareixerà quan activis Subscriptions)</li>
-<li>Stripe fa 1a càrrega → webhook <code>checkout.session.completed</code> → genera JWT (30/365 dies)</li>
-<li>Cada mes/any Stripe cobra sol → webhook <code>invoice.paid</code> → estén JWT +30/+365 dies</li>
-<li>Si el client cancel·la o falla el cobrament → webhook <code>customer.subscription.deleted</code> → JWT revocat</li>
-</ol>
-
-<div class="callout callout-red">
-<b>⏸️ BLOQUEJAT PER TU:</b> Cal <b>constituir empresa</b> (autònom o SL) i <b>obrir Stripe account</b>. Sense això no pots rebre pagaments recurrents legalment. Un cop fet, segueix la <a href="/guia-stripe-setup.html" target="_blank"><b>guia dedicada</b></a> (5 minuts):
-<ol style="margin-top:6px">
-<li>Crear compte Stripe amb NIF empresa</li>
-<li>Crear 4 productes recurrents (STD Mes/Any, PREMIUM Mes/Any)</li>
-<li>Copiar els 4 Price IDs (<code>price_1xxx...</code>) al fitxer <code>.env</code></li>
-<li>Configurar el webhook a <code>https://el-teu-domini.com/api/webhook/stripe</code></li>
-<li>Reiniciar backend</li>
-</ol>
-Automàticament els Endpoints s'activen i el botó "Pagar amb targeta" apareix al formulari públic.
-</div>
-
-<h3>Comissions Stripe (referència)</h3>
-<ul>
-<li>Targetes europees: <b>1,4% + 0,25€</b> per transacció</li>
-<li>Targetes no-europees: <b>2,9% + 0,25€</b></li>
-<li>Per un pla STD Anual de 299,90€: uns <b>4,45€ de comissió</b> (≈1,48%)</li>
-</ul>
 
 <hr>
 
-<h1 id="enviar-app">5. Distribució de l'app + auto-updates</h1>
+<h1 id="enviar-app">7. Distribució de l'app</h1>
 
 <h3>Opció actual: WeTransfer / Google Drive</h3>
 <ol>
-<li>Compiles l'app: <code>node /app/commercial/build/obfuscate.js && cd /app/commercial/electron && npm run build:all</code></li>
-<li>Puges <code>MediCar Plus Setup 2.0.0.exe</code> a WeTransfer</li>
-<li>Envies el link al client + el JWT</li>
+<li>Compiles amb <code>node obfuscate.js && npm run build:all</code></li>
+<li>Puges <code>.exe</code> a WeTransfer</li>
+<li>Envies link + JWT + <a href="/guia-client-installacio.html">guia client</a></li>
 </ol>
 
 <h3>Opció futura: GitHub Releases + Auto-updates <span class="badge badge-wait">CODI LLEST</span></h3>
+Un cop configures GitHub (veure <a href="/guia-github-releases.html">guia dedicada</a>): un simple <code>git tag v2.0.1</code> = update automàtic a tots els clients.
 
-<div class="callout callout-green">
-<b>Novetat 07/2026:</b> Ja tens preparat:
-<ul style="margin-top:6px">
-<li>Workflow <code>.github/workflows/release.yml</code> que compila i publica sol quan fas <code>git tag v*</code></li>
-<li><code>main.js</code> ja porta <code>electron-updater</code> integrat: cada arrencada consulta GitHub Releases i notifica el client si hi ha versió nova</li>
-<li>Menú <b>Ajuda → Comprovar actualitzacions</b> per fer-ho manual</li>
-</ul>
-</div>
-
-<b>Què has de fer per activar-ho</b> (uns 15 min, una vegada):
-<ol>
-<li>Crear repo GitHub (privat o públic) — recomanat <code>medicar-plus-releases</code></li>
-<li>Actualitzar <code>package.json → build.publish.owner</code> amb el teu usuari</li>
-<li>Pujar el codi</li>
-<li>Crear un Personal Access Token amb scope <code>repo</code></li>
-<li>Guardar-lo com a secret <code>GH_TOKEN</code> al repo</li>
-<li>A partir d'aquí: cada <code>git tag v2.0.1 && git push --tags</code> = release nova per a tots els clients</li>
-</ol>
-Detall complet: <a href="/guia-github-releases.html" target="_blank"><b>guia dedicada</b></a>.
-
-<h3>Plantilla d'email d'entrega (copia-pega)</h3>
-
+<h3>Plantilla d'email d'entrega</h3>
 <pre>Benvingut/da a MediCar Plus!
 
 Adjunt li envio la seva llicència:
@@ -306,231 +302,158 @@ Adjunt li envio la seva llicència:
    [link WeTransfer o GitHub Releases]
 
 3. GUIA D'INSTAL·LACIÓ (5 minuts):
-   https://el-teu-domini.com/guia-client-installacio.html
+   https://medicarplus.com/guia-client-installacio.html
 
-Si Windows Defender l'avisa, cliqui "Más información" →
-"Ejecutar de todos modos" (l'app és segura, encara no
-té certificat digital comercial).
-
-Un cop instal·lada, la clau caduca segons el pla contractat.
-Rebrà avís abans de la renovació.
-
-Per qualsevol dubte: brugulatmarc@gmail.com
+Un cop instal·lada, la clau queda vinculada al seu PC (HWID Lock).
+Si canvia d'ordinador, escrigui'ns i li desbloquejarem al moment.
 
 Salutacions,
 M. Brugulat Lopez · MediCar Plus</pre>
 
 <hr>
 
-<h1 id="sms">6. Mòdul SMS/WhatsApp</h1>
+<h1 id="sms">8. Mòdul SMS/WhatsApp</h1>
 
 <h3>Què fa</h3>
-Envia recordatoris massius (renovacions carnet, revisions caducades) via SMS/WhatsApp. Estalvia el cost de cartes físiques.
+Recordatoris massius (renovacions carnet, revisions caducades) via SMS/WhatsApp. Estalvia cost de cartes físiques.
 
-<h3>Com s'usa dins l'app</h3>
-<ol>
-<li>Botó <b>📱 Avisos</b> al header (verd, al costat d'IRPF)</li>
-<li>Es divideix en 5 seccions:
-  <ul>
-    <li><b>Importar CSV</b> — puja el llistat DGT (Nom, Cognom1, Cognom2, Telèfon, DNI, Data caducitat, Adreça). Detecció automàtica de columnes</li>
-    <li><b>Afegir manual</b> — Nom + Telèfon directament</li>
-    <li><b>Missatge amb variables</b> — <code>{NOM}</code>, <code>{DNI}</code>, <code>{DATA_CADUCITAT}</code>, <code>{ADRECA}</code></li>
-    <li><b>Canals</b> — checkboxes SMS / WhatsApp / els dos</li>
-    <li><b>Contactes</b> — checkboxes individuals + preview del missatge personalitzat</li>
-  </ul>
-</li>
-<li>Accions:
-  <ul>
-    <li><b>📤 Exportar CSV</b> — descarrega telèfon + missatge personalitzat (per LabsMobile/SMSarena)</li>
-    <li><b>🚀 Enviar avisos</b> — via Twilio (cal configuració)</li>
-    <li><b>📜 Historial</b> — últims 5000 enviaments amb filtre per data</li>
-  </ul>
-</li>
-</ol>
+<h3>Ús dins l'app</h3>
+Botó <b>📱 Avisos</b> al header. Inclou:
+<ul>
+<li><b>Importar CSV</b> — llistat DGT (Nom, Cognom1, Cognom2, Telèfon, DNI, Caducitat, Adreça)</li>
+<li><b>Afegir manual</b> — Nom + Telèfon</li>
+<li><b>Missatge amb variables</b> — <code>{NOM}</code>, <code>{DNI}</code>, <code>{DATA_CADUCITAT}</code>, <code>{ADRECA}</code></li>
+<li><b>Canals</b> — SMS/WhatsApp/els dos</li>
+<li><b>📤 Exportar CSV</b> — descarrega telèfons + missatge personalitzat (per LabsMobile/SMSarena)</li>
+<li><b>🚀 Enviar avisos</b> — via Twilio (cal configuració)</li>
+<li><b>📜 Historial</b> — últims 5000 enviaments amb filtre per data</li>
+</ul>
 
 <div class="callout callout-red">
-<b>⚠️ Falta a la CSV del DGT:</b> el fitxer que reps del proveïdor DGT <b>no inclou columna Telefono</b>. Cal demanar al teu proveïdor que l'afegeixi — sense telèfon no es pot enviar SMS.
+<b>⚠️ Falta a la CSV del DGT:</b> el fitxer del proveïdor no inclou columna Telefono. Cal demanar-la al proveïdor.
 </div>
 
-<h3>Estat Twilio</h3>
-<div class="callout callout-purple">
-Endpoints <code>/api/notifications/send</code> i <code>/api/notifications/history</code> operatius, però retornen 503 fins que configuris:
-<ul style="margin-top:6px">
-<li><code>TWILIO_ACCOUNT_SID</code> (comença per <code>AC...</code>)</li>
-<li><code>TWILIO_AUTH_TOKEN</code></li>
-<li><code>TWILIO_PHONE_NUMBER</code> (format <code>+34XXXXXXXXX</code>)</li>
-</ul>
-Cost aproximat: ~1$/mes per número + ~0,05€/SMS + ~0,05€/conversa WhatsApp.
-</div>
-
-<h3>Alternativa gratis: CSV a LabsMobile</h3>
-Fins que activis Twilio, usa <b>📤 Exportar CSV</b> i puja el fitxer a:
+<h3>Alternativa gratis a Twilio (mentre esperes)</h3>
+Usa <b>📤 Exportar CSV</b> i puja el fitxer a:
 <ul>
 <li><b>LabsMobile</b> (~0,03€/SMS · empresa espanyola)</li>
 <li><b>SMSarena</b> (~0,03€/SMS)</li>
 </ul>
-Ambdós accepten CSV amb 2 columnes: telèfon + missatge.
 
 <hr>
 
-<h1 id="estadistiques">7. Panell d'estadístiques</h1>
+<h1 id="estadistiques">9. Panell d'estadístiques</h1>
 
-<div class="callout callout-green">
-<b>Novetat 07/2026:</b> nova pestanya <b>📊 Estadístiques</b> al admin panel amb tota la telemetria del negoci.
-</div>
-
-<h3>Què hi trobaràs</h3>
+Nova pestanya <b>📊 Estadístiques</b> al admin panel. Inclou:
 <ul>
-<li>💰 <b>MRR</b> (Monthly Recurring Revenue) — ingressos mensuals projectats sumant totes les llicències actives</li>
-<li>💰 <b>ARR</b> (Annual Recurring Revenue) — MRR × 12, per veure el potencial anual</li>
-<li>👥 <b>Clients de pagament</b> — quants STD + PREMIUM actius tens ara</li>
-<li>📈 <b>Desglossament per pla</b> — STD_MES, STD_ANY, PREMIUM_MES, PREMIUM_ANY amb comptador i equivalent mensual</li>
-<li>🎫 <b>Estat de llicències</b> — total, actives, revocades, expirades, verifies totals</li>
-<li>🔒 <b>Vinculades a HWID</b> — quantes tens amb candau + total de resets fets</li>
-<li>📮 <b>Sol·licituds</b> — pendents/aprovades/rebutjades + <b>taxa de conversió</b></li>
-<li>📈 <b>Activitat</b> — noves llicències els últims 7 i 30 dies</li>
-<li>🏆 <b>Top 5 clients</b> per número de verificacions (útil per detectar comportaments anòmals)</li>
+<li>💰 <b>MRR</b> — ingressos mensuals recurrents projectats</li>
+<li>💰 <b>ARR</b> — MRR × 12</li>
+<li>👥 Clients de pagament (actius STD + PREMIUM)</li>
+<li>📈 Desglossament per pla (STD_MES, STD_ANY, PREMIUM_MES, PREMIUM_ANY)</li>
+<li>🎫 Estat llicències (actives, revocades, expirades, amb HWID lock, verifies totals)</li>
+<li>📮 Sol·licituds + taxa de conversió</li>
+<li>📈 Noves llicències últims 7d i 30d</li>
+<li>🏆 Top 5 clients per número de verificacions</li>
 </ul>
 
-<h3>Endpoint tècnic</h3>
-<code>GET /api/licenses/stats</code> (X-Admin-Token). Retorna tot en JSON per si vols exportar-ho o connectar-ho a un Excel/Notion.
-
 <div class="callout callout-blue">
-<b>💡 Idea d'ús:</b> revisa el MRR cada dilluns. Si veus que baixa, mira sol·licituds pendents que potser has oblidat de processar. Si puja, celebra-ho 🎉.
+<b>💡 Consell:</b> revisa el MRR cada dilluns. Si baixa, mira sol·licituds pendents. Si puja, celebra-ho 🎉.
 </div>
+
+<hr>
+
+<h1 id="preus">10. Preus i plans configurats</h1>
 
 <table>
 <tr><th>Pla</th><th>Mensual</th><th>Anual</th><th>Estalvi</th><th>Inclou</th></tr>
 <tr><td><b>TRIAL</b></td><td colspan="3">Gratis 30 dies</td><td>Tot STD</td></tr>
-<tr><td><b>STD</b></td><td><span class="price-card">29,90€/mes</span></td><td><span class="price-card">299,90€/any</span></td><td>16%</td><td>Caixa · IRPF · Llibreta · Estadístiques · Cercador · Suport email</td></tr>
+<tr><td><b>STD</b></td><td><span class="price-card">29,90€/mes</span></td><td><span class="price-card">299,90€/any</span></td><td>16%</td><td>Caixa · IRPF · Llibreta · Informe Anual · Estadístiques · Cercador · Suport email</td></tr>
 <tr><td><b>PREMIUM</b> ⭐</td><td><span class="price-card">39,90€/mes</span></td><td><span class="price-card">399,90€/any</span></td><td>17%</td><td>Tot STD + <b>SMS/WhatsApp</b> + Suport prioritari</td></tr>
 </table>
 
-Preus definits al backend: <code>/app/backend/routes/payments.py</code> constant <code>PACKAGES</code>. Per canviar-los, avisa'm.
-
 <hr>
 
-<h1 id="proteccio">8. Protecció del codi (anti-clonació)</h1>
+<h1 id="proteccio">11. Protecció del codi</h1>
 
 <h3>Què tens protegit</h3>
 <ul>
-<li>✅ <b>JavaScript obfuscator alt</b>: el codi queda il·legible amb string arrays, control flow flattening i dead code injection</li>
-<li>✅ <b>Empaquetat ASAR</b> dins l'.exe (un usuari normal no hi arriba)</li>
-<li>✅ <b>DevTools desactivats</b> (F12, Ctrl+Shift+I, Ctrl+U, botó dret tot bloquejat)</li>
-<li>✅ <b>Llicència JWT amb secret al servidor</b>: encara que algú copiï l'HTML, no pot generar claus vàlides sense el teu <code>LICENSE_SECRET</code></li>
-<li>✅ <b>Master Key personal</b> no evident (<code>MB-MASTER-BRUGULAT-2026-OWNER</code>)</li>
+<li>✅ JavaScript obfuscator alt (string arrays + control flow flattening)</li>
+<li>✅ Empaquetat ASAR dins l'.exe</li>
+<li>✅ DevTools desactivats (F12, Ctrl+Shift+I, Ctrl+U, botó dret)</li>
+<li>✅ JWT amb secret al servidor (impossible generar claus vàlides sense el teu <code>LICENSE_SECRET</code>)</li>
+<li>✅ Master Key personal no evident</li>
+<li>✅ <b>HWID Lock</b> — llicència vinculada al PC del client (impedeix pirateig entre centres)</li>
 </ul>
 
-<h3>Què NO es pot protegir (cap empresa pot)</h3>
-<ul>
-<li>❌ La idea/concepte: 10 min mirant l'app → algú pot fer una còpia amb IA</li>
-<li>❌ El disseny visual (CSS és copiable per screenshots)</li>
-<li>❌ Reverse engineering profund (40h de feina d'un dev sènior)</li>
-</ul>
-
-<h3>Barreres reals (les que et defensen de veritat)</h3>
-<ol>
-<li><b>Coneixement del sector DGT</b> — no clonable</li>
-<li><b>Client base + confiança</b> — canviar de proveïdor és molt car per un centre</li>
-<li><b>Suport tècnic en català</b> — barrera d'idioma</li>
-<li><b>Preu baix (30€/mes)</b> — no val la pena copiar per aquest marge</li>
-</ol>
-
-<h3>Millores opcionals (per si vols apretar més)</h3>
-<ul>
-<li>✅ <b>HWID lock</b> — <b>JA IMPLEMENTAT!</b> Cada llicència queda vinculada al maquinari del PC on s'activa per 1a vegada. Si un client vol regalar-la al veí, el sistema la rebutja. Detall complet a sota ⬇️</li>
-<li><b>Code signing certificate</b> (~200€/any) — treu l'avís "publicador desconegut" i identifica còpies falses. Recomanat si vendràs a >20 clients</li>
-<li><b>Domain-lock de webhook</b> — rebutjar peticions de verificació sospitoses</li>
-</ul>
-
-<h3>🔒 HWID Lock — Com funciona</h3>
-
-<div class="callout callout-green">
-<b>Novetat 07/2026:</b> Sistema anti-pirateig entre clients activat de sèrie.
-</div>
-
+<h3>🔒 HWID Lock detallat</h3>
 <b>Com actua:</b>
 <ol>
-<li>El client instal·la l'app i activa el JWT al seu PC (PC A)</li>
-<li>El backend rep <b>HWID (fingerprint del maquinari)</b> de la petició de verify i el <b>guarda vinculat a la llicència</b> (això és el "binding")</li>
-<li>Cada vegada que l'app arrenca, envia el seu HWID actual</li>
-<li>Si el HWID coincideix amb el guardat → OK, funciona</li>
-<li>Si el HWID <b>és diferent</b> (per exemple algú ha copiat el JWT a un altre PC) → l'app mostra:
-  <br><i>"Aquesta llicència està vinculada a un altre ordinador. Contacta amb el proveïdor per fer el canvi."</i></li>
+<li>Client instal·la l'app i activa el JWT al seu PC (PC A)</li>
+<li>Backend rep HWID i el guarda vinculat a la llicència (binding)</li>
+<li>Cada verify posterior compara HWID</li>
+<li>Si HWID diferent → app mostra <i>"Aquesta llicència està vinculada a un altre ordinador. Contacta amb el proveïdor per fer el canvi."</i></li>
 </ol>
 
-<b>Com es genera el HWID (a l'.exe):</b>
-<pre>hostname + platform + arquitectura + memòria total + primera MAC address
-                             ↓ SHA-256
-                     HW-XXXXXXXX...  (24 chars)</pre>
-
-<b>Quan un client canvia legítimament de PC:</b>
+<b>Quan un client canvia de PC legítimament:</b>
 <ol>
-<li>El client et contacta explicant que ha canviat d'ordinador</li>
-<li>Vés a l'admin panel <code>/admin</code></li>
-<li>Localitza la seva llicència a la llista</li>
-<li>Clica el botó <b>🔓 (taronja)</b> — "Desbloquejar HWID"</li>
+<li>Client et contacta</li>
+<li>Vés a <code>/admin</code>, localitza la seva llicència</li>
+<li>Clica <b>🔓 (taronja)</b> — Desbloquejar HWID</li>
 <li>Confirmes → el HWID guardat es buida</li>
-<li>El client obre l'app al nou PC → nou binding automàtic al nou HWID</li>
+<li>Client obre l'app al nou PC → nou binding automàtic</li>
 </ol>
 
-<div class="callout">
-<b>💡 Comptador de resets:</b> el sistema guarda <code>hwid_reset_count</code>. Si un client demana 3 canvis en 6 mesos, sospita — potser està distribuint la clau a diversos PCs.
-</div>
-
-<b>Quan un client tingui 2 ordinadors legítims (per exemple oficina + casa):</b>
-<div class="callout callout-blue">
-<b>Solució recomanada:</b> genera-li <b>2 llicències separades</b> (una per PC, cada una amb el seu Install ID). Cobra un extra (per exemple +50%) per aquest privilegi. Així es respecta el HWID lock i tens ingressos majors.
-</div>
-
-<b>Endpoint tècnic:</b> <code>POST /api/licenses/{install_id}/reset-hwid</code> (X-Admin-Token requerit).
+<b>Comptador de resets:</b> el sistema guarda <code>hwid_reset_count</code>. Si un client demana 3+ canvis en 6 mesos, sospita.
 
 <div class="callout callout-blue">
-<b>💡 Recomanació:</b> No obsessionar-se. Focus a captar clients — cada centre nou és una barrera de sortida que un clonador no pot copiar.
+<b>💡 Client amb 2 PCs (oficina+casa):</b> genera <b>2 llicències separades</b> amb Install IDs diferents. Cobra un extra (+50%). Respecta el HWID lock i tens ingressos majors.
 </div>
 
 <hr>
 
-<h1 id="faq">10. Preguntes freqüents</h1>
+<h1 id="faq">12. Preguntes freqüents</h1>
 
 <h3>Un client canvia d'ordinador, què faig?</h3>
-Al nou PC, l'app genera un <b>Install ID diferent</b>. El client te l'ha de passar. Entres al admin, generes un JWT nou lligat al nou ID i li envies. L'antic queda inutilitzat.
+Vés al admin, localitza la seva llicència, clica <b>🔓 Desbloquejar HWID</b>. Confirmes i llest — al nou PC quedarà vinculada automàticament.
 
 <h3>Com faig una promoció (mesos gratis)?</h3>
-Al admin, quan aprovis, indica una <b>durada personalitzada</b> (per exemple 90 dies gratis). El JWT porta el <code>exp</code> incorporat i caduca sol.<br>Amb Stripe Subscriptions actiu, pots crear <b>codis de promoció</b> al Dashboard (paràmetre <code>allow_promotion_codes: true</code> ja habilitat).
-
-<h3>El client vol cancel·lar la subscripció mensual (Stripe)?</h3>
-<b>Amb Subscriptions actiu:</b> el client cancel·la des del <b>Customer Portal</b> de Stripe (endpoint futur). Al final del cicle, el webhook <code>customer.subscription.deleted</code> revoca el JWT sol.<br>
-<b>Amb transferència:</b> simplement no li renoves quan caduqui.
+Al aprovar, indica una <b>durada personalitzada</b> (per exemple 90 dies gratis). El JWT porta el <code>exp</code> i caduca sol.<br>Amb Stripe Subscriptions: crea <b>codis de promoció</b> al Dashboard.
 
 <h3>Cost mensual del sistema en producció?</h3>
 <ul>
-<li>Domini propi: ~10€/any</li>
-<li>Hosting (Emergent Deploy o similar): ~15€/mes</li>
+<li>Domini: ~10€/any (~1€/mes)</li>
+<li>Emergent Deploy: ~15€/mes</li>
+<li>Google Workspace: ~5€/mes (opcional)</li>
 <li>Stripe: 0€ fix, només comissió (~1,4%)</li>
 <li>Twilio: ~1$/mes + ~0,05€/SMS</li>
-<li>Resend: gratis fins a 3000 emails/mes</li>
+<li>Resend: gratis fins 3000 emails/mes</li>
 </ul>
-<b>Total fix: ~15€/mes.</b> Amb 1 client STD anual (299,90€) ja et cobreix l'any sencer.
+<b>Total fix: ~20-25€/mes.</b> Amb 1 client STD anual (299,90€) ja tens l'any cobert.
 
 <h3>Puc revendre a 100+ centres alhora?</h3>
-Sí, escalable de sèrie. Cada centre té JWT únic. El backend gestiona verificacions concurrents amb <b>límit 60 verify/minute per IP</b>.
+Sí, escalable. Cada centre té JWT únic + HWID únic. Backend gestiona verificacions concurrents amb rate limit 60/minute per IP.
 
 <h3>Què passa si perdo el <code>LICENSE_SECRET</code>?</h3>
-Totes les llicències existents deixen de verificar-se. Cal <b>regenerar el secret + regenerar tots els JWTs actius + reenviar-los</b>. Fes-ne backup a un gestor de contrasenyes.
+Totes les llicències existents deixen de verificar-se. Cal regenerar el secret + regenerar tots els JWTs + reenviar-los. <b>Fes-ne backup a un gestor de contrasenyes.</b>
+
+<h3>Per què hi ha "flashos" en obrir el preview?</h3>
+El servidor preview d'Emergent s'adorm després d'uns minuts sense visites. Quan hi tornes triga 30-60s a despertar-se. <b>Un cop facis el deploy a producció (15€/mes) el servidor NO s'adorm mai i el problema desapareix del tot.</b>
+
+<h3>Puc revendre a més d'un centre alhora?</h3>
+Absolutament. Cada centre té la seva llicència JWT única. Tot el sistema està preparat per escalar.
 
 <hr>
 
-<h1 id="guies">11. Guies tècniques enllaçades</h1>
+<h1 id="guies">13. Guies tècniques enllaçades</h1>
 <ul style="line-height:2">
-<li>🚀 <a href="/guia-deploy.html" target="_blank"><b>Deploy a producció + domini propi</b></a> ⭐ — pas a pas per passar del preview al servidor real amb domini <code>medicarplus.com</code>. <b>Passa-ho al teu informàtic.</b></li>
+<li>🚀 <a href="/guia-deploy.html" target="_blank"><b>Deploy a producció + domini propi</b></a> ⭐ — pas a pas per passar del preview al servidor real. <b>Passa-ho al teu informàtic.</b></li>
 <li>💳 <a href="/guia-stripe-setup.html" target="_blank"><b>Configurar Stripe Subscriptions</b></a> — 6 passos per activar pagaments recurrents</li>
 <li>🚀 <a href="/guia-github-releases.html" target="_blank"><b>Auto-updates amb GitHub Releases</b></a> — 7 passos per publicació automàtica</li>
 <li>👤 <a href="/guia-client-installacio.html" target="_blank"><b>Guia d'instal·lació per clients</b></a> — envia-la a cada client nou</li>
 </ul>
 
 <div class="footer">
-Guia MediCar Plus v2 · M.Brugulat Lopez · Actualitzada 07/2026<br>
+Guia MediCar Plus v2 · M.Brugulat Lopez · Actualitzada 08/07/2026<br>
 Contacte: brugulatmarc@gmail.com
 </div>
 

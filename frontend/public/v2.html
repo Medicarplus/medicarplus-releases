@@ -2368,9 +2368,25 @@ function isLicenseActive(){
   const needsCheck=LIC.VERIFY_URL&&lic.type==='JWT'&&daysSinceCheck>LIC.CHECK_INTERVAL_DAYS;
   if(needsCheck){
     verifyOnline(lic.key,installId).then(res=>{
-      if(res.revoked||res.expired||res.ok===false){console.warn('Llicència invalidada pel servidor:',res.reason);localStorage.removeItem(LIC.KEY);location.reload();}
-      else{localStorage.setItem(LIC.LAST_CHECK,Date.now().toString());}
-    }).catch(()=>{});
+      // Protecció anti-loop: només marquem revocada si el servidor respon
+      // EXPLÍCITAMENT amb ok:false + una raó legítima (no un timeout ni cold-start).
+      // Si la resposta és incompleta o buida (servidor adormit/desconnexió), no fem res —
+      // ja tornarem a intentar-ho més tard sense forçar recàrrega.
+      if(!res||typeof res!=='object'){return}
+      if(res.skipped===true||res.error){return}
+      const isDefinitelyInvalid=(res.revoked===true)||(res.expired===true)||(res.ok===false&&res.reason);
+      if(isDefinitelyInvalid){
+        console.warn('Llicència invalidada pel servidor:',res.reason||'desconegut');
+        // Evita reload infinit: només 1 reload cada 30 segons màxim
+        const lastReload=parseInt(sessionStorage.getItem('caja.license.lastreload')||'0');
+        if(Date.now()-lastReload<30000){console.warn('Reload suprimit (evitant loop)');return}
+        sessionStorage.setItem('caja.license.lastreload',String(Date.now()));
+        localStorage.removeItem(LIC.KEY);
+        location.reload();
+      }else if(res.ok===true){
+        localStorage.setItem(LIC.LAST_CHECK,Date.now().toString());
+      }
+    }).catch((e)=>{console.warn('Verify online fallit (retry més endavant):',e&&e.message||e)});
   }
   if(LIC.VERIFY_URL&&lic.type==='JWT'&&daysSinceCheck>LIC.MAX_OFFLINE_DAYS)return false;
   return true;
@@ -2466,7 +2482,9 @@ function showLicenseInfo(){
       verifyBtn.disabled=true;verifyBtn.textContent='Verificant…';
       try{
         const res=await verifyOnline(lic.key,installId);
-        if(res.ok===false){alert('✗ El servidor ha rebutjat la llicència: '+(res.reason||'desconegut')+'\n\nEs desactivarà l\'app.');localStorage.removeItem(LIC.KEY);location.reload();}
+        if(res.ok===false&&res.reason){alert(L('✗ El servidor ha rebutjat la llicència: ','✗ El servidor ha rechazado la licencia: ')+(res.reason||'desconegut'));localStorage.removeItem(LIC.KEY);location.reload();}
+        else if(res.ok===true){/* validada online */}
+        // Si res.ok és undefined/null o hi ha error de xarxa, no fem res — l'usuari ja ha entrat OK offline
         else{localStorage.setItem(LIC.LAST_CHECK,Date.now().toString());alert('✓ Llicència confirmada pel servidor.');back.remove();}
       }catch(e){alert('⚠ No s\'ha pogut contactar el servidor: '+e.message);verifyBtn.disabled=false;verifyBtn.textContent='↻ Verificar ara';}
     };
