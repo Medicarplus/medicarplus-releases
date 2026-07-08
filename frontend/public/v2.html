@@ -1626,31 +1626,17 @@ function computeAudit(dateFrom,dateTo){
       byGroup[g]=(byGroup[g]||0)+1;
     });
     v.entries.sort((a,b)=>a.date.localeCompare(b.date));
-    // GRUPS DUPLICATS: dins d'un mateix grup hi ha 2+ entrades del mateix nom → alarma FORTA
+    // GRUPS DUPLICATS: dins d'un mateix grup hi ha 2+ entrades del mateix nom → REVISAR (pot ser duplicat O interromput, no distingible)
     const duplicatedGroups=Object.entries(byGroup).filter(([g,c])=>c>=2).map(([g,c])=>({group:g,count:c}));
     const hasSameGroupDup=duplicatedGroups.length>0;
-    // Analitzem GAPS temporals per distingir DUPLICAT (mateix dia/setmana) vs INTERROMPUT (>7 dies)
-    let hasDuplicate=false, hasInterrupted=false;
-    if(hasSameGroupDup){
-      // Per cada grup duplicat, mira els dies de les seves entrades
-      duplicatedGroups.forEach(dg=>{
-        const dates=v.entries.filter(x=>!x.e.retorno && x.e.kind!=='DH' && ((x.e.grupo||'—').toString().trim()===dg.group)).map(x=>x.date).sort();
-        for(let i=1;i<dates.length;i++){
-          const gap=Math.round((new Date(dates[i])-new Date(dates[i-1]))/86400000);
-          if(gap<=7)hasDuplicate=true;
-          else hasInterrupted=true;
-        }
-      });
-    }
     // ERROR: fitxa a 0€ sense contrapartida D/H
     const zeroWithoutDh=zeroCount>0&&dhCount===0;
     // GRUPS DIFERENTS: mateix nom apareix en 2+ grups diferents → info SUAU (normal)
     const distinctGroups=Object.keys(byGroup);
     const hasDiffGroups=distinctGroups.length>=2;
-    // CATEGORIA principal (per filtre): prioritat duplicat > interromput > error > info
+    // CATEGORIA principal (per filtre): prioritat same_group > error > info
     let category='info';
-    if(hasDuplicate)category='duplicado';
-    else if(hasInterrupted)category='interrumpido';
+    if(hasSameGroupDup)category='same_group';
     else if(zeroWithoutDh)category='error';
     else if(hasDiffGroups)category='info';
     const suspicious=hasSameGroupDup||zeroWithoutDh;
@@ -1660,7 +1646,7 @@ function computeAudit(dateFrom,dateTo){
     else if(hasDiffGroups&&trafCount>=2)severity=1;
     const dFirst=new Date(v.entries[0].date),dLast=new Date(v.entries[v.entries.length-1].date);
     const daySpan=Math.round((dLast-dFirst)/86400000);
-    return {key:k,display:v.display,entries:v.entries,totalImp,totalTasa,zeroCount,dhCount,dhSum,trafCount,suspicious,severity,hasSameGroupDup,duplicatedGroups,distinctGroups,daySpan,category,hasDuplicate,hasInterrupted,zeroWithoutDh};
+    return {key:k,display:v.display,entries:v.entries,totalImp,totalTasa,zeroCount,dhCount,dhSum,trafCount,suspicious,severity,hasSameGroupDup,duplicatedGroups,distinctGroups,daySpan,category,zeroWithoutDh};
   }).sort((a,b)=>{
     // Ordre: severity DESC, després per número d'entrades DESC
     if(a.severity!==b.severity)return b.severity-a.severity;
@@ -1688,12 +1674,11 @@ $('#btnAudit').onclick=()=>{
         <button class="btn" data-preset="12m" style="padding:6px 10px;font-size:11px">1 año</button>
         <button class="btn" data-preset="all" style="padding:6px 10px;font-size:11px">Todo</button>
       </div>
-      <span class="small" style="margin-left:auto;color:#f97316">🔴 Duplicat · 🟠 Interromput · ⚠️ Error · 🟡 Info</span>
+      <span class="small" style="margin-left:auto;color:#f97316">🔴 Mismo grupo · ⚠️ Error 0€ · 🟡 Info</span>
     </div>
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;background:#141821;border:1px solid #2a3040;border-radius:8px;padding:10px 14px">
       <b style="font-size:12px;color:#f5b301;letter-spacing:1px">🔎 FILTRAR:</b>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#fed7aa"><input type="checkbox" id="fltDup" checked style="cursor:pointer;accent-color:#ea580c" /> 🔴 Posible duplicado</label>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#fdba74"><input type="checkbox" id="fltInt" checked style="cursor:pointer;accent-color:#c2410c" /> 🟠 Posible interrumpido</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#fed7aa"><input type="checkbox" id="fltSame" checked style="cursor:pointer;accent-color:#ea580c" /> 🔴 Mismo grupo (duplicado o interrumpido)</label>
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#ff96a0"><input type="checkbox" id="fltErr" checked style="cursor:pointer;accent-color:#dc2626" /> ⚠️ Posible error (0€)</label>
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#ffd58a"><input type="checkbox" id="fltInfo" style="cursor:pointer;accent-color:#a16207" /> 🟡 Info (varios grupos)</label>
       <button class="btn" id="fltAll" style="padding:5px 10px;font-size:11px;margin-left:auto">Todo</button>
@@ -1720,13 +1705,11 @@ $('#btnAudit').onclick=()=>{
     if(!from||!to||from>to){back.querySelector('#auBody').innerHTML='<div class="empty">Rango de fechas no válido</div>';return}
     const data=computeAudit(from,to);
     // Aplica els filtres seleccionats
-    const wantDup=back.querySelector('#fltDup').checked;
-    const wantInt=back.querySelector('#fltInt').checked;
+    const wantSame=back.querySelector('#fltSame').checked;
     const wantErr=back.querySelector('#fltErr').checked;
     const wantInfo=back.querySelector('#fltInfo').checked;
     const filtered=data.filter(c=>{
-      if(c.category==='duplicado'&&wantDup)return true;
-      if(c.category==='interrumpido'&&wantInt)return true;
+      if(c.category==='same_group'&&wantSame)return true;
       if(c.category==='error'&&wantErr)return true;
       if(c.category==='info'&&wantInfo)return true;
       return false;
@@ -1735,15 +1718,14 @@ $('#btnAudit').onclick=()=>{
     const rangeTxt=`${from.split('-').reverse().join('/')} → ${to.split('-').reverse().join('/')}`;
     if(!filtered.length){
       if(!data.length)body.innerHTML=`<div class="empty" style="padding:40px">✅ Ningún cliente aparece más de una vez entre ${rangeTxt}.<br><br>Todo limpio en este rango.</div>`;
-      else body.innerHTML=`<div class="empty" style="padding:40px">🔎 Ningún resultado con los filtros seleccionados.<br><br>Hay <b>${data.length}</b> cliente(s) repetido(s) en total pero ninguno encaixa amb els filtres activats. Activa més filtres a dalt.</div>`;
+      else body.innerHTML=`<div class="empty" style="padding:40px">🔎 Ningún resultado con los filtros seleccionados.<br><br>Hay <b>${data.length}</b> cliente(s) repetido(s) en total. Activa más filtros arriba.</div>`;
       return;
     }
-    const dupCount=filtered.filter(x=>x.category==='duplicado').length;
-    const intCount=filtered.filter(x=>x.category==='interrumpido').length;
+    const sameCount=filtered.filter(x=>x.category==='same_group').length;
     const errCount=filtered.filter(x=>x.category==='error').length;
     const infoCount=filtered.filter(x=>x.category==='info').length;
-    body.innerHTML=`<div style="padding:10px 14px;background:${(dupCount+intCount+errCount)?'#3a1c22':'#1f3a2e'};border:1px solid ${(dupCount+intCount+errCount)?'#5e2a33':'#2a5e44'};border-radius:8px;margin-bottom:12px;font-size:13px">
-      Rango: <b>${rangeTxt}</b> · Mostrant <b>${filtered.length}</b> de <b>${data.length}</b> repetit(s) · <b style="color:#fed7aa">${dupCount}</b> 🔴 duplicats · <b style="color:#fdba74">${intCount}</b> 🟠 interromputs · <b style="color:#ff96a0">${errCount}</b> ⚠️ errors · <b style="color:#ffd58a">${infoCount}</b> 🟡 info
+    body.innerHTML=`<div style="padding:10px 14px;background:${(sameCount+errCount)?'#3a1c22':'#1f3a2e'};border:1px solid ${(sameCount+errCount)?'#5e2a33':'#2a5e44'};border-radius:8px;margin-bottom:12px;font-size:13px">
+      Rango: <b>${rangeTxt}</b> · Mostrando <b>${filtered.length}</b> de <b>${data.length}</b> repetido(s) · <b style="color:#fed7aa">${sameCount}</b> 🔴 mismo grupo · <b style="color:#ff96a0">${errCount}</b> ⚠️ errores · <b style="color:#ffd58a">${infoCount}</b> 🟡 info
     </div>`+
     filtered.map(c=>{
       const rows=c.entries.map(({date,e})=>{
@@ -1769,7 +1751,7 @@ $('#btnAudit').onclick=()=>{
       // Missatge final segons severitat
       let footer='';
       if(c.severity===2){
-        if(c.hasSameGroupDup)footer=`<div class="small" style="margin-top:8px;color:#fed7aa">🔴 Mismo cliente repetido en el mismo grupo → probable duplicado, interrumpido o devolución pendiente. Revisa aquí.</div>`;
+        if(c.hasSameGroupDup)footer=`<div class="small" style="margin-top:8px;color:#fed7aa">🔴 Mismo cliente repetido en el mismo grupo → puede ser un <b>duplicado</b> real (mismo trámite dos veces) o un <b>interrumpido</b> (venir varios días para completar el mismo trámite). Revísalo tú manualment.</div>`;
         else footer=`<div class="small" style="margin-top:8px;color:#ff96a0">⚠️ Ficha a 0€ sin compensación en Debe/Haber. Probablemente aquí está el descuadre.</div>`;
       }else if(c.severity===1){
         footer=`<div class="small" style="margin-top:8px;color:#ffd58a">🟡 Cliente en varios grupos diferentes (${c.distinctGroups.join(', ')}) — normal, sólo informativo.</div>`;
@@ -1787,9 +1769,9 @@ $('#btnAudit').onclick=()=>{
   back.querySelector('#auReload').onclick=renderAudit;
   back.querySelector('#auFrom').onchange=renderAudit;
   back.querySelector('#auTo').onchange=renderAudit;
-  ['#fltDup','#fltInt','#fltErr','#fltInfo'].forEach(s=>back.querySelector(s).onchange=renderAudit);
-  back.querySelector('#fltAll').onclick=()=>{['#fltDup','#fltInt','#fltErr','#fltInfo'].forEach(s=>back.querySelector(s).checked=true);renderAudit()};
-  back.querySelector('#fltNone').onclick=()=>{back.querySelector('#fltDup').checked=true;back.querySelector('#fltInt').checked=true;back.querySelector('#fltErr').checked=true;back.querySelector('#fltInfo').checked=false;renderAudit()};
+  ['#fltSame','#fltErr','#fltInfo'].forEach(s=>back.querySelector(s).onchange=renderAudit);
+  back.querySelector('#fltAll').onclick=()=>{['#fltSame','#fltErr','#fltInfo'].forEach(s=>back.querySelector(s).checked=true);renderAudit()};
+  back.querySelector('#fltNone').onclick=()=>{back.querySelector('#fltSame').checked=true;back.querySelector('#fltErr').checked=true;back.querySelector('#fltInfo').checked=false;renderAudit()};
   back.querySelector('#auAskAi').onclick=()=>{
     const from=back.querySelector('#auFrom').value;
     const to=back.querySelector('#auTo').value;
@@ -2746,6 +2728,22 @@ setTimeout(()=>{
     logoutBtn.style.cssText='margin-right:6px;padding:7px 12px;background:linear-gradient(135deg,#7f1d1d 0%,#991b1b 100%);border:1px solid #b91c1c;color:#fee2e2;display:inline-flex;align-items:center;box-shadow:0 2px 8px rgba(185,28,28,.3)';
     logoutBtn.onclick=()=>{
       if(confirm('Desactivar la llicència actual i tornar a la pantalla d\'activació?\n\nLes teves dades locals (dies, entrades, IRPF, còpies) NO s\'esborraran.')){
+        localStorage.removeItem('caja.license.v1');
+        localStorage.removeItem('caja.license.lastcheck.v1');
+        location.reload();
+      }
+    };
+    langBtn.parentElement.insertBefore(logoutBtn,langBtn);
+  }
+  const sig=document.querySelector('[style*="Powered by"]');
+  const sigParent=sig?sig.parentElement:null;
+  if(sigParent){sigParent.style.cursor='pointer';sigParent.style.pointerEvents='auto';sigParent.onclick=showLicenseInfo;sigParent.title='Clica per veure info de llicència'}
+},500);
+
+</script>
+</body>
+</html>
+ a la pantalla d\'activació?\n\nLes teves dades locals (dies, entrades, IRPF, còpies) NO s\'esborraran.')){
         localStorage.removeItem('caja.license.v1');
         localStorage.removeItem('caja.license.lastcheck.v1');
         location.reload();
