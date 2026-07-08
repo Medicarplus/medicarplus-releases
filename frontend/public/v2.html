@@ -323,7 +323,7 @@
 const STORE_KEY='caja.v1';const $=s=>document.querySelector(s);const $$=s=>document.querySelectorAll(s);
 // ============ i18n ============
 const I18N={
-  es:{app_title:'MediCar Plus',app_sub:'Cierre diario · Importación CSV/Excel · Debe / Haber',stats:'📊 ESTADÍSTICAS',date:'FECHA',today:'Hoy',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar copia',restore_copy:'📂 Restaurar copia',history:'🛡️ Historial',ledger:'📖 Libreta',accounting:'Contabilidad',annual_report:'📊 Informe anual',audit:'🔎 Auditoría',ai_advisor:'🤖 Asesor IA',print:'🖨️ Imprimir',tab_traffic:'Tráfico (Renov/Exped)',tab_reviews:'Revisiones / Certificados / Otros',tab_dh:'Debe / Haber',concept:'Concepto',group:'Grupo',name:'Nombre',amount:'Importe (€)',dgt_fee:'Tasa DGT (€)',payment:'F. Pago',cash:'Efectivo',card:'Tarjeta',transfer:'Transferencia',renewal:'Renovación',issue:'Expedición',duplicate:'Duplicado',exchange:'Canje',other:'Otro',driving:'Conducir',moped:'Ciclomotor',ph_name:'Apellidos, Nombre',add_entry:'+ Añadir entrada',entries_of_day:'Entradas del día',clear_day:'🗑️ Vaciar día',type:'Tipo',name_concept:'Nombre / Concepto',amount_short:'Importe',disc:'Dto',fee_short:'Tasa',fp_fee:'FP Tasa',actions:'Acciones',empty_entries:'No hay entradas. Importa CSV/Excel o añade manualmente arriba.',day_close:'Cierre del día',month_split:'Reparto mes actual',by_concept:'Resumen por concepto',history_title:'Histórico'},
+  es:{app_title:'MediCar Plus',app_sub:'Cierre diario · Importación CSV/Excel · Debe / Haber',stats:'📊 ESTADÍSTICAS',date:'FECHA',today:'Hoy',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar copia',restore_copy:'📂 Restaurar copia',history:'🛡️ Historial',ledger:'📖 Libreta',accounting:'Contabilidad',annual_report:'📊 Informe anual',reserve:'💰 Reserva de cambio',audit:'🔎 Auditoría',ai_advisor:'🤖 Asesor IA',print:'🖨️ Imprimir',tab_traffic:'Tráfico (Renov/Exped)',tab_reviews:'Revisiones / Certificados / Otros',tab_dh:'Debe / Haber',concept:'Concepto',group:'Grupo',name:'Nombre',amount:'Importe (€)',dgt_fee:'Tasa DGT (€)',payment:'F. Pago',cash:'Efectivo',card:'Tarjeta',transfer:'Transferencia',renewal:'Renovación',issue:'Expedición',duplicate:'Duplicado',exchange:'Canje',other:'Otro',driving:'Conducir',moped:'Ciclomotor',ph_name:'Apellidos, Nombre',add_entry:'+ Añadir entrada',entries_of_day:'Entradas del día',clear_day:'🗑️ Vaciar día',type:'Tipo',name_concept:'Nombre / Concepto',amount_short:'Importe',disc:'Dto',fee_short:'Tasa',fp_fee:'FP Tasa',actions:'Acciones',empty_entries:'No hay entradas. Importa CSV/Excel o añade manualmente arriba.',day_close:'Cierre del día',month_split:'Reparto mes actual',by_concept:'Resumen por concepto',history_title:'Histórico'},
   ca:{app_title:'MediCar Plus',app_sub:'Tancament diari · Importació CSV/Excel · Deure / Haver',stats:'📊 ESTADÍSTIQUES',date:'DATA',today:'Avui',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar còpia',restore_copy:'📂 Restaurar còpia',history:'🛡️ Historial',ledger:'📖 Llibreta',accounting:'Comptabilitat',annual_report:'📊 Informe anual',audit:'🔎 Auditoria',ai_advisor:'🤖 Assessor IA',print:'🖨️ Imprimir',tab_traffic:'Trànsit (Renov/Exped)',tab_reviews:'Revisions / Certificats / Altres',tab_dh:'Deure / Haver',concept:'Concepte',group:'Grup',name:'Nom',amount:'Import (€)',dgt_fee:'Taxa DGT (€)',payment:'F. Pagament',cash:'Efectiu',card:'Targeta',transfer:'Transferència',renewal:'Renovació',issue:'Expedició',duplicate:'Duplicat',exchange:'Canvi',other:'Altres',driving:'Conduir',moped:'Ciclomotor',ph_name:'Cognoms, Nom',add_entry:'+ Afegir entrada',entries_of_day:'Entrades del dia',clear_day:'🗑️ Buidar dia',type:'Tipus',name_concept:'Nom / Concepte',amount_short:'Import',disc:'Dte',fee_short:'Taxa',fp_fee:'FP Taxa',actions:'Accions',empty_entries:"No hi ha entrades. Importa CSV/Excel o afegeix manualment a dalt.",day_close:'Tancament del dia',month_split:'Repartiment mes actual',by_concept:'Resum per concepte',history_title:'Històric'}
 };
 let currentLang=localStorage.getItem('caja.lang')||'es';
@@ -812,6 +812,7 @@ $('#btnHistory').onclick=()=>openBackupHistory();
 $('#btnLedger').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLedger()};
 $('#btnIrpf').onclick=()=>{$('#btnAccountingMenu').style.display='none';openIRPF()};
 $('#btnAnnualReport').onclick=()=>{$('#btnAccountingMenu').style.display='none';openAnnualReport()};
+$('#btnCambio').onclick=()=>{$('#btnAccountingMenu').style.display='none';openCambio()};
 $('#btnAccountingToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnAccountingMenu');m.style.display=(m.style.display==='none'||!m.style.display)?'flex':'none'};
 document.addEventListener('click',(e)=>{const box=$('#btnAccounting');const menu=$('#btnAccountingMenu');if(menu&&box&&!box.contains(e.target))menu.style.display='none'});
 
@@ -1521,6 +1522,155 @@ function _buildAnnualReport(year){
   return html;
 }
 function _arCard(label,value,color,bg){return `<div style="background:${bg};border:1px solid ${color}55;border-left:4px solid ${color};padding:12px 14px;border-radius:6px"><div style="font-size:10px;color:#64748b;letter-spacing:1px;text-transform:uppercase">${label}</div><div style="font-size:20px;color:${color};font-weight:700;margin-top:4px;font-family:'Courier New',monospace">${value}</div></div>`}
+
+// ============================================================================
+// RESERVA DE CAMBIO · seguiment de monedes i bitllets guardats a l'oficina
+// ============================================================================
+const CAMBIO_KEY='caja.reserva.v1';
+const CAMBIO_DENOMS=[
+  {k:'c1',label:'1 céntimo',val:0.01,type:'coin'},
+  {k:'c2',label:'2 céntimos',val:0.02,type:'coin'},
+  {k:'c5',label:'5 céntimos',val:0.05,type:'coin'},
+  {k:'c10',label:'10 céntimos',val:0.10,type:'coin'},
+  {k:'c20',label:'20 céntimos',val:0.20,type:'coin'},
+  {k:'c50',label:'50 céntimos',val:0.50,type:'coin'},
+  {k:'e1',label:'1 €',val:1,type:'coin'},
+  {k:'e2',label:'2 €',val:2,type:'coin'},
+  {k:'b5',label:'5 €',val:5,type:'bill'},
+  {k:'b10',label:'10 €',val:10,type:'bill'},
+  {k:'b20',label:'20 €',val:20,type:'bill'},
+  {k:'b50',label:'50 €',val:50,type:'bill'},
+];
+function loadCambio(){try{return JSON.parse(localStorage.getItem(CAMBIO_KEY))||{}}catch(e){return{}}}
+function saveCambio(o){localStorage.setItem(CAMBIO_KEY,JSON.stringify(o))}
+function cambioTotal(o){return CAMBIO_DENOMS.reduce((s,d)=>s+(o[d.k]||0)*d.val,0)}
+
+function openCambio(){
+  const back=document.createElement('div');back.className='modal-back';
+  back.innerHTML=`<div class="modal" style="max-width:720px;width:97%;max-height:94vh;overflow:auto">
+    <div style="display:flex;align-items:center;gap:14px;margin:-16px -16px 16px -16px;padding:14px 20px;background:linear-gradient(90deg,#0f2a1e,#0f172a);border-radius:12px 12px 0 0">
+      <h3 style="margin:0;flex:1;color:#22c55e;font-family:Georgia,serif">💰 Reserva de cambio</h3>
+      <button class="btn" id="cambioReset" style="background:#7f1d1d;color:#fff;border-color:#7f1d1d;font-size:12px">🗑️ Vaciar todo</button>
+      <button class="btn" id="cambioClose" style="background:#334155;color:#fff;border-color:#334155">✖</button>
+    </div>
+    <p class="small" style="color:#94a3b8;margin:0 0 12px">Anota les monedes i bitllets que tens guardats per fer canvi. Usa <b style="color:#22c55e">+</b> quan afegeixes (banc) i <b style="color:#ef4444">–</b> quan treus (per fer canvi durant el dia).</p>
+    <div id="cambioTotal" style="text-align:center;padding:16px;background:linear-gradient(135deg,#065f46,#0f172a);border:2px solid #22c55e;border-radius:12px;margin-bottom:14px">
+      <div style="font-size:11px;color:#a7f3d0;letter-spacing:2px;text-transform:uppercase">Total guardat</div>
+      <div id="cambioTotalNum" style="font-size:36px;color:#7ee3aa;font-weight:700;font-family:'Courier New',monospace;margin-top:4px">0,00 €</div>
+    </div>
+    <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" id="cambioAdd" style="background:#166534;color:#fff;border-color:#166534;flex:1;font-weight:700">➕ Añadir cambio (del banco)</button>
+      <button class="btn" id="cambioRemove" style="background:#7c2d12;color:#fff;border-color:#7c2d12;flex:1;font-weight:700">➖ Retirar (para caja)</button>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:12px">
+      <thead><tr style="background:#0f172a;color:#f5b301"><th style="padding:8px;text-align:left">Denominació</th><th style="padding:8px;text-align:center;width:180px">Quantitat</th><th style="padding:8px;text-align:right">Subtotal</th></tr></thead>
+      <tbody id="cambioBody"></tbody>
+    </table>
+  </div>`;
+  document.body.appendChild(back);
+  back.addEventListener('click',e=>{if(e.target===back)back.remove()});
+  back.querySelector('#cambioClose').onclick=()=>back.remove();
+
+  let data=loadCambio();
+  const bodyEl=back.querySelector('#cambioBody');
+  const totalEl=back.querySelector('#cambioTotalNum');
+  const render=()=>{
+    bodyEl.innerHTML=CAMBIO_DENOMS.map(d=>{
+      const q=data[d.k]||0;
+      const sub=q*d.val;
+      const emoji=d.type==='coin'?'🪙':'💵';
+      return `<tr style="border-bottom:1px solid #1e293b">
+        <td style="padding:8px 6px"><b style="color:#e2e8f0">${emoji} ${d.label}</b></td>
+        <td style="padding:8px 6px;text-align:center;white-space:nowrap">
+          <button class="btn" data-minus="${d.k}" style="padding:4px 10px;background:#7f1d1d;color:#fff;border-color:#7f1d1d;font-weight:700;min-width:34px">–</button>
+          <input type="number" min="0" max="9999" step="1" value="${q}" data-inp="${d.k}" style="width:70px;padding:6px 8px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;text-align:center;font-family:'Courier New',monospace;font-weight:700;margin:0 4px" />
+          <button class="btn" data-plus="${d.k}" style="padding:4px 10px;background:#166534;color:#fff;border-color:#166534;font-weight:700;min-width:34px">+</button>
+        </td>
+        <td style="padding:8px 6px;text-align:right;font-family:'Courier New',monospace;font-weight:${q?700:400};color:${q?'#7ee3aa':'#64748b'}">${fmt(sub)}</td>
+      </tr>`;
+    }).join('');
+    totalEl.textContent=fmt(cambioTotal(data));
+    // Bind events
+    bodyEl.querySelectorAll('[data-minus]').forEach(b=>b.onclick=()=>{const k=b.dataset.minus;data[k]=Math.max(0,(data[k]||0)-1);saveCambio(data);render()});
+    bodyEl.querySelectorAll('[data-plus]').forEach(b=>b.onclick=()=>{const k=b.dataset.plus;data[k]=(data[k]||0)+1;saveCambio(data);render()});
+    bodyEl.querySelectorAll('[data-inp]').forEach(inp=>inp.onchange=()=>{const k=inp.dataset.inp;data[k]=Math.max(0,parseInt(inp.value)||0);saveCambio(data);render()});
+  };
+  render();
+
+  back.querySelector('#cambioReset').onclick=()=>{
+    if(!confirm('¿Vaciar la reserva de cambio? Se pondrán todas las cantidades a 0.'))return;
+    data={};saveCambio(data);render();
+  };
+  back.querySelector('#cambioAdd').onclick=()=>_cambioBulkOp(data,render,'add');
+  back.querySelector('#cambioRemove').onclick=()=>_cambioBulkOp(data,render,'remove');
+}
+
+function _cambioBulkOp(data,rerender,mode){
+  const back=document.createElement('div');back.className='modal-back';
+  const title=mode==='add'?'➕ Añadir cambio (del banco)':'➖ Retirar cambio (para caja)';
+  const color=mode==='add'?'#166534':'#7c2d12';
+  back.innerHTML=`<div class="modal" style="max-width:520px;width:97%">
+    <div style="display:flex;align-items:center;gap:14px;margin:-16px -16px 16px -16px;padding:12px 18px;background:${color};color:#fff;border-radius:12px 12px 0 0">
+      <h3 style="margin:0;flex:1;font-family:Georgia,serif">${title}</h3>
+      <button class="btn" id="bkClose" style="background:#0f172a;color:#fff;border-color:#0f172a">✖</button>
+    </div>
+    <p class="small" style="color:#94a3b8;margin:0 0 12px">Indica cuántas piezas de cada tipo ${mode==='add'?'añades':'retiras'} en esta operación. Se ${mode==='add'?'sumarán':'restarán'} a la reserva actual.</p>
+    <div id="bkBody" style="max-height:60vh;overflow:auto"></div>
+    <div style="text-align:center;padding:14px 0;border-top:1px solid #1e293b;margin-top:10px">
+      <div class="small" style="color:#94a3b8">Total operación</div>
+      <div id="bkTotal" style="font-size:22px;color:${color};font-weight:700;font-family:'Courier New',monospace">0,00 €</div>
+    </div>
+    <div style="text-align:right;margin-top:12px">
+      <button class="btn" id="bkCancel">Cancelar</button>
+      <button class="btn" id="bkOk" style="background:${color};color:#fff;border-color:${color};font-weight:700">${mode==='add'?'✓ Añadir':'✓ Retirar'}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(back);
+  back.addEventListener('click',e=>{if(e.target===back)back.remove()});
+  back.querySelector('#bkClose').onclick=()=>back.remove();
+  back.querySelector('#bkCancel').onclick=()=>back.remove();
+  const bkBody=back.querySelector('#bkBody');
+  const bkTotal=back.querySelector('#bkTotal');
+  const ops={};
+  bkBody.innerHTML=CAMBIO_DENOMS.map(d=>{
+    const emoji=d.type==='coin'?'🪙':'💵';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid #1e293b">
+      <span style="flex:1;color:#e2e8f0">${emoji} ${d.label}</span>
+      <input type="number" min="0" max="9999" step="1" value="0" data-bk="${d.k}" data-val="${d.val}" style="width:80px;padding:6px 8px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;text-align:center;font-family:'Courier New',monospace;font-weight:700" />
+      <span class="small" style="width:70px;text-align:right;color:#7ee3aa;font-family:'Courier New',monospace" data-sub="${d.k}">0,00 €</span>
+    </div>`;
+  }).join('');
+  const recalc=()=>{
+    let t=0;
+    bkBody.querySelectorAll('[data-bk]').forEach(inp=>{
+      const q=Math.max(0,parseInt(inp.value)||0);
+      const v=parseFloat(inp.dataset.val);
+      const sub=q*v;
+      t+=sub;
+      const s=bkBody.querySelector(`[data-sub="${inp.dataset.bk}"]`);
+      if(s)s.textContent=fmt(sub);
+      ops[inp.dataset.bk]=q;
+    });
+    bkTotal.textContent=fmt(t);
+  };
+  bkBody.querySelectorAll('[data-bk]').forEach(inp=>inp.oninput=recalc);
+  back.querySelector('#bkOk').onclick=()=>{
+    recalc();
+    let changed=0;
+    CAMBIO_DENOMS.forEach(d=>{
+      const q=ops[d.k]||0;
+      if(q>0){
+        if(mode==='add'){data[d.k]=(data[d.k]||0)+q;changed++}
+        else{data[d.k]=Math.max(0,(data[d.k]||0)-q);changed++}
+      }
+    });
+    if(!changed){toast('No has indicado ninguna cantidad');return}
+    saveCambio(data);
+    back.remove();
+    rerender();
+    toast(mode==='add'?'✓ Cambio añadido a la reserva':'✓ Cambio retirado de la reserva');
+  };
+}
 $('#btnClearDay').onclick=()=>{if(!entriesOf(currentDate).length){toast('No hay entradas que vaciar');return}const cnt=entriesOf(currentDate).length;confirmModal('🗑️ Vaciar día',`Se borrarán las <b>${cnt} entrada(s)</b> del día <b>${currentDate.split('-').reverse().join('/')}</b>.<br><br>✅ Se guardará una copia de seguridad automática antes de borrar.`,()=>{pushSnapshot('preClear');delete state.byDate[currentDate];saveState();render();toast('Día vaciado ✅ (copia de seguridad guardada en 🛡️ Historial)',3500)},'Sí, vaciar día')};
 $('#btnPrint').onclick=()=>window.print();
 // ============ SAVE HANDLE (File System Access API) ============
@@ -2728,22 +2878,6 @@ setTimeout(()=>{
     logoutBtn.style.cssText='margin-right:6px;padding:7px 12px;background:linear-gradient(135deg,#7f1d1d 0%,#991b1b 100%);border:1px solid #b91c1c;color:#fee2e2;display:inline-flex;align-items:center;box-shadow:0 2px 8px rgba(185,28,28,.3)';
     logoutBtn.onclick=()=>{
       if(confirm('Desactivar la llicència actual i tornar a la pantalla d\'activació?\n\nLes teves dades locals (dies, entrades, IRPF, còpies) NO s\'esborraran.')){
-        localStorage.removeItem('caja.license.v1');
-        localStorage.removeItem('caja.license.lastcheck.v1');
-        location.reload();
-      }
-    };
-    langBtn.parentElement.insertBefore(logoutBtn,langBtn);
-  }
-  const sig=document.querySelector('[style*="Powered by"]');
-  const sigParent=sig?sig.parentElement:null;
-  if(sigParent){sigParent.style.cursor='pointer';sigParent.style.pointerEvents='auto';sigParent.onclick=showLicenseInfo;sigParent.title='Clica per veure info de llicència'}
-},500);
-
-</script>
-</body>
-</html>
- a la pantalla d\'activació?\n\nLes teves dades locals (dies, entrades, IRPF, còpies) NO s\'esborraran.')){
         localStorage.removeItem('caja.license.v1');
         localStorage.removeItem('caja.license.lastcheck.v1');
         location.reload();
