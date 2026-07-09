@@ -114,6 +114,9 @@ function setupAutoUpdater() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.logger = null; // desactivat en producció
+  // Desactiva verificació de signatura digital (no signem els .exe amb cert de pagament)
+  if (typeof autoUpdater.disableWebInstaller !== 'undefined') autoUpdater.disableWebInstaller = false;
+  autoUpdater.forceDevUpdateConfig = false;
 
   let latestUpdateInfo = null;
 
