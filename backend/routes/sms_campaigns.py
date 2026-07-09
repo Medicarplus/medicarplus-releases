@@ -149,6 +149,8 @@ def build_router(db):
         contacts: List[dict] = []
         valid_count = 0
         invalid_count = 0
+        duplicate_count = 0
+        seen_mobiles: dict = {}  # mobile → index del primer contacte que el té
 
         # Normalitza noms de capçalera (majúsc + espais)
         def col(row: dict, *aliases: str) -> str:
@@ -177,25 +179,36 @@ def build_router(db):
             if not mobile:
                 # Prova si el "telèfon" en canvi és mòbil
                 mobile = normalize_mobile(fijo_raw)
-            if not mobile:
+            is_duplicate = False
+            if mobile and mobile in seen_mobiles:
+                # Aquest mòbil ja el tenim en un contacte anterior — dupliqué
+                is_duplicate = True
+                reason = f"duplicat (ja al contacte #{seen_mobiles[mobile]+1})"
+                duplicate_count += 1
+                mobile_final = None  # No l'incluim al llistat de vàlids
+            elif mobile:
+                seen_mobiles[mobile] = len(contacts)
+                mobile_final = mobile
+                valid_count += 1
+            else:
                 if movil_raw or fijo_raw:
                     reason = "no és mòbil (comença per 9)"
                 else:
                     reason = "sense telèfon"
                 invalid_count += 1
-            else:
-                valid_count += 1
+                mobile_final = None
 
             contacts.append({
                 "external_id": ext_id,
                 "name": name,
                 "surname1": surname1,
                 "surname2": surname2,
-                "mobile": mobile,
-                "landline": fijo_raw if not mobile else None,
+                "mobile": mobile_final,
+                "landline": fijo_raw if not mobile_final else None,
                 "revision_date": rev,
-                "valid": mobile is not None,
+                "valid": mobile_final is not None,
                 "reason": reason,
+                "duplicate": is_duplicate,
             })
 
         return {
@@ -203,6 +216,7 @@ def build_router(db):
             "total_rows": len(contacts),
             "valid_count": valid_count,
             "invalid_count": invalid_count,
+            "duplicate_count": duplicate_count,
             "contacts": contacts,
             "twilio_configured": _has_twilio(),
         }

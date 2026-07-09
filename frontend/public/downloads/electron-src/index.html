@@ -2534,14 +2534,26 @@ function openSmsModal(){
     const prev=document.getElementById('smsPreviewArea');
     const validRows=d.contacts.map((c,i)=>{
       const nom=[c.name,c.surname1,c.surname2].filter(Boolean).join(' ');
-      const badge=c.valid?'<span style="background:#22c55e;color:#0a0f1a;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:800">OK</span>':`<span style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:800" title="${c.reason||''}">${c.reason||'INVÀLID'}</span>`;
-      const tel=c.valid?('<code style="color:#22c55e">'+c.mobile+'</code>'):('<code style="color:#64748b">'+(c.landline||'-')+'</code>');
-      return `<tr style="border-bottom:1px solid #1e293b;${c.valid?'':'opacity:.55'}"><td style="padding:6px 10px;font-size:12px">${nom}</td><td style="padding:6px 10px">${tel}</td><td style="padding:6px 10px;font-size:11px;color:#94a3b8">${c.revision_date||''}</td><td style="padding:6px 10px;text-align:right">${badge}</td></tr>`;
+      let badge, tel;
+      if(c.duplicate){
+        badge='<span style="background:#f5b301;color:#0a0f1a;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:800" title="'+(c.reason||'')+'">DUPLICAT</span>';
+        tel='<code style="color:#f5b301;text-decoration:line-through">'+(c.mobile||'-')+'</code>';
+      } else if(c.valid){
+        badge='<span style="background:#22c55e;color:#0a0f1a;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:800">OK</span>';
+        tel='<code style="color:#22c55e">'+c.mobile+'</code>';
+      } else {
+        badge='<span style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:800" title="'+(c.reason||'')+'">'+(c.reason||'INVÀLID')+'</span>';
+        tel='<code style="color:#64748b">'+(c.landline||'-')+'</code>';
+      }
+      const opacity=(c.valid&&!c.duplicate)?'':';opacity:.55';
+      return `<tr style="border-bottom:1px solid #1e293b${opacity}"><td style="padding:6px 10px;font-size:12px">${nom}</td><td style="padding:6px 10px">${tel}</td><td style="padding:6px 10px;font-size:11px;color:#94a3b8">${c.revision_date||''}</td><td style="padding:6px 10px;text-align:right">${badge}</td></tr>`;
     }).join('');
+    const dupBox=d.duplicate_count?`<div style="flex:1;min-width:120px;background:#3a2a06;padding:12px;border-radius:8px;text-align:center"><div style="font-size:10px;color:#fde68a;text-transform:uppercase">${isCA?'Duplicats':'Duplicados'}</div><div style="font-size:24px;font-weight:800;color:#f5b301">${d.duplicate_count}</div></div>`:'';
     prev.innerHTML=`
       <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:16px;margin-top:20px">
         <div style="display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap">
           <div style="flex:1;min-width:120px;background:#052e16;padding:12px;border-radius:8px;text-align:center"><div style="font-size:10px;color:#7ee3aa;text-transform:uppercase">${isCA?'Vàlids':'Válidos'}</div><div style="font-size:24px;font-weight:800;color:#22c55e">${d.valid_count}</div></div>
+          ${dupBox}
           <div style="flex:1;min-width:120px;background:#3a0606;padding:12px;border-radius:8px;text-align:center"><div style="font-size:10px;color:#fecaca;text-transform:uppercase">${isCA?'Invàlids':'Inválidos'}</div><div style="font-size:24px;font-weight:800;color:#ef4444">${d.invalid_count}</div></div>
           <div style="flex:1;min-width:120px;background:#1e293b;padding:12px;border-radius:8px;text-align:center"><div style="font-size:10px;color:#94a3b8;text-transform:uppercase">Total</div><div style="font-size:24px;font-weight:800;color:#cbd5e1">${d.total_rows}</div></div>
         </div>
