@@ -7,6 +7,7 @@ eliminant la possibilitat que una resposta HTML 404 (o qualsevol contingut incor
 acabi al disc i corrompi la build.
 """
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from pathlib import Path
 import hashlib
 from datetime import datetime, timezone
@@ -15,6 +16,9 @@ ELECTRON_SRC_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / 
 
 # Fitxers que sync.js baixa. Han d'existir SEMPRE al servidor.
 TRACKED_FILES = ["index.html", "main.js", "preload.js", "sync.js", "package.json"]
+
+# Fitxers auxiliars del sistema bulletproof (scripts locals)
+AUX_FILES = ["validate-local.js", "smoke-test.js", "publish-safe.ps1"]
 
 # Signatures de contingut: cada fitxer HA de contenir aquests strings.
 # Si en falta algun, considerem el fitxer corrupte i NO l'incloem al manifest.
@@ -71,3 +75,36 @@ async def electron_manifest():
         "errors": errors,
         "files": files_info,
     }
+
+
+# ============================================================================
+# DOWNLOAD endpoints — RUTA API que bypassa qualsevol bot-detection de Cloudflare
+# sobre fitxers estàtics. Serveix el mateix contingut que /downloads/electron-src/
+# però via ruta /api/ que no aplica les mateixes regles.
+# ============================================================================
+
+# Fitxers permesos per baixar (whitelist estricta)
+ALLOWED_DOWNLOADS = set(TRACKED_FILES) | set(AUX_FILES)
+
+
+@router.get("/electron/download/{filename}")
+async def electron_download(filename: str):
+    """Serveix qualsevol fitxer permès des de electron-src/ com attachment."""
+    if filename not in ALLOWED_DOWNLOADS:
+        raise HTTPException(status_code=404, detail="file not allowed")
+    p = ELECTRON_SRC_DIR / filename
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="file not found")
+    # Content-type explícit per evitar sniffing rar
+    ctype_map = {
+        ".js": "application/javascript",
+        ".json": "application/json",
+        ".html": "text/html",
+        ".ps1": "text/plain",
+    }
+    ext = p.suffix.lower()
+    ctype = ctype_map.get(ext, "application/octet-stream")
+    return FileResponse(p, media_type=ctype, filename=filename, headers={
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        "X-Content-Type-Options": "nosniff",
+    })

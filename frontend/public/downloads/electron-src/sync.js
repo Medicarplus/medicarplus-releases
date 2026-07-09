@@ -33,7 +33,9 @@ const MANIFEST_PATHS = [
   '/api/electron/manifest',              // preview server (dinàmic, sempre fresc)
   '/downloads/electron-src/manifest.json' // fallback estàtic (GitHub Pages, si es publica)
 ];
-const SRC_PATH = '/downloads/electron-src';
+// Ruta primària: /api/electron/download/{f} (BYPASSA bot-detection de Cloudflare)
+// Ruta fallback: /downloads/electron-src/{f} (estàtic, pot rebre 404 des d'algunes IPs)
+const SRC_PATHS = ['/api/electron/download', '/downloads/electron-src'];
 
 const FILES_1TO1 = ['index.html', 'main.js', 'preload.js', 'sync.js'];
 const PKG_MERGE_KEYS = ['scripts', 'build', 'author', 'description', 'main', 'productName'];
@@ -98,21 +100,18 @@ async function fetchManifest() {
 async function downloadFileWithRetries(base, fileName, expectedHash) {
   const MAX_ATTEMPTS = 4;
   let lastErr = null;
-  // Per index.html tenim un ALIES: si el path oficial falla, prova /v2.html
-  // (és el mateix fitxer servit des d'un altre path — capa de resiliència)
-  const paths = [`${SRC_PATH}/${fileName}`];
+  // Combinacions de paths (primer /api/, després estàtic). Per index.html també /v2.html.
+  const paths = SRC_PATHS.map(sp => `${sp}/${fileName}`);
   if (fileName === 'index.html') paths.push('/v2.html');
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     for (const p of paths) {
-      const isAltPath = (p !== `${SRC_PATH}/${fileName}`);
+      const isOfficial = p.endsWith(`/${fileName}`) && (p.startsWith('/api/electron/download') || p.startsWith(SRC_PATHS[1]));
       const url = `${base}${p}?t=${Date.now()}_${attempt}`;
       try {
         const data = await download(url, 30000);
         if (data.length < 50) throw new Error(`resposta massa curta (${data.length}B)`);
-        // Verifica SHA-256 contra manifest NOMÉS a la ruta oficial.
-        // A rutes alternatives (ex. /v2.html) el contingut pot diferir per meta-tags
-        // dinàmics del servidor, per tant confiem només en signatures.
-        if (expectedHash && !isAltPath) {
+        // Verifica SHA-256 contra manifest NOMÉS a rutes oficials (mateix contingut).
+        if (expectedHash && isOfficial) {
           const got = sha256(data);
           if (got !== expectedHash) {
             throw new Error(`SHA mismatch (esperat ${expectedHash.slice(0,10)}…, rebut ${got.slice(0,10)}…)`);
