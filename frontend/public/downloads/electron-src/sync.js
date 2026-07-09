@@ -53,22 +53,29 @@ function download(url, timeoutMs = 15000) {
 
 async function tryDownloadFile(fileName) {
   let lastErr = null;
-  for (const base of SOURCES) {
-    const url = `${base}/${fileName}?t=${Date.now()}`;
-    try {
-      const data = await download(url);
-      if (data.length < 50) throw new Error(`resposta massa curta (${data.length}B)`);
-      const validator = FILE_SIGNATURES[fileName];
-      if (validator) {
-        const text = data.toString('utf8');
-        if (!validator(text)) {
-          throw new Error('contingut invàlid (probablement HTML 404 en lloc del fitxer real)');
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    for (const base of SOURCES) {
+      const url = `${base}/${fileName}?t=${Date.now()}_${attempt}`;
+      try {
+        const data = await download(url, 30000);
+        if (data.length < 50) throw new Error(`resposta massa curta (${data.length}B)`);
+        const validator = FILE_SIGNATURES[fileName];
+        if (validator) {
+          const text = data.toString('utf8');
+          if (!validator(text)) {
+            throw new Error('contingut invàlid (probablement HTML 404 en lloc del fitxer real)');
+          }
         }
-      }
-      return { data, url };
-    } catch (e) { lastErr = e; }
+        return { data, url };
+      } catch (e) { lastErr = e; }
+    }
+    // Espera 2s abans del proper intent (Cloudflare/servidor pot recuperar-se)
+    if (attempt < MAX_RETRIES) {
+      await new Promise(r => setTimeout(r, 2000));
+    }
   }
-  throw lastErr || new Error('cap font disponible');
+  throw lastErr || new Error('cap font disponible (3 intents)');
 }
 
 function rimraf(dir) {
