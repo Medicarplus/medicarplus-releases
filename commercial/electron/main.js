@@ -42,7 +42,9 @@ function createWindow() {
       sandbox: true,
       webSecurity: true,
       devTools: false, // ⚠️ desactiva DevTools en producció (impedeix inspecció)
-      spellcheck: false
+      spellcheck: false,
+      // Passem la versió al preload perquè sandbox=true no permet require('./package.json')
+      additionalArguments: [`--app-version=${app.getVersion()}`]
     }
   });
 

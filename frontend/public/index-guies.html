@@ -67,8 +67,78 @@
 
 <!-- RESUM DEL DIA 08/07/2026 -->
 <div style="background:linear-gradient(135deg,#0f172a,#1e293b);border:2px solid #22c55e;border-radius:14px;padding:22px;margin:20px 0;box-shadow:0 10px 30px rgba(34,197,94,.15)">
-<h2 style="color:#7ee3aa;margin:0 0 6px;font-family:Georgia,serif">🎉 Resum del dia 08/07/2026</h2>
-<p style="color:#94a3b8;font-size:13px;margin:0 0 16px">Avui has muntat tot això. Guarda't aquesta llista, és el que hem aconseguit en un dia:</p>
+<h2 style="color:#7ee3aa;margin:0 0 6px;font-family:Georgia,serif">🎯 Tasques d'avui 09/07/2026</h2>
+<p style="color:#94a3b8;font-size:13px;margin:0 0 16px">Últimes tasques per tenir <code>medicarplus.es</code> en línia i tot al 100%:</p>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+
+<div style="background:#0f172a;padding:14px;border-radius:10px;border-left:3px solid #22c55e">
+  <b style="color:#7ee3aa">1️⃣ Publica v2.0.5 amb el fix de versió</b>
+  <ul style="color:#e2e8f0;font-size:13px;margin:6px 0 0;padding-left:18px;line-height:1.7">
+    <li>Fix del bug "v2.0.0 (web)" al preload (sandbox mode)</li>
+    <li>Ara la versió es passa via <code>additionalArguments</code></li>
+    <li>Descarrega el zip nou i publica normalment</li>
+  </ul>
+</div>
+
+<div style="background:#0f172a;padding:14px;border-radius:10px;border-left:3px solid #f5b301">
+  <b style="color:#f5b301">2️⃣ Verifica auto-updater complet</b>
+  <ul style="color:#e2e8f0;font-size:13px;margin:6px 0 0;padding-left:18px;line-height:1.7">
+    <li>Obre MediCar Plus del PC</li>
+    <li>Espera 2 min amb el programa obert</li>
+    <li>Ha de sortir "Actualització disponible"</li>
+    <li>Reinicia → hauries de veure <code>v2.0.5</code> (sense "(web)")</li>
+  </ul>
+</div>
+
+<div style="background:#0f172a;padding:14px;border-radius:10px;border-left:3px solid #a78bfa">
+  <b style="color:#a78bfa">3️⃣ Deploy a producció</b>
+  <ul style="color:#e2e8f0;font-size:13px;margin:6px 0 0;padding-left:18px;line-height:1.7">
+    <li>Clica "Deploy" al menú d'Emergent (a dalt-dreta)</li>
+    <li>Emergent construeix i publica el codi</li>
+    <li>Rebrà una URL/IP nova</li>
+    <li>2-5 min de compilació</li>
+  </ul>
+</div>
+
+<div style="background:#0f172a;padding:14px;border-radius:10px;border-left:3px solid #ec4899">
+  <b style="color:#ec4899">4️⃣ Canvia DNS d'IONOS</b>
+  <ul style="color:#e2e8f0;font-size:13px;margin:6px 0 0;padding-left:18px;line-height:1.7">
+    <li>Panell IONOS → Dominis → medicarplus.es → DNS</li>
+    <li>Edita el registre <code>A @</code></li>
+    <li>Canvia IP <code>217.160.0.211</code> per la nova d'Emergent</li>
+    <li>Afegeix <code>CNAME www → medicarplus.es</code></li>
+    <li>Propagació: 15 min - 2h</li>
+  </ul>
+</div>
+
+<div style="background:#0f172a;padding:14px;border-radius:10px;border-left:3px solid #14b8a6">
+  <b style="color:#14b8a6">5️⃣ ✨ medicarplus.es EN LÍNIA</b>
+  <ul style="color:#e2e8f0;font-size:13px;margin:6px 0 0;padding-left:18px;line-height:1.7">
+    <li>Landing pública a <code>https://medicarplus.es</code></li>
+    <li>Admin a <code>https://medicarplus.es/admin</code></li>
+    <li>Compra Stripe funcional</li>
+    <li>Emails automàtics 🚀</li>
+  </ul>
+</div>
+
+<div style="background:#0f172a;padding:14px;border-radius:10px;border-left:3px solid #f97316">
+  <b style="color:#f97316">6️⃣ Post-deploy — Canvia webhook Stripe</b>
+  <ul style="color:#e2e8f0;font-size:13px;margin:6px 0 0;padding-left:18px;line-height:1.7">
+    <li>Stripe Dashboard → Desarrolladores → Webhooks</li>
+    <li>Edita el webhook actual</li>
+    <li>Canvia URL a <code>https://medicarplus.es/api/webhook/stripe</code></li>
+    <li>Guarda</li>
+  </ul>
+</div>
+
+</div>
+</div>
+
+<!-- RESUM DEL DIA 08/07/2026 -->
+<div style="background:linear-gradient(135deg,#0f172a,#1e293b);border:2px solid #6b7280;border-radius:14px;padding:22px;margin:20px 0;opacity:.85">
+<h2 style="color:#cbd5e1;margin:0 0 6px;font-family:Georgia,serif">📚 Historial 08/07/2026 (fet ahir)</h2>
+<p style="color:#94a3b8;font-size:13px;margin:0 0 16px">Ahir vas muntar tot això:</p>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
 

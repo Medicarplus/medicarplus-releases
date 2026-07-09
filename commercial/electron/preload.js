@@ -7,9 +7,15 @@
 // ============================================================================
 
 const { contextBridge, ipcRenderer } = require('electron');
-const pkg = (() => {
-  try { return require('./package.json'); } catch (e) { return { version: '2.0.0' }; }
-})();
+// La versió es passa via additionalArguments des de main.js perquè sandbox=true no permet require('./package.json')
+function readAppVersion(){
+  try{
+    const arg = (process.argv || []).find(a => typeof a==='string' && a.startsWith('--app-version='));
+    if(arg) return arg.split('=')[1];
+  }catch(e){}
+  return '2.0.0';
+}
+const APP_VERSION = readAppVersion();
 const os = require('os');
 const crypto = require('crypto');
 
@@ -46,7 +52,7 @@ function computeHwid() {
 }
 
 contextBridge.exposeInMainWorld('appInfo', {
-  version: pkg.version || '2.0.0',
+  version: APP_VERSION,
   platform: 'electron',
   isDesktop: true,
   hwid: computeHwid(),
