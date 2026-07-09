@@ -1,0 +1,73 @@
+"""
+Electron source manifest endpoint.
+----------------------------------
+Serveix un JSON amb SHA-256 + mida de cada fitxer font que sync.js necessita.
+Els builds locals validen aquest hash ABANS de sobreescriure els fitxers locals,
+eliminant la possibilitat que una resposta HTML 404 (o qualsevol contingut incorrecte)
+acabi al disc i corrompi la build.
+"""
+from fastapi import APIRouter, HTTPException
+from pathlib import Path
+import hashlib
+from datetime import datetime, timezone
+
+ELECTRON_SRC_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / "public" / "downloads" / "electron-src"
+
+# Fitxers que sync.js baixa. Han d'existir SEMPRE al servidor.
+TRACKED_FILES = ["index.html", "main.js", "preload.js", "sync.js", "package.json"]
+
+# Signatures de contingut: cada fitxer HA de contenir aquests strings.
+# Si en falta algun, considerem el fitxer corrupte i NO l'incloem al manifest.
+CONTENT_SIGNATURES = {
+    "index.html":   ["MediCar Plus"],
+    "main.js":      ["require('electron')", "BrowserWindow"],
+    "preload.js":   ["contextBridge"],
+    "sync.js":      ["SOURCES", "tryDownloadFile"],
+    "package.json": ['"name"', '"version"'],
+}
+
+
+def _hash_file(path: Path) -> dict:
+    data = path.read_bytes()
+    return {
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "size": len(data),
+    }
+
+
+router = APIRouter()
+
+
+@router.get("/electron/manifest")
+async def electron_manifest():
+    """Retorna hashes + mides dels fitxers font Electron. Si algun està corrupte,
+    l'omet del manifest (sync.js el detectarà i no sobreescriurà el local)."""
+    if not ELECTRON_SRC_DIR.exists():
+        raise HTTPException(status_code=503, detail="electron source directory missing")
+
+    files_info = {}
+    errors = []
+    for name in TRACKED_FILES:
+        p = ELECTRON_SRC_DIR / name
+        if not p.exists():
+            errors.append(f"{name}: missing on server")
+            continue
+        try:
+            text = p.read_text(encoding="utf-8", errors="ignore")
+        except Exception as e:
+            errors.append(f"{name}: read error ({e})")
+            continue
+        # Signatura de contingut — no serveix un fitxer que no és el que hauria de ser
+        for sig in CONTENT_SIGNATURES.get(name, []):
+            if sig not in text:
+                errors.append(f"{name}: signature missing ({sig!r})")
+                break
+        else:
+            files_info[name] = _hash_file(p)
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "server_ok": len(errors) == 0,
+        "errors": errors,
+        "files": files_info,
+    }

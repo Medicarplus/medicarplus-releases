@@ -1,370 +1,177 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ca">
 <head>
-<meta charset="UTF-8">
-<title>Guia — Publicar actualitzacions · MediCar Plus</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
+<title>🛡️ Publicació BULLETPROOF · MediCar Plus</title>
 <style>
-:root{--bg:#0f172a;--panel:#1e293b;--panel2:#0f1a2e;--txt:#e2e8f0;--muted:#94a3b8;--gold:#f5b301;--green:#22c55e;--red:#ef4444;--blue:#3b82f6}
-*{box-sizing:border-box}
-body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--txt);line-height:1.6;padding:24px}
-.wrap{max-width:920px;margin:0 auto}
-h1{color:var(--gold);font-size:32px;margin:0 0 6px;letter-spacing:.5px}
-.sub{color:var(--muted);font-size:14px;margin-bottom:32px}
-h2{color:var(--gold);font-size:22px;margin:32px 0 12px;padding-bottom:8px;border-bottom:2px solid #334155}
-h3{color:#fff;font-size:17px;margin:24px 0 8px}
-h4{color:#cbd5e1;font-size:14px;margin:16px 0 6px;letter-spacing:.5px;text-transform:uppercase}
-p{margin:8px 0}
-code{background:#0e1117;color:#f5b301;padding:2px 6px;border-radius:4px;font-family:'Consolas','Menlo',monospace;font-size:13px;border:1px solid #334155}
-pre{background:#0e1117;color:#e2e8f0;padding:14px 16px;border-radius:8px;overflow-x:auto;border:1px solid #334155;font-family:'Consolas','Menlo',monospace;font-size:13px;line-height:1.5;margin:10px 0}
-pre code{background:none;border:none;padding:0;color:inherit}
-.box{background:var(--panel);border:1px solid #334155;border-radius:12px;padding:20px;margin:14px 0}
-.box.info{border-left:4px solid var(--blue)}
-.box.ok{border-left:4px solid var(--green);background:linear-gradient(135deg,#052e16,#0f172a)}
-.box.warn{border-left:4px solid #f97316;background:linear-gradient(135deg,#3a1a06,#1a0e00)}
-.box.danger{border-left:4px solid var(--red);background:linear-gradient(135deg,#3a0606,#1a0000)}
-.step{background:var(--panel2);border:1px solid #334155;border-radius:10px;padding:14px 18px;margin:10px 0}
-.step-num{display:inline-block;background:var(--gold);color:#0f172a;width:26px;height:26px;border-radius:50%;text-align:center;line-height:26px;font-weight:800;margin-right:10px;font-size:13px}
-kbd{background:#334155;color:#f5b301;padding:2px 8px;border-radius:4px;font-family:'Consolas',monospace;font-size:12px;border:1px solid #475569;box-shadow:inset 0 -1px 0 rgba(0,0,0,.3)}
-table{width:100%;border-collapse:collapse;margin:12px 0}
-th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #334155;font-size:13px}
-th{background:#0e1a2e;color:var(--gold);text-transform:uppercase;letter-spacing:.5px;font-size:11px}
-tr:hover{background:#0f1a2e}
-.back{display:inline-block;color:var(--gold);text-decoration:none;font-size:13px;margin-bottom:20px;padding:6px 12px;border:1px solid var(--gold);border-radius:6px;transition:all .2s}
-.back:hover{background:var(--gold);color:#0f172a}
-.tag{display:inline-block;background:#7c2d12;color:#fed7aa;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:.5px;margin-left:8px;vertical-align:middle}
-.tag.new{background:#166534;color:#bbf7d0}
-.tag.critical{background:#7f1d1d;color:#fecaca}
-ul,ol{margin:8px 0;padding-left:24px}
-li{margin:4px 0}
-a{color:var(--gold);text-decoration:none;border-bottom:1px dashed var(--gold)}
-a:hover{color:#fff;border-bottom-style:solid}
-.copyable{position:relative;cursor:pointer;transition:all .2s}
-.copyable:hover{border-color:var(--gold)}
-.copyable:hover::after{content:'📋 Clic per copiar';position:absolute;top:8px;right:12px;font-size:11px;color:var(--gold);opacity:.9}
+  body{font-family:system-ui,sans-serif;background:#0f1115;color:#e8ecf2;padding:40px;max-width:900px;margin:0 auto;line-height:1.6}
+  h1{color:#3ddc97;margin:0 0 8px} h2{color:#5aa9ff;margin-top:32px;border-bottom:1px solid #262b36;padding-bottom:6px}
+  code,pre{background:#171a21;padding:2px 8px;border-radius:4px;font-family:'Courier New',monospace;color:#3ddc97}
+  pre{padding:16px;overflow-x:auto;font-size:13px;border:1px solid #262b36;white-space:pre-wrap}
+  .step{background:#171a21;border-left:4px solid #3ddc97;padding:16px 20px;margin:16px 0;border-radius:6px}
+  .warn{background:#2a1a0f;border-left:4px solid #ff9d4a;padding:12px 16px;margin:12px 0;border-radius:4px}
+  .ok{background:#0f2418;border-left:4px solid #3ddc97;padding:12px 16px;margin:12px 0;border-radius:4px}
+  .layer{background:#171a21;padding:12px 16px;margin:8px 0;border-radius:6px;border:1px solid #262b36}
+  .layer strong{color:#5fe6b0}
+  hr{border:0;border-top:1px solid #262b36;margin:24px 0}
+  .big{font-size:28px;font-weight:700;color:#3ddc97;text-align:center;margin:24px 0}
 </style>
 </head>
 <body>
-<div class="wrap">
-<a href="index-guies.html" class="back">← Tornar a l'índex de guies</a>
+<h1>🛡️ Publicació BULLETPROOF de MediCar Plus</h1>
+<p style="color:#9aa3b2">Sistema de <strong>10 capes</strong> que garanteix que <strong>MAI</strong> es publiqui un <code>.exe</code> corrupte als clients, i que si passés, tinguis una <strong>palanca d'emergència remota</strong> per bloquejar-lo al moment.</p>
 
-<h1>📦 Publicar noves versions</h1>
-<div class="sub">Sistema d'actualitzacions automàtiques amb sync + oneClick installer · Actualitzat 09/07/2026</div>
+<div class="big">👉 UNA SOLA COMANDA</div>
+<pre>cd C:\Users\...\medicarplus-electron
+powershell -File publish-safe.ps1</pre>
+<p style="text-align:center;color:#9aa3b2">Això fa TOT: sync → validate → bump → build → smoke → publish. Aborta a la primera cosa rara.</p>
 
-<div class="box ok">
-<b>✨ El sistema està totalment automatitzat.</b> Una sola comanda descarrega els últims fitxers del servidor, compila, publica a GitHub, i els clients reben l'actualització automàticament.
-</div>
+<div class="ok" style="text-align:center;font-size:16px">
+<strong>🆘 URGÈNCIA:</strong> si algun cop publiques una versió dolenta i vols aturar-la globalment,
+crea/edita <code>/app/backend/electron_channel.json</code> amb la versió al camp <code>blocked_versions</code>
+i tots els clients pararan de descarregar-la immediatament.</div>
 
-<h2>🌐 Ecosistema complet MediCar Plus</h2>
+<h2>🧬 Les 7 capes de defensa</h2>
 
-<div class="box info">
-<b>Tot l'ecosistema activat el 09/07/2026:</b>
-<table style="margin-top:12px">
-<tr><th>Component</th><th>URL / Ubicació</th><th>Estat</th></tr>
-<tr><td>Landing pública</td><td><a href="https://medicarplus.es" target="_blank">medicarplus.es</a></td><td>✅ Viva (GitHub Pages, gratis)</td></tr>
-<tr><td>App comercial (.exe)</td><td>Distribuïda via GitHub Releases</td><td>✅ Auto-update actiu</td></tr>
-<tr><td>Repo releases</td><td><a href="https://github.com/Medicarplus/medicarplus-releases" target="_blank">Medicarplus/medicarplus-releases</a></td><td>✅ Públic</td></tr>
-<tr><td>Repo landing</td><td><a href="https://github.com/Medicarplus/medicarplus.es" target="_blank">Medicarplus/medicarplus.es</a></td><td>✅ Públic</td></tr>
-<tr><td>Correu corporatiu</td><td>info@medicarplus.es, marc@, suport@, factures@, no-reply@</td><td>✅ IONOS Correo Básico 5</td></tr>
-<tr><td>SMTP tickets suport</td><td>Configurat al backend Emergent</td><td>✅ Envia a info@medicarplus.es</td></tr>
-<tr><td>Backend + Panel Admin</td><td>Preview Emergent (no deployed encara)</td><td>⏳ Deploy pendent (esperant IBAN empresa)</td></tr>
-<tr><td>Stripe</td><td>Mode TEST activat</td><td>⏳ Live pendent (esperant IBAN empresa)</td></tr>
-</table>
-</div>
+<div class="layer"><strong>Capa 1 — Manifest servidor (SHA-256)</strong><br>
+El backend serveix <code>/api/electron/manifest</code> amb el hash SHA-256 i mida de cada fitxer font.
+Aquest és l'origen de veritat. <em>Sense això, no es descarrega res.</em></div>
 
-<h2>🚀 Publicar una nova versió (procediment normal)</h2>
+<div class="layer"><strong>Capa 2 — sync.js atòmic amb verificació SHA</strong><br>
+Baixa cada fitxer a <code>.sync-tmp/</code>, verifica SHA-256 contra el manifest, verifica signatures
+de contingut, i només llavors sobreescriu. Si algun falla, els fitxers locals no es toquen. Amb backup automàtic.</div>
 
-<div class="step">
-<span class="step-num">1</span><b>Obre PowerShell</b> (tecla Windows → escriu <kbd>powershell</kbd>)
-</div>
+<div class="layer"><strong>Capa 3 — validate-local.js pre-build</strong><br>
+Abans d'obrir electron-builder, un script inspecciona els fitxers locals i verifica que
+continguin les strings crítiques (<code>MediCar Plus</code>, <code>Entradas del día</code>,
+<code>require('electron')</code>, <code>autoUpdater</code>, etc.). Si en falta una: <strong>abort exit 3</strong>.</div>
 
-<div class="step">
-<span class="step-num">2</span><b>Executa aquestes 3 línies</b> (una a una):
-<pre class="copyable" onclick="navigator.clipboard.writeText(this.innerText.replace(/^\$/gm,''))"><code>cd C:\medicarplus\electron
-$env:GH_TOKEN="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"
-npm run release</code></pre>
-</div>
+<div class="layer"><strong>Capa 4 — Client-side crash guard</strong><br>
+Al top de <code>index.html</code> hi ha un boot-guard: si en 8 segons no s'ha renderitzat cap element clau,
+mostra una UI de recuperació al client dient-li que reinstal·li. <em>Cap client veurà mai una finestra en blanc.</em></div>
 
-<div class="step">
-<span class="step-num">3</span>Espera 2-3 minuts. Veuràs:
-<pre><code>🔄 Sincronitzant fitxers font des del servidor...
-   · index.html ... ✅ actualitzat
-   · main.js ... ✔️  ja al dia
-   · preload.js ... ✔️  ja al dia
-   · sync.js ... ✔️  ja al dia
-   · package.json (build config) ... ✔️  ja al dia
-🧹 dist/ netejat (build fresc garantit)
-📦 Resultat: 1 actualitzat(s), 0 error(s)
+<div class="layer"><strong>Capa 5 — smoke-test.js post-build</strong><br>
+Després de compilar el <code>.exe</code>, un altre script obre l'<code>app.asar</code> compilat
+i verifica que dins hi són les strings crítiques + que els installers tenen mida raonable (>30 MB).
+Si falla: <strong>no es publica.</strong></div>
 
-v2.0.11
-building target=nsis file=dist\MediCar Plus Setup 2.0.11.exe archs=x64 oneClick=true perMachine=false
-[==================================] 100% 0.0s | MediCar-Plus-Setup-2.0.11.exe to github
-Done!</code></pre>
-</div>
+<div class="layer"><strong>Capa 6 — publish-safe.ps1 orquestrador</strong><br>
+Un únic script PowerShell que encadena tot amb ✅/❌ clars i <code>$ErrorActionPreference = "Stop"</code>.
+Impossible saltar-se cap pas.</div>
 
-<div class="step">
-<span class="step-num">4</span><b>Els clients reben l'actualització automàticament</b> al següent cop que obrin l'app. Veuran un diàleg: <i>"Nova versió v2.0.11 llesta. Reiniciar i actualitzar ara?"</i>
-</div>
+<div class="layer"><strong>Capa 7 — Verificació post-release</strong><br>
+Consulta l'API de GitHub per confirmar que la release apareix realment amb la versió esperada
+(via <code>api.github.com/.../releases/latest</code>).</div>
 
-<div class="box info">
-<b>💡 Què fa <code>npm run release</code>?</b>
-<ol>
-<li>Executa <code>node sync.js</code> — baixa els últims fitxers font del servidor Emergent</li>
-<li>Neteja <code>dist/</code> per garantir build fresc</li>
-<li><code>npm version patch</code> — puja versió automàticament (ex: 2.0.10 → 2.0.11)</li>
-<li><code>electron-builder</code> — compila l'installer + portable per Windows x64</li>
-<li>Puja els <code>.exe</code> + <code>latest.yml</code> a GitHub Releases</li>
-</ol>
-</div>
+<div class="layer"><strong>Capa 8 — KILL SWITCH remot (control total)</strong><br>
+Endpoint <code>/api/electron/update-channel</code>. Els clients el consulten ABANS
+d'auto-actualitzar-se. Pots bloquejar QUALSEVOL versió des del servidor editant
+<code>/app/backend/electron_channel.json</code>:
+<pre>{
+  "latest_safe_version": "2.0.21",
+  "blocked_versions": ["2.0.19", "2.0.20"],
+  "message": "Actualitza a l'última versió"
+}</pre>
+Efecte immediat en tots els clients: no descarregaran versions bloquejades.</div>
 
-<h2>🔑 Credencials importants <span class="tag critical">GUARDAR AMB CURA</span></h2>
+<div class="layer"><strong>Capa 9 — Main.js consulta el kill switch</strong><br>
+Al detectar una nova versió, el client Electron truca al servidor. Si el servidor diu
+"aquesta versió està bloquejada", cancel·la la descàrrega/instal·lació. <em>Palanca d'emergència
+sense necessitat de tocar res al client.</em></div>
 
-<table>
-<tr><th>Credencial</th><th>Valor</th><th>On la faig servir</th></tr>
-<tr><td><b>GitHub Personal Access Token (PAT)</b></td><td><code style="font-size:10px">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</code></td><td><code>$env:GH_TOKEN</code> abans de <code>npm run release</code></td></tr>
-<tr><td><b>Master License Key</b></td><td><code>MB-MASTER-BRUGULAT-2026-OWNER</code></td><td>Activa l'app sense pagar (només per tu)</td></tr>
-<tr><td><b>Admin Panel Token</b></td><td><code>MB-ADMIN-BRUGULAT-2026-4F8E2A1C</code></td><td>Genera llicències als clients via <a href="/admin" target="_blank">/admin</a></td></tr>
-<tr><td><b>Stripe Test API Key</b></td><td><code style="font-size:10px">sk_test_51Tqx1KDICdnmKtZ3...</code></td><td>Al backend <code>.env</code> per pagaments TEST</td></tr>
-<tr><td><b>SMTP IONOS</b></td><td><code>smtp.ionos.es:587</code> · usuari <code>info@medicarplus.es</code></td><td>Enviament d'emails (pendent contrasenya al <code>.env</code>)</td></tr>
-</table>
+<div class="layer"><strong>Capa 10 — Boot guard + window.onerror global</strong><br>
+Dins <code>index.html</code>: si al arrencar (a) es llença qualsevol error JS o (b) no es renderitza
+cap element principal en 10 segons, mostra UI de recuperació amb enllaç a reinstalar.
+<em>Cap client veurà una finestra en blanc mai.</em></div>
 
-<h2>⚠️ Què fer si el GH_TOKEN caduca <span class="tag">IMPORTANT</span></h2>
-
-<div class="box warn">
-El PAT actual expira segons la política de GitHub. Si un dia executes <code>npm run release</code> i obtens <b>401 Unauthorized</b> o similar, el token ha caducat.
-</div>
-
-<h3>Regenerar el token (5 minuts)</h3>
+<h2>📋 Ús diari (procediment normal)</h2>
 
 <div class="step">
-<span class="step-num">1</span>Obre <a href="https://github.com/settings/personal-access-tokens" target="_blank">github.com/settings/personal-access-tokens</a> (autenticat com <b>Medicarplus</b>)
+<strong>1) Fes els canvis al servidor (via mi, Emergent)</strong><br>
+Modifica <code>v2.html</code>, <code>main.js</code>, etc. Jo els copio a <code>/downloads/electron-src/</code>
+i el manifest s'actualitza sol amb els SHA-256 correctes.
 </div>
 
 <div class="step">
-<span class="step-num">2</span>Si el token vell hi és → <b>Regenerate</b>. Si no → <b>Generate new token → Fine-grained token</b>
+<strong>2) Obre PowerShell al directori local</strong>
+<pre>cd C:\Users\...\medicarplus-electron</pre>
 </div>
 
 <div class="step">
-<span class="step-num">3</span><b>Nom:</b> <code>medicarplus-release</code> · <b>Expiration:</b> 1 any (o "No expiration")<br>
-<b>Repository access:</b> Only select repositories → <code>Medicarplus/medicarplus-releases</code><br>
-<b>Repository permissions:</b>
-<ul>
-<li><b>Contents:</b> Read and write</li>
-<li><b>Metadata:</b> Read-only (obligatori)</li>
-<li><b>Actions:</b> Read and write</li>
-</ul>
+<strong>3) Executa el publicador segur</strong>
+<pre>powershell -File publish-safe.ps1</pre>
+Sortida esperada:
+<pre>===== 1/7 · SYNC amb manifest + SHA-256 =====
+   · manifest ... ✅ obtingut (5 fitxers)
+   · index.html ... ✅ verificat (313 KB, SHA OK)
+   · main.js ... ✅ verificat (9.6 KB, SHA OK)
+   ...
+===== 2/7 · VALIDATE fitxers locals =====
+   ✅ index.html — 3 marcadors OK
+   ...
+===== 3/7 · Bump de versió (patch) =====
+   ✅ versió: 2.0.21 → 2.0.22
+===== 4/7 · build (NSIS + Portable) =====
+   ✅ build compilada
+===== 5/7 · SMOKE TEST sobre el .exe =====
+   ✅ .exe verificat
+===== 6/7 · Publish a GitHub Releases =====
+   ✅ publicat a GitHub
+===== 7/7 · Verificació final release remota =====
+   ✅ release v2.0.22 visible a GitHub
+
+🎉 PUBLICAT AMB ÈXIT · v2.0.22</pre>
 </div>
 
-<div class="step">
-<span class="step-num">4</span>Copia el nou token (comença per <code>github_pat_11...</code>) — <b>només és visible UN COP</b>
+<h2>🚨 Què passa si alguna capa falla?</h2>
+
+<div class="warn">
+<strong>Capa 1 (manifest) falla</strong> → sync continua amb signatures de contingut (menys estricte però igual detecta HTML 404).
+</div>
+<div class="warn">
+<strong>Capa 2 (sync) falla per un fitxer</strong> → mantenim la còpia local d'aquell fitxer i seguim. La build continuarà <em>només</em> si el local és vàlid.
+</div>
+<div class="warn">
+<strong>Capa 3 (validate) falla</strong> → <strong>ABORT total</strong>. Missatge dient exactament què falta. Solució: <code>npm run sync</code> i tornar a intentar.
+</div>
+<div class="warn">
+<strong>Capa 5 (smoke) falla</strong> → <strong>ABORT abans de publish</strong>. El <code>.exe</code> no arriba mai a GitHub. Els clients no s'assabenten.
+</div>
+<div class="warn">
+<strong>Client rep una versió corrupta miraculosament</strong> → Capa 4 (crash guard) mostra pantalla de recuperació amb enllaç a reinstalar. No finestres en blanc.
 </div>
 
-<div class="step">
-<span class="step-num">5</span>Substitueix-lo al PowerShell:
-<pre><code>$env:GH_TOKEN="EL_NOU_TOKEN_AQUI"</code></pre>
-</div>
-
-<div class="step">
-<span class="step-num">6</span><b>Actualitza aquesta guia</b> amb el nou token perquè no el perdis. Digues al teu agent:<br>
-<i>"Actualitza el GH_TOKEN a la guia amb el nou valor: github_pat_..."</i>
-</div>
-
-<h2>📥 Sistema d'auto-sync (com funciona)</h2>
-
-<div class="box info">
-Quan executes <code>npm run release</code>, el fitxer <code>sync.js</code> baixa automàticament els fitxers font més recents del servidor. Així no has de descarregar zips manualment.
-</div>
-
-<h4>Fitxers que se sincronitzen des del servidor</h4>
-<table>
-<tr><th>Fitxer</th><th>Origen</th><th>Què conté</th></tr>
-<tr><td><code>index.html</code></td><td><code>medicarplus.es/downloads/electron-src/index.html</code></td><td>L'app sencera (UI, funcionalitats)</td></tr>
-<tr><td><code>main.js</code></td><td>Idem</td><td>Configuració Electron (finestres, menus, auto-updater)</td></tr>
-<tr><td><code>preload.js</code></td><td>Idem</td><td>Bridge HWID + versió</td></tr>
-<tr><td><code>sync.js</code></td><td>Idem (s'auto-actualitza)</td><td>El propi script sync</td></tr>
-<tr><td><code>package.json</code></td><td>Idem</td><td>Només la secció <code>build</code> (la version es preserva local)</td></tr>
-</table>
-
-<h4>URLs de sincronització (ordre de prioritat)</h4>
-<ol>
-<li><code>https://medicarplus.es/downloads/electron-src/</code> (domini definitiu)</li>
-<li><code>https://project-helper-47.preview.emergentagent.com/downloads/electron-src/</code> (preview Emergent)</li>
-</ol>
-
-<h2>🔧 Configuració NSIS Installer (oneClick)</h2>
-
-<div class="box ok">
-<b>Instal·lació silenciosa activada.</b> Quan un client fa doble clic al <code>.exe</code>:
-<ol>
-<li>NSIS auto-desinstal·la la versió antiga (silenciosament)</li>
-<li>Instal·la la nova al mateix lloc</li>
-<li>Crea drecera al desktop + menú Inici</li>
-<li>Obre l'app automàticament</li>
-</ol>
-Total: <b>3-5 segons, sense preguntes, sense mesclar versions</b>.
-</div>
-
-<h4>Configuració al package.json</h4>
-<pre><code>"nsis": {
-  "oneClick": true,              // silenciós, auto-uninstall previ
-  "perMachine": false,           // instal·la per usuari (no requereix admin)
-  "allowToChangeInstallationDirectory": false,
-  "createDesktopShortcut": true,
-  "createStartMenuShortcut": true,
-  "runAfterFinish": true,        // obre l'app quan acaba
-  "deleteAppDataOnUninstall": false,  // preserva localStorage
-  "differentialPackage": true    // updates incrementals (més ràpid)
-}</code></pre>
-
-<h2>🚨 Recuperació de desastres</h2>
-
-<div class="box warn">
-En condicions normals, <b>tot ha de funcionar automàticament</b> (auto-sync, oneClick installer, auto-update). Aquestes comandes són <b>només per emergències</b> quan alguna cosa falla i cal reiniciar des de zero.
-</div>
-
-<h3>🆘 Reset TOTAL del client (comanda única d'emergència)</h3>
-
-<div class="step">
-Si l'app d'un client s'ha quedat penjada, mostra versions barrejades, o no arrenca:
-<pre class="copyable" onclick="navigator.clipboard.writeText(this.innerText)"><code># Tanca l'app, elimina TOT rastre, obliga descàrrega fresca
-Get-Process | Where-Object { $_.ProcessName -like "*MediCar*" } | Stop-Process -Force
-Start-Sleep -Seconds 2
-Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Programs\MediCar Plus" -ErrorAction SilentlyContinue
-Remove-Item -Recurse -Force "$env:APPDATA\MediCar Plus" -ErrorAction SilentlyContinue
-Remove-Item -Force "$env:USERPROFILE\Desktop\MediCar Plus.lnk" -ErrorAction SilentlyContinue
-Remove-Item -Recurse -Force "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\MediCar Plus" -ErrorAction SilentlyContinue
-Write-Host "OK - Neteja completa. Descarrega el .exe des de:"
-Write-Host "https://github.com/Medicarplus/medicarplus-releases/releases/latest" -ForegroundColor Cyan</code></pre>
-<b>⚠️ Preserva les dades del client</b> (localStorage, dies, IRPF, còpies) — només elimina l'installer.
-</div>
-
-<h3>🔧 Reset del PC de desenvolupament (C:\medicarplus\electron\)</h3>
-
-<div class="step">
-Si <code>npm run release</code> falla amb errors estranys o els fitxers font s'han corromput:
-<pre class="copyable" onclick="navigator.clipboard.writeText(this.innerText)"><code># 1. Backup opcional de node_modules (per no reinstal·lar)
-Move-Item C:\medicarplus\electron\node_modules $env:TEMP\node_modules_backup -ErrorAction SilentlyContinue
-
-# 2. Elimina tot excepte node_modules
-Remove-Item -Recurse -Force C:\medicarplus\electron\* -Exclude node_modules -ErrorAction SilentlyContinue
-
-# 3. Baixa i extreu últim zip
-Invoke-WebRequest "https://project-helper-47.preview.emergentagent.com/downloads/medicar-plus-electron.zip" -OutFile "$env:TEMP\mp.zip"
-Expand-Archive -Force "$env:TEMP\mp.zip" -DestinationPath "C:\medicarplus\"
-
-# 4. Restaura node_modules
-Move-Item $env:TEMP\node_modules_backup C:\medicarplus\electron\node_modules -ErrorAction SilentlyContinue
-
-# 5. Torna a executar release
-cd C:\medicarplus\electron
-$env:GH_TOKEN="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"
-npm run release</code></pre>
-</div>
-
-<h3>🔴 Errors comuns i solució</h3>
-
-<table>
-<tr><th>Error</th><th>Causa</th><th>Solució</th></tr>
-<tr><td><code>electron-builder is not recognized</code></td><td>node_modules no instal·lat</td><td><code>npm install</code> a C:\medicarplus\electron\</td></tr>
-<tr><td><code>401 Unauthorized</code> al publicar</td><td>GH_TOKEN caducat</td><td>Regenerar token (veure secció ⚠️ dalt)</td></tr>
-<tr><td><code>Cannot find module './package.json'</code></td><td>sync.js no ha funcionat</td><td>Executa <code>npm run sync</code> abans</td></tr>
-<tr><td>App mostra <code>v2.0.0 (web)</code></td><td>Preload no s'exposa (sandbox activat)</td><td>Comprova <code>sandbox: false</code> a main.js</td></tr>
-<tr><td>Client no rep auto-update</td><td>Repo GitHub és privat</td><td>Fer PÚBLIC a Settings → Visibility</td></tr>
-<tr><td>"Reinstalling" versions barrejades</td><td>Installer antic amb <code>oneClick: false</code></td><td>Client fa reset TOTAL (comanda de dalt) i instal·la fresc</td></tr>
-<tr><td>Instal·lació demana ruta / accepta condicions</td><td>package.json amb <code>oneClick: false</code></td><td>Verificar package.json → <code>"oneClick": true</code></td></tr>
-<tr><td>Auto-update encallada &gt; 5 min</td><td>Xarxa lenta o timeout GitHub</td><td>Descàrrega manual del .exe (últim recurs)</td></tr>
-<tr><td>El nom d'empresa surt genèric al header</td><td>CFG carregat després del render</td><td>Ja resolt v2.0.12+ (pre-load CFG)</td></tr>
-</table>
-
-<h3>Si el repo GitHub es cau o s'esborra</h3>
-<ol>
-<li>Crea nou repo public: <code>Medicarplus/medicarplus-releases</code></li>
-<li>El primer <code>npm run release</code> hi puja tot automàticament</li>
-<li>Els clients existents seguiran funcionant (offline license) fins que rebin la propera update</li>
-</ol>
-
-<h3>Si un client no pot instal·lar l'update</h3>
-<ol>
-<li>El repo GitHub ha de ser <b>PÚBLIC</b> (comprovar a Settings → Change visibility)</li>
-<li>Verifica que hi ha <code>latest.yml</code> al release (el genera electron-builder sol)</li>
-<li>El client pot descarregar el <code>.exe</code> manualment i executar-lo — auto-desinstal·larà l'antic</li>
-</ol>
-
-<h2>📋 Comandes ràpides de referència</h2>
-
-<pre><code># Publicar nova versió
-cd C:\medicarplus\electron
-$env:GH_TOKEN="github_pat_..."
-npm run release
-
-# Comprovar quina versió hi ha instal·lada al PC
-(Get-Item "$env:LOCALAPPDATA\Programs\MediCar Plus\MediCar Plus.exe").VersionInfo.ProductVersion
-
-# Desinstal·lar manualment (per si es queda encallat)
-Get-Process | Where-Object { $_.ProcessName -like "*MediCar*" } | Stop-Process -Force
-Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Programs\MediCar Plus" -ErrorAction SilentlyContinue
-
-# Recuperar C:\medicarplus\electron\ des del servidor
-Invoke-WebRequest "https://project-helper-47.preview.emergentagent.com/downloads/medicar-plus-electron.zip" -OutFile "$env:TEMP\mp.zip"
-Expand-Archive -Force "$env:TEMP\mp.zip" -DestinationPath "C:\medicarplus\"
-
-# Sincronitzar sense fer release (només actualitzar fitxers)
-cd C:\medicarplus\electron
+<h2>🛠️ Comandes útils individuals</h2>
+<pre># Només sync (verificar què faria)
 npm run sync
 
-# Verificar que sync.js és nou (ha de retornar &gt; 4000)
-(Get-Item C:\medicarplus\electron\sync.js).Length
+# Només validar fitxers locals sense compilar
+npm run validate
 
-# Verificar que package.json té oneClick: true
-Get-Content C:\medicarplus\electron\package.json | Select-String "oneClick"</code></pre>
+# Compilar amb validate + smoke (però SENSE publicar)
+npm run build
 
-<h2>🔗 Enllaços útils</h2>
-<ul>
-<li><a href="https://github.com/Medicarplus/medicarplus-releases/releases" target="_blank">📦 GitHub Releases (versions publicades)</a></li>
-<li><a href="https://github.com/Medicarplus/medicarplus-releases/settings" target="_blank">⚙️ GitHub Repo Settings (fer públic/privat)</a></li>
-<li><a href="https://github.com/settings/personal-access-tokens" target="_blank">🔑 Regenerar GH_TOKEN</a></li>
-<li><a href="https://dashboard.stripe.com" target="_blank">💳 Stripe Dashboard</a></li>
-<li><a href="index-guies.html">📚 Índex de guies</a></li>
-</ul>
+# Compilar i publicar (assumeix que ja has sincronitzat)
+npm run publish
 
-<div class="box ok" style="margin-top:32px;text-align:center">
-<b>🎯 Recorda:</b> Una sola comanda <code>npm run release</code> ho fa tot. Auto-sync, auto-compile, auto-publish, auto-update per als clients.<br><br>
-<span style="color:var(--gold);font-size:16px;font-weight:700">Zero descàrregues manuals. Zero neteges. Zero problemes.</span>
-</div>
+# TOT en un (via PowerShell wrapper, RECOMANAT):
+powershell -File publish-safe.ps1</pre>
 
-</div>
-</body>
-</html>
-Car Plus" -ErrorAction SilentlyContinue
+<h2>🧪 Verificar manualment el manifest</h2>
+<p>Obre al navegador:</p>
+<pre>https://project-helper-47.preview.emergentagent.com/api/electron/manifest</pre>
+<p>Ha de retornar un JSON amb <code>server_ok: true</code> i els 5 fitxers amb el seu SHA.</p>
 
-# Recuperar C:\medicarplus\electron\ des del servidor
-Invoke-WebRequest "https://project-helper-47.preview.emergentagent.com/downloads/medicar-plus-electron.zip" -OutFile "$env:TEMP\mp.zip"
-Expand-Archive -Force "$env:TEMP\mp.zip" -DestinationPath "C:\medicarplus\"
+<h2>❓ Recuperació d'emergència</h2>
+<p>Si tot es trenca i no confies gens dels fitxers locals:</p>
+<pre># Esborra tot i baixa manualment
+Remove-Item index.html, main.js, preload.js -ErrorAction SilentlyContinue
+Invoke-WebRequest -Uri "https://project-helper-47.preview.emergentagent.com/downloads/electron-src/index.html?t=$(Get-Random)" -OutFile "index.html"
+Invoke-WebRequest -Uri "https://project-helper-47.preview.emergentagent.com/downloads/electron-src/main.js?t=$(Get-Random)" -OutFile "main.js"
+Invoke-WebRequest -Uri "https://project-helper-47.preview.emergentagent.com/downloads/electron-src/preload.js?t=$(Get-Random)" -OutFile "preload.js"
+node validate-local.js</pre>
 
-# Sincronitzar sense fer release (només actualitzar fitxers)
-cd C:\medicarplus\electron
-npm run sync
-
-# Verificar que sync.js és nou (ha de retornar &gt; 4000)
-(Get-Item C:\medicarplus\electron\sync.js).Length
-
-# Verificar que package.json té oneClick: true
-Get-Content C:\medicarplus\electron\package.json | Select-String "oneClick"</code></pre>
-
-<h2>🔗 Enllaços útils</h2>
-<ul>
-<li><a href="https://github.com/Medicarplus/medicarplus-releases/releases" target="_blank">📦 GitHub Releases (versions publicades)</a></li>
-<li><a href="https://github.com/Medicarplus/medicarplus-releases/settings" target="_blank">⚙️ GitHub Repo Settings (fer públic/privat)</a></li>
-<li><a href="https://github.com/settings/personal-access-tokens" target="_blank">🔑 Regenerar GH_TOKEN</a></li>
-<li><a href="https://dashboard.stripe.com" target="_blank">💳 Stripe Dashboard</a></li>
-<li><a href="index-guies.html">📚 Índex de guies</a></li>
-</ul>
-
-<div class="box ok" style="margin-top:32px;text-align:center">
-<b>🎯 Recorda:</b> Una sola comanda <code>npm run release</code> ho fa tot. Auto-sync, auto-compile, auto-publish, auto-update per als clients.<br><br>
-<span style="color:var(--gold);font-size:16px;font-weight:700">Zero descàrregues manuals. Zero neteges. Zero problemes.</span>
-</div>
-
-</div>
+<hr>
+<p style="color:#9aa3b2;text-align:center">MediCar Plus · Sistema bulletproof v2 · 2026</p>
 </body>
 </html>

@@ -119,12 +119,67 @@ function setupAutoUpdater() {
   autoUpdater.forceDevUpdateConfig = false;
 
   let latestUpdateInfo = null;
+  let killSwitch = { blocked: [], latest_safe: null, action: 'ok' };
 
-  autoUpdater.on('update-available', (info) => {
+  // KILL SWITCH · consulta al servidor abans de deixar que autoUpdater instal·li res
+  const KILL_URL = 'https://project-helper-47.preview.emergentagent.com/api/electron/update-channel';
+  async function fetchKillSwitch() {
+    return new Promise((resolve) => {
+      try {
+        const https = require('https');
+        const url = `${KILL_URL}?current_version=${encodeURIComponent(app.getVersion())}&t=${Date.now()}`;
+        const req = https.get(url, { timeout: 8000 }, (res) => {
+          if (res.statusCode !== 200) return resolve(null);
+          const chunks = [];
+          res.on('data', c => chunks.push(c));
+          res.on('end', () => {
+            try {
+              const d = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+              resolve(d);
+            } catch (e) { resolve(null); }
+          });
+        });
+        req.on('error', () => resolve(null));
+        req.on('timeout', () => { req.destroy(); resolve(null); });
+      } catch (e) { resolve(null); }
+    });
+  }
+
+  function versionGT(a, b) {
+    const pa = String(a).split('.').map(Number);
+    const pb = String(b).split('.').map(Number);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      const x = pa[i] || 0, y = pb[i] || 0;
+      if (x > y) return true;
+      if (x < y) return false;
+    }
+    return false;
+  }
+
+  autoUpdater.on('update-available', async (info) => {
     updateAvailable = true;
     latestUpdateInfo = info;
     console.log('Nova versió disponible:', info.version);
-    // Notifica al renderer perquè pugui mostrar el progrés en directe al modal
+
+    // KILL SWITCH CHECK: consulta el servidor si aquesta versió està bloquejada
+    const ks = await fetchKillSwitch();
+    if (ks) {
+      killSwitch = ks;
+      if (Array.isArray(ks.blocked_versions) && ks.blocked_versions.includes(info.version)) {
+        console.warn(`⛔ Versió ${info.version} BLOQUEJADA pel servidor — cancel·lem l'update.`);
+        // Cancel·la la descàrrega — no volem instal·lar una versió dolenta
+        try { autoUpdater.autoDownload = false; } catch(e) { /* ignorem */ }
+        try { autoUpdater.autoInstallOnAppQuit = false; } catch(e) { /* ignorem */ }
+        return;
+      }
+      if (ks.latest_safe_version && versionGT(info.version, ks.latest_safe_version)) {
+        console.warn(`⛔ Versió ${info.version} > latest_safe (${ks.latest_safe_version}) — cancel·lem l'update.`);
+        try { autoUpdater.autoDownload = false; } catch(e) { /* ignorem */ }
+        try { autoUpdater.autoInstallOnAppQuit = false; } catch(e) { /* ignorem */ }
+        return;
+      }
+    }
+
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-available', { version: info.version });
     }

@@ -1,5 +1,41 @@
 # PRD — MediCar Plus (Estat 08/07/2026)
 
+
+## 🛡️ Sistema BULLETPROOF de publicació (09/07/2026) — 10 CAPES
+
+Impossible que arribi un `.exe` corrupte als clients. Palanca d'emergència remota.
+
+**Capes servidor (backend):**
+1. **Manifest SHA-256** — `GET /api/electron/manifest` retorna hashes + mides + validacions de signatura dels 5 fitxers font. Si algun està corrupte al servidor, s'omet del manifest.
+2. **Kill switch remot** — `GET /api/electron/update-channel?current_version=X`. Configurable via `/app/backend/electron_channel.json` amb `blocked_versions`, `latest_safe_version`, `rollback_to`.
+
+**Capes local build (a `/app/commercial/electron/`):**
+3. **`sync.js` v2** — Descàrrega ATÒMICA: manifest → tmp → SHA verify → signatures → swap. Backup automàtic. Rutes alternatives (index.html cau a `/v2.html` si `/downloads/electron-src/index.html` retorna 404). Exit 3 FATAL si locals corruptes.
+4. **`validate-local.js`** — Verifica strings crítiques abans de compilar. Abort exit 3 si en falta cap.
+5. **`smoke-test.js`** — Extreu `app.asar` del `.exe` compilat i verifica strings crítiques + mida raonable (>30MB).
+6. **`publish-safe.ps1`** — Orquestrador PowerShell 1-comanda: sync → validate → bump → build → smoke → publish → verify-remote. Aborta al primer error.
+7. **Verificació remota GitHub API** — Consulta la release publicada per confirmar que hi és.
+
+**Capes client (main.js + index.html):**
+8. **Kill switch client-side** (`main.js`) — Consulta `/api/electron/update-channel` abans que autoUpdater instal·li res. Si la versió està bloquejada, cancel·la la descàrrega/instal·lació.
+9. **Boot guard** (`index.html`) — Si en 10s no s'ha renderitzat cap element clau, mostra UI de recuperació amb enllaç a reinstalar.
+10. **window.onerror global** (`index.html`) — Captura errors JS globals i, si passen abans de renderitzar contingut, mostra UI de recuperació. Cap client veurà mai una finestra en blanc.
+
+**Fitxers rellevants:**
+- `/app/backend/routes/electron_manifest.py` (endpoint manifest)
+- `/app/backend/routes/electron_channel.py` (endpoint kill switch)
+- `/app/backend/electron_channel.json` (opcional, config del kill switch)
+- `/app/commercial/electron/sync.js` — descàrrega bulletproof
+- `/app/commercial/electron/validate-local.js` — pre-build check
+- `/app/commercial/electron/smoke-test.js` — post-build check
+- `/app/commercial/electron/publish-safe.ps1` — one-command wrapper
+- Tots també servits a `/downloads/electron-src/` perquè l'usuari els pugui baixar
+
+**Ús diari:** `powershell -File publish-safe.ps1` (a la carpeta local de build)
+
+**Emergència:** editar `/app/backend/electron_channel.json` amb la versió dolenta a `blocked_versions` → efecte immediat en tots els clients.
+
+
 ## Estat del sistema
 
 ### ✅ COMPLETAT AVUI (dia productiu)

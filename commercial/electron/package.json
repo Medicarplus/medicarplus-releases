@@ -11,12 +11,14 @@
   "scripts": {
     "start": "electron .",
     "sync": "node sync.js",
-    "build": "electron-builder --win --x64",
-    "build:portable": "electron-builder --win portable --x64",
-    "build:installer": "electron-builder --win nsis --x64",
-    "build:all": "electron-builder --win nsis portable --x64",
-    "release": "node sync.js && npm version patch --no-git-tag-version && electron-builder --win nsis portable --x64 --publish always",
-    "publish": "electron-builder --win nsis portable --x64 --publish always"
+    "validate": "node validate-local.js",
+    "smoke": "node smoke-test.js",
+    "build": "node validate-local.js && electron-builder --win --x64 && node smoke-test.js",
+    "build:portable": "node validate-local.js && electron-builder --win portable --x64 && node smoke-test.js",
+    "build:installer": "node validate-local.js && electron-builder --win nsis --x64 && node smoke-test.js",
+    "build:all": "node validate-local.js && electron-builder --win nsis portable --x64 && node smoke-test.js",
+    "release": "node sync.js && node validate-local.js && npm version patch --no-git-tag-version && electron-builder --win nsis portable --x64 && node smoke-test.js && electron-builder --win nsis portable --x64 --publish always",
+    "publish": "node smoke-test.js && electron-builder --win nsis portable --x64 --publish always"
   },
   "dependencies": {
     "electron-updater": "^6.3.9"

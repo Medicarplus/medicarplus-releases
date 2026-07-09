@@ -209,6 +209,14 @@ app.include_router(build_support_router(db), prefix="/api")
 from routes.sms_campaigns import build_router as build_sms_router
 app.include_router(build_sms_router(db), prefix="/api")
 
+# Electron manifest — SHA-256 + mida dels fitxers font per sync bulletproof
+from routes.electron_manifest import router as electron_manifest_router
+app.include_router(electron_manifest_router, prefix="/api")
+
+# Electron update channel — KILL SWITCH remot per bloquejar versions dolentes
+from routes.electron_channel import router as electron_channel_router
+app.include_router(electron_channel_router, prefix="/api")
+
 # Stripe webhook (obligatori per playbook: /api/webhook/stripe)
 # Gestiona tant one-off (via emergentintegrations) com subscriptions (via stripe SDK)
 from fastapi import Request as _FastReq
