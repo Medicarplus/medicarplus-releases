@@ -2393,18 +2393,27 @@ if($('#btnSettings')){$('#btnSettings').onclick=openSettingsModal}
 // ============================================================================
 // MODAL AVISOS SMS · Campanyes amb tongades, cerca i estadístiques
 // ============================================================================
-const SMS_API=(function(){
-  try{return (typeof LIC!=='undefined'&&LIC.VERIFY_URL)?LIC.VERIFY_URL.replace(/\/api\/.*$/,''):'https://medicarplus.es'}catch(e){return 'https://medicarplus.es'}
-})();
+function getSmsApiBase(){
+  try{
+    if(typeof LIC!=='undefined'&&LIC.VERIFY_URL){
+      return LIC.VERIFY_URL.replace(/\/api\/.*$/,'');
+    }
+  }catch(e){}
+  return 'https://project-helper-47.preview.emergentagent.com';
+}
 const SMS_ADMIN_TOKEN='MB-ADMIN-BRUGULAT-2026-4F8E2A1C';
 
 async function apiSms(path, opts={}){
-  const url=SMS_API+'/api/sms'+path;
+  const url=getSmsApiBase()+'/api/sms'+path;
   const res=await fetch(url,{
     ...opts,
     headers:{'X-Admin-Token':SMS_ADMIN_TOKEN, ...(opts.headers||{})}
   });
-  if(!res.ok) throw new Error('HTTP '+res.status);
+  if(!res.ok){
+    let bodyText='';
+    try{bodyText=await res.text()}catch(e){}
+    throw new Error('HTTP '+res.status+(bodyText?' · '+bodyText.slice(0,200):''));
+  }
   return await res.json();
 }
 
