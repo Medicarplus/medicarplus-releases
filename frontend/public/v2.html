@@ -3074,9 +3074,14 @@ if($('#btnSms')){$('#btnSms').onclick=openSmsModal}
     renderList();
   }
   const btn=document.getElementById('btnSms');
-  // NOTA: el nou modal (openSmsModal) amb backend real substitueix el renderModal antic
-  // Si vols recuperar l'antic modal offline-only, canvia openSmsModal per renderModal
-  if(btn)btn.onclick=(typeof openSmsModal==='function')?openSmsModal:renderModal;
+  // Ja no cal fallback — openSmsModal és el modal oficial. Si un dia falla la definició, no obrir res és menys perillós que obrir un modal antic sense backend.
+  if(btn)btn.onclick=function(){
+    if(typeof openSmsModal==='function'){
+      openSmsModal();
+    } else {
+      alert('Modal SMS no carregat. Reinicia l\'app.');
+    }
+  };
 })();
 
 
