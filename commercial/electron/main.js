@@ -39,12 +39,10 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      sandbox: false,
       webSecurity: true,
       devTools: false, // ⚠️ desactiva DevTools en producció (impedeix inspecció)
-      spellcheck: false,
-      // Passem la versió al preload perquè sandbox=true no permet require('./package.json')
-      additionalArguments: [`--app-version=${app.getVersion()}`]
+      spellcheck: false
     }
   });
 

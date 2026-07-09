@@ -3,21 +3,25 @@
 // Marc Brugulat Lopez · 2026
 // ============================================================================
 // Exposa nomes info del maquinari necessaria per a HWID lock. El renderer
-// no te acces directe a Node.js APIs (contextIsolation + sandbox actius).
+// no te acces directe a Node.js APIs (contextIsolation actiu, sandbox false
+// perque necessitem os/crypto/require al preload).
 // ============================================================================
 
 const { contextBridge, ipcRenderer } = require('electron');
-// La versió es passa via additionalArguments des de main.js perquè sandbox=true no permet require('./package.json')
-function readAppVersion(){
-  try{
-    const arg = (process.argv || []).find(a => typeof a==='string' && a.startsWith('--app-version='));
-    if(arg) return arg.split('=')[1];
-  }catch(e){}
-  return '2.0.0';
-}
-const APP_VERSION = readAppVersion();
 const os = require('os');
 const crypto = require('crypto');
+
+// Llegim la versió del package.json en runtime (sandbox=false permet require)
+function readAppVersion(){
+  try{
+    const pkg = require('./package.json');
+    if(pkg && pkg.version) return pkg.version;
+  }catch(e){
+    console.warn('preload: no s\'ha pogut llegir package.json:', e.message);
+  }
+  return '0.0.0';
+}
+const APP_VERSION = readAppVersion();
 
 /**
  * Genera un HWID estable a partir de trets del maquinari.
