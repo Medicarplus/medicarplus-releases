@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MediCar Plus · Software para centros médicos DGT y autoescuelas</title>
+<meta name="description" content="Software profesional para gestión de caja diaria en centros médicos de reconocimiento de conductores y autoescuelas. Cierre diario, importación DGT, contabilidad, IRPF, avisos SMS.">
+<meta property="og:title" content="MediCar Plus · Software profesional para centros médicos DGT">
+<meta property="og:description" content="Cierre diario, importación DGT, contabilidad, IRPF, avisos SMS. Instalación local con licencia hardware-locked.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://medicarplus.es">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="android-chrome-192x192.png">
+<style>
+:root{
+  --bg:#0a0f1a; --bg2:#0f172a; --card:#131c2e;
+  --gold:#f5b301; --gold-soft:#fde68a;
+  --text:#e8ecf2; --muted:#94a3b8;
+  --border:#1e293b; --green:#22c55e;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Segoe UI','Inter',system-ui,-apple-system,sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.container{max-width:1200px;margin:0 auto;padding:0 24px}
+a{color:var(--gold);text-decoration:none}
+a:hover{color:var(--gold-soft)}
+
+/* HEADER */
+header{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  background:rgba(10,15,26,.85);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+}
+.nav{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;max-width:1200px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;color:var(--gold)}
+.brand-logo{width:40px;height:40px;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.brand-logo img{width:100%;height:100%;object-fit:cover;display:block}
+.nav-links{display:flex;gap:28px}
+.nav-links a{color:var(--text);font-size:14px;font-weight:500;transition:color .2s}
+.nav-links a:hover{color:var(--gold)}
+@media(max-width:768px){.nav-links{display:none}}
+
+/* HERO */
+.hero{
+  padding:140px 0 80px;
+  background:radial-gradient(ellipse at top,#1a2540 0%,transparent 70%);
+  position:relative;overflow:hidden;
+}
+.hero::before{
+  content:'';position:absolute;top:0;left:0;right:0;bottom:0;
+  background-image:radial-gradient(circle at 20% 30%,rgba(245,179,1,.08) 0%,transparent 40%),radial-gradient(circle at 80% 60%,rgba(34,197,94,.06) 0%,transparent 40%);
+  pointer-events:none;
+}
+.hero-content{position:relative;z-index:1;text-align:center}
+.badge{
+  display:inline-block;background:rgba(245,179,1,.1);color:var(--gold);
+  padding:6px 16px;border-radius:20px;font-size:12px;font-weight:700;
+  letter-spacing:.5px;text-transform:uppercase;border:1px solid rgba(245,179,1,.3);
+  margin-bottom:20px;
+}
+h1{
+  font-size:clamp(36px,5vw,64px);font-weight:800;line-height:1.1;
+  margin-bottom:20px;letter-spacing:-1px;
+}
+h1 .highlight{color:var(--gold);font-family:Georgia,serif;font-style:italic}
+.hero-sub{
+  font-size:clamp(16px,2vw,20px);color:var(--muted);max-width:700px;
+  margin:0 auto 40px;line-height:1.6;
+}
+.cta-group{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:60px}
+.btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:14px 28px;border-radius:10px;font-weight:700;
+  font-size:15px;cursor:pointer;transition:all .2s;
+  border:none;font-family:inherit;
+}
+.btn-primary{background:var(--gold);color:#0a0f1a;box-shadow:0 4px 16px rgba(245,179,1,.3)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(245,179,1,.4);color:#0a0f1a}
+.btn-secondary{background:transparent;color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--gold);color:var(--gold)}
+
+.hero-stats{display:flex;justify-content:center;gap:60px;flex-wrap:wrap;margin-top:40px}
+.stat{text-align:center}
+.stat-num{font-size:36px;font-weight:800;color:var(--gold);font-family:Georgia,serif}
+.stat-lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+
+/* SECTIONS */
+section{padding:80px 0;position:relative}
+.section-head{text-align:center;margin-bottom:60px}
+.section-tag{color:var(--gold);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:12px}
+h2{font-size:clamp(28px,4vw,42px);font-weight:800;line-height:1.15;margin-bottom:16px;letter-spacing:-.5px}
+.section-sub{color:var(--muted);font-size:17px;max-width:600px;margin:0 auto}
+
+/* FEATURES GRID */
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.feature{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:28px 24px;transition:all .2s;
+}
+.feature:hover{transform:translateY(-4px);border-color:var(--gold)}
+.feature-icon{
+  width:48px;height:48px;border-radius:10px;
+  background:linear-gradient(135deg,rgba(245,179,1,.15),rgba(245,179,1,.05));
+  display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:16px;
+}
+.feature h3{color:var(--gold);font-family:Georgia,serif;font-size:19px;margin-bottom:10px}
+.feature p{color:var(--muted);font-size:14px;line-height:1.6}
+
+/* PLANS */
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;max-width:1000px;margin:0 auto}
+.plan{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:32px 28px;position:relative;transition:all .2s;
+}
+.plan:hover{transform:translateY(-4px)}
+.plan.featured{border:2px solid var(--gold);box-shadow:0 8px 32px rgba(245,179,1,.15)}
+.plan-tag{
+  position:absolute;top:-12px;left:50%;transform:translateX(-50%);
+  background:var(--gold);color:#0a0f1a;padding:4px 16px;border-radius:20px;
+  font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+}
+.plan-name{color:var(--gold);font-family:Georgia,serif;font-size:22px;margin-bottom:8px}
+.plan-desc{color:var(--muted);font-size:13px;margin-bottom:24px;min-height:36px}
+.plan-price{font-size:42px;font-weight:800;color:var(--text);letter-spacing:-1px;font-family:Georgia,serif}
+.plan-period{color:var(--muted);font-size:14px;margin-left:4px}
+.plan-note{color:var(--muted);font-size:12px;margin:6px 0 24px;min-height:16px}
+.plan-features{list-style:none;margin:24px 0}
+.plan-features li{padding:8px 0;color:var(--muted);font-size:14px;display:flex;align-items:flex-start;gap:10px}
+.plan-features li::before{content:'✓';color:var(--green);font-weight:800;flex-shrink:0}
+.plan .btn{width:100%;justify-content:center;margin-top:16px}
+
+/* FAQ */
+.faq{max-width:800px;margin:0 auto}
+details{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:0;margin-bottom:12px;overflow:hidden;transition:border-color .2s;
+}
+details[open]{border-color:var(--gold)}
+summary{padding:20px 24px;cursor:pointer;font-weight:600;color:var(--text);font-size:15px;list-style:none;position:relative;padding-right:50px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:'+';position:absolute;right:24px;top:50%;transform:translateY(-50%);color:var(--gold);font-size:24px;font-weight:400;transition:transform .2s}
+details[open] summary::after{transform:translateY(-50%) rotate(45deg)}
+details p{padding:0 24px 20px;color:var(--muted);font-size:14px;line-height:1.7}
+
+/* CONTACT */
+.contact-wrap{max-width:640px;margin:0 auto;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:40px}
+.contact-form label{display:block;margin-bottom:6px;color:var(--muted);font-size:13px;font-weight:600;letter-spacing:.3px;text-transform:uppercase}
+.contact-form input,.contact-form textarea,.contact-form select{
+  width:100%;background:var(--bg2);color:var(--text);
+  border:1px solid var(--border);border-radius:8px;
+  padding:12px 14px;font-size:15px;font-family:inherit;
+  margin-bottom:16px;transition:border-color .2s;
+}
+.contact-form input:focus,.contact-form textarea:focus,.contact-form select:focus{outline:none;border-color:var(--gold)}
+.contact-form textarea{resize:vertical;min-height:120px}
+.contact-info{text-align:center;margin-top:24px;padding-top:24px;border-top:1px solid var(--border)}
+.contact-info p{color:var(--muted);font-size:13px;margin:4px 0}
+.contact-info a{font-weight:700}
+
+/* FOOTER */
+footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 20px;margin-top:60px}
+.footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:40px;margin-bottom:32px}
+@media(max-width:768px){.footer-grid{grid-template-columns:1fr;text-align:center}}
+.footer-brand p{color:var(--muted);font-size:13px;margin-top:10px;line-height:1.6;max-width:400px}
+.footer-col h4{color:var(--gold);font-size:13px;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;font-weight:700}
+.footer-col ul{list-style:none}
+.footer-col li{margin:6px 0}
+.footer-col a{color:var(--muted);font-size:13px;transition:color .2s}
+.footer-col a:hover{color:var(--gold)}
+.footer-bottom{border-top:1px solid var(--border);padding-top:20px;text-align:center;color:var(--muted);font-size:12px}
+
+/* Accessibility & animations */
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <nav class="nav">
+    <a href="#" class="brand">
+      <div class="brand-logo"><img src="favicon.png" alt="MediCar Plus"></div>
+      MediCar Plus
+    </a>
+    <div class="nav-links">
+      <a href="#features">Características</a>
+      <a href="#plans">Planes</a>
+      <a href="#faq">FAQ</a>
+      <a href="#contacto">Contacto</a>
+    </div>
+  </nav>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container hero-content">
+    <span class="badge">🩺 Software especializado · Sector médico DGT</span>
+    <h1>Cierre diario de caja para <span class="highlight">centros médicos</span> y autoescuelas</h1>
+    <p class="hero-sub">
+      Importa el CSV de la DGT en 1 clic, cuadra el efectivo, gestiona IRPF, envía avisos SMS de renovación
+      y ten toda tu contabilidad al día. Software desktop nativo, funciona sin internet, con licencia
+      vinculada al hardware.
+    </p>
+    <div class="cta-group">
+      <a href="#contacto" class="btn btn-primary">📞 Solicitar información</a>
+      <a href="#features" class="btn btn-secondary">Ver características →</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><div class="stat-num">DGT</div><div class="stat-lbl">Compatible</div></div>
+      <div class="stat"><div class="stat-num">Offline</div><div class="stat-lbl">Sin conexión</div></div>
+      <div class="stat"><div class="stat-num">30d</div><div class="stat-lbl">Prueba gratuita</div></div>
+      <div class="stat"><div class="stat-num">🇪🇸 🇦🇩</div><div class="stat-lbl">Español · Català</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-tag">Características</div>
+      <h2>Todo lo que necesita tu centro médico o autoescuela</h2>
+      <p class="section-sub">Sistema completo diseñado desde la práctica diaria de los profesionales del sector.</p>
+    </div>
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">📥</div>
+        <h3>Importación CSV DGT</h3>
+        <p>Sube el fichero de la DGT y el sistema clasifica automáticamente: renovaciones, expediciones, canjes, duplicados. Cada uno con su tasa correcta.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">💰</div>
+        <h3>Cuadre de caja diario</h3>
+        <p>Efectivo, tarjeta, Bizum, transferencia. Saldo anterior, ingresos del día, IRPF a descontar, caja física. Todo cuadrado al céntimo.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📋</div>
+        <h3>IRPF configurable</h3>
+        <p>Elige el % (7%, 15%, 19% o custom) por empresa. Se aplica automáticamente en cada asiento y suma anual disponible.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📊</div>
+        <h3>Contabilidad completa</h3>
+        <p>Libreta anual, reparto de socios por porcentajes, reserva de cambio, informe anual con gráficos, auditoría de tasas.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📱</div>
+        <h3>Avisos SMS · WhatsApp</h3>
+        <p>Envía recordatorios automáticos a clientes cuando toca renovar el permiso o revisión. Integrado con Twilio.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔎</div>
+        <h3>Búsqueda inteligente</h3>
+        <p>Encuentra cualquier cliente por nombre o apellidos en el histórico completo. Ve todas sus visitas y pagos.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🖨️</div>
+        <h3>Impresión & backup</h3>
+        <p>Imprime cierre diario, exporta copias de seguridad JSON, historial protegido con snapshots automáticos.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔒</div>
+        <h3>Licencia hardware-locked</h3>
+        <p>1 licencia = 1 ordenador. Impide piratería. Datos siempre locales en tu PC, cumple con LOPD/RGPD.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🤖</div>
+        <h3>Asesor IA integrado</h3>
+        <p>Pregunta en lenguaje natural: "¿cuánto he facturado este mes?" o "¿quién me debe dinero?". Respuesta en segundos.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔄</div>
+        <h3>Actualizaciones automáticas</h3>
+        <p>Nuevas funcionalidades y mejoras llegan solas. Sin reinstalar. Sin perder datos. Sin fricción.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🌐</div>
+        <h3>Español · Català</h3>
+        <p>Interfaz completamente traducida. Cambia idioma con un clic. Ideal para centros bilingües.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">💾</div>
+        <h3>Funciona offline</h3>
+        <p>La app es 100% local. No depende de tu conexión. Solo verifica licencia cada 7 días online.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLANS -->
+<section id="plans" style="background:linear-gradient(180deg,transparent,rgba(15,23,42,.5))">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-tag">Precios</div>
+      <h2>Un plan pensado para cada tipo de centro</h2>
+      <p class="section-sub">Prueba gratis 30 días. Sin tarjeta. Sin compromiso.</p>
+    </div>
+    <div class="plans">
+
+      <div class="plan">
+        <div class="plan-name">Prueba gratuita</div>
+        <div class="plan-desc">Explora todas las funciones sin límites</div>
+        <div class="plan-price">0€<span class="plan-period">/30 días</span></div>
+        <div class="plan-note">Sin tarjeta requerida</div>
+        <ul class="plan-features">
+          <li>Todas las funciones activadas</li>
+          <li>Sin limitaciones</li>
+          <li>1 ordenador</li>
+          <li>Soporte por email</li>
+        </ul>
+        <a href="#contacto" class="btn btn-secondary">Solicitar prueba</a>
+      </div>
+
+      <div class="plan featured">
+        <div class="plan-tag">⭐ Más popular</div>
+        <div class="plan-name">Standard</div>
+        <div class="plan-desc">Para centros médicos y autoescuelas activos</div>
+        <div class="plan-price">29,90€<span class="plan-period">/mes</span></div>
+        <div class="plan-note">O 299,90€/año (2 meses gratis)</div>
+        <ul class="plan-features">
+          <li>Importación CSV DGT ilimitada</li>
+          <li>Contabilidad completa</li>
+          <li>IRPF configurable</li>
+          <li>Búsqueda de clientes</li>
+          <li>Backup automático</li>
+          <li>Actualizaciones incluidas</li>
+          <li>Soporte por email</li>
+        </ul>
+        <a href="#contacto" class="btn btn-primary">Contactar</a>
+      </div>
+
+      <div class="plan">
+        <div class="plan-name">Premium</div>
+        <div class="plan-desc">Centros multi-empresa con socios y SMS</div>
+        <div class="plan-price">39,90€<span class="plan-period">/mes</span></div>
+        <div class="plan-note">O 399,90€/año</div>
+        <ul class="plan-features">
+          <li>Todo lo del Standard</li>
+          <li><b>2 empresas</b> gestionadas</li>
+          <li>Reparto de socios %</li>
+          <li>Envío SMS/WhatsApp masivo</li>
+          <li>Asesor IA integrado</li>
+          <li>Auditoría avanzada</li>
+          <li>Soporte prioritario</li>
+        </ul>
+        <a href="#contacto" class="btn btn-secondary">Contactar</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-tag">Preguntas frecuentes</div>
+      <h2>¿Tienes dudas? Aquí las resolvemos</h2>
+    </div>
+    <div class="faq">
+      <details>
+        <summary>¿Necesito conexión a internet?</summary>
+        <p>No. MediCar Plus funciona 100% en local en tu ordenador. Solo se conecta a internet una vez cada 7 días para verificar que tu licencia sigue activa. Todos tus datos (entradas, IRPF, clientes) están siempre en tu PC.</p>
+      </details>
+      <details>
+        <summary>¿Se puede usar en varios ordenadores?</summary>
+        <p>Cada licencia va vinculada a 1 ordenador (mediante identificador único de hardware). Si necesitas usarlo en varios equipos, contacta con nosotros para configurar licencias adicionales con descuento.</p>
+      </details>
+      <details>
+        <summary>¿Qué pasa si cambio de ordenador?</summary>
+        <p>Puedes solicitar la transferencia de licencia contactando con soporte. Tenemos un sistema de "reset HWID" que te permite mover la licencia a un equipo nuevo (hasta 3 veces al año sin coste).</p>
+      </details>
+      <details>
+        <summary>¿Mis datos están seguros?</summary>
+        <p>Absolutamente. Los datos son 100% locales: nunca salen de tu ordenador. Cumple con LOPD/RGPD por defecto. El único intercambio con nuestro servidor es la verificación de licencia (que no envía datos de clientes).</p>
+      </details>
+      <details>
+        <summary>¿Cómo se actualizan las nuevas versiones?</summary>
+        <p>Automáticamente. Cuando publicamos una mejora, tu app se actualiza sola al abrirla. Sin reinstalar. Sin perder datos. Verás un aviso "Nueva versión disponible" y con 1 clic queda todo listo.</p>
+      </details>
+      <details>
+        <summary>¿Se factura con IVA?</summary>
+        <p>Sí, todas las cuotas incluyen factura simplificada con IVA (o exenta según normativa aplicable). Podrás descargar tus facturas desde el área de cliente cuando el sistema esté totalmente operativo.</p>
+      </details>
+      <details>
+        <summary>¿Puedo cancelar cuando quiera?</summary>
+        <p>Sí. Las suscripciones son mensuales o anuales, sin permanencia. Puedes cancelar en cualquier momento y tu licencia funciona hasta el final del periodo pagado. Después, la app entra en modo lectura hasta renovar.</p>
+      </details>
+      <details>
+        <summary>¿Ofrecéis soporte técnico?</summary>
+        <p>Sí. Todos los planes incluyen soporte por email en menos de 24h laborables. El plan Premium tiene soporte prioritario (respuesta en 4h). Escríbenos a <a href="mailto:info@medicarplus.es">info@medicarplus.es</a>.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contacto" style="background:linear-gradient(180deg,transparent,rgba(15,23,42,.5))">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-tag">Contacto</div>
+      <h2>Solicita más información o una demo</h2>
+      <p class="section-sub">Te respondemos personalmente en menos de 24h laborables.</p>
+    </div>
+    <div class="contact-wrap">
+      <form class="contact-form" onsubmit="sendContact(event)">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div>
+            <label for="c-name">Nombre completo *</label>
+            <input type="text" id="c-name" required>
+          </div>
+          <div>
+            <label for="c-email">Email *</label>
+            <input type="email" id="c-email" required>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div>
+            <label for="c-empresa">Centro / Autoescuela</label>
+            <input type="text" id="c-empresa" placeholder="Nombre del negocio">
+          </div>
+          <div>
+            <label for="c-tel">Teléfono</label>
+            <input type="tel" id="c-tel" placeholder="Opcional">
+          </div>
+        </div>
+        <label for="c-tipo">¿Qué necesitas?</label>
+        <select id="c-tipo">
+          <option value="info">Información general</option>
+          <option value="demo">Demo del software</option>
+          <option value="trial">Solicitar prueba de 30 días</option>
+          <option value="precio">Consulta sobre precios</option>
+          <option value="soporte">Soporte técnico</option>
+        </select>
+        <label for="c-msg">Mensaje *</label>
+        <textarea id="c-msg" required placeholder="Cuéntanos qué necesitas..."></textarea>
+        <button type="submit" class="btn btn-primary" style="width:100%">📤 Enviar mensaje</button>
+      </form>
+      <div class="contact-info">
+        <p>O escríbenos directamente:</p>
+        <p><a href="mailto:info@medicarplus.es">info@medicarplus.es</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="brand" style="font-size:20px">
+          <div class="brand-logo"><img src="favicon.png" alt="MediCar Plus"></div>
+          MediCar Plus
+        </div>
+        <p>Software profesional para gestión de caja diaria en centros médicos de reconocimiento de conductores y autoescuelas del territorio español y andorrano.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Producto</h4>
+        <ul>
+          <li><a href="#features">Características</a></li>
+          <li><a href="#plans">Precios</a></li>
+          <li><a href="#faq">FAQ</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Contacto</h4>
+        <ul>
+          <li><a href="mailto:info@medicarplus.es">info@medicarplus.es</a></li>
+          <li><a href="mailto:suport@medicarplus.es">suport@medicarplus.es</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      © 2026 MediCar Plus · Todos los derechos reservados · <a href="mailto:info@medicarplus.es">Contacto</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+function sendContact(e){
+  e.preventDefault();
+  const name = document.getElementById('c-name').value.trim();
+  const email = document.getElementById('c-email').value.trim();
+  const empresa = document.getElementById('c-empresa').value.trim();
+  const tel = document.getElementById('c-tel').value.trim();
+  const tipo = document.getElementById('c-tipo').value;
+  const msg = document.getElementById('c-msg').value.trim();
+
+  const tipoLabels = {info:'Información general',demo:'Demo del software',trial:'Prueba 30 días',precio:'Consulta precios',soporte:'Soporte técnico'};
+
+  const subject = `[MediCar Plus · ${tipoLabels[tipo]}] Solicitud de ${name}`;
+  const body = `Hola,\n\n${msg}\n\n---\nDatos del contacto:\nNombre: ${name}\nEmail: ${email}\nCentro: ${empresa || '(no indicado)'}\nTeléfono: ${tel || '(no indicado)'}\nTipo de consulta: ${tipoLabels[tipo]}\n\n(Enviado desde medicarplus.es)`;
+
+  const mailto = `mailto:info@medicarplus.es?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = mailto;
+
+  setTimeout(() => {
+    alert('✅ Se ha abierto tu cliente de email con el mensaje preparado. Revisa que se envíe correctamente. Si no se abre nada, escríbenos directamente a info@medicarplus.es');
+  }, 500);
+}
+</script>
+
+</body>
+</html>
