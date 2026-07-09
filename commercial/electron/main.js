@@ -225,6 +225,24 @@ function setupMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+// IPC: Comprovar actualitzacions des del renderer (botó dins l'app)
+ipcMain.handle('check-for-updates', async () => {
+  if (!autoUpdater) {
+    return { ok: false, status: 'unavailable', currentVersion: app.getVersion() };
+  }
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    const currentVersion = app.getVersion();
+    const latest = result && result.updateInfo ? result.updateInfo.version : currentVersion;
+    if (latest && latest !== currentVersion) {
+      return { ok: true, status: 'available', currentVersion, latestVersion: latest };
+    }
+    return { ok: true, status: 'uptodate', currentVersion, latestVersion: latest };
+  } catch (err) {
+    return { ok: false, status: 'error', message: err.message, currentVersion: app.getVersion() };
+  }
+});
+
 app.whenReady().then(() => {
   setupMenu();
   createWindow();

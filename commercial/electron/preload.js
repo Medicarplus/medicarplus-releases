@@ -56,4 +56,5 @@ contextBridge.exposeInMainWorld('appInfo', {
   platform: 'electron',
   isDesktop: true,
   hwid: computeHwid(),
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
 });

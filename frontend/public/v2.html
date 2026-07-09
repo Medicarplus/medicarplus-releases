@@ -184,7 +184,6 @@
     <button class="btn" id="btnNextDay" title="Día siguiente">→</button>
     <button class="btn" id="btnToday" data-i18n="today">Hoy</button>
     <span class="pill" id="saldoAnt" style="padding:8px 14px;font-size:12px;display:inline-flex;gap:10px;align-items:center;background:linear-gradient(180deg,#1a2030 0%,#141821 100%);border-color:#2f3547"><span style="color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-size:10px" data-i18n="prev_balance">Saldo anterior</span><span id="saldoAntNum" style="color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums;font-size:14px;font-family:'Consolas','Menlo','Courier New',monospace;letter-spacing:.3px">0,00 €</span></span>
-    <button class="btn btn-primary" id="btnImport" data-i18n="import_csv">📥 Importar CSV / Excel</button>
     <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,.xls" style="display:none" />
     <button class="btn btn-success" id="btnExport" data-i18n="save_copy">💾 Guardar copia</button>
     <button class="btn" id="btnImportJson" data-i18n="restore_copy">📂 Restaurar copia</button>
@@ -206,7 +205,8 @@
     <button class="btn traffic-only" id="btnAudit" style="background:linear-gradient(90deg,#ea580c 0%,#f97316 100%);color:#fff;border-color:transparent;font-weight:700" data-i18n="audit">🔎 Auditoría</button>
     <button class="btn" id="btnAiAsk" style="background:linear-gradient(90deg,#7c3aed 0%,#a855f7 100%);color:#fff;border-color:transparent;font-weight:700" data-i18n="ai_advisor">🤖 Asesor IA</button>
     <button class="btn" id="btnPrint" data-i18n="print">🖨️ Imprimir</button>
-    <button class="btn" id="btnLang" title="Canviar idioma / Cambiar idioma" style="background:#2a2f3a;border-color:#4a5568;color:#e8ecf2;font-weight:700;padding:6px 12px" data-testid="lang-toggle">🌐 <span id="langLabel">ES</span></button>
+    <button class="btn" id="btnSettings" title="Configuració" style="background:linear-gradient(135deg,#334155,#1e293b);border-color:#475569;color:#e8ecf2;font-weight:700;padding:6px 12px" data-testid="btn-settings">⚙️ <span data-i18n="settings">Configuració</span></button>
+    <button class="btn" id="btnLang" style="display:none" data-testid="lang-toggle"><span id="langLabel">ES</span></button>
   </div>
 </header>
 <main>
@@ -307,7 +307,7 @@
         </div>
       </div>
       <div class="panel">
-        <h2><span data-i18n="entries_of_day">Entradas del día</span> <span><button class="btn btn-danger no-print" id="btnClearDay" data-i18n="clear_day">🗑️ Vaciar día</button></span></h2>
+        <h2 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span data-i18n="entries_of_day">Entradas del día</span> <span style="display:inline-flex;gap:8px;align-items:center;margin-left:auto"><button class="btn btn-primary no-print" id="btnImport" data-i18n="import_csv" data-testid="btn-import-csv">📥 Importar CSV / Excel</button><button class="btn btn-danger no-print" id="btnClearDay" data-i18n="clear_day">🗑️ Vaciar día</button></span></h2>
         <div style="max-height:62vh;overflow:auto">
           <table id="tbl"><thead><tr><th>#</th><th data-i18n="type">Tipo</th><th data-i18n="group">Grupo</th><th data-i18n="name_concept">Nombre / Concepto</th><th class="num" data-i18n="amount_short">Importe</th><th class="num" data-i18n="disc">Dto</th><th class="num" data-i18n="fee_short">Tasa</th><th>FP</th><th data-i18n="fp_fee">FP Tasa</th><th class="num act" data-i18n="actions">Acciones</th></tr></thead><tbody id="tbody"></tbody></table>
           <div class="empty" id="empty" data-i18n="empty_entries">No hay entradas. Importa CSV/Excel o añade manualmente arriba.</div>
@@ -327,8 +327,8 @@
 const STORE_KEY='caja.v1';const $=s=>document.querySelector(s);const $$=s=>document.querySelectorAll(s);
 // ============ i18n ============
 const I18N={
-  es:{app_title:'MediCar Plus',app_sub:'Cierre diario · Importación CSV/Excel · Debe / Haber',stats:'📊 ESTADÍSTICAS',date:'FECHA',today:'Hoy',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar copia',restore_copy:'📂 Restaurar copia',history:'🛡️ Historial',ledger:'📖 Libreta',accounting:'Contabilidad',annual_report:'📊 Informe anual',reserve:'💰 Reserva de cambio',audit:'🔎 Auditoría',ai_advisor:'🤖 Asesor IA',print:'🖨️ Imprimir',tab_traffic:'Tráfico (Renov/Exped)',tab_reviews:'Revisiones / Certificados / Otros',tab_dh:'Debe / Haber',concept:'Concepto',group:'Grupo',name:'Nombre',amount:'Importe (€)',dgt_fee:'Tasa DGT (€)',payment:'F. Pago',cash:'Efectivo',card:'Tarjeta',transfer:'Transferencia',renewal:'Renovación',issue:'Expedición',duplicate:'Duplicado',exchange:'Canje',other:'Otro',driving:'Conducir',moped:'Ciclomotor',ph_name:'Apellidos, Nombre',add_entry:'+ Añadir entrada',entries_of_day:'Entradas del día',clear_day:'🗑️ Vaciar día',type:'Tipo',name_concept:'Nombre / Concepto',amount_short:'Importe',disc:'Dto',fee_short:'Tasa',fp_fee:'FP Tasa',actions:'Acciones',empty_entries:'No hay entradas. Importa CSV/Excel o añade manualmente arriba.',day_close:'Cierre del día',month_split:'Reparto mes actual',by_concept:'Resumen por concepto',history_title:'Histórico'},
-  ca:{app_title:'MediCar Plus',app_sub:'Tancament diari · Importació CSV/Excel · Deure / Haver',stats:'📊 ESTADÍSTIQUES',date:'DATA',today:'Avui',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar còpia',restore_copy:'📂 Restaurar còpia',history:'🛡️ Historial',ledger:'📖 Llibreta',accounting:'Comptabilitat',annual_report:'📊 Informe anual',audit:'🔎 Auditoria',ai_advisor:'🤖 Assessor IA',print:'🖨️ Imprimir',tab_traffic:'Trànsit (Renov/Exped)',tab_reviews:'Revisions / Certificats / Altres',tab_dh:'Deure / Haver',concept:'Concepte',group:'Grup',name:'Nom',amount:'Import (€)',dgt_fee:'Taxa DGT (€)',payment:'F. Pagament',cash:'Efectiu',card:'Targeta',transfer:'Transferència',renewal:'Renovació',issue:'Expedició',duplicate:'Duplicat',exchange:'Canvi',other:'Altres',driving:'Conduir',moped:'Ciclomotor',ph_name:'Cognoms, Nom',add_entry:'+ Afegir entrada',entries_of_day:'Entrades del dia',clear_day:'🗑️ Buidar dia',type:'Tipus',name_concept:'Nom / Concepte',amount_short:'Import',disc:'Dte',fee_short:'Taxa',fp_fee:'FP Taxa',actions:'Accions',empty_entries:"No hi ha entrades. Importa CSV/Excel o afegeix manualment a dalt.",day_close:'Tancament del dia',month_split:'Repartiment mes actual',by_concept:'Resum per concepte',history_title:'Històric'}
+  es:{app_title:'MediCar Plus',app_sub:'Cierre diario · Importación CSV/Excel · Debe / Haber',stats:'📊 ESTADÍSTICAS',date:'FECHA',today:'Hoy',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar copia',restore_copy:'📂 Restaurar copia',history:'🛡️ Historial',ledger:'📖 Libreta',accounting:'Contabilidad',annual_report:'📊 Informe anual',reserve:'💰 Reserva de cambio',audit:'🔎 Auditoría',ai_advisor:'🤖 Asesor IA',print:'🖨️ Imprimir',settings:'Configuración',tab_traffic:'Tráfico (Renov/Exped)',tab_reviews:'Revisiones / Certificados / Otros',tab_dh:'Debe / Haber',concept:'Concepto',group:'Grupo',name:'Nombre',amount:'Importe (€)',dgt_fee:'Tasa DGT (€)',payment:'F. Pago',cash:'Efectivo',card:'Tarjeta',transfer:'Transferencia',renewal:'Renovación',issue:'Expedición',duplicate:'Duplicado',exchange:'Canje',other:'Otro',driving:'Conducir',moped:'Ciclomotor',ph_name:'Apellidos, Nombre',add_entry:'+ Añadir entrada',entries_of_day:'Entradas del día',clear_day:'🗑️ Vaciar día',type:'Tipo',name_concept:'Nombre / Concepto',amount_short:'Importe',disc:'Dto',fee_short:'Tasa',fp_fee:'FP Tasa',actions:'Acciones',empty_entries:'No hay entradas. Importa CSV/Excel o añade manualmente arriba.',day_close:'Cierre del día',month_split:'Reparto mes actual',by_concept:'Resumen por concepto',history_title:'Histórico'},
+  ca:{app_title:'MediCar Plus',app_sub:'Tancament diari · Importació CSV/Excel · Deure / Haver',stats:'📊 ESTADÍSTIQUES',date:'DATA',today:'Avui',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar còpia',restore_copy:'📂 Restaurar còpia',history:'🛡️ Historial',ledger:'📖 Llibreta',accounting:'Comptabilitat',annual_report:'📊 Informe anual',audit:'🔎 Auditoria',ai_advisor:'🤖 Assessor IA',print:'🖨️ Imprimir',settings:'Configuració',tab_traffic:'Trànsit (Renov/Exped)',tab_reviews:'Revisions / Certificats / Altres',tab_dh:'Deure / Haver',concept:'Concepte',group:'Grup',name:'Nom',amount:'Import (€)',dgt_fee:'Taxa DGT (€)',payment:'F. Pagament',cash:'Efectiu',card:'Targeta',transfer:'Transferència',renewal:'Renovació',issue:'Expedició',duplicate:'Duplicat',exchange:'Canvi',other:'Altres',driving:'Conduir',moped:'Ciclomotor',ph_name:'Cognoms, Nom',add_entry:'+ Afegir entrada',entries_of_day:'Entrades del dia',clear_day:'🗑️ Buidar dia',type:'Tipus',name_concept:'Nom / Concepte',amount_short:'Import',disc:'Dte',fee_short:'Taxa',fp_fee:'FP Taxa',actions:'Accions',empty_entries:"No hi ha entrades. Importa CSV/Excel o afegeix manualment a dalt.",day_close:'Tancament del dia',month_split:'Repartiment mes actual',by_concept:'Resum per concepte',history_title:'Històric'}
 };
 let currentLang=localStorage.getItem('caja.lang')||'es';
 function t(key){return (I18N[currentLang]||I18N.ca)[key]||key}
@@ -2174,6 +2174,201 @@ $('#btnLang').onclick=toggleLang;
 applyLang();
 
 // ============================================================================
+// MODAL CONFIGURACIÓ · centralitza idioma, actualitzacions, suport, sortir
+// ============================================================================
+function openSettingsModal(){
+  const existing=document.getElementById('settingsModal');
+  if(existing){existing.remove();return}
+  const isElec=!!(window.appInfo&&window.appInfo.isDesktop);
+  const appVer=(window.appInfo&&window.appInfo.version)?window.appInfo.version:'web';
+  const lic=(()=>{try{return JSON.parse(localStorage.getItem('caja.license.v1')||'{}')}catch(e){return{}}})();
+  const hwid=(window.appInfo&&window.appInfo.hwid)||'';
+  const back=document.createElement('div');
+  back.id='settingsModal';
+  back.className='modal-back';
+  back.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:10000;backdrop-filter:blur(6px);padding:20px';
+  const isCA=currentLang==='ca';
+  const T={
+    title:isCA?'⚙️ Configuració':'⚙️ Configuración',
+    close:isCA?'Tancar':'Cerrar',
+    langSec:isCA?'🌐 Idioma':'🌐 Idioma',
+    langDesc:isCA?'Canvia l\'idioma de la interfície':'Cambia el idioma de la interfaz',
+    versionSec:isCA?'🔄 Actualitzacions':'🔄 Actualizaciones',
+    versionCurrent:isCA?'Versió actual':'Versión actual',
+    checkUpd:isCA?'Comprovar última versió':'Comprobar última versión',
+    checkingUpd:isCA?'Comprovant...':'Comprobando...',
+    upToDate:isCA?'✅ Ja tens la última versió':'✅ Ya tienes la última versión',
+    updAvail:isCA?'🎉 Nova versió disponible: v':'🎉 Nueva versión disponible: v',
+    updDownloading:isCA?' — descarregant en segon pla':' — descargando en segundo plano',
+    updErr:isCA?'⚠️ No s\'ha pogut comprovar':'⚠️ No se ha podido comprobar',
+    updWebOnly:isCA?'ℹ️ Les actualitzacions automàtiques només funcionen a l\'app d\'escriptori (.exe).':'ℹ️ Las actualizaciones automáticas solo funcionan en la app de escritorio (.exe).',
+    companiesSec:isCA?'🏢 Empreses':'🏢 Empresas',
+    companiesDesc:isCA?'Configura noms, socis i percentatges':'Configura nombres, socios y porcentajes',
+    openWizard:isCA?'Obrir configurador':'Abrir configurador',
+    supportSec:isCA?'📧 Contactar amb suport':'📧 Contactar con soporte',
+    supportDesc:isCA?'Envia\'ns un missatge amb el teu problema o consulta. Rebràs resposta a l\'email indicat.':'Envíanos un mensaje con tu problema o consulta. Recibirás respuesta al email indicado.',
+    fName:isCA?'Nom':'Nombre',
+    fEmail:'Email',
+    fCategory:isCA?'Tipus':'Tipo',
+    fSubject:isCA?'Assumpte':'Asunto',
+    fMessage:isCA?'Missatge':'Mensaje',
+    catBug:isCA?'🐞 Error / Bug':'🐞 Error / Bug',
+    catQuestion:isCA?'❓ Consulta':'❓ Consulta',
+    catBilling:isCA?'💳 Facturació':'💳 Facturación',
+    catFeature:isCA?'💡 Suggeriment':'💡 Sugerencia',
+    catGeneral:isCA?'📩 General':'📩 General',
+    send:isCA?'📤 Enviar missatge':'📤 Enviar mensaje',
+    sending:isCA?'Enviant...':'Enviando...',
+    sentOk:isCA?'✅ Missatge enviat correctament. Et respondrem aviat.':'✅ Mensaje enviado correctamente. Te responderemos pronto.',
+    sentErr:isCA?'⚠️ Error enviant. Torna-ho a provar més tard.':'⚠️ Error enviando. Vuelve a intentarlo más tarde.',
+    logoutSec:isCA?'🚪 Sortir / Canviar llicència':'🚪 Salir / Cambiar licencia',
+    logoutDesc:isCA?'Desactiva aquesta llicència en aquest ordinador. Les dades locals NO s\'esborraran.':'Desactiva esta licencia en este ordenador. Los datos locales NO se borrarán.',
+    logoutBtn:isCA?'Sortir ara':'Salir ahora',
+    logoutConfirm:isCA?'Vols desactivar la llicència i tornar a la pantalla d\'activació?\n\nLes teves dades locals (dies, entrades, IRPF, còpies) NO s\'esborraran.':'¿Desactivar la licencia y volver a la pantalla de activación?\n\nTus datos locales (días, entradas, IRPF, copias) NO se borrarán.'
+  };
+  back.innerHTML=`
+    <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border:1px solid #334155;border-radius:14px;max-width:640px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,.6);color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid #334155;position:sticky;top:0;background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);z-index:2">
+        <h3 style="margin:0;font-size:20px;color:#f5b301;letter-spacing:.5px">${T.title}</h3>
+        <button id="setClose" style="background:transparent;border:1px solid #475569;color:#cbd5e1;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:13px">${T.close} ✕</button>
+      </div>
+      <div style="padding:18px 22px;display:flex;flex-direction:column;gap:18px">
+
+        <!-- Idioma -->
+        <div class="settings-section" style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px">
+          <div style="font-size:13px;font-weight:700;color:#f5b301;letter-spacing:.5px;margin-bottom:4px">${T.langSec}</div>
+          <div style="font-size:12px;color:#94a3b8;margin-bottom:10px">${T.langDesc}</div>
+          <div style="display:flex;gap:8px">
+            <button id="setLangCa" class="btn" style="flex:1;background:${currentLang==='ca'?'#f5b301':'#1e293b'};color:${currentLang==='ca'?'#0f172a':'#e2e8f0'};border-color:${currentLang==='ca'?'#f5b301':'#475569'};font-weight:700">🏴 Català</button>
+            <button id="setLangEs" class="btn" style="flex:1;background:${currentLang==='es'?'#f5b301':'#1e293b'};color:${currentLang==='es'?'#0f172a':'#e2e8f0'};border-color:${currentLang==='es'?'#f5b301':'#475569'};font-weight:700">🇪🇸 Español</button>
+          </div>
+        </div>
+
+        <!-- Actualitzacions -->
+        <div class="settings-section" style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px">
+          <div style="font-size:13px;font-weight:700;color:#f5b301;letter-spacing:.5px;margin-bottom:4px">${T.versionSec}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:12px">
+            <span style="color:#94a3b8">${T.versionCurrent}</span>
+            <span style="color:#22c55e;font-family:'Consolas',monospace;font-weight:700">v${appVer}${isElec?'':' (web)'}</span>
+          </div>
+          <button id="setCheckUpd" class="btn" style="width:100%;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border-color:transparent;font-weight:700;padding:10px" data-testid="btn-check-updates">${T.checkUpd}</button>
+          <div id="setUpdStatus" style="margin-top:10px;font-size:12px;color:#94a3b8;text-align:center;min-height:16px"></div>
+        </div>
+
+        <!-- Empreses -->
+        <div class="settings-section" style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px">
+          <div style="font-size:13px;font-weight:700;color:#f5b301;letter-spacing:.5px;margin-bottom:4px">${T.companiesSec}</div>
+          <div style="font-size:12px;color:#94a3b8;margin-bottom:10px">${T.companiesDesc}</div>
+          <button id="setOpenWizard" class="btn" style="width:100%;background:#1e293b;color:#e2e8f0;border-color:#475569;font-weight:600;padding:8px">${T.openWizard}</button>
+        </div>
+
+        <!-- Contactar suport -->
+        <div class="settings-section" style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px">
+          <div style="font-size:13px;font-weight:700;color:#f5b301;letter-spacing:.5px;margin-bottom:4px">${T.supportSec}</div>
+          <div style="font-size:12px;color:#94a3b8;margin-bottom:10px">${T.supportDesc}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <input type="text" id="supName" placeholder="${T.fName}" value="${(lic.client_name||'').replace(/"/g,'&quot;')}" style="background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:12px" data-testid="support-name" />
+            <input type="email" id="supEmail" placeholder="${T.fEmail}" value="${(lic.email||'').replace(/"/g,'&quot;')}" style="background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:12px" data-testid="support-email" />
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:8px">
+            <select id="supCategory" style="background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:12px" data-testid="support-category">
+              <option value="bug">${T.catBug}</option>
+              <option value="question">${T.catQuestion}</option>
+              <option value="billing">${T.catBilling}</option>
+              <option value="feature">${T.catFeature}</option>
+              <option value="general">${T.catGeneral}</option>
+            </select>
+            <input type="text" id="supSubject" placeholder="${T.fSubject}" style="background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:12px" data-testid="support-subject" />
+          </div>
+          <textarea id="supMessage" placeholder="${T.fMessage}" rows="4" style="width:100%;background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:12px;font-family:inherit;resize:vertical;box-sizing:border-box" data-testid="support-message"></textarea>
+          <button id="setSendSupport" class="btn" style="width:100%;margin-top:8px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;border-color:transparent;font-weight:700;padding:10px" data-testid="btn-send-support">${T.send}</button>
+          <div id="setSupportStatus" style="margin-top:8px;font-size:12px;text-align:center;min-height:16px"></div>
+        </div>
+
+        <!-- Sortir -->
+        <div class="settings-section" style="background:linear-gradient(135deg,#450a0a 0%,#1f0505 100%);border:1px solid #7f1d1d;border-radius:10px;padding:14px">
+          <div style="font-size:13px;font-weight:700;color:#fca5a5;letter-spacing:.5px;margin-bottom:4px">${T.logoutSec}</div>
+          <div style="font-size:12px;color:#fecaca;opacity:.85;margin-bottom:10px">${T.logoutDesc}</div>
+          <button id="setLogout" class="btn" style="width:100%;background:linear-gradient(135deg,#991b1b,#7f1d1d);color:#fee2e2;border:1px solid #b91c1c;font-weight:700;padding:10px" data-testid="btn-logout">${T.logoutBtn}</button>
+        </div>
+
+      </div>
+    </div>
+  `;
+  document.body.appendChild(back);
+  back.addEventListener('click',(e)=>{if(e.target===back)back.remove()});
+  document.getElementById('setClose').onclick=()=>back.remove();
+
+  // Idioma
+  document.getElementById('setLangCa').onclick=()=>{if(currentLang!=='ca'){toggleLang();}back.remove();openSettingsModal()};
+  document.getElementById('setLangEs').onclick=()=>{if(currentLang!=='es'){toggleLang();}back.remove();openSettingsModal()};
+
+  // Comprovar actualitzacions
+  document.getElementById('setCheckUpd').onclick=async()=>{
+    const st=document.getElementById('setUpdStatus');
+    const btn=document.getElementById('setCheckUpd');
+    if(!isElec){st.innerHTML='<span style="color:#94a3b8">'+T.updWebOnly+'</span>';return}
+    btn.disabled=true;btn.textContent=T.checkingUpd;st.textContent='';
+    try{
+      const r=await window.appInfo.checkForUpdates();
+      if(r&&r.status==='available'){
+        st.innerHTML='<span style="color:#22c55e;font-weight:700">'+T.updAvail+r.latestVersion+'</span><span style="color:#94a3b8">'+T.updDownloading+'</span>';
+      }else if(r&&r.status==='uptodate'){
+        st.innerHTML='<span style="color:#22c55e;font-weight:700">'+T.upToDate+'</span>';
+      }else{
+        st.innerHTML='<span style="color:#f97316">'+T.updErr+(r&&r.message?': '+r.message:'')+'</span>';
+      }
+    }catch(e){
+      st.innerHTML='<span style="color:#f97316">'+T.updErr+': '+e.message+'</span>';
+    }
+    btn.disabled=false;btn.textContent=T.checkUpd;
+  };
+
+  // Obrir wizard d'empreses
+  document.getElementById('setOpenWizard').onclick=()=>{back.remove();if(typeof showConfigWizard==='function')showConfigWizard(false)};
+
+  // Enviar suport
+  document.getElementById('setSendSupport').onclick=async()=>{
+    const name=document.getElementById('supName').value.trim();
+    const email=document.getElementById('supEmail').value.trim();
+    const subject=document.getElementById('supSubject').value.trim();
+    const message=document.getElementById('supMessage').value.trim();
+    const category=document.getElementById('supCategory').value;
+    const st=document.getElementById('setSupportStatus');
+    if(!name||!email||!subject||!message){st.innerHTML='<span style="color:#f97316">'+(isCA?'Omple tots els camps':'Rellena todos los campos')+'</span>';return}
+    const btn=document.getElementById('setSendSupport');
+    btn.disabled=true;btn.textContent=T.sending;st.textContent='';
+    try{
+      const backendUrl=(typeof LIC!=='undefined'&&LIC.VERIFY_URL)?LIC.VERIFY_URL.replace(/\/api\/.*$/,''):'https://medicarplus.es';
+      const res=await fetch(backendUrl+'/api/support/contact',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name,email,subject,message,category,app_version:appVer,hwid:hwid,license_key:lic.license_key||'',client_name:lic.client_name||''})
+      });
+      const data=await res.json();
+      if(data&&data.ok){
+        st.innerHTML='<span style="color:#22c55e;font-weight:700">'+T.sentOk+'</span>';
+        document.getElementById('supSubject').value='';document.getElementById('supMessage').value='';
+      }else{
+        st.innerHTML='<span style="color:#f97316">'+T.sentErr+'</span>';
+      }
+    }catch(e){
+      st.innerHTML='<span style="color:#f97316">'+T.sentErr+' ('+e.message+')</span>';
+    }
+    btn.disabled=false;btn.textContent=T.send;
+  };
+
+  // Sortir
+  document.getElementById('setLogout').onclick=()=>{
+    if(confirm(T.logoutConfirm)){
+      localStorage.removeItem('caja.license.v1');
+      localStorage.removeItem('caja.license.lastcheck.v1');
+      location.reload();
+    }
+  };
+}
+if($('#btnSettings')){$('#btnSettings').onclick=openSettingsModal}
+
+// ============================================================================
 // CERCADOR DE CLIENTS · per nom / cognom / concepte
 // ============================================================================
 (function initClientSearch(){
@@ -2988,30 +3183,6 @@ if(!isLicenseActive()){showActivationModal()}
 else if(!isConfigured()){setTimeout(()=>showConfigWizard(true),200)}
 // Botons ⚙️ Configuració + 🔓 Sortir/Canviar llicència al header
 setTimeout(()=>{
-  const langBtn=document.querySelector('#btnLang');
-  if(langBtn&&!document.querySelector('#btnCfg')){
-    const cfgBtn=document.createElement('button');
-    cfgBtn.id='btnCfg';cfgBtn.className='btn';cfgBtn.innerHTML='⚙️';
-    cfgBtn.title='Configuració d\'empreses';
-    cfgBtn.style.cssText='margin-right:6px;padding:6px 10px;font-size:15px';
-    cfgBtn.onclick=()=>showConfigWizard(false);
-    langBtn.parentElement.insertBefore(cfgBtn,langBtn);
-  }
-  if(langBtn&&!document.querySelector('#btnLogout')){
-    const logoutBtn=document.createElement('button');
-    logoutBtn.id='btnLogout';logoutBtn.className='btn';
-    logoutBtn.innerHTML='<span style="font-size:14px;line-height:1">🚪</span><span style="font-size:10px;letter-spacing:1.5px;font-weight:700;margin-left:4px">SORTIR</span>';
-    logoutBtn.title='Sortir · Canviar llicència';
-    logoutBtn.style.cssText='margin-right:6px;padding:7px 12px;background:linear-gradient(135deg,#7f1d1d 0%,#991b1b 100%);border:1px solid #b91c1c;color:#fee2e2;display:inline-flex;align-items:center;box-shadow:0 2px 8px rgba(185,28,28,.3)';
-    logoutBtn.onclick=()=>{
-      if(confirm('Desactivar la llicència actual i tornar a la pantalla d\'activació?\n\nLes teves dades locals (dies, entrades, IRPF, còpies) NO s\'esborraran.')){
-        localStorage.removeItem('caja.license.v1');
-        localStorage.removeItem('caja.license.lastcheck.v1');
-        location.reload();
-      }
-    };
-    langBtn.parentElement.insertBefore(logoutBtn,langBtn);
-  }
   const sig=document.querySelector('[style*="Powered by"]');
   const sigParent=sig?sig.parentElement:null;
   if(sigParent){sigParent.style.cursor='pointer';sigParent.style.pointerEvents='auto';sigParent.onclick=showLicenseInfo;sigParent.title='Clica per veure info de llicència'}

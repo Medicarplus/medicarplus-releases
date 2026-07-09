@@ -201,6 +201,10 @@ app.include_router(notifications_router, prefix="/api")
 from routes.payments import router as payments_router
 app.include_router(payments_router, prefix="/api")
 
+# Support (formulari de contacte dins l'app comercial)
+from routes.support import build_router as build_support_router
+app.include_router(build_support_router(db), prefix="/api")
+
 # Stripe webhook (obligatori per playbook: /api/webhook/stripe)
 # Gestiona tant one-off (via emergentintegrations) com subscriptions (via stripe SDK)
 from fastapi import Request as _FastReq

@@ -70,3 +70,9 @@ Vegeu `/app/memory/test_credentials.md`
 - **2026-07-08**: GitHub Releases (v2.0.0, v2.0.1) + auto-updater
 - **2026-07-08**: Landing page amb dual CTA (Stripe checkout + transfer)
 - **2026-07-08**: v2.0.3 preparat amb versió visible, medicarplus.es link, referències personals eliminades
+- **2026-07-08**: Fix sandbox=true bloqueava versió package.json (v2.0.5)
+- **2026-07-08**: Badge visual de període de prova (30 dies) amb estats Verd/Taronja/Vermell
+- **2026-07-09**: 📥 Botó Importar CSV mogut al costat de "Entradas del día" (secció Tràfic)
+- **2026-07-09**: ⚙️ Modal Configuració centralitzat (Idioma + Comprovar versió + Empreses + Suport + Sortir)
+- **2026-07-09**: Backend `/api/support/contact` endpoint per tickets amb integració SMTP IONOS (SMTP_PASS pendent)
+- **2026-07-09**: IPC `check-for-updates` exposat via preload per botó manual al modal
