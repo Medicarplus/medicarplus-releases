@@ -2391,6 +2391,260 @@ function openSettingsModal(){
 if($('#btnSettings')){$('#btnSettings').onclick=openSettingsModal}
 
 // ============================================================================
+// MODAL AVISOS SMS · Campanyes amb tongades, cerca i estadístiques
+// ============================================================================
+const SMS_API=(function(){
+  try{return (typeof LIC!=='undefined'&&LIC.VERIFY_URL)?LIC.VERIFY_URL.replace(/\/api\/.*$/,''):'https://medicarplus.es'}catch(e){return 'https://medicarplus.es'}
+})();
+const SMS_ADMIN_TOKEN='MB-ADMIN-BRUGULAT-2026-4F8E2A1C';
+
+async function apiSms(path, opts={}){
+  const url=SMS_API+'/api/sms'+path;
+  const res=await fetch(url,{
+    ...opts,
+    headers:{'X-Admin-Token':SMS_ADMIN_TOKEN, ...(opts.headers||{})}
+  });
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  return await res.json();
+}
+
+function openSmsModal(){
+  const existing=document.getElementById('smsModal');
+  if(existing){existing.remove();return}
+  const isCA=currentLang==='ca';
+  const T={
+    title:'📱 '+(isCA?'Avisos SMS · Campanyes':'Avisos SMS · Campañas'),
+    close:isCA?'Tancar':'Cerrar',
+    newCamp:isCA?'+ Nova campanya':'+ Nueva campaña',
+    stats:isCA?'📊 Estadístiques':'📊 Estadísticas',
+    hist:isCA?'📋 Històric de campanyes':'📋 Histórico de campañas',
+    loading:isCA?'Carregant...':'Cargando...',
+    noItems:isCA?'Encara no hi ha campanyes. Crea la primera!':'Aún no hay campañas. Crea la primera!',
+    mockMode:isCA?'⚠️ Mode PROVA · Twilio no configurat. Els SMS es simulen (no s\'envien reals).':'⚠️ Modo PRUEBA · Twilio no configurado. Los SMS se simulan (no se envían reales).',
+    realMode:isCA?'✅ Mode REAL · Twilio actiu. Els SMS s\'enviaran de veritat.':'✅ Modo REAL · Twilio activo. Los SMS se enviarán realmente.',
+  };
+  const back=document.createElement('div');
+  back.id='smsModal';
+  back.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:10000;backdrop-filter:blur(6px);padding:20px';
+  back.innerHTML=`
+    <div style="background:linear-gradient(135deg,#0f172a,#0a0f1a);border:1px solid #334155;border-radius:14px;max-width:1100px;width:100%;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 25px 60px rgba(0,0,0,.7);color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #334155;background:linear-gradient(135deg,#052e16,#0f172a)">
+        <h3 style="margin:0;font-size:20px;color:#22c55e;letter-spacing:.5px">${T.title}</h3>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="smsBtnStats" style="background:#1e293b;border:1px solid #475569;color:#cbd5e1;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">${T.stats}</button>
+          <button id="smsBtnNew" style="background:linear-gradient(135deg,#059669,#10b981);border:none;color:#fff;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700" data-testid="btn-sms-new">${T.newCamp}</button>
+          <button id="smsClose" style="background:transparent;border:1px solid #475569;color:#cbd5e1;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:13px">${T.close} ✕</button>
+        </div>
+      </div>
+      <div id="smsBody" style="padding:18px 24px;overflow-y:auto;flex:1"></div>
+    </div>
+  `;
+  document.body.appendChild(back);
+  back.addEventListener('click',(e)=>{if(e.target===back)back.remove()});
+  document.getElementById('smsClose').onclick=()=>back.remove();
+  document.getElementById('smsBtnNew').onclick=()=>renderSmsNew();
+  document.getElementById('smsBtnStats').onclick=()=>renderSmsStats();
+
+  renderSmsList();
+
+  async function renderSmsList(){
+    const body=document.getElementById('smsBody');
+    body.innerHTML='<div style="text-align:center;padding:40px;color:#94a3b8">'+T.loading+'</div>';
+    try{
+      const d=await apiSms('/campaigns');
+      const twilioBanner=`<div style="padding:10px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:16px;background:#7c2d12;color:#fed7aa;border:1px solid #ea580c">${T.mockMode}</div>`;
+      const items=d.campaigns||[];
+      if(!items.length){
+        body.innerHTML=twilioBanner+`<div style="text-align:center;padding:60px 20px;color:#94a3b8"><div style="font-size:48px;margin-bottom:12px">📭</div><div style="font-size:15px">${T.noItems}</div></div>`;
+        return;
+      }
+      const rows=items.map(c=>{
+        const dt=new Date(c.created_at).toLocaleString(isCA?'ca-ES':'es-ES');
+        const stCol=c.status==='sent'?'#22c55e':(c.status==='partial'?'#f97316':'#ef4444');
+        return `<tr class="sms-row" data-id="${c.id}" style="cursor:pointer;border-bottom:1px solid #1e293b" onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background=''">
+          <td style="padding:10px;color:#e2e8f0"><b>${(c.name||'').replace(/</g,'&lt;')}</b><div style="font-size:11px;color:#64748b">${dt}</div></td>
+          <td style="padding:10px;text-align:center;color:#22c55e;font-weight:700">${c.sent_count||0}</td>
+          <td style="padding:10px;text-align:center;color:#f97316">${c.error_count||0}</td>
+          <td style="padding:10px;text-align:center;color:#94a3b8">${c.filtered_invalid||0}</td>
+          <td style="padding:10px;text-align:center"><span style="background:${stCol};color:#0f172a;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:800">${(c.status||'').toUpperCase()}</span></td>
+        </tr>`;
+      }).join('');
+      body.innerHTML=twilioBanner+`
+        <div style="font-size:13px;color:#94a3b8;margin-bottom:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase">${T.hist} (${items.length})</div>
+        <table style="width:100%;border-collapse:collapse;background:#0e1a2e;border:1px solid #1e293b;border-radius:8px;overflow:hidden">
+          <thead><tr style="background:#1e293b"><th style="padding:10px;text-align:left;color:#f5b301;font-size:11px;text-transform:uppercase">${isCA?'Campanya':'Campaña'}</th><th style="padding:10px;color:#22c55e;font-size:11px">✓ ${isCA?'Enviats':'Enviados'}</th><th style="padding:10px;color:#f97316;font-size:11px">✗ Errors</th><th style="padding:10px;color:#94a3b8;font-size:11px">${isCA?'Invàlids':'Inválidos'}</th><th style="padding:10px;color:#cbd5e1;font-size:11px">Status</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      body.querySelectorAll('.sms-row').forEach(r=>r.onclick=()=>renderSmsDetail(r.dataset.id));
+    }catch(e){
+      body.innerHTML='<div style="color:#ef4444;text-align:center;padding:40px">Error: '+e.message+'</div>';
+    }
+  }
+
+  async function renderSmsStats(){
+    const body=document.getElementById('smsBody');
+    body.innerHTML='<div style="text-align:center;padding:40px;color:#94a3b8">'+T.loading+'</div>';
+    try{
+      const d=await apiSms('/stats');
+      const monthRows=(d.by_month||[]).slice(0,12).map(m=>`<tr><td style="padding:8px 12px">${m.month}</td><td style="padding:8px 12px;text-align:right;font-weight:700;color:#22c55e">${m.sent}</td></tr>`).join('');
+      body.innerHTML=`
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
+          <div style="background:#0e1a2e;padding:20px;border-radius:10px;border:1px solid #1e293b;text-align:center"><div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">${isCA?'Campanyes':'Campañas'}</div><div style="font-size:32px;font-weight:800;color:#f5b301">${d.total_campaigns||0}</div></div>
+          <div style="background:#052e16;padding:20px;border-radius:10px;border:1px solid #22c55e;text-align:center"><div style="font-size:12px;color:#7ee3aa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">✓ ${isCA?'Enviats':'Enviados'}</div><div style="font-size:32px;font-weight:800;color:#22c55e">${d.total_sent||0}</div></div>
+          <div style="background:#3a1a06;padding:20px;border-radius:10px;border:1px solid #f97316;text-align:center"><div style="font-size:12px;color:#fed7aa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">✗ Errors</div><div style="font-size:32px;font-weight:800;color:#f97316">${d.total_errors||0}</div></div>
+          <div style="background:#1e293b;padding:20px;border-radius:10px;border:1px solid #475569;text-align:center"><div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">${isCA?'Sense mòbil':'Sin móvil'}</div><div style="font-size:32px;font-weight:800;color:#cbd5e1">${d.total_invalid||0}</div></div>
+        </div>
+        <div style="background:#0e1a2e;padding:20px;border-radius:10px;border:1px solid #1e293b">
+          <div style="font-size:13px;color:#f5b301;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;font-weight:700">📅 ${isCA?'Enviaments per mes':'Envíos por mes'}</div>
+          <table style="width:100%;border-collapse:collapse">${monthRows||'<tr><td style="padding:20px;color:#64748b;text-align:center">'+(isCA?'Encara sense dades':'Aún sin datos')+'</td></tr>'}</table>
+        </div>
+        <div style="text-align:center;margin-top:20px"><button onclick="document.getElementById('smsBody').innerHTML='';document.getElementById('smsClose').click();openSmsModal();" style="background:#1e293b;color:#e2e8f0;border:1px solid #475569;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">← ${isCA?'Tornar':'Volver'}</button></div>
+      `;
+    }catch(e){
+      body.innerHTML='<div style="color:#ef4444;text-align:center;padding:40px">Error: '+e.message+'</div>';
+    }
+  }
+
+  function renderSmsNew(){
+    const body=document.getElementById('smsBody');
+    body.innerHTML=`
+      <div style="background:#0e1a2e;padding:24px;border-radius:12px;border:1px solid #1e293b">
+        <div style="font-size:14px;color:#22c55e;text-transform:uppercase;letter-spacing:.5px;font-weight:800;margin-bottom:6px">📥 ${isCA?'Pas 1 · Puja el CSV de GIC':'Paso 1 · Sube el CSV de GIC'}</div>
+        <div style="color:#94a3b8;font-size:13px;margin-bottom:16px">${isCA?'El CSV ha de tenir les columnes: Nombre, Apellido1, Apellido2, Movil, Telefono, FechaRevision':'El CSV debe tener las columnas: Nombre, Apellido1, Apellido2, Movil, Telefono, FechaRevision'}</div>
+        <input type="file" id="smsCsvFile" accept=".csv" style="background:#0f172a;color:#e2e8f0;border:1px dashed #475569;border-radius:8px;padding:16px;width:100%;font-family:inherit;cursor:pointer" data-testid="sms-csv-file">
+        <div id="smsPreviewArea" style="margin-top:20px"></div>
+      </div>
+    `;
+    document.getElementById('smsCsvFile').onchange=async(ev)=>{
+      const file=ev.target.files[0];
+      if(!file)return;
+      const prev=document.getElementById('smsPreviewArea');
+      prev.innerHTML='<div style="color:#94a3b8;padding:20px;text-align:center">'+T.loading+'</div>';
+      try{
+        const fd=new FormData();fd.append('file',file);
+        const d=await apiSms('/preview',{method:'POST',body:fd});
+        renderSmsPreview(d);
+      }catch(e){
+        prev.innerHTML='<div style="color:#ef4444;padding:20px;text-align:center">Error: '+e.message+'</div>';
+      }
+    };
+  }
+
+  function renderSmsPreview(d){
+    const prev=document.getElementById('smsPreviewArea');
+    const validRows=d.contacts.map((c,i)=>{
+      const nom=[c.name,c.surname1,c.surname2].filter(Boolean).join(' ');
+      const badge=c.valid?'<span style="background:#22c55e;color:#0a0f1a;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:800">OK</span>':`<span style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:800" title="${c.reason||''}">${c.reason||'INVÀLID'}</span>`;
+      const tel=c.valid?('<code style="color:#22c55e">'+c.mobile+'</code>'):('<code style="color:#64748b">'+(c.landline||'-')+'</code>');
+      return `<tr style="border-bottom:1px solid #1e293b;${c.valid?'':'opacity:.55'}"><td style="padding:6px 10px;font-size:12px">${nom}</td><td style="padding:6px 10px">${tel}</td><td style="padding:6px 10px;font-size:11px;color:#94a3b8">${c.revision_date||''}</td><td style="padding:6px 10px;text-align:right">${badge}</td></tr>`;
+    }).join('');
+    prev.innerHTML=`
+      <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:16px;margin-top:20px">
+        <div style="display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap">
+          <div style="flex:1;min-width:120px;background:#052e16;padding:12px;border-radius:8px;text-align:center"><div style="font-size:10px;color:#7ee3aa;text-transform:uppercase">${isCA?'Vàlids':'Válidos'}</div><div style="font-size:24px;font-weight:800;color:#22c55e">${d.valid_count}</div></div>
+          <div style="flex:1;min-width:120px;background:#3a0606;padding:12px;border-radius:8px;text-align:center"><div style="font-size:10px;color:#fecaca;text-transform:uppercase">${isCA?'Invàlids':'Inválidos'}</div><div style="font-size:24px;font-weight:800;color:#ef4444">${d.invalid_count}</div></div>
+          <div style="flex:1;min-width:120px;background:#1e293b;padding:12px;border-radius:8px;text-align:center"><div style="font-size:10px;color:#94a3b8;text-transform:uppercase">Total</div><div style="font-size:24px;font-weight:800;color:#cbd5e1">${d.total_rows}</div></div>
+        </div>
+        <div style="max-height:280px;overflow-y:auto;border:1px solid #1e293b;border-radius:8px">
+          <table style="width:100%;border-collapse:collapse;background:#0e1a2e"><thead><tr style="background:#1e293b;position:sticky;top:0"><th style="padding:8px 10px;text-align:left;font-size:11px;color:#f5b301;text-transform:uppercase">${isCA?'Nom':'Nombre'}</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:#f5b301;text-transform:uppercase">${isCA?'Mòbil':'Móvil'}</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:#f5b301;text-transform:uppercase">${isCA?'Data':'Fecha'}</th><th style="padding:8px 10px;text-align:right;font-size:11px;color:#f5b301;text-transform:uppercase">Status</th></tr></thead><tbody>${validRows}</tbody></table>
+        </div>
+      </div>
+      <div style="background:#0e1a2e;padding:20px;border-radius:12px;border:1px solid #1e293b;margin-top:16px">
+        <div style="font-size:14px;color:#22c55e;text-transform:uppercase;letter-spacing:.5px;font-weight:800;margin-bottom:6px">✏️ ${isCA?'Pas 2 · Personalitza el missatge':'Paso 2 · Personaliza el mensaje'}</div>
+        <div style="color:#94a3b8;font-size:12px;margin-bottom:10px">${isCA?'Variables disponibles':'Variables disponibles'}: <code>{{nom}}</code>, <code>{{cognom}}</code>, <code>{{nom_complet}}</code>, <code>{{data_caducitat}}</code></div>
+        <label style="display:block;font-size:11px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase">${isCA?'Nom de la campanya':'Nombre de la campaña'}</label>
+        <input type="text" id="smsCampName" value="${isCA?'Campanya':'Campaña'} ${new Date().toLocaleDateString(isCA?'ca-ES':'es-ES')}" style="width:100%;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:13px;margin-bottom:10px" data-testid="sms-camp-name">
+        <label style="display:block;font-size:11px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase">${isCA?'Missatge (màx 160 caràcters recomanat)':'Mensaje (máx 160 caracteres recomendado)'}</label>
+        <textarea id="smsTemplate" rows="4" style="width:100%;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box" data-testid="sms-template">Hola {{nom}}, le recordamos que su revisión médica caduca el {{data_caducitat}}. Reserve cita al 93 XXX XX XX. Info: medicarplus.es</textarea>
+        <div id="smsCharCount" style="text-align:right;font-size:11px;color:#94a3b8;margin-top:4px"></div>
+      </div>
+      <div style="text-align:center;margin-top:20px">
+        <button onclick="document.getElementById('smsBody').innerHTML='';document.getElementById('smsClose').click();openSmsModal();" style="background:#1e293b;color:#e2e8f0;border:1px solid #475569;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;margin-right:10px">← ${isCA?'Cancel·lar':'Cancelar'}</button>
+        <button id="smsBtnSend" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;padding:12px 28px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:800;box-shadow:0 4px 14px rgba(16,185,129,.3)" data-testid="btn-sms-send">🚀 ${isCA?'Enviar campanya ('+d.valid_count+' contactes)':'Enviar campaña ('+d.valid_count+' contactos)'}</button>
+      </div>
+    `;
+    const tpl=document.getElementById('smsTemplate');
+    const cnt=document.getElementById('smsCharCount');
+    function updCount(){const l=tpl.value.length;cnt.innerHTML='<span style="color:'+(l>160?'#ef4444':'#22c55e')+';font-weight:700">'+l+' / 160</span> '+(l>160?'· '+(isCA?'excedeix, es dividirà en múltiples SMS':'excede, se dividirá en múltiples SMS'):'');}
+    updCount();tpl.oninput=updCount;
+    document.getElementById('smsBtnSend').onclick=async(ev)=>{
+      const btn=ev.target;
+      if(!confirm(isCA?`Enviar la campanya a ${d.valid_count} contactes?`:`¿Enviar la campaña a ${d.valid_count} contactos?`))return;
+      btn.disabled=true;btn.textContent=isCA?'Enviant...':'Enviando...';
+      try{
+        const name=document.getElementById('smsCampName').value.trim();
+        const template=tpl.value.trim();
+        const r=await apiSms('/campaigns',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,template,contacts:d.contacts})});
+        alert((isCA?'✅ Campanya creada\n\nEnviats: ':'✅ Campaña creada\n\nEnviados: ')+r.sent_count+'\n'+(isCA?'Errors: ':'Errores: ')+r.error_count+'\n'+(isCA?'Sense mòbil: ':'Sin móvil: ')+r.filtered_invalid+'\n\nMode: '+r.twilio_mode.toUpperCase());
+        renderSmsList();
+      }catch(e){
+        alert('Error: '+e.message);
+        btn.disabled=false;
+      }
+    };
+  }
+
+  async function renderSmsDetail(id){
+    const body=document.getElementById('smsBody');
+    body.innerHTML='<div style="text-align:center;padding:40px;color:#94a3b8">'+T.loading+'</div>';
+    try{
+      const d=await apiSms('/campaigns/'+encodeURIComponent(id));
+      function drawRows(list){
+        return list.map(c=>{
+          const nom=[c.name,c.surname1,c.surname2].filter(Boolean).join(' ');
+          const st=c.sent?'<span style="background:#22c55e;color:#0a0f1a;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:800">✓ SENT</span>':'<span style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:800">✗ ERROR</span>';
+          const tel=c.mobile||c.landline||'-';
+          const dt=c.sent_at?new Date(c.sent_at).toLocaleString(isCA?'ca-ES':'es-ES'):'-';
+          return `<tr style="border-bottom:1px solid #1e293b"><td style="padding:6px 10px;font-size:12px">${nom}</td><td style="padding:6px 10px;font-family:'Consolas',monospace;font-size:12px">${tel}</td><td style="padding:6px 10px;text-align:right">${st}</td><td style="padding:6px 10px;font-size:11px;color:#94a3b8">${dt}</td></tr>`;
+        }).join('');
+      }
+      const dt=new Date(d.created_at).toLocaleString(isCA?'ca-ES':'es-ES');
+      body.innerHTML=`
+        <div style="margin-bottom:16px"><button onclick="document.getElementById('smsBody').innerHTML='';document.getElementById('smsClose').click();openSmsModal();" style="background:#1e293b;color:#e2e8f0;border:1px solid #475569;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">← ${isCA?'Tornar al llistat':'Volver al listado'}</button></div>
+        <div style="background:#0e1a2e;padding:18px;border-radius:12px;border:1px solid #1e293b;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:14px">
+            <div>
+              <div style="font-size:18px;font-weight:800;color:#f5b301">${(d.name||'').replace(/</g,'&lt;')}</div>
+              <div style="font-size:12px;color:#64748b;margin-top:4px">${dt} · ${d.twilio_used?'📡 REAL':'🧪 MOCK'}</div>
+            </div>
+            <div style="display:flex;gap:10px">
+              <div style="background:#052e16;padding:8px 14px;border-radius:8px;text-align:center"><div style="font-size:10px;color:#7ee3aa">✓ ${isCA?'Enviats':'Enviados'}</div><div style="font-size:20px;font-weight:800;color:#22c55e">${d.sent_count}</div></div>
+              <div style="background:#3a0606;padding:8px 14px;border-radius:8px;text-align:center"><div style="font-size:10px;color:#fecaca">✗ Errors</div><div style="font-size:20px;font-weight:800;color:#ef4444">${d.error_count}</div></div>
+              <div style="background:#1e293b;padding:8px 14px;border-radius:8px;text-align:center"><div style="font-size:10px;color:#94a3b8">${isCA?'Sense mòbil':'Sin móvil'}</div><div style="font-size:20px;font-weight:800;color:#cbd5e1">${d.filtered_invalid}</div></div>
+            </div>
+          </div>
+          <div style="margin-top:12px;padding:10px;background:#0f172a;border-radius:6px;font-size:12px;color:#cbd5e1;border:1px solid #1e293b">
+            <b style="color:#f5b301">${isCA?'Missatge:':'Mensaje:'}</b> ${d.template.replace(/</g,'&lt;')}
+          </div>
+        </div>
+        <div style="background:#0e1a2e;padding:14px;border-radius:10px;border:1px solid #1e293b">
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+            <input type="text" id="smsSearch" placeholder="${isCA?'🔎 Cerca per nom o cognom...':'🔎 Buscar por nombre o apellido...'}" style="flex:1;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 12px;font-size:13px" data-testid="sms-search">
+            <span style="color:#94a3b8;font-size:12px" id="smsResultCount">${d.contacts.length} ${isCA?'contactes':'contactos'}</span>
+          </div>
+          <div style="max-height:400px;overflow-y:auto;border:1px solid #1e293b;border-radius:8px">
+            <table style="width:100%;border-collapse:collapse;background:#0f172a"><thead><tr style="background:#1e293b;position:sticky;top:0"><th style="padding:8px 10px;text-align:left;font-size:11px;color:#f5b301;text-transform:uppercase">${isCA?'Nom':'Nombre'}</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:#f5b301;text-transform:uppercase">${isCA?'Mòbil':'Móvil'}</th><th style="padding:8px 10px;text-align:right;font-size:11px;color:#f5b301;text-transform:uppercase">Status</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:#f5b301;text-transform:uppercase">${isCA?'Enviat el':'Enviado el'}</th></tr></thead><tbody id="smsRows">${drawRows(d.contacts)}</tbody></table>
+          </div>
+        </div>
+      `;
+      const inp=document.getElementById('smsSearch');
+      inp.oninput=()=>{
+        const q=inp.value.toLowerCase().trim();
+        const filt=q?d.contacts.filter(c=>{
+          const full=((c.name||'')+' '+(c.surname1||'')+' '+(c.surname2||'')).toLowerCase();
+          return full.includes(q);
+        }):d.contacts;
+        document.getElementById('smsRows').innerHTML=drawRows(filt);
+        document.getElementById('smsResultCount').textContent=filt.length+' '+(isCA?'contactes':'contactos');
+      };
+    }catch(e){
+      body.innerHTML='<div style="color:#ef4444;text-align:center;padding:40px">Error: '+e.message+'</div>';
+    }
+  }
+}
+if($('#btnSms')){$('#btnSms').onclick=openSmsModal}
+
+// ============================================================================
 // CERCADOR DE CLIENTS · per nom / cognom / concepte
 // ============================================================================
 (function initClientSearch(){
@@ -2799,7 +3053,9 @@ if($('#btnSettings')){$('#btnSettings').onclick=openSettingsModal}
     renderList();
   }
   const btn=document.getElementById('btnSms');
-  if(btn)btn.onclick=renderModal;
+  // NOTA: el nou modal (openSmsModal) amb backend real substitueix el renderModal antic
+  // Si vols recuperar l'antic modal offline-only, canvia openSmsModal per renderModal
+  if(btn)btn.onclick=(typeof openSmsModal==='function')?openSmsModal:renderModal;
 })();
 
 
