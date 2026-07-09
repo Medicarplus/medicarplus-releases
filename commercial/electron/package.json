@@ -76,6 +76,8 @@
     },
     "portable": {
       "artifactName": "MediCarPlus-Portable-${version}.exe"
-    }
+    },
+    "asar": true,
+    "compression": "maximum"
   }
 }

@@ -1,0 +1,83 @@
+{
+  "name": "medicar-plus",
+  "productName": "MediCar Plus",
+  "version": "2.0.5",
+  "description": "MediCar Plus · Registre diari de caixa per centres mèdics de reconeixement de conductors",
+  "author": {
+    "name": "MediCar Plus",
+    "email": "info@medicarplus.es"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "sync": "node sync.js",
+    "build": "electron-builder --win --x64",
+    "build:portable": "electron-builder --win portable --x64",
+    "build:installer": "electron-builder --win nsis --x64",
+    "build:all": "electron-builder --win nsis portable --x64",
+    "release": "node sync.js && npm version patch --no-git-tag-version && electron-builder --win nsis portable --x64 --publish always",
+    "publish": "electron-builder --win nsis portable --x64 --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.brugulat.medicarplus",
+    "productName": "MediCar Plus",
+    "copyright": "Copyright © 2026 Marc Brugulat Lopez",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "assets/**/*"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Medicarplus",
+        "repo": "medicarplus-releases",
+        "releaseType": "release"
+      }
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "publisherName": "MediCar Plus"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MediCar Plus",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "differentialPackage": true
+    },
+    "portable": {
+      "artifactName": "MediCarPlus-Portable-${version}.exe"
+    },
+    "asar": true,
+    "compression": "maximum"
+  }
+}
