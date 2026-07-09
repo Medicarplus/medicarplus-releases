@@ -201,11 +201,63 @@ Total: <b>3-5 segons, sense preguntes, sense mesclar versions</b>.
 
 <h2>🚨 Recuperació de desastres</h2>
 
-<h3>Si es trenca alguna cosa al PC local</h3>
-<div class="step">Torna a executar la comanda única per recuperar-ho tot des del servidor:
-<pre><code>Invoke-WebRequest "https://project-helper-47.preview.emergentagent.com/downloads/medicar-plus-electron.zip" -OutFile "$env:TEMP\mp.zip"
-Expand-Archive -Force "$env:TEMP\mp.zip" -DestinationPath "C:\medicarplus\"</code></pre>
+<div class="box warn">
+En condicions normals, <b>tot ha de funcionar automàticament</b> (auto-sync, oneClick installer, auto-update). Aquestes comandes són <b>només per emergències</b> quan alguna cosa falla i cal reiniciar des de zero.
 </div>
+
+<h3>🆘 Reset TOTAL del client (comanda única d'emergència)</h3>
+
+<div class="step">
+Si l'app d'un client s'ha quedat penjada, mostra versions barrejades, o no arrenca:
+<pre class="copyable" onclick="navigator.clipboard.writeText(this.innerText)"><code># Tanca l'app, elimina TOT rastre, obliga descàrrega fresca
+Get-Process | Where-Object { $_.ProcessName -like "*MediCar*" } | Stop-Process -Force
+Start-Sleep -Seconds 2
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Programs\MediCar Plus" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force "$env:APPDATA\MediCar Plus" -ErrorAction SilentlyContinue
+Remove-Item -Force "$env:USERPROFILE\Desktop\MediCar Plus.lnk" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\MediCar Plus" -ErrorAction SilentlyContinue
+Write-Host "OK - Neteja completa. Descarrega el .exe des de:"
+Write-Host "https://github.com/Medicarplus/medicarplus-releases/releases/latest" -ForegroundColor Cyan</code></pre>
+<b>⚠️ Preserva les dades del client</b> (localStorage, dies, IRPF, còpies) — només elimina l'installer.
+</div>
+
+<h3>🔧 Reset del PC de desenvolupament (C:\medicarplus\electron\)</h3>
+
+<div class="step">
+Si <code>npm run release</code> falla amb errors estranys o els fitxers font s'han corromput:
+<pre class="copyable" onclick="navigator.clipboard.writeText(this.innerText)"><code># 1. Backup opcional de node_modules (per no reinstal·lar)
+Move-Item C:\medicarplus\electron\node_modules $env:TEMP\node_modules_backup -ErrorAction SilentlyContinue
+
+# 2. Elimina tot excepte node_modules
+Remove-Item -Recurse -Force C:\medicarplus\electron\* -Exclude node_modules -ErrorAction SilentlyContinue
+
+# 3. Baixa i extreu últim zip
+Invoke-WebRequest "https://project-helper-47.preview.emergentagent.com/downloads/medicar-plus-electron.zip" -OutFile "$env:TEMP\mp.zip"
+Expand-Archive -Force "$env:TEMP\mp.zip" -DestinationPath "C:\medicarplus\"
+
+# 4. Restaura node_modules
+Move-Item $env:TEMP\node_modules_backup C:\medicarplus\electron\node_modules -ErrorAction SilentlyContinue
+
+# 5. Torna a executar release
+cd C:\medicarplus\electron
+$env:GH_TOKEN="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"
+npm run release</code></pre>
+</div>
+
+<h3>🔴 Errors comuns i solució</h3>
+
+<table>
+<tr><th>Error</th><th>Causa</th><th>Solució</th></tr>
+<tr><td><code>electron-builder is not recognized</code></td><td>node_modules no instal·lat</td><td><code>npm install</code> a C:\medicarplus\electron\</td></tr>
+<tr><td><code>401 Unauthorized</code> al publicar</td><td>GH_TOKEN caducat</td><td>Regenerar token (veure secció ⚠️ dalt)</td></tr>
+<tr><td><code>Cannot find module './package.json'</code></td><td>sync.js no ha funcionat</td><td>Executa <code>npm run sync</code> abans</td></tr>
+<tr><td>App mostra <code>v2.0.0 (web)</code></td><td>Preload no s'exposa (sandbox activat)</td><td>Comprova <code>sandbox: false</code> a main.js</td></tr>
+<tr><td>Client no rep auto-update</td><td>Repo GitHub és privat</td><td>Fer PÚBLIC a Settings → Visibility</td></tr>
+<tr><td>"Reinstalling" versions barrejades</td><td>Installer antic amb <code>oneClick: false</code></td><td>Client fa reset TOTAL (comanda de dalt) i instal·la fresc</td></tr>
+<tr><td>Instal·lació demana ruta / accepta condicions</td><td>package.json amb <code>oneClick: false</code></td><td>Verificar package.json → <code>"oneClick": true</code></td></tr>
+<tr><td>Auto-update encallada &gt; 5 min</td><td>Xarxa lenta o timeout GitHub</td><td>Descàrrega manual del .exe (últim recurs)</td></tr>
+<tr><td>El nom d'empresa surt genèric al header</td><td>CFG carregat després del render</td><td>Ja resolt v2.0.12+ (pre-load CFG)</td></tr>
+</table>
 
 <h3>Si el repo GitHub es cau o s'esborra</h3>
 <ol>

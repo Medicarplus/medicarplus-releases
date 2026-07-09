@@ -61,4 +61,11 @@ contextBridge.exposeInMainWorld('appInfo', {
   isDesktop: true,
   hwid: computeHwid(),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  onUpdateEvent: (callback) => {
+    const handler = (_ev, payload) => callback(payload);
+    ipcRenderer.on('update-available', (_ev, p) => callback({ event: 'available', ...p }));
+    ipcRenderer.on('update-progress', (_ev, p) => callback({ event: 'progress', ...p }));
+    ipcRenderer.on('update-downloaded', (_ev, p) => callback({ event: 'downloaded', ...p }));
+    ipcRenderer.on('update-error', (_ev, p) => callback({ event: 'error', ...p }));
+  },
 });
