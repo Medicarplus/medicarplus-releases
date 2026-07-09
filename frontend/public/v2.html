@@ -201,6 +201,7 @@
     </div>
     <button class="btn" id="btnSms" style="background:linear-gradient(90deg,#059669 0%,#10b981 100%);color:#fff;border-color:transparent;font-weight:700" title="Avisos SMS / WhatsApp de renovació">📱 Avisos</button>
     <a id="btnWebsite" href="https://medicarplus.es" target="_blank" rel="noopener" title="Obrir medicarplus.es · Compte, ajuda, actualitzacions" style="background:linear-gradient(90deg,#0f172a 0%,#1e293b 100%);color:#f5b301;border:1px solid #f5b301;border-radius:6px;padding:8px 14px;font-weight:700;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:'Segoe UI',sans-serif" data-testid="btn-website">🌐 medicarplus.es</a>
+    <div id="trialBadge" data-testid="trial-badge" style="display:none;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;font-family:'Segoe UI',sans-serif;font-size:12px;font-weight:700;border:1px solid;letter-spacing:.3px"></div>
     <span id="autosaveBadge" style="display:none;padding:5px 10px;border-radius:6px;background:#1f3a2e;color:#7ee3aa;font-size:11px;font-family:'Consolas',monospace;letter-spacing:.3px;border:1px solid #2a5e44"></span>
     <button class="btn traffic-only" id="btnAudit" style="background:linear-gradient(90deg,#ea580c 0%,#f97316 100%);color:#fff;border-color:transparent;font-weight:700" data-i18n="audit">🔎 Auditoría</button>
     <button class="btn" id="btnAiAsk" style="background:linear-gradient(90deg,#7c3aed 0%,#a855f7 100%);color:#fff;border-color:transparent;font-weight:700" data-i18n="ai_advisor">🤖 Asesor IA</button>
@@ -2586,6 +2587,41 @@ applyLang();
 
 
 // ============================================================================
+// Badge de compte enrere del trial · només visible si la llicència activa és TRIAL
+// 3 estats visuals: verd (>10 dies) / taronja (3-10) / vermell (<3 · o expirada)
+// S'actualitza cada minut automàticament.
+window.updateTrialBadge = function(){
+  try{
+    var lic = null;
+    try{lic = JSON.parse(localStorage.getItem('caja.license.v1')||'null')}catch(e){}
+    var el = document.getElementById('trialBadge');
+    if(!el) return;
+    // Només mostrem badge si és TRIAL amb data d'expiració vàlida
+    if(!lic || lic.plan !== 'TRIAL' || !lic.expTs){el.style.display='none';return}
+    var msRemaining = Number(lic.expTs) - Date.now();
+    var daysLeft = Math.ceil(msRemaining / 86400000);
+    var expired = daysLeft <= 0;
+    var color, bg, border, icon, txt;
+    if(expired){
+      color='#fecaca';bg='linear-gradient(90deg,#7f1d1d,#991b1b)';border='#dc2626';icon='⛔';txt='PROVA EXPIRADA';
+    }else if(daysLeft <= 3){
+      color='#fecaca';bg='linear-gradient(90deg,#7f1d1d,#991b1b)';border='#dc2626';icon='⚠️';txt='Quedan '+daysLeft+' día'+(daysLeft===1?'':'s');
+    }else if(daysLeft <= 10){
+      color='#fed7aa';bg='linear-gradient(90deg,#7c2d12,#9a3412)';border='#f97316';icon='⏳';txt='Quedan '+daysLeft+' días de prueba';
+    }else{
+      color='#bbf7d0';bg='linear-gradient(90deg,#14532d,#166534)';border='#22c55e';icon='✨';txt='Prueba: '+daysLeft+' días restantes';
+    }
+    el.style.display='inline-flex';
+    el.style.background=bg;
+    el.style.color=color;
+    el.style.borderColor=border;
+    el.innerHTML = '<span style="font-size:14px">'+icon+'</span><span>'+txt+'</span><a href="https://medicarplus.es/#pricing" target="_blank" rel="noopener" style="background:rgba(255,255,255,.15);color:'+color+';padding:3px 8px;border-radius:4px;text-decoration:none;font-weight:700;font-size:11px;border:1px solid rgba(255,255,255,.2);margin-left:4px" data-testid="trial-buy-btn">Comprar</a>';
+  }catch(e){}
+};
+// Actualitza a l'inici i cada 60s
+try{window.updateTrialBadge()}catch(e){}
+try{setInterval(function(){try{window.updateTrialBadge()}catch(e){}}, 60000)}catch(e){}
+
 // Mostra la versió del programa a la cantonada superior dreta (des d'Electron via preload)
 (function initVersion(){
   try{
@@ -2632,7 +2668,7 @@ function _validateJwtLocal(jwt,installId){
   if(p.sub&&p.sub!==installId)return {ok:false,reason:"La clau no correspon a aquesta instal·lació"};
   if(p.exp){const now=Math.floor(Date.now()/1000);if(p.exp<now)return {ok:false,reason:'Llicència expirada'};}
   const expLabel=p.exp?new Date(p.exp*1000).toLocaleDateString('ca-ES'):'PERPÈTUA';
-  return {ok:true,type:'JWT',plan:p.plan||'STD',centre:'Client comercial',expires:expLabel,payload:p};
+  return {ok:true,type:'JWT',plan:p.plan||'STD',centre:'Client comercial',expires:expLabel,expTs:p.exp?p.exp*1000:null,payload:p};
 }
 function validateKey(key,installId){
   if(!key)return {ok:false,reason:'Clau buida'};
@@ -2755,7 +2791,9 @@ function showActivationModal(){
       }catch(e){console.warn('Activació offline (servidor no accessible):',e);showInfo('⚠ Activada offline (es re-verificarà quan hi hagi connexió)');}
       btn.disabled=false;btn.textContent='✓ Activar Llicència';
     }
-    saveLicense({key:rawKey,type:v.type,centre,plan,expires,activated:new Date().toISOString(),installId});
+    saveLicense({key:rawKey,type:v.type,centre,plan,expires,expTs:v.expTs||null,activated:new Date().toISOString(),installId});
+    // Actualitzem el badge de trial immediatament després d'activar
+    try{if(typeof window.updateTrialBadge==='function')window.updateTrialBadge()}catch(e){}
     back.innerHTML='<div style="text-align:center;color:#22c55e;font-family:Georgia,serif"><div style="font-size:60px;margin-bottom:12px">✓</div><h2 style="margin:0">Llicència activada!</h2><p style="color:#94a3b8">Recarregant l\'app...</p></div>';
     setTimeout(()=>location.reload(),1200);
   };
