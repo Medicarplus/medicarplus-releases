@@ -55,6 +55,23 @@ a:hover{color:#fff;border-bottom-style:solid}
 <b>✨ El sistema està totalment automatitzat.</b> Una sola comanda descarrega els últims fitxers del servidor, compila, publica a GitHub, i els clients reben l'actualització automàticament.
 </div>
 
+<h2>🌐 Ecosistema complet MediCar Plus</h2>
+
+<div class="box info">
+<b>Tot l'ecosistema activat el 09/07/2026:</b>
+<table style="margin-top:12px">
+<tr><th>Component</th><th>URL / Ubicació</th><th>Estat</th></tr>
+<tr><td>Landing pública</td><td><a href="https://medicarplus.es" target="_blank">medicarplus.es</a></td><td>✅ Viva (GitHub Pages, gratis)</td></tr>
+<tr><td>App comercial (.exe)</td><td>Distribuïda via GitHub Releases</td><td>✅ Auto-update actiu</td></tr>
+<tr><td>Repo releases</td><td><a href="https://github.com/Medicarplus/medicarplus-releases" target="_blank">Medicarplus/medicarplus-releases</a></td><td>✅ Públic</td></tr>
+<tr><td>Repo landing</td><td><a href="https://github.com/Medicarplus/medicarplus.es" target="_blank">Medicarplus/medicarplus.es</a></td><td>✅ Públic</td></tr>
+<tr><td>Correu corporatiu</td><td>info@medicarplus.es, marc@, suport@, factures@, no-reply@</td><td>✅ IONOS Correo Básico 5</td></tr>
+<tr><td>SMTP tickets suport</td><td>Configurat al backend Emergent</td><td>✅ Envia a info@medicarplus.es</td></tr>
+<tr><td>Backend + Panel Admin</td><td>Preview Emergent (no deployed encara)</td><td>⏳ Deploy pendent (esperant IBAN empresa)</td></tr>
+<tr><td>Stripe</td><td>Mode TEST activat</td><td>⏳ Live pendent (esperant IBAN empresa)</td></tr>
+</table>
+</div>
+
 <h2>🚀 Publicar una nova versió (procediment normal)</h2>
 
 <div class="step">
@@ -286,6 +303,39 @@ npm run release
 # Desinstal·lar manualment (per si es queda encallat)
 Get-Process | Where-Object { $_.ProcessName -like "*MediCar*" } | Stop-Process -Force
 Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Programs\MediCar Plus" -ErrorAction SilentlyContinue
+
+# Recuperar C:\medicarplus\electron\ des del servidor
+Invoke-WebRequest "https://project-helper-47.preview.emergentagent.com/downloads/medicar-plus-electron.zip" -OutFile "$env:TEMP\mp.zip"
+Expand-Archive -Force "$env:TEMP\mp.zip" -DestinationPath "C:\medicarplus\"
+
+# Sincronitzar sense fer release (només actualitzar fitxers)
+cd C:\medicarplus\electron
+npm run sync
+
+# Verificar que sync.js és nou (ha de retornar &gt; 4000)
+(Get-Item C:\medicarplus\electron\sync.js).Length
+
+# Verificar que package.json té oneClick: true
+Get-Content C:\medicarplus\electron\package.json | Select-String "oneClick"</code></pre>
+
+<h2>🔗 Enllaços útils</h2>
+<ul>
+<li><a href="https://github.com/Medicarplus/medicarplus-releases/releases" target="_blank">📦 GitHub Releases (versions publicades)</a></li>
+<li><a href="https://github.com/Medicarplus/medicarplus-releases/settings" target="_blank">⚙️ GitHub Repo Settings (fer públic/privat)</a></li>
+<li><a href="https://github.com/settings/personal-access-tokens" target="_blank">🔑 Regenerar GH_TOKEN</a></li>
+<li><a href="https://dashboard.stripe.com" target="_blank">💳 Stripe Dashboard</a></li>
+<li><a href="index-guies.html">📚 Índex de guies</a></li>
+</ul>
+
+<div class="box ok" style="margin-top:32px;text-align:center">
+<b>🎯 Recorda:</b> Una sola comanda <code>npm run release</code> ho fa tot. Auto-sync, auto-compile, auto-publish, auto-update per als clients.<br><br>
+<span style="color:var(--gold);font-size:16px;font-weight:700">Zero descàrregues manuals. Zero neteges. Zero problemes.</span>
+</div>
+
+</div>
+</body>
+</html>
+Car Plus" -ErrorAction SilentlyContinue
 
 # Recuperar C:\medicarplus\electron\ des del servidor
 Invoke-WebRequest "https://project-helper-47.preview.emergentagent.com/downloads/medicar-plus-electron.zip" -OutFile "$env:TEMP\mp.zip"

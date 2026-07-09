@@ -74,5 +74,12 @@ Vegeu `/app/memory/test_credentials.md`
 - **2026-07-08**: Badge visual de període de prova (30 dies) amb estats Verd/Taronja/Vermell
 - **2026-07-09**: 📥 Botó Importar CSV mogut al costat de "Entradas del día" (secció Tràfic)
 - **2026-07-09**: ⚙️ Modal Configuració centralitzat (Idioma + Comprovar versió + Empreses + Suport + Sortir)
-- **2026-07-09**: Backend `/api/support/contact` endpoint per tickets amb integració SMTP IONOS (SMTP_PASS pendent)
+- **2026-07-09**: Backend `/api/support/contact` endpoint per tickets amb integració SMTP IONOS
 - **2026-07-09**: IPC `check-for-updates` exposat via preload per botó manual al modal
+- **2026-07-09**: sync.js auto-download servidor + oneClick installer + `verifyUpdateCodeSignature: false`
+- **2026-07-09**: Auto-updater funcional (repo medicarplus-releases PÚBLIC)
+- **2026-07-09**: Landing medicarplus.es LIVE via GitHub Pages (repo Medicarplus/medicarplus.es)
+- **2026-07-09**: Favicon + logo cotxe integrat a la landing
+- **2026-07-09**: Reposicionament: DGT → GIC, "centros de reconocimientos médicos" (no autoescuelas)
+- **2026-07-09**: SMTP IONOS actiu (SMTP_PASS al .env) - tickets suport arriben a info@medicarplus.es ✅
+- **2026-07-09**: Guia mestre `/guia-publicar-versions.html` amb totes les seccions actualitzades
