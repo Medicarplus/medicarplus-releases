@@ -11,13 +11,26 @@
 // ============================================================================
 // BULLETPROOF CLIENT · Boot guard + error catcher
 // Marc Brugulat Lopez · 2026
-// Si l'app crasha o no es carrega, mostrem UI de recuperació en lloc de
+// Si l'app crasha o NO renderitza, mostrem UI de recuperació en lloc de
 // finestra en blanc. El client MAI veurà una app que no respon.
 // ============================================================================
 (function(){
   var recovered = false;
+  function bootHealthy(){
+    // L'app està sana si:
+    //   (a) existeix qualsevol dels elements principals reals, o
+    //   (b) hi ha més de 15 nodes visibles al body (l'app renderitza molt)
+    var realProbes = ['#appTitle', '#appVersion', '#mainTabs', '#btn-settings', '#btnAccounting', '#btn-import-csv'];
+    for (var i = 0; i < realProbes.length; i++) {
+      if (document.querySelector(realProbes[i])) return true;
+    }
+    if (document.body && document.body.getElementsByTagName('*').length > 30) return true;
+    return false;
+  }
   function showRecovery(reason){
     if (recovered) return;
+    // Si de cop resulta que l'app s'ha carregat mentrestant, no la trenquem
+    if (bootHealthy()) return;
     recovered = true;
     try {
       document.body.innerHTML = '<div style="font-family:system-ui,sans-serif;background:#0f1115;color:#e8ecf2;padding:40px;min-height:100vh">'
@@ -33,30 +46,27 @@
         + '</ol></div>';
     } catch(e){}
   }
-  // Captura errors JS globals
+  // Captura errors JS globals — només mostrem recovery si passen ABANS que l'app carregui
   window.addEventListener('error', function(e){
     console.error('Global error:', e.message);
-    // Només mostrem recovery si passa MOLT aviat (abans de renderitzar contingut clau)
     setTimeout(function(){
-      if (!document.querySelector('#todayList') && !document.querySelector('#companyGrid')) {
-        showRecovery('Error JavaScript: ' + (e.message || 'desconegut'));
-      }
+      if (!bootHealthy()) showRecovery('Error JavaScript: ' + (e.message || 'desconegut'));
     }, 3000);
   });
   window.addEventListener('unhandledrejection', function(e){
     console.error('Unhandled promise rejection:', e.reason);
   });
-  // Boot guard: si en 10s no s'ha renderitzat res clau, mostra UI de recuperació
+  // Boot guard: si en 15s (temps generós) no s'ha renderitzat res clau, mostrem UI de recuperació
   window.__mcpBootGuard = setTimeout(function(){
-    var probes = ['#todayList', '#companyGrid', '#todayTotal'];
-    var found = probes.some(function(sel){ return document.querySelector(sel); });
-    if (!found) showRecovery('No s\'ha carregat cap element principal en 10 segons.');
-  }, 10000);
-  document.addEventListener('DOMContentLoaded', function(){
-    if (document.querySelector('#todayList') || document.querySelector('#companyGrid')) {
+    if (!bootHealthy()) showRecovery('L\'app no ha respost en 15 segons.');
+  }, 15000);
+  // També comprovem a cada segon: si el boot esdevé sà, cancel·lem el guard
+  var healthPoll = setInterval(function(){
+    if (bootHealthy()) {
       clearTimeout(window.__mcpBootGuard);
+      clearInterval(healthPoll);
     }
-  });
+  }, 500);
 })();
 </script>
 <style>
