@@ -2,7 +2,7 @@
 // MediCar Plus · v2 COMERCIAL · Electron Main Process
 // Marc Brugulat Lopez · 2026
 // ============================================================================
-const { app, BrowserWindow, Menu, shell, dialog } = require('electron');
+const { app, BrowserWindow, Menu, shell, dialog, ipcMain } = require('electron');
 const path = require('path');
 
 // Auto-updater (Opció A: GitHub Releases). Fallar silenciosament si el repo
