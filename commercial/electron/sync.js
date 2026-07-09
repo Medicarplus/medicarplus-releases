@@ -3,12 +3,10 @@
 // sync.js — Auto-sincronitza els fitxers font des del servidor
 // Marc Brugulat Lopez · 2026
 // ----------------------------------------------------------------------------
-// S'executa automàticament abans de `npm run release`.
-//  · Descarrega les últimes versions de index.html, main.js, preload.js
-//  · Sincronitza el `build` config de package.json (però preserva la versió local)
-//  · S'auto-actualitza (sync.js baixa la seva pròpia última versió)
-//  · Neteja el cache de dist/ per evitar builds amb fitxers cachejats
-// Si no hi ha internet, usa els fitxers locals sense fallar.
+// Baixa les últimes versions dels fitxers font, VALIDA que el contingut sigui
+// realment el fitxer esperat (evita rebre HTML 404 en lloc de codi JS), i
+// només l'escriu al disc si la validació passa. Si tots els fitxers fallen,
+// deixa els locals intactes.
 // ============================================================================
 
 const https = require('https');
@@ -16,16 +14,24 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// Ordre de prioritat: preview Emergent PRIMER perquè és el que serveix els fitxers font.
+// medicarplus.es és GitHub Pages estàtic (no té /downloads/electron-src/).
 const SOURCES = [
-  'https://medicarplus.es/downloads/electron-src',
-  'https://project-helper-47.preview.emergentagent.com/downloads/electron-src'
+  'https://project-helper-47.preview.emergentagent.com/downloads/electron-src',
+  'https://medicarplus.es/downloads/electron-src'
 ];
 
-// Fitxers que se sincronitzen 1:1 des del servidor
 const FILES_1TO1 = ['index.html', 'main.js', 'preload.js', 'sync.js'];
-
-// package.json se sincronitza intel·ligentment (preserva version, sync build config)
 const PKG_MERGE_KEYS = ['scripts', 'build', 'author', 'description', 'main', 'productName'];
+
+// Validacions per assegurar que el contingut és el fitxer real i no una pàgina HTML de 404.
+const FILE_SIGNATURES = {
+  'index.html': (s) => s.includes('<!DOCTYPE html>') && s.includes('MediCar Plus'),
+  'main.js': (s) => !s.startsWith('<!DOCTYPE') && s.includes("require('electron')"),
+  'preload.js': (s) => !s.startsWith('<!DOCTYPE') && s.includes('contextBridge'),
+  'sync.js': (s) => !s.startsWith('<!DOCTYPE') && s.includes('SOURCES') && s.includes('FILES_1TO1'),
+  'package.json': (s) => { try { const j = JSON.parse(s); return !!(j.name && j.version); } catch(e){ return false; } },
+};
 
 function download(url, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
@@ -52,6 +58,13 @@ async function tryDownloadFile(fileName) {
     try {
       const data = await download(url);
       if (data.length < 50) throw new Error(`resposta massa curta (${data.length}B)`);
+      const validator = FILE_SIGNATURES[fileName];
+      if (validator) {
+        const text = data.toString('utf8');
+        if (!validator(text)) {
+          throw new Error('contingut invàlid (probablement HTML 404 en lloc del fitxer real)');
+        }
+      }
       return { data, url };
     } catch (e) { lastErr = e; }
   }
@@ -73,7 +86,6 @@ function rimraf(dir) {
   const localDir = __dirname;
   let updated = 0, failed = 0;
 
-  // 1) Sync de fitxers 1:1
   for (const f of FILES_1TO1) {
     process.stdout.write(`   · ${f} ... `);
     try {
@@ -92,12 +104,11 @@ function rimraf(dir) {
         console.log('✔️  ja al dia');
       }
     } catch (e) {
-      console.log(`⚠️  no disponible (${e.message})`);
+      console.log(`⚠️  no disponible (${e.message}) — mantenim la còpia local`);
       failed++;
     }
   }
 
-  // 2) Sync intel·ligent de package.json (preserva version)
   process.stdout.write(`   · package.json (build config) ... `);
   try {
     const { data } = await tryDownloadFile('package.json');
@@ -111,7 +122,6 @@ function rimraf(dir) {
         changed = true;
       }
     }
-    // Preservem: version, dependencies (perquè node_modules no es trenqui)
     if (changed) {
       fs.writeFileSync(localPath, JSON.stringify(localPkg, null, 2) + '\n');
       console.log('✅ build config actualitzada (version preservada)');
@@ -124,7 +134,6 @@ function rimraf(dir) {
     failed++;
   }
 
-  // 3) Neteja cache de builds anteriors per garantir build net
   const distDir = path.join(localDir, 'dist');
   if (rimraf(distDir)) {
     console.log('🧹 dist/ netejat (build fresc garantit)');
