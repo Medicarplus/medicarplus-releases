@@ -115,40 +115,63 @@ function setupAutoUpdater() {
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.logger = null; // desactivat en producció
 
+  let latestUpdateInfo = null;
+
   autoUpdater.on('update-available', (info) => {
     updateAvailable = true;
+    latestUpdateInfo = info;
     console.log('Nova versió disponible:', info.version);
+    // Notifica al renderer perquè pugui mostrar el progrés en directe al modal
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-available', { version: info.version });
+    }
   });
 
   autoUpdater.on('update-not-available', () => {
     updateAvailable = false;
   });
 
+  autoUpdater.on('download-progress', (progress) => {
+    // Envia el % al renderer per mostrar-lo a la barra de progres del modal ⚙️
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-progress', {
+        percent: Math.round(progress.percent),
+        transferred: progress.transferred,
+        total: progress.total,
+        bytesPerSecond: progress.bytesPerSecond
+      });
+    }
+  });
+
   autoUpdater.on('error', (err) => {
     console.warn('Auto-update error:', err.message);
-    // Silenciós — el client no ha de veure errors de update si el repo encara
-    // no està configurat o si no hi ha internet.
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-error', { message: err.message });
+    }
   });
 
   autoUpdater.on('update-downloaded', (info) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-downloaded', { version: info.version });
+    }
     dialog.showMessageBox(mainWindow, {
       type: 'info',
-      buttons: ['Reiniciar i actualitzar ara', 'Més tard'],
+      buttons: ['🚀 Reiniciar i actualitzar ara', 'Més tard'],
       defaultId: 0,
       cancelId: 1,
-      title: 'Actualització disponible',
-      message: `MediCar Plus v${info.version} està llest per instal·lar`,
-      detail: 'La nova versió s\'ha descarregat i s\'instal·larà al reiniciar. Vols reiniciar ara?'
+      title: '✨ Nova versió llesta',
+      message: `MediCar Plus v${info.version} descarregada correctament`,
+      detail: 'S\'instal·larà i l\'app es reiniciarà en 2-3 segons. Les teves dades es preserven íntegrament.\n\nVols reiniciar ara?'
     }).then(result => {
       if (result.response === 0) {
-        autoUpdater.quitAndInstall();
+        setTimeout(() => autoUpdater.quitAndInstall(), 100);
       }
     }).catch(() => {});
   });
 
   // Comprovació silenciosa a l'arrencada (espera 5s perquè no bloquegi UI)
   setTimeout(() => {
-    try { autoUpdater.checkForUpdatesAndNotify(); }
+    try { autoUpdater.checkForUpdates(); }
     catch (e) { console.warn('checkForUpdates failed:', e.message); }
   }, 5000);
 }

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<title>Guia — Publicar actualitzacions · MediCar Plus</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{--bg:#0f172a;--panel:#1e293b;--panel2:#0f1a2e;--txt:#e2e8f0;--muted:#94a3b8;--gold:#f5b301;--green:#22c55e;--red:#ef4444;--blue:#3b82f6}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--txt);line-height:1.6;padding:24px}
+.wrap{max-width:920px;margin:0 auto}
+h1{color:var(--gold);font-size:32px;margin:0 0 6px;letter-spacing:.5px}
+.sub{color:var(--muted);font-size:14px;margin-bottom:32px}
+h2{color:var(--gold);font-size:22px;margin:32px 0 12px;padding-bottom:8px;border-bottom:2px solid #334155}
+h3{color:#fff;font-size:17px;margin:24px 0 8px}
+h4{color:#cbd5e1;font-size:14px;margin:16px 0 6px;letter-spacing:.5px;text-transform:uppercase}
+p{margin:8px 0}
+code{background:#0e1117;color:#f5b301;padding:2px 6px;border-radius:4px;font-family:'Consolas','Menlo',monospace;font-size:13px;border:1px solid #334155}
+pre{background:#0e1117;color:#e2e8f0;padding:14px 16px;border-radius:8px;overflow-x:auto;border:1px solid #334155;font-family:'Consolas','Menlo',monospace;font-size:13px;line-height:1.5;margin:10px 0}
+pre code{background:none;border:none;padding:0;color:inherit}
+.box{background:var(--panel);border:1px solid #334155;border-radius:12px;padding:20px;margin:14px 0}
+.box.info{border-left:4px solid var(--blue)}
+.box.ok{border-left:4px solid var(--green);background:linear-gradient(135deg,#052e16,#0f172a)}
+.box.warn{border-left:4px solid #f97316;background:linear-gradient(135deg,#3a1a06,#1a0e00)}
+.box.danger{border-left:4px solid var(--red);background:linear-gradient(135deg,#3a0606,#1a0000)}
+.step{background:var(--panel2);border:1px solid #334155;border-radius:10px;padding:14px 18px;margin:10px 0}
+.step-num{display:inline-block;background:var(--gold);color:#0f172a;width:26px;height:26px;border-radius:50%;text-align:center;line-height:26px;font-weight:800;margin-right:10px;font-size:13px}
+kbd{background:#334155;color:#f5b301;padding:2px 8px;border-radius:4px;font-family:'Consolas',monospace;font-size:12px;border:1px solid #475569;box-shadow:inset 0 -1px 0 rgba(0,0,0,.3)}
+table{width:100%;border-collapse:collapse;margin:12px 0}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #334155;font-size:13px}
+th{background:#0e1a2e;color:var(--gold);text-transform:uppercase;letter-spacing:.5px;font-size:11px}
+tr:hover{background:#0f1a2e}
+.back{display:inline-block;color:var(--gold);text-decoration:none;font-size:13px;margin-bottom:20px;padding:6px 12px;border:1px solid var(--gold);border-radius:6px;transition:all .2s}
+.back:hover{background:var(--gold);color:#0f172a}
+.tag{display:inline-block;background:#7c2d12;color:#fed7aa;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:.5px;margin-left:8px;vertical-align:middle}
+.tag.new{background:#166534;color:#bbf7d0}
+.tag.critical{background:#7f1d1d;color:#fecaca}
+ul,ol{margin:8px 0;padding-left:24px}
+li{margin:4px 0}
+a{color:var(--gold);text-decoration:none;border-bottom:1px dashed var(--gold)}
+a:hover{color:#fff;border-bottom-style:solid}
+.copyable{position:relative;cursor:pointer;transition:all .2s}
+.copyable:hover{border-color:var(--gold)}
+.copyable:hover::after{content:'📋 Clic per copiar';position:absolute;top:8px;right:12px;font-size:11px;color:var(--gold);opacity:.9}
+</style>
+</head>
+<body>
+<div class="wrap">
+<a href="index-guies.html" class="back">← Tornar a l'índex de guies</a>
+
+<h1>📦 Publicar noves versions</h1>
+<div class="sub">Sistema d'actualitzacions automàtiques amb sync + oneClick installer · Actualitzat 09/07/2026</div>
+
+<div class="box ok">
+<b>✨ El sistema està totalment automatitzat.</b> Una sola comanda descarrega els últims fitxers del servidor, compila, publica a GitHub, i els clients reben l'actualització automàticament.
+</div>
+
+<h2>🚀 Publicar una nova versió (procediment normal)</h2>
+
+<div class="step">
+<span class="step-num">1</span><b>Obre PowerShell</b> (tecla Windows → escriu <kbd>powershell</kbd>)
+</div>
+
+<div class="step">
+<span class="step-num">2</span><b>Executa aquestes 3 línies</b> (una a una):
+<pre class="copyable" onclick="navigator.clipboard.writeText(this.innerText.replace(/^\$/gm,''))"><code>cd C:\medicarplus\electron
+$env:GH_TOKEN="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"
+npm run release</code></pre>
+</div>
+
+<div class="step">
+<span class="step-num">3</span>Espera 2-3 minuts. Veuràs:
+<pre><code>🔄 Sincronitzant fitxers font des del servidor...
+   · index.html ... ✅ actualitzat
+   · main.js ... ✔️  ja al dia
+   · preload.js ... ✔️  ja al dia
+   · sync.js ... ✔️  ja al dia
+   · package.json (build config) ... ✔️  ja al dia
+🧹 dist/ netejat (build fresc garantit)
+📦 Resultat: 1 actualitzat(s), 0 error(s)
+
+v2.0.11
+building target=nsis file=dist\MediCar Plus Setup 2.0.11.exe archs=x64 oneClick=true perMachine=false
+[==================================] 100% 0.0s | MediCar-Plus-Setup-2.0.11.exe to github
+Done!</code></pre>
+</div>
+
+<div class="step">
+<span class="step-num">4</span><b>Els clients reben l'actualització automàticament</b> al següent cop que obrin l'app. Veuran un diàleg: <i>"Nova versió v2.0.11 llesta. Reiniciar i actualitzar ara?"</i>
+</div>
+
+<div class="box info">
+<b>💡 Què fa <code>npm run release</code>?</b>
+<ol>
+<li>Executa <code>node sync.js</code> — baixa els últims fitxers font del servidor Emergent</li>
+<li>Neteja <code>dist/</code> per garantir build fresc</li>
+<li><code>npm version patch</code> — puja versió automàticament (ex: 2.0.10 → 2.0.11)</li>
+<li><code>electron-builder</code> — compila l'installer + portable per Windows x64</li>
+<li>Puja els <code>.exe</code> + <code>latest.yml</code> a GitHub Releases</li>
+</ol>
+</div>
+
+<h2>🔑 Credencials importants <span class="tag critical">GUARDAR AMB CURA</span></h2>
+
+<table>
+<tr><th>Credencial</th><th>Valor</th><th>On la faig servir</th></tr>
+<tr><td><b>GitHub Personal Access Token (PAT)</b></td><td><code style="font-size:10px">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</code></td><td><code>$env:GH_TOKEN</code> abans de <code>npm run release</code></td></tr>
+<tr><td><b>Master License Key</b></td><td><code>MB-MASTER-BRUGULAT-2026-OWNER</code></td><td>Activa l'app sense pagar (només per tu)</td></tr>
+<tr><td><b>Admin Panel Token</b></td><td><code>MB-ADMIN-BRUGULAT-2026-4F8E2A1C</code></td><td>Genera llicències als clients via <a href="/admin" target="_blank">/admin</a></td></tr>
+<tr><td><b>Stripe Test API Key</b></td><td><code style="font-size:10px">sk_test_51Tqx1KDICdnmKtZ3...</code></td><td>Al backend <code>.env</code> per pagaments TEST</td></tr>
+<tr><td><b>SMTP IONOS</b></td><td><code>smtp.ionos.es:587</code> · usuari <code>info@medicarplus.es</code></td><td>Enviament d'emails (pendent contrasenya al <code>.env</code>)</td></tr>
+</table>
+
+<h2>⚠️ Què fer si el GH_TOKEN caduca <span class="tag">IMPORTANT</span></h2>
+
+<div class="box warn">
+El PAT actual expira segons la política de GitHub. Si un dia executes <code>npm run release</code> i obtens <b>401 Unauthorized</b> o similar, el token ha caducat.
+</div>
+
+<h3>Regenerar el token (5 minuts)</h3>
+
+<div class="step">
+<span class="step-num">1</span>Obre <a href="https://github.com/settings/personal-access-tokens" target="_blank">github.com/settings/personal-access-tokens</a> (autenticat com <b>Medicarplus</b>)
+</div>
+
+<div class="step">
+<span class="step-num">2</span>Si el token vell hi és → <b>Regenerate</b>. Si no → <b>Generate new token → Fine-grained token</b>
+</div>
+
+<div class="step">
+<span class="step-num">3</span><b>Nom:</b> <code>medicarplus-release</code> · <b>Expiration:</b> 1 any (o "No expiration")<br>
+<b>Repository access:</b> Only select repositories → <code>Medicarplus/medicarplus-releases</code><br>
+<b>Repository permissions:</b>
+<ul>
+<li><b>Contents:</b> Read and write</li>
+<li><b>Metadata:</b> Read-only (obligatori)</li>
+<li><b>Actions:</b> Read and write</li>
+</ul>
+</div>
+
+<div class="step">
+<span class="step-num">4</span>Copia el nou token (comença per <code>github_pat_11...</code>) — <b>només és visible UN COP</b>
+</div>
+
+<div class="step">
+<span class="step-num">5</span>Substitueix-lo al PowerShell:
+<pre><code>$env:GH_TOKEN="EL_NOU_TOKEN_AQUI"</code></pre>
+</div>
+
+<div class="step">
+<span class="step-num">6</span><b>Actualitza aquesta guia</b> amb el nou token perquè no el perdis. Digues al teu agent:<br>
+<i>"Actualitza el GH_TOKEN a la guia amb el nou valor: github_pat_..."</i>
+</div>
+
+<h2>📥 Sistema d'auto-sync (com funciona)</h2>
+
+<div class="box info">
+Quan executes <code>npm run release</code>, el fitxer <code>sync.js</code> baixa automàticament els fitxers font més recents del servidor. Així no has de descarregar zips manualment.
+</div>
+
+<h4>Fitxers que se sincronitzen des del servidor</h4>
+<table>
+<tr><th>Fitxer</th><th>Origen</th><th>Què conté</th></tr>
+<tr><td><code>index.html</code></td><td><code>medicarplus.es/downloads/electron-src/index.html</code></td><td>L'app sencera (UI, funcionalitats)</td></tr>
+<tr><td><code>main.js</code></td><td>Idem</td><td>Configuració Electron (finestres, menus, auto-updater)</td></tr>
+<tr><td><code>preload.js</code></td><td>Idem</td><td>Bridge HWID + versió</td></tr>
+<tr><td><code>sync.js</code></td><td>Idem (s'auto-actualitza)</td><td>El propi script sync</td></tr>
+<tr><td><code>package.json</code></td><td>Idem</td><td>Només la secció <code>build</code> (la version es preserva local)</td></tr>
+</table>
+
+<h4>URLs de sincronització (ordre de prioritat)</h4>
+<ol>
+<li><code>https://medicarplus.es/downloads/electron-src/</code> (domini definitiu)</li>
+<li><code>https://project-helper-47.preview.emergentagent.com/downloads/electron-src/</code> (preview Emergent)</li>
+</ol>
+
+<h2>🔧 Configuració NSIS Installer (oneClick)</h2>
+
+<div class="box ok">
+<b>Instal·lació silenciosa activada.</b> Quan un client fa doble clic al <code>.exe</code>:
+<ol>
+<li>NSIS auto-desinstal·la la versió antiga (silenciosament)</li>
+<li>Instal·la la nova al mateix lloc</li>
+<li>Crea drecera al desktop + menú Inici</li>
+<li>Obre l'app automàticament</li>
+</ol>
+Total: <b>3-5 segons, sense preguntes, sense mesclar versions</b>.
+</div>
+
+<h4>Configuració al package.json</h4>
+<pre><code>"nsis": {
+  "oneClick": true,              // silenciós, auto-uninstall previ
+  "perMachine": false,           // instal·la per usuari (no requereix admin)
+  "allowToChangeInstallationDirectory": false,
+  "createDesktopShortcut": true,
+  "createStartMenuShortcut": true,
+  "runAfterFinish": true,        // obre l'app quan acaba
+  "deleteAppDataOnUninstall": false,  // preserva localStorage
+  "differentialPackage": true    // updates incrementals (més ràpid)
+}</code></pre>
+
+<h2>🚨 Recuperació de desastres</h2>
+
+<h3>Si es trenca alguna cosa al PC local</h3>
+<div class="step">Torna a executar la comanda única per recuperar-ho tot des del servidor:
+<pre><code>Invoke-WebRequest "https://project-helper-47.preview.emergentagent.com/downloads/medicar-plus-electron.zip" -OutFile "$env:TEMP\mp.zip"
+Expand-Archive -Force "$env:TEMP\mp.zip" -DestinationPath "C:\medicarplus\"</code></pre>
+</div>
+
+<h3>Si el repo GitHub es cau o s'esborra</h3>
+<ol>
+<li>Crea nou repo public: <code>Medicarplus/medicarplus-releases</code></li>
+<li>El primer <code>npm run release</code> hi puja tot automàticament</li>
+<li>Els clients existents seguiran funcionant (offline license) fins que rebin la propera update</li>
+</ol>
+
+<h3>Si un client no pot instal·lar l'update</h3>
+<ol>
+<li>El repo GitHub ha de ser <b>PÚBLIC</b> (comprovar a Settings → Change visibility)</li>
+<li>Verifica que hi ha <code>latest.yml</code> al release (el genera electron-builder sol)</li>
+<li>El client pot descarregar el <code>.exe</code> manualment i executar-lo — auto-desinstal·larà l'antic</li>
+</ol>
+
+<h2>📋 Comandes ràpides de referència</h2>
+
+<pre><code># Publicar nova versió
+cd C:\medicarplus\electron
+$env:GH_TOKEN="github_pat_..."
+npm run release
+
+# Comprovar quina versió hi ha instal·lada al PC
+(Get-Item "$env:LOCALAPPDATA\Programs\MediCar Plus\MediCar Plus.exe").VersionInfo.ProductVersion
+
+# Desinstal·lar manualment (per si es queda encallat)
+Get-Process | Where-Object { $_.ProcessName -like "*MediCar*" } | Stop-Process -Force
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Programs\MediCar Plus" -ErrorAction SilentlyContinue
+
+# Recuperar C:\medicarplus\electron\ des del servidor
+Invoke-WebRequest "https://project-helper-47.preview.emergentagent.com/downloads/medicar-plus-electron.zip" -OutFile "$env:TEMP\mp.zip"
+Expand-Archive -Force "$env:TEMP\mp.zip" -DestinationPath "C:\medicarplus\"
+
+# Sincronitzar sense fer release (només actualitzar fitxers)
+cd C:\medicarplus\electron
+npm run sync
+
+# Verificar que sync.js és nou (ha de retornar &gt; 4000)
+(Get-Item C:\medicarplus\electron\sync.js).Length
+
+# Verificar que package.json té oneClick: true
+Get-Content C:\medicarplus\electron\package.json | Select-String "oneClick"</code></pre>
+
+<h2>🔗 Enllaços útils</h2>
+<ul>
+<li><a href="https://github.com/Medicarplus/medicarplus-releases/releases" target="_blank">📦 GitHub Releases (versions publicades)</a></li>
+<li><a href="https://github.com/Medicarplus/medicarplus-releases/settings" target="_blank">⚙️ GitHub Repo Settings (fer públic/privat)</a></li>
+<li><a href="https://github.com/settings/personal-access-tokens" target="_blank">🔑 Regenerar GH_TOKEN</a></li>
+<li><a href="https://dashboard.stripe.com" target="_blank">💳 Stripe Dashboard</a></li>
+<li><a href="index-guies.html">📚 Índex de guies</a></li>
+</ul>
+
+<div class="box ok" style="margin-top:32px;text-align:center">
+<b>🎯 Recorda:</b> Una sola comanda <code>npm run release</code> ho fa tot. Auto-sync, auto-compile, auto-publish, auto-update per als clients.<br><br>
+<span style="color:var(--gold);font-size:16px;font-weight:700">Zero descàrregues manuals. Zero neteges. Zero problemes.</span>
+</div>
+
+</div>
+</body>
+</html>

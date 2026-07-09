@@ -1826,6 +1826,8 @@ function renderCemplaSplit(){
   $('#cemplaSplitBox').innerHTML=html;
 }
 const _origRender=render;render=function(){_origRender();renderCemplaSplit()};
+// Pre-carrega CFG (noms d'empresa configurats) abans del primer applyCompanyUI
+try{ window.CFG = JSON.parse(localStorage.getItem('caja.config.v1'))||{}; }catch(e){ window.CFG={}; }
 applyCompanyUI();setDate(currentDate);
 
 /* ============ AUDITORIA DE TASAS ============ */
@@ -2312,7 +2314,7 @@ function openSettingsModal(){
     try{
       const r=await window.appInfo.checkForUpdates();
       if(r&&r.status==='available'){
-        st.innerHTML='<span style="color:#22c55e;font-weight:700">'+T.updAvail+r.latestVersion+'</span><span style="color:#94a3b8">'+T.updDownloading+'</span>';
+        st.innerHTML='<div style="color:#22c55e;font-weight:700">'+T.updAvail+r.latestVersion+'</div><div id="updProgressWrap" style="margin-top:10px"><div style="background:#0f172a;border:1px solid #334155;border-radius:6px;height:18px;overflow:hidden;position:relative"><div id="updProgressBar" style="background:linear-gradient(90deg,#059669,#10b981);height:100%;width:0%;transition:width .3s"></div><div id="updProgressLabel" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5)">'+T.updDownloading.trim()+'...</div></div></div>';
       }else if(r&&r.status==='uptodate'){
         st.innerHTML='<span style="color:#22c55e;font-weight:700">'+T.upToDate+'</span>';
       }else{
@@ -2323,6 +2325,26 @@ function openSettingsModal(){
     }
     btn.disabled=false;btn.textContent=T.checkUpd;
   };
+
+  // Subscriu-se als events d'auto-update (només 1 cop per sessió)
+  if(isElec && !window.__updSubscribed && typeof window.appInfo.onUpdateEvent==='function'){
+    window.__updSubscribed=true;
+    window.appInfo.onUpdateEvent((p)=>{
+      const bar=document.getElementById('updProgressBar');
+      const lbl=document.getElementById('updProgressLabel');
+      const st=document.getElementById('setUpdStatus');
+      if(p.event==='progress' && bar && lbl){
+        bar.style.width=p.percent+'%';
+        const mb=(n)=>(n/1024/1024).toFixed(1);
+        const spd=p.bytesPerSecond?' · '+mb(p.bytesPerSecond)+' MB/s':'';
+        lbl.textContent=p.percent+'% ('+mb(p.transferred)+'/'+mb(p.total)+' MB)'+spd;
+      }else if(p.event==='downloaded' && st){
+        st.innerHTML='<span style="color:#22c55e;font-weight:700">✅ v'+p.version+' descarregada. Es reiniciarà en breu...</span>';
+      }else if(p.event==='error' && st){
+        st.innerHTML='<span style="color:#f97316">⚠️ Error: '+p.message+'</span>';
+      }
+    });
+  }
 
   // Obrir wizard d'empreses
   document.getElementById('setOpenWizard').onclick=()=>{back.remove();if(typeof showConfigWizard==='function')showConfigWizard(false)};
