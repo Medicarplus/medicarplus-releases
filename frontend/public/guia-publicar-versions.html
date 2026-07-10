@@ -2,7 +2,7 @@
 <html lang="ca">
 <head>
 <meta charset="utf-8">
-<title>🛡️ Publicació BULLETPROOF · MediCar Plus</title>
+<title>📕 Guia Publicar Versions · MediCar Plus</title>
 <style>
   body{font-family:system-ui,sans-serif;background:#0f1115;color:#e8ecf2;padding:40px;max-width:900px;margin:0 auto;line-height:1.6}
   h1{color:#3ddc97;margin:0 0 8px} h2{color:#5aa9ff;margin-top:32px;border-bottom:1px solid #262b36;padding-bottom:6px}
@@ -11,167 +11,128 @@
   .step{background:#171a21;border-left:4px solid #3ddc97;padding:16px 20px;margin:16px 0;border-radius:6px}
   .warn{background:#2a1a0f;border-left:4px solid #ff9d4a;padding:12px 16px;margin:12px 0;border-radius:4px}
   .ok{background:#0f2418;border-left:4px solid #3ddc97;padding:12px 16px;margin:12px 0;border-radius:4px}
-  .layer{background:#171a21;padding:12px 16px;margin:8px 0;border-radius:6px;border:1px solid #262b36}
-  .layer strong{color:#5fe6b0}
+  .big{font-size:24px;font-weight:700;color:#3ddc97;text-align:center;margin:24px 0}
   hr{border:0;border-top:1px solid #262b36;margin:24px 0}
-  .big{font-size:28px;font-weight:700;color:#3ddc97;text-align:center;margin:24px 0}
+  .num{background:#3ddc97;color:#0f1115;width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;margin-right:8px}
 </style>
 </head>
 <body>
-<h1>🛡️ Publicació BULLETPROOF de MediCar Plus</h1>
-<p style="color:#9aa3b2">Sistema de <strong>10 capes</strong> que garanteix que <strong>MAI</strong> es publiqui un <code>.exe</code> corrupte als clients, i que si passés, tinguis una <strong>palanca d'emergència remota</strong> per bloquejar-lo al moment.</p>
+<h1>📕 Guia per publicar una versió nova de MediCar Plus</h1>
+<p style="color:#9aa3b2">Actualitzada · Sistema simplificat · 2 comandes, tot automàtic.</p>
 
-<div class="big">👉 UNA SOLA COMANDA</div>
-<pre>cd C:\Users\...\medicarplus-electron
-powershell -File publish-safe.ps1</pre>
-<p style="text-align:center;color:#9aa3b2">Això fa TOT: sync → validate → bump → build → smoke → publish. Aborta a la primera cosa rara.</p>
+<div class="big">👉 LA COMANDA ÚNICA</div>
+<pre>cd C:\medicarplus\electron
+powershell -ExecutionPolicy Bypass -File .\publish-safe.ps1</pre>
+<p style="text-align:center;color:#9aa3b2">Res més. El script fa sol: sync → validate → bump → build → smoke → publish.</p>
 
-<div class="ok" style="text-align:center;font-size:16px">
-<strong>🆘 URGÈNCIA:</strong> si algun cop publiques una versió dolenta i vols aturar-la globalment,
-crea/edita <code>/app/backend/electron_channel.json</code> amb la versió al camp <code>blocked_versions</code>
-i tots els clients pararan de descarregar-la immediatament.</div>
-
-<h2>🧬 Les 7 capes de defensa</h2>
-
-<div class="layer"><strong>Capa 1 — Manifest servidor (SHA-256)</strong><br>
-El backend serveix <code>/api/electron/manifest</code> amb el hash SHA-256 i mida de cada fitxer font.
-Aquest és l'origen de veritat. <em>Sense això, no es descarrega res.</em></div>
-
-<div class="layer"><strong>Capa 2 — sync.js atòmic amb verificació SHA</strong><br>
-Baixa cada fitxer a <code>.sync-tmp/</code>, verifica SHA-256 contra el manifest, verifica signatures
-de contingut, i només llavors sobreescriu. Si algun falla, els fitxers locals no es toquen. Amb backup automàtic.</div>
-
-<div class="layer"><strong>Capa 3 — validate-local.js pre-build</strong><br>
-Abans d'obrir electron-builder, un script inspecciona els fitxers locals i verifica que
-continguin les strings crítiques (<code>MediCar Plus</code>, <code>Entradas del día</code>,
-<code>require('electron')</code>, <code>autoUpdater</code>, etc.). Si en falta una: <strong>abort exit 3</strong>.</div>
-
-<div class="layer"><strong>Capa 4 — Client-side crash guard</strong><br>
-Al top de <code>index.html</code> hi ha un boot-guard: si en 8 segons no s'ha renderitzat cap element clau,
-mostra una UI de recuperació al client dient-li que reinstal·li. <em>Cap client veurà mai una finestra en blanc.</em></div>
-
-<div class="layer"><strong>Capa 5 — smoke-test.js post-build</strong><br>
-Després de compilar el <code>.exe</code>, un altre script obre l'<code>app.asar</code> compilat
-i verifica que dins hi són les strings crítiques + que els installers tenen mida raonable (>30 MB).
-Si falla: <strong>no es publica.</strong></div>
-
-<div class="layer"><strong>Capa 6 — publish-safe.ps1 orquestrador</strong><br>
-Un únic script PowerShell que encadena tot amb ✅/❌ clars i <code>$ErrorActionPreference = "Stop"</code>.
-Impossible saltar-se cap pas.</div>
-
-<div class="layer"><strong>Capa 7 — Verificació post-release</strong><br>
-Consulta l'API de GitHub per confirmar que la release apareix realment amb la versió esperada
-(via <code>api.github.com/.../releases/latest</code>).</div>
-
-<div class="layer"><strong>Capa 8 — KILL SWITCH remot (control total)</strong><br>
-Endpoint <code>/api/electron/update-channel</code>. Els clients el consulten ABANS
-d'auto-actualitzar-se. Pots bloquejar QUALSEVOL versió des del servidor editant
-<code>/app/backend/electron_channel.json</code>:
-<pre>{
-  "latest_safe_version": "2.0.21",
-  "blocked_versions": ["2.0.19", "2.0.20"],
-  "message": "Actualitza a l'última versió"
-}</pre>
-Efecte immediat en tots els clients: no descarregaran versions bloquejades.</div>
-
-<div class="layer"><strong>Capa 9 — Main.js consulta el kill switch</strong><br>
-Al detectar una nova versió, el client Electron truca al servidor. Si el servidor diu
-"aquesta versió està bloquejada", cancel·la la descàrrega/instal·lació. <em>Palanca d'emergència
-sense necessitat de tocar res al client.</em></div>
-
-<div class="layer"><strong>Capa 10 — Boot guard + window.onerror global</strong><br>
-Dins <code>index.html</code>: si al arrencar (a) es llença qualsevol error JS o (b) no es renderitza
-cap element principal en 10 segons, mostra UI de recuperació amb enllaç a reinstalar.
-<em>Cap client veurà una finestra en blanc mai.</em></div>
-
-<h2>📋 Ús diari (procediment normal)</h2>
+<h2>🔧 Preparació (només un cop, ja fet)</h2>
 
 <div class="step">
-<strong>1) Fes els canvis al servidor (via mi, Emergent)</strong><br>
-Modifica <code>v2.html</code>, <code>main.js</code>, etc. Jo els copio a <code>/downloads/electron-src/</code>
-i el manifest s'actualitza sol amb els SHA-256 correctes.
+<span class="num">1</span><strong>Node.js instal·lat</strong> · Comprova: <code>node -v</code> ha de retornar ≥18
 </div>
 
 <div class="step">
-<strong>2) Obre PowerShell al directori local</strong>
-<pre>cd C:\Users\...\medicarplus-electron</pre>
+<span class="num">2</span><strong>GH_TOKEN configurat com a variable d'entorn permanent</strong><br>
+Es va fer amb <code>setx GH_TOKEN "ghp_..."</code> · Verifica:
+<pre>echo $env:GH_TOKEN</pre>
+Si un dia expira (dura 1 any), en generes un de nou a <a href="https://github.com/settings/tokens" style="color:#5aa9ff">github.com/settings/tokens</a> amb permisos <code>repo</code> + <code>workflow</code> i tornes a executar <code>setx GH_TOKEN "..."</code>.
 </div>
 
 <div class="step">
-<strong>3) Executa el publicador segur</strong>
-<pre>powershell -File publish-safe.ps1</pre>
+<span class="num">3</span><strong>Directori local</strong>: <code>C:\medicarplus\electron</code> amb els scripts <code>sync.js</code>, <code>validate-local.js</code>, <code>smoke-test.js</code>, <code>publish-safe.ps1</code>.
+</div>
+
+<h2>🚀 Publicació dia a dia</h2>
+
+<div class="step">
+<strong>1) Fem els canvis (al servidor, jo)</strong><br>
+Modifico <code>v2.html</code>, <code>main.js</code>, etc. Els copio automàticament a <code>/downloads/electron-src/</code>.
+</div>
+
+<div class="step">
+<strong>2) Tu obres PowerShell i executes:</strong>
+<pre>cd C:\medicarplus\electron
+powershell -ExecutionPolicy Bypass -File .\publish-safe.ps1</pre>
+
 Sortida esperada:
-<pre>===== 1/7 · SYNC amb manifest + SHA-256 =====
-   · manifest ... ✅ obtingut (5 fitxers)
-   · index.html ... ✅ verificat (313 KB, SHA OK)
-   · main.js ... ✅ verificat (9.6 KB, SHA OK)
-   ...
-===== 2/7 · VALIDATE fitxers locals =====
-   ✅ index.html — 3 marcadors OK
-   ...
-===== 3/7 · Bump de versió (patch) =====
-   ✅ versió: 2.0.21 → 2.0.22
-===== 4/7 · build (NSIS + Portable) =====
-   ✅ build compilada
-===== 5/7 · SMOKE TEST sobre el .exe =====
-   ✅ .exe verificat
-===== 6/7 · Publish a GitHub Releases =====
-   ✅ publicat a GitHub
-===== 7/7 · Verificació final release remota =====
-   ✅ release v2.0.22 visible a GitHub
+<pre>===== 1/5 · Sync fitxers font (obligatori tot OK) =====
+  index.html ... OK actualitzat (313.4 KB)
+  main.js ... OK actualitzat (11.9 KB)
+  ...
+  [OK] sync completat
 
-🎉 PUBLICAT AMB ÈXIT · v2.0.22</pre>
+===== 2/5 · Validate fitxers locals =====
+  index.html: OK (8 marcadors)
+  ...
+  [OK] fitxers verificats
+
+===== 3/5 · Bump versio i build =====
+  [i] versio: 2.0.26 -> 2.0.27
+  [OK] build compilada
+
+===== 4/5 · Smoke test sobre el .exe =====
+  ✅ MediCar Plus Setup 2.0.27.exe (79.0 MB)
+  ✅ MediCarPlus-Portable-2.0.27.exe (78.6 MB)
+  [OK] .exe verificat
+
+===== 5/5 · Publish a GitHub Releases =====
+  [OK] publicat a GitHub
+  [OK] release v2.0.27 visible a GitHub
+
+PUBLICAT AMB EXIT - v2.0.27
+Els clients rebran l auto-update en els propers minuts.</pre>
 </div>
 
-<h2>🚨 Què passa si alguna capa falla?</h2>
+<div class="step">
+<strong>3) Els clients reben l'auto-update en 5-30 min</strong><br>
+La propera vegada que obrin (o si tanquen i tornen a obrir), veuran la nova versió instal·lada.
+</div>
+
+<h2>🛡️ Sistema de seguretat integrat</h2>
+
+<p>El <code>publish-safe.ps1</code> té 5 punts d'aturada automàtica. <strong>Si algun falla, no publica res.</strong></p>
+
+<div class="ok"><strong>Pas 1 falla</strong> → sync no pot baixar el codi actualitzat del servidor · ATURA (mai barreges versions vella/nova).</div>
+<div class="ok"><strong>Pas 2 falla</strong> → algun fitxer local no té les marques esperades (ex: falta el botó SMS, un ID clau, etc.) · ATURA.</div>
+<div class="ok"><strong>Pas 3 falla</strong> → electron-builder no ha pogut compilar · ATURA (dist/ es queda net).</div>
+<div class="ok"><strong>Pas 4 falla</strong> → el <code>.exe</code> compilat no conté les marques esperades o és massa petit · ATURA (no arriba a GitHub).</div>
+<div class="ok"><strong>Pas 5 falla</strong> → error a l'upload de GitHub (per exemple, token expirat) · ATURA amb missatge clar.</div>
+
+<h2>🆘 Emergència — Kill Switch remot</h2>
+
+<p>Si algun dia arribés a publicar-se una versió dolenta (impossible amb el sistema, però per si de cas), es pot <strong>bloquejar globalment</strong> per a tots els clients editant al servidor el fitxer:</p>
+<pre>/app/backend/electron_channel.json</pre>
+<p>Contingut:</p>
+<pre>{
+  "latest_safe_version": "2.0.26",
+  "blocked_versions": ["2.0.27"],
+  "message": "Actualitza a la darrera versio estable"
+}</pre>
+<p>Els clients consulten aquest endpoint abans d'instal·lar cap update. Si la versió està a <code>blocked_versions</code>, no la descarreguen.</p>
+
+<h2>🔍 Resolució de problemes comuns</h2>
 
 <div class="warn">
-<strong>Capa 1 (manifest) falla</strong> → sync continua amb signatures de contingut (menys estricte però igual detecta HTML 404).
+<strong>"GH_TOKEN no esta configurat"</strong><br>
+Executa: <code>setx GH_TOKEN "ghp_..."</code> · Tanca PowerShell · Obre'n un de nou · Torna a executar publish-safe.ps1.
 </div>
+
 <div class="warn">
-<strong>Capa 2 (sync) falla per un fitxer</strong> → mantenim la còpia local d'aquell fitxer i seguim. La build continuarà <em>només</em> si el local és vàlid.
+<strong>"sync.js FAIL (HTTP 404)"</strong><br>
+Cloudflare pot fer una intermitència momentània. Espera 30s i torna a executar. El sistema té reintents automàtics.
 </div>
+
 <div class="warn">
-<strong>Capa 3 (validate) falla</strong> → <strong>ABORT total</strong>. Missatge dient exactament què falta. Solució: <code>npm run sync</code> i tornar a intentar.
+<strong>"validate-local.js FAIL: falta marcador X"</strong><br>
+Significa que el sync no ha portat tot el codi correctament. Executa <code>node sync.js</code> manualment per veure què falla, i torna a intentar-ho.
 </div>
+
 <div class="warn">
-<strong>Capa 5 (smoke) falla</strong> → <strong>ABORT abans de publish</strong>. El <code>.exe</code> no arriba mai a GitHub. Els clients no s'assabenten.
+<strong>Tinc dubtes sobre si una versió està publicada</strong><br>
+Visita: <a href="https://github.com/Medicarplus/medicarplus-releases/releases" style="color:#5aa9ff">github.com/Medicarplus/medicarplus-releases/releases</a>
 </div>
-<div class="warn">
-<strong>Client rep una versió corrupta miraculosament</strong> → Capa 4 (crash guard) mostra pantalla de recuperació amb enllaç a reinstalar. No finestres en blanc.
-</div>
-
-<h2>🛠️ Comandes útils individuals</h2>
-<pre># Només sync (verificar què faria)
-npm run sync
-
-# Només validar fitxers locals sense compilar
-npm run validate
-
-# Compilar amb validate + smoke (però SENSE publicar)
-npm run build
-
-# Compilar i publicar (assumeix que ja has sincronitzat)
-npm run publish
-
-# TOT en un (via PowerShell wrapper, RECOMANAT):
-powershell -File publish-safe.ps1</pre>
-
-<h2>🧪 Verificar manualment el manifest</h2>
-<p>Obre al navegador:</p>
-<pre>https://project-helper-47.preview.emergentagent.com/api/electron/manifest</pre>
-<p>Ha de retornar un JSON amb <code>server_ok: true</code> i els 5 fitxers amb el seu SHA.</p>
-
-<h2>❓ Recuperació d'emergència</h2>
-<p>Si tot es trenca i no confies gens dels fitxers locals:</p>
-<pre># Esborra tot i baixa manualment
-Remove-Item index.html, main.js, preload.js -ErrorAction SilentlyContinue
-Invoke-WebRequest -Uri "https://project-helper-47.preview.emergentagent.com/downloads/electron-src/index.html?t=$(Get-Random)" -OutFile "index.html"
-Invoke-WebRequest -Uri "https://project-helper-47.preview.emergentagent.com/downloads/electron-src/main.js?t=$(Get-Random)" -OutFile "main.js"
-Invoke-WebRequest -Uri "https://project-helper-47.preview.emergentagent.com/downloads/electron-src/preload.js?t=$(Get-Random)" -OutFile "preload.js"
-node validate-local.js</pre>
 
 <hr>
-<p style="color:#9aa3b2;text-align:center">MediCar Plus · Sistema bulletproof v2 · 2026</p>
+<p style="color:#9aa3b2;text-align:center">MediCar Plus · Marc Brugulat Lopez · 2026</p>
 </body>
 </html>
