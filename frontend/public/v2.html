@@ -2203,10 +2203,9 @@ function computeAudit(dateFrom,dateTo){
   });
 }
 $('#btnAudit').onclick=()=>{
-  // Default range: last 12 months (or all data if less)
+  // Default range: solo hoy (l'usuari amplia amb els botons Hoy/1 mes/etc.)
   const today=isoToday();
-  const d=new Date();d.setMonth(d.getMonth()-12);
-  const defFrom=d.toISOString().slice(0,10);
+  const defFrom=today;
   const back=document.createElement('div');back.className='modal-back';
   back.innerHTML=`<div class="modal" style="max-width:1100px;width:95%;max-height:90vh;display:flex;flex-direction:column">
     <h3 style="color:#f97316">🔎 Auditoría de tasas · Clientes repetidos en el rango</h3>
@@ -2217,6 +2216,7 @@ $('#btnAudit').onclick=()=>{
       <input type="date" id="auTo" value="${today}" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px" />
       <button class="btn" id="auReload">🔄 Buscar</button>
       <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn" data-preset="today" style="padding:6px 10px;font-size:11px">Hoy</button>
         <button class="btn" data-preset="1m" style="padding:6px 10px;font-size:11px">1 mes</button>
         <button class="btn" data-preset="3m" style="padding:6px 10px;font-size:11px">3 meses</button>
         <button class="btn" data-preset="6m" style="padding:6px 10px;font-size:11px">6 meses</button>
@@ -2243,7 +2243,8 @@ $('#btnAudit').onclick=()=>{
   back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
   const applyPreset=p=>{
     const t=isoToday();const dt=new Date();
-    if(p==='all'){const dates=Object.keys(state.byDate).sort();if(dates.length){back.querySelector('#auFrom').value=dates[0];back.querySelector('#auTo').value=t}}
+    if(p==='today'){back.querySelector('#auFrom').value=t;back.querySelector('#auTo').value=t}
+    else if(p==='all'){const dates=Object.keys(state.byDate).sort();if(dates.length){back.querySelector('#auFrom').value=dates[0];back.querySelector('#auTo').value=t}}
     else{const map={'1m':1,'3m':3,'6m':6,'12m':12};dt.setMonth(dt.getMonth()-map[p]);back.querySelector('#auFrom').value=dt.toISOString().slice(0,10);back.querySelector('#auTo').value=t}
     renderAudit();
   };
