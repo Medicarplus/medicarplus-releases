@@ -300,6 +300,10 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
       <div class="section-tag">Precios</div>
       <h2>Un plan pensado para cada tipo de centro</h2>
       <p class="section-sub">Prueba gratis 30 días. Sin tarjeta. Sin compromiso.</p>
+      <div class="billing-toggle" style="display:inline-flex;background:#1e293b;border:1px solid #334155;border-radius:999px;padding:4px;margin-top:20px;gap:2px" data-testid="billing-toggle">
+        <button type="button" id="billMonthly" class="bill-btn active" data-plan="monthly" style="background:#3ddc97;color:#0f172a;border:none;padding:8px 20px;border-radius:999px;cursor:pointer;font-weight:700;font-size:13px;transition:all .2s">Mensual</button>
+        <button type="button" id="billYearly" class="bill-btn" data-plan="yearly" style="background:transparent;color:#cbd5e1;border:none;padding:8px 20px;border-radius:999px;cursor:pointer;font-weight:700;font-size:13px;transition:all .2s">Anual <span style="background:#f5b301;color:#0f172a;padding:1px 6px;border-radius:4px;font-size:10px;margin-left:4px">-17%</span></button>
+      </div>
     </div>
     <div class="plans">
 
@@ -317,12 +321,12 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
         <a href="#contacto" class="btn btn-secondary">Solicitar prueba</a>
       </div>
 
-      <div class="plan featured">
-        <div class="plan-tag">⭐ Más popular</div>
+      <div class="plan" data-plan-std>
         <div class="plan-name">Standard</div>
         <div class="plan-desc">Para centros de reconocimientos médicos con volumen medio</div>
-        <div class="plan-price">29,90€<span class="plan-period">/mes</span></div>
-        <div class="plan-note">O 299,90€/año (2 meses gratis)</div>
+        <div class="plan-price"><span data-price-std-monthly>29,90€</span><span data-price-std-yearly style="display:none">299,90€</span><span class="plan-period" data-period>/mes</span></div>
+        <div class="plan-note" data-note-std-monthly>O 299,90€/año (ahorra 58,90€)</div>
+        <div class="plan-note" data-note-std-yearly style="display:none">Ahorras 58,90€ vs pago mensual</div>
         <ul class="plan-features">
           <li>Importación CSV DGT ilimitada</li>
           <li>Contabilidad completa</li>
@@ -332,14 +336,16 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
           <li>Actualizaciones incluidas</li>
           <li>Soporte por email</li>
         </ul>
-        <a href="#contacto" class="btn btn-primary">Contactar</a>
+        <a href="#contacto" class="btn btn-secondary">Contactar</a>
       </div>
 
-      <div class="plan">
+      <div class="plan featured" data-plan-prm>
+        <div class="plan-tag">⭐ Más popular</div>
         <div class="plan-name">Premium</div>
         <div class="plan-desc">Centros multi-especialidad con socios y campañas SMS</div>
-        <div class="plan-price">39,90€<span class="plan-period">/mes</span></div>
-        <div class="plan-note">O 399,90€/año</div>
+        <div class="plan-price"><span data-price-prm-monthly>39,90€</span><span data-price-prm-yearly style="display:none">399,90€</span><span class="plan-period" data-period>/mes</span></div>
+        <div class="plan-note" data-note-prm-monthly>O 399,90€/año (ahorra 78,90€)</div>
+        <div class="plan-note" data-note-prm-yearly style="display:none">Ahorras 78,90€ vs pago mensual</div>
         <ul class="plan-features">
           <li>Todo lo del Standard</li>
           <li><b>2 empresas</b> gestionadas</li>
@@ -349,12 +355,32 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
           <li>Auditoría avanzada</li>
           <li>Soporte prioritario</li>
         </ul>
-        <a href="#contacto" class="btn btn-secondary">Contactar</a>
+        <a href="#contacto" class="btn btn-primary">Contactar</a>
       </div>
 
     </div>
   </div>
 </section>
+<script>
+(function(){
+  const btnM=document.getElementById('billMonthly'),btnY=document.getElementById('billYearly');
+  if(!btnM||!btnY)return;
+  function apply(plan){
+    const isY=plan==='yearly';
+    // Botons
+    btnM.style.background=isY?'transparent':'#3ddc97';
+    btnM.style.color=isY?'#cbd5e1':'#0f172a';
+    btnY.style.background=isY?'#3ddc97':'transparent';
+    btnY.style.color=isY?'#0f172a':'#cbd5e1';
+    // Preus i notes
+    document.querySelectorAll('[data-price-std-monthly],[data-price-prm-monthly],[data-note-std-monthly],[data-note-prm-monthly]').forEach(e=>e.style.display=isY?'none':'');
+    document.querySelectorAll('[data-price-std-yearly],[data-price-prm-yearly],[data-note-std-yearly],[data-note-prm-yearly]').forEach(e=>e.style.display=isY?'':'none');
+    document.querySelectorAll('[data-period]').forEach(e=>e.textContent=isY?'/año':'/mes');
+  }
+  btnM.onclick=()=>apply('monthly');
+  btnY.onclick=()=>apply('yearly');
+})();
+</script>
 
 <!-- FAQ -->
 <section id="faq">
