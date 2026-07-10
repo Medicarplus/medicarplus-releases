@@ -2,12 +2,10 @@
 // ============================================================================
 // validate-local.js · Marc Brugulat Lopez · 2026
 // ----------------------------------------------------------------------------
-// Executat ABANS d'electron-builder. Inspecciona els fitxers locals i verifica
-// que continguin TOTES les strings crítiques esperades. Si en falta alguna
-// (per exemple, s'ha perdut el modal SMS o el modal de Configuració), ATURA
-// el procés de build amb exit code 3.
+// Verifica que els fitxers locals continguin les strings i IDs crítics ABANS
+// de compilar el .exe. Si en falta un → ATURA amb exit 3.
 //
-// Aquesta és l'última línia de defensa abans de compilar un .exe corrupte.
+// Aquesta és la darrera línia de defensa entre "sync ha acabat" i "compila".
 // ============================================================================
 
 const fs = require('fs');
@@ -15,78 +13,80 @@ const path = require('path');
 
 const dir = __dirname;
 
-// Fitxers requerits amb marcadors crítics. La build ATURA si en falta un.
+// Fitxers requerits i les strings/IDs que HAN de contenir.
+// Si en falta cap, la build s'atura per NO publicar una app trencada.
 const REQUIRED = {
   'index.html': [
-    { marker: '<!doctype html>', why: 'no és un HTML vàlid', ci: true },
-    { marker: 'MediCar Plus',    why: 'no és l\'app MediCar Plus' },
-    { marker: 'Entradas del día', why: 'falta la secció principal d\'entrades' },
+    '<!doctype html>',        // HTML vàlid
+    'MediCar Plus',           // Marca correcta
+    'Entradas del día',       // Secció principal
+    'id="appTitle"',          // Header renderitzat
+    'id="mainTabs"',          // Sistema de pestanyes
+    'id="btn-settings"',      // Botó Configuració
+    'id="btn-import-csv"',    // Botó Importar CSV
+    'id="btn-sms-new"',       // Botó SMS
   ],
   'main.js': [
-    { marker: "require('electron')", why: 'no és el main.js d\'Electron' },
-    { marker: 'BrowserWindow',       why: 'falta la creació de finestra' },
-    { marker: 'autoUpdater',         why: 'falta el sistema d\'auto-update' },
+    "require('electron')",
+    'BrowserWindow',
+    'autoUpdater',
+    'checkForUpdates',
   ],
   'preload.js': [
-    { marker: 'contextBridge',       why: 'no és un preload d\'Electron' },
+    'contextBridge',
   ],
   'package.json': [
-    { marker: '"medicar-plus"',      why: 'package.json no és el correcte' },
-    { marker: '"electron-updater"',  why: 'falta electron-updater a dependencies' },
+    '"medicar-plus"',
+    '"electron-updater"',
+    '"electron-builder"',
   ],
 };
 
 let hasError = false;
-console.log('🔎 Validant fitxers locals abans de compilar...');
+console.log('Validant fitxers locals abans de compilar...');
 
-for (const [file, checks] of Object.entries(REQUIRED)) {
+for (const [file, markers] of Object.entries(REQUIRED)) {
   const p = path.join(dir, file);
   if (!fs.existsSync(p)) {
-    console.log(`   ❌ ${file} — NO EXISTEIX`);
+    console.log(`  ${file}: NO EXISTEIX`);
     hasError = true;
     continue;
   }
   const content = fs.readFileSync(p, 'utf8');
   if (content.length < 100) {
-    console.log(`   ❌ ${file} — fitxer sospitosament curt (${content.length}B)`);
+    console.log(`  ${file}: fitxer sospitosament curt (${content.length}B)`);
     hasError = true;
     continue;
   }
-  const missing = [];
-  for (const c of checks) {
-    const found = c.ci
-      ? new RegExp(c.marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(content)
-      : content.includes(c.marker);
-    if (!found) missing.push(c);
-  }
+  const missing = markers.filter(m => !content.includes(m));
   if (missing.length > 0) {
-    console.log(`   ❌ ${file}`);
-    for (const m of missing) console.log(`       · falta "${m.marker}" → ${m.why}`);
+    console.log(`  ${file}: FALTEN ${missing.length} marcador(s)`);
+    for (const m of missing) console.log(`    - "${m}"`);
     hasError = true;
   } else {
-    console.log(`   ✅ ${file} — ${checks.length} marcadors OK (${(content.length/1024).toFixed(1)} KB)`);
+    console.log(`  ${file}: OK (${markers.length} marcadors, ${(content.length / 1024).toFixed(1)} KB)`);
   }
 }
 
-// Verifica version bump-able
+// Validació addicional: la versió del package.json ha de ser semver
 try {
   const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
   if (!/^\d+\.\d+\.\d+$/.test(pkg.version)) {
-    console.log(`   ❌ package.json — versió invàlida: "${pkg.version}"`);
+    console.log(`  package.json: versió no vàlida "${pkg.version}"`);
     hasError = true;
   } else {
-    console.log(`   ✅ package.json version: ${pkg.version}`);
+    console.log(`  package.json: version ${pkg.version} OK`);
   }
 } catch (e) {
-  console.log(`   ❌ package.json — no parsejable: ${e.message}`);
+  console.log(`  package.json: no parsejable (${e.message})`);
   hasError = true;
 }
 
 if (hasError) {
-  console.log('\n🚫 VALIDACIÓ FALLIDA — la build s\'ha aturat per NO publicar un .exe corrupte.');
-  console.log('👉 Executa `npm run sync` per recuperar els fitxers correctes del servidor.');
+  console.log('\nVALIDACIO FALLIDA — no compilem per no publicar una versio trencada.');
+  console.log('Executa "npm run sync" per baixar les versions correctes.');
   process.exit(3);
 }
 
-console.log('\n✅ Tots els fitxers locals són vàlids — safe to build');
+console.log('\nTots els fitxers son valids — safe to build.');
 process.exit(0);

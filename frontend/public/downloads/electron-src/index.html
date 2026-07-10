@@ -7,68 +7,6 @@
 <meta http-equiv="Expires" content="0" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>MediCar Plus</title>
-<script>
-// ============================================================================
-// BULLETPROOF CLIENT · Boot guard + error catcher
-// Marc Brugulat Lopez · 2026
-// Si l'app crasha o NO renderitza, mostrem UI de recuperació en lloc de
-// finestra en blanc. El client MAI veurà una app que no respon.
-// ============================================================================
-(function(){
-  var recovered = false;
-  function bootHealthy(){
-    // L'app està sana si:
-    //   (a) existeix qualsevol dels elements principals reals, o
-    //   (b) hi ha més de 15 nodes visibles al body (l'app renderitza molt)
-    var realProbes = ['#appTitle', '#appVersion', '#mainTabs', '#btn-settings', '#btnAccounting', '#btn-import-csv'];
-    for (var i = 0; i < realProbes.length; i++) {
-      if (document.querySelector(realProbes[i])) return true;
-    }
-    if (document.body && document.body.getElementsByTagName('*').length > 30) return true;
-    return false;
-  }
-  function showRecovery(reason){
-    if (recovered) return;
-    // Si de cop resulta que l'app s'ha carregat mentrestant, no la trenquem
-    if (bootHealthy()) return;
-    recovered = true;
-    try {
-      document.body.innerHTML = '<div style="font-family:system-ui,sans-serif;background:#0f1115;color:#e8ecf2;padding:40px;min-height:100vh">'
-        + '<h1 style="color:#ff5d6c;margin:0 0 12px">⚠️ MediCar Plus s\'ha aturat</h1>'
-        + '<p style="color:#9aa3b2;font-size:15px">Aquesta versió ha detectat un problema en carregar-se. <strong>Les teves dades estan segures.</strong></p>'
-        + '<div style="background:#171a21;padding:16px;border-radius:8px;margin:20px 0;font-family:monospace;font-size:12px;color:#ff9d4a">Motiu: ' + reason + '</div>'
-        + '<h3 style="color:#5aa9ff;margin-top:24px">Com resoldre-ho:</h3>'
-        + '<ol style="line-height:1.9;font-size:15px">'
-        + '<li>Tanca aquesta finestra.</li>'
-        + '<li>Descarrega l\'última versió des de <a href="https://medicarplus.es" target="_blank" style="color:#5aa9ff">medicarplus.es</a></li>'
-        + '<li>Executa l\'instal·lador. Les teves dades locals no es tocaran.</li>'
-        + '<li>Si el problema persisteix, escriu a <a href="mailto:info@medicarplus.es" style="color:#5aa9ff">info@medicarplus.es</a> amb aquesta captura.</li>'
-        + '</ol></div>';
-    } catch(e){}
-  }
-  // Captura errors JS globals — només mostrem recovery si passen ABANS que l'app carregui
-  window.addEventListener('error', function(e){
-    console.error('Global error:', e.message);
-    setTimeout(function(){
-      if (!bootHealthy()) showRecovery('Error JavaScript: ' + (e.message || 'desconegut'));
-    }, 3000);
-  });
-  window.addEventListener('unhandledrejection', function(e){
-    console.error('Unhandled promise rejection:', e.reason);
-  });
-  // Boot guard: si en 15s (temps generós) no s'ha renderitzat res clau, mostrem UI de recuperació
-  window.__mcpBootGuard = setTimeout(function(){
-    if (!bootHealthy()) showRecovery('L\'app no ha respost en 15 segons.');
-  }, 15000);
-  // També comprovem a cada segon: si el boot esdevé sà, cancel·lem el guard
-  var healthPoll = setInterval(function(){
-    if (bootHealthy()) {
-      clearTimeout(window.__mcpBootGuard);
-      clearInterval(healthPoll);
-    }
-  }, 500);
-})();
-</script>
 <style>
   :root{--bg:#0f1115;--panel:#171a21;--panel-2:#1d212b;--line:#262b36;--text:#e8ecf2;--muted:#9aa3b2;--accent:#3ddc97;--accent-2:#5fe6b0;--green:#3ddc97;--red:#ff5d6c;--blue:#5aa9ff;--chip:#2a3040;--tint:61,220,151}
   *{box-sizing:border-box}
