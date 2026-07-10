@@ -308,6 +308,16 @@
       </div>
       <div class="panel">
         <h2 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span data-i18n="entries_of_day">Entradas del día</span> <span style="display:inline-flex;gap:8px;align-items:center;margin-left:auto"><button class="btn btn-primary no-print" id="btnImport" data-i18n="import_csv" data-testid="btn-import-csv">📥 Importar CSV / Excel</button><button class="btn btn-danger no-print" id="btnClearDay" data-i18n="clear_day">🗑️ Vaciar día</button></span></h2>
+        <div id="entryFilters" class="no-print" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 10px;background:#171a21;border:1px solid #262b36;border-radius:8px;margin-bottom:8px;font-size:12px">
+          <span style="color:#7a8394;font-weight:600">🔎 Filtro:</span>
+          <div id="filterChips" style="display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:200px"></div>
+          <span style="color:#7a8394;margin-left:8px">Rango:</span>
+          <input type="date" id="filterFrom" title="Desde" style="background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 6px;font-size:11px" />
+          <input type="date" id="filterTo" title="Hasta" style="background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 6px;font-size:11px" />
+          <button id="filterApply" class="btn" style="padding:4px 10px;font-size:11px" title="Aplicar filtro por rango">Aplicar</button>
+          <button id="filterReset" class="btn" style="padding:4px 10px;font-size:11px;background:#2a3040" title="Volver al día actual">Solo hoy</button>
+          <span id="filterInfo" style="color:#7ee3aa;font-size:11px;margin-left:auto"></span>
+        </div>
         <div style="max-height:62vh;overflow:auto">
           <table id="tbl"><thead><tr><th>#</th><th data-i18n="type">Tipo</th><th data-i18n="group">Grupo</th><th data-i18n="name_concept">Nombre / Concepto</th><th class="num" data-i18n="amount_short">Importe</th><th class="num" data-i18n="disc">Dto</th><th class="num" data-i18n="fee_short">Tasa</th><th>FP</th><th data-i18n="fp_fee">FP Tasa</th><th class="num act" data-i18n="actions">Acciones</th></tr></thead><tbody id="tbody"></tbody></table>
           <div class="empty" id="empty" data-i18n="empty_entries">No hay entradas. Importa CSV/Excel o añade manualmente arriba.</div>
@@ -700,13 +710,84 @@ function importTrafficRows(rows){if(!rows.length){toast('Archivo vacío');return
   const data=rows.slice(1);const grouped={};let total=0,dates=new Set();
   // Normaliza FP: si el valor viene entero como "EFECTIVO"/"TARJETA"/"BIZUM"/"TRANSFERENCIA", extrae primera letra correcta
   const normFp=v=>{const s=String(v||'').trim().toUpperCase();if(!s)return 'E';if(/^TAR/.test(s)||s==='T')return 'T';if(/^BIZ/.test(s)||s==='B')return 'B';if(/^TRA/.test(s)||s==='X')return 'X';if(/^EFE/.test(s)||s==='E')return 'E';return s[0]||'E'};
-  data.forEach(r=>{const fechaRaw=String(r[iFecha]||'').trim();if(!fechaRaw)return;const m=fechaRaw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);if(!m)return;let[_,d,mo,y]=m;if(y.length===2)y='20'+y;const iso=`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;const nombre=[String(r[iAp1]||'').trim(),String(r[iAp2]||'').trim(),String(r[iNombre]||'').trim()].filter(Boolean).join(' ').replace(/\s+/g,' ').trim()||'(sin nombre)';const fpVal=iFp>=0?normFp(r[iFp]):'E';const fpTasaVal=iFpTasa>=0?normFp(r[iFpTasa]):fpVal;const e={id:uid(),kind:'TRAF',_csv:true,tipo:String(r[iTipo]||'').trim()||'Otro',grupo:String(r[iGrupo]||'').trim()||'-',nombre,importe:num(r[iImporte]),descuento:0,tasa:iTasas.length?iTasas.reduce((s,i)=>s+num(r[i]),0):0,fp:fpVal,fpTasa:fpTasaVal,retorno:false};if(e.importe===0&&e.tasa===0&&!nombre)return;(grouped[iso]||=[]).push(e);total++;dates.add(iso)});
+  data.forEach(r=>{const fechaRaw=String(r[iFecha]||'').trim();if(!fechaRaw)return;const m=fechaRaw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);if(!m)return;let[_,d,mo,y]=m;if(y.length===2)y='20'+y;const iso=`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;const nombre=[String(r[iNombre]||'').trim(),String(r[iAp1]||'').trim(),String(r[iAp2]||'').trim()].filter(Boolean).join(' ').replace(/\s+/g,' ').trim()||'(sin nombre)';const fpVal=iFp>=0?normFp(r[iFp]):'E';const fpTasaVal=iFpTasa>=0?normFp(r[iFpTasa]):fpVal;const e={id:uid(),kind:'TRAF',_csv:true,tipo:String(r[iTipo]||'').trim()||'Otro',grupo:String(r[iGrupo]||'').trim()||'-',nombre,importe:num(r[iImporte]),descuento:0,tasa:iTasas.length?iTasas.reduce((s,i)=>s+num(r[i]),0):0,fp:fpVal,fpTasa:fpTasaVal,retorno:false};if(e.importe===0&&e.tasa===0&&!nombre)return;(grouped[iso]||=[]).push(e);total++;dates.add(iso)});
   if(!total){toast('No se han encontrado filas válidas');return}
   let added=0,skipped=0;for(const[date,arr]of Object.entries(grouped)){const list=entriesOf(date);for(const e of arr){const dup=list.some(x=>x._csv&&x.nombre===e.nombre&&x.tipo===e.tipo&&x.importe===e.importe&&x.tasa===e.tasa);if(dup){skipped++;continue}list.push(e);added++}}
   saveState();const first=[...dates].sort()[0];if(first)setDate(first);else render();
   toast(`✅ Importado: ${added} entrada(s)${skipped?`, ${skipped} duplicada(s) ignorada(s)`:''}${detectMsg}`,3800)
 }
-function render(){$('#fecha').value=currentDate;const list=entriesOf(currentDate);$('#empty').style.display=list.length?'none':'block';const tb=$('#tbody');tb.innerHTML='';list.forEach((e,i)=>{const tr=document.createElement('tr');if(e.retorno)tr.className='retorno';const tipoTag=e.kind==='DH'?`<span class="tag ${e.tipo==='HABER'?'haber':'debe'}">${e.tipo}</span>`:`<span class="tag">${e.tipo||'-'}</span>`;tr.innerHTML=`<td>${i+1}</td><td>${tipoTag}</td><td>${e.grupo||'-'}</td><td>${escapeHtml(e.nombre)}</td><td class="num">${fmt(e.importe)}</td><td class="num">${e.descuento?fmt(e.descuento):'—'}</td><td class="num">${e.tasa?fmt(e.tasa):'—'}</td><td>${fpTag(e.fp,e.id,'fp')}</td><td>${e.tasa?fpTag(e.fpTasa,e.id,'fpTasa'):'—'}</td><td class="act"><div class="actions no-print"><button class="icon-btn" data-act="edit" data-id="${e.id}" title="Editar">✏️</button><button class="icon-btn" data-act="ret" data-id="${e.id}" title="Retorno / Reactivar">${e.retorno?'↩︎':'↺'}</button><button class="icon-btn" data-act="del" data-id="${e.id}" title="Eliminar">🗑️</button></div></td>`;tb.appendChild(tr)});tb.querySelectorAll('button').forEach(b=>b.onclick=()=>actEntry(b.dataset.act,b.dataset.id));tb.querySelectorAll('[data-fp-tag]').forEach(el=>{el.oncontextmenu=ev=>{ev.preventDefault();showFpMenu(ev.clientX,ev.clientY,el.dataset.fpTag,el.dataset.fpWhich)};el.onclick=ev=>{ev.preventDefault();showFpMenu(ev.clientX,ev.clientY,el.dataset.fpTag,el.dataset.fpWhich)}});renderSummary(list);renderByConcept(list);renderHistory();renderSaldoAnterior();wireOtrosDetail(list)}
+// Filtre d'entrades: tipus + rang de dates
+const entryFilter = { types: new Set(), from: null, to: null };
+function getFilteredEntries(){
+  // Determina el rang de dates
+  const from = entryFilter.from || currentDate;
+  const to = entryFilter.to || currentDate;
+  const inRange = (d)=> d>=from && d<=to;
+  const dates = Object.keys(state.byDate||{}).filter(inRange);
+  // Si no hi ha rang seleccionat, només currentDate
+  let all = [];
+  if(entryFilter.from || entryFilter.to){
+    dates.forEach(d=>{ (state.byDate[d]||[]).forEach(e=> all.push({...e, _date:d})); });
+  } else {
+    (state.byDate[currentDate]||[]).forEach(e=> all.push({...e, _date:currentDate}));
+  }
+  // Filtre per tipus
+  if(entryFilter.types.size > 0){
+    all = all.filter(e => entryFilter.types.has(String(e.tipo||'').toUpperCase()));
+  }
+  return all;
+}
+function renderFilterChips(){
+  const chipsEl = $('#filterChips'); if(!chipsEl) return;
+  // Obtenir tots els tipus únics del dia actual (o rang si està activat)
+  const src = (entryFilter.from||entryFilter.to)
+    ? Object.keys(state.byDate||{}).filter(d=>d>=(entryFilter.from||currentDate)&&d<=(entryFilter.to||currentDate)).flatMap(d=>state.byDate[d]||[])
+    : (state.byDate[currentDate]||[]);
+  const types = new Map();
+  src.forEach(e=>{ if(e.retorno||e.kind==='DH')return; const t=String(e.tipo||'').toUpperCase()||'?'; types.set(t,(types.get(t)||0)+1); });
+  const sorted = [...types.entries()].sort((a,b)=>b[1]-a[1]);
+  chipsEl.innerHTML = sorted.map(([t,c])=>{
+    const active = entryFilter.types.has(t);
+    return `<span data-chip="${t}" style="padding:3px 10px;border-radius:12px;cursor:pointer;background:${active?'#3ddc97':'#2a3040'};color:${active?'#0f1115':'#e2e8f0'};font-weight:${active?700:500};font-size:11px;user-select:none">${t} (${c})</span>`;
+  }).join('') + (sorted.length ? `<span data-chip="__ALL__" style="padding:3px 10px;border-radius:12px;cursor:pointer;background:transparent;color:#7a8394;font-size:11px;border:1px dashed #334155;user-select:none">Todos</span>` : '<span style="color:#7a8394">Sin entradas</span>');
+  chipsEl.querySelectorAll('[data-chip]').forEach(el=>{
+    el.onclick = ()=>{
+      const t = el.dataset.chip;
+      if(t==='__ALL__') entryFilter.types.clear();
+      else if(entryFilter.types.has(t)) entryFilter.types.delete(t);
+      else entryFilter.types.add(t);
+      render();
+    };
+  });
+  // Info a la dreta
+  const infoEl = $('#filterInfo');
+  if(infoEl){
+    const parts = [];
+    if(entryFilter.types.size>0) parts.push(`${entryFilter.types.size} tipo(s)`);
+    if(entryFilter.from||entryFilter.to){
+      const f = entryFilter.from||currentDate, tt = entryFilter.to||currentDate;
+      parts.push(`${f.split('-').reverse().join('/')} → ${tt.split('-').reverse().join('/')}`);
+    }
+    infoEl.textContent = parts.length ? '● '+parts.join(' · ') : '';
+  }
+}
+function wireFilterControls(){
+  const fFrom = $('#filterFrom'), fTo = $('#filterTo'), fApply=$('#filterApply'), fReset=$('#filterReset');
+  if(!fFrom) return;
+  if(entryFilter.from) fFrom.value = entryFilter.from; else fFrom.value = '';
+  if(entryFilter.to)   fTo.value   = entryFilter.to;   else fTo.value = '';
+  fApply.onclick = ()=>{
+    entryFilter.from = fFrom.value || null;
+    entryFilter.to   = fTo.value   || null;
+    render();
+  };
+  fReset.onclick = ()=>{
+    entryFilter.from = null; entryFilter.to = null; entryFilter.types.clear();
+    fFrom.value=''; fTo.value='';
+    render();
+  };
+}
+function render(){$('#fecha').value=currentDate;const list=entriesOf(currentDate);const shown = getFilteredEntries();$('#empty').style.display=shown.length?'none':'block';const tb=$('#tbody');tb.innerHTML='';shown.forEach((e,i)=>{const tr=document.createElement('tr');if(e.retorno)tr.className='retorno';const tipoTag=e.kind==='DH'?`<span class="tag ${e.tipo==='HABER'?'haber':'debe'}">${e.tipo}</span>`:`<span class="tag">${e.tipo||'-'}</span>`;const dateBadge=(entryFilter.from||entryFilter.to)&&e._date?`<span style="font-size:10px;color:#7a8394;margin-left:6px">${e._date.split('-').reverse().slice(0,2).join('/')}</span>`:'';tr.innerHTML=`<td>${i+1}</td><td>${tipoTag}${dateBadge}</td><td>${e.grupo||'-'}</td><td>${escapeHtml(e.nombre)}</td><td class="num">${fmt(e.importe)}</td><td class="num">${e.descuento?fmt(e.descuento):'—'}</td><td class="num">${e.tasa?fmt(e.tasa):'—'}</td><td>${fpTag(e.fp,e.id,'fp')}</td><td>${e.tasa?fpTag(e.fpTasa,e.id,'fpTasa'):'—'}</td><td class="act"><div class="actions no-print"><button class="icon-btn" data-act="edit" data-id="${e.id}" title="Editar">✏️</button><button class="icon-btn" data-act="ret" data-id="${e.id}" title="Retorno / Reactivar">${e.retorno?'↩︎':'↺'}</button><button class="icon-btn" data-act="del" data-id="${e.id}" title="Eliminar">🗑️</button></div></td>`;tb.appendChild(tr)});tb.querySelectorAll('button').forEach(b=>b.onclick=()=>actEntry(b.dataset.act,b.dataset.id));tb.querySelectorAll('[data-fp-tag]').forEach(el=>{el.oncontextmenu=ev=>{ev.preventDefault();showFpMenu(ev.clientX,ev.clientY,el.dataset.fpTag,el.dataset.fpWhich)};el.onclick=ev=>{ev.preventDefault();showFpMenu(ev.clientX,ev.clientY,el.dataset.fpTag,el.dataset.fpWhich)}});renderSummary(list);renderByConcept(list);renderHistory();renderSaldoAnterior();wireOtrosDetail(list);renderFilterChips();wireFilterControls()}
 function wireOtrosDetail(list){const row=document.querySelector('[data-otros-detail]');if(!row)return;row.onclick=()=>showOtrosDetail(list)}
 function showOtrosDetail(list){const otros=list.filter(e=>!e.retorno&&e.kind!=='DH'&&!isTramiteDGT(e));if(!otros.length){toast('No hay otros servicios');return}const back=document.createElement('div');back.className='modal-back';const rows=otros.map((e,i)=>`<tr><td style="padding:6px 8px">${i+1}</td><td style="padding:6px 8px"><span class="tag" style="font-size:10px">${e.tipo||'-'}</span></td><td style="padding:6px 8px">${escapeHtml(e.nombre)}</td><td class="num" style="padding:6px 8px">${fmt(e.importe)}</td><td class="num" style="padding:6px 8px">${e.tasa?fmt(e.tasa):'—'}</td><td style="padding:6px 8px;text-align:center"><span title="Forma de pago">${e.fp||'E'}</span></td></tr>`).join('');const total=otros.reduce((s,e)=>s+(e.importe-(e.descuento||0)),0);const tasas=otros.reduce((s,e)=>s+(e.tasa||0),0);back.innerHTML=`<div class="modal" style="max-width:720px;width:95%"><h3>📋 Otros servicios · Detalle (${otros.length})</h3><p style="color:#9aa3b2;font-size:12px;margin:-4px 0 12px">Estos son los servicios que <b>NO</b> vienen del CSV de la DGT (añadidos manualmente).</p><div style="max-height:400px;overflow:auto;border:1px solid #262b36;border-radius:6px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead style="background:#171a21;position:sticky;top:0"><tr><th style="padding:8px;text-align:left">#</th><th style="padding:8px;text-align:left">Tipo</th><th style="padding:8px;text-align:left">Nombre / Concepto</th><th style="padding:8px;text-align:right">Importe</th><th style="padding:8px;text-align:right">Tasa</th><th style="padding:8px;text-align:center">FP</th></tr></thead><tbody>${rows}</tbody><tfoot style="background:#171a21"><tr><td colspan="3" style="padding:8px;font-weight:700">TOTAL</td><td class="num" style="padding:8px;font-weight:700">${fmt(total)}</td><td class="num" style="padding:8px;font-weight:700">${fmt(tasas)}</td><td></td></tr></tfoot></table></div><div class="row" style="margin-top:14px"><button class="btn btn-primary" data-close>Cerrar</button></div></div>`;document.body.appendChild(back);back.addEventListener('click',ev=>{if(ev.target===back||ev.target.matches('[data-close]'))back.remove()});document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){back.remove();document.removeEventListener('keydown',esc)}})}
 function showFpMenu(x,y,id,which){document.querySelectorAll('.fp-menu').forEach(m=>m.remove());const list=entriesOf(currentDate);const e=list.find(x=>x.id===id);if(!e)return;const opts=[{k:'E',lbl:'💵 Efectivo',c:'#3ddc97'},{k:'T',lbl:'💳 Tarjeta → Banc',c:'#5aa9ff'},{k:'B',lbl:'📱 Bizum → Banc',c:'#f5b301'},{k:'X',lbl:'🏦 Transferència → Banc',c:'#a78bfa'}];const menu=document.createElement('div');menu.className='fp-menu';menu.style.cssText=`position:fixed;top:${y}px;left:${x}px;background:#1a1e26;border:1px solid #3a4050;border-radius:8px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.6);z-index:9999;min-width:200px`;menu.innerHTML=`<div style="padding:6px 10px;font-size:11px;color:#7a8394;border-bottom:1px solid #2a3040;margin-bottom:4px">Canviar mètode de pagament${which==='fpTasa'?' (tasa DGT)':''}</div>`+opts.map(o=>`<div data-k="${o.k}" style="padding:8px 12px;cursor:pointer;border-radius:5px;color:${o.c};font-weight:${e[which]===o.k?700:500};background:${e[which]===o.k?'rgba(255,255,255,.05)':'transparent'};display:flex;justify-content:space-between;align-items:center"><span>${o.lbl}</span>${e[which]===o.k?'<span style="font-size:12px">✓</span>':''}</div>`).join('');document.body.appendChild(menu);menu.querySelectorAll('[data-k]').forEach(row=>{row.onmouseenter=()=>row.style.background='rgba(255,255,255,.08)';row.onmouseleave=()=>row.style.background=e[which]===row.dataset.k?'rgba(255,255,255,.05)':'transparent';row.onclick=()=>{e[which]=row.dataset.k;saveState();render();toast('✓ Mètode de pagament actualitzat')}});setTimeout(()=>{document.addEventListener('click',function close(ev){if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('click',close)}})},50)}
