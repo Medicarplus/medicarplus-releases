@@ -19,6 +19,21 @@ if (-not (Test-Path "./package.json") -or -not (Test-Path "./sync.js")) {
   Fail "No trobo package.json o sync.js. Executa aquest script al directori d Electron."
 }
 
+# GH_TOKEN present? (necessari per pas 5 publish). Comprovem AVIAT
+# per no perdre 2 minuts compilant si el token no hi es.
+$hasToken = $false
+if ($env:GH_TOKEN) { $hasToken = $true }
+elseif ([Environment]::GetEnvironmentVariable('GH_TOKEN','User'))    { $hasToken = $true; $env:GH_TOKEN = [Environment]::GetEnvironmentVariable('GH_TOKEN','User') }
+elseif ([Environment]::GetEnvironmentVariable('GH_TOKEN','Machine')) { $hasToken = $true; $env:GH_TOKEN = [Environment]::GetEnvironmentVariable('GH_TOKEN','Machine') }
+elseif (Test-Path ".env") {
+  $line = (Get-Content .env | Where-Object { $_ -match '^GH_TOKEN=' })
+  if ($line) { $env:GH_TOKEN = $line -replace '^GH_TOKEN=',''; $hasToken = $true }
+}
+if (-not $hasToken) {
+  Fail "GH_TOKEN no esta configurat. Executa: setx GH_TOKEN `"ghp_...`" i obre un PowerShell nou."
+}
+Info ("GH_TOKEN detectat (" + $env:GH_TOKEN.Length + " chars)")
+
 # --- 1/5 SYNC ---
 # Baixa els fitxers font del servidor. Si ALGUN falla, aturem sense compilar.
 # Aixi mai publicarem una versio amb codi antic barrejat.
