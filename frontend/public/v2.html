@@ -592,8 +592,7 @@ function shiftDate(delta){const d=new Date(currentDate);d.setDate(d.getDate()+de
 $('#btnPrevDay').onclick=()=>shiftDate(-1);$('#btnNextDay').onclick=()=>shiftDate(1);$('#btnToday').onclick=()=>setDate(isoToday());$('#fecha').onchange=e=>setDate(e.target.value);
 $('#cTrafic').onclick=()=>switchCompany('trafic');
 $('#cCempla').onclick=()=>switchCompany('cempla');
-$('#cStats').onclick=()=>openStats();
-$('#cLibroReg').onclick=()=>openLibroRegistro();
+// Handlers de #cStats i #cLibroReg eliminats: ambdós accessos ara viuen dins de "Contabilidad ▼"
 
 // ============ ESTADÍSTIQUES AUTOESCOLES CEMPLA CB ============
 const STATS_KEY='caja.stats.v1';
@@ -1136,6 +1135,8 @@ $('#btnLedger').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLe
 $('#btnIrpf').onclick=()=>{$('#btnAccountingMenu').style.display='none';openIRPF()};
 $('#btnAnnualReport').onclick=()=>{$('#btnAccountingMenu').style.display='none';openAnnualReport()};
 $('#btnCambio').onclick=()=>{$('#btnAccountingMenu').style.display='none';openCambio()};
+$('#btnStatsMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';openStats()};
+$('#btnLibroRegMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLibroRegistro()};
 $('#btnAccountingToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnAccountingMenu');m.style.display=(m.style.display==='none'||!m.style.display)?'flex':'none'};
 document.addEventListener('click',(e)=>{const box=$('#btnAccounting');const menu=$('#btnAccountingMenu');if(menu&&box&&!box.contains(e.target))menu.style.display='none'});
 

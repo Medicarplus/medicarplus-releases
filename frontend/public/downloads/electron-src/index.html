@@ -173,8 +173,6 @@
   <div class="company-switch" data-testid="company-switch">
     <button id="cTrafic" class="active">🚗 <span data-cfg-name="1">Empresa 1</span></button>
     <button id="cCempla" class="cempla">🩺 <span data-cfg-name="2">Empresa 2</span></button>
-    <button id="cStats" style="color:#f5b301" data-i18n="stats">📊 ESTADÍSTIQUES</button>
-    <button id="cLibroReg" style="color:#7ec8ff" data-testid="btn-libro-registro">📖 LIBRO DE REGISTRO</button>
   </div>
   <div style="position:fixed;top:6px;right:12px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:1.5px;font-style:italic;opacity:0.95;z-index:9999;text-align:right;line-height:1.3;pointer-events:none;user-select:none">
     <div style="font-size:9px;font-weight:600;letter-spacing:1.5px;color:#94a3b8;text-transform:uppercase;opacity:.75">Powered by</div>
@@ -200,6 +198,8 @@
         <button class="btn" id="btnIrpf" style="background:#3a2a1f;border-color:#8b5e2a;color:#f0d6bf;font-weight:600;width:100%;text-align:left">📋 IRPF</button>
         <button class="btn" id="btnAnnualReport" style="background:#1e293b;border-color:#f5b301;color:#f5b301;font-weight:600;width:100%;text-align:left" data-i18n="annual_report">📊 Informe anual</button>
         <button class="btn" id="btnCambio" style="background:#1f3a2e;border-color:#22c55e;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-i18n="reserve" data-testid="btn-cambio">💰 Reserva de cambio</button>
+        <button class="btn" id="btnStatsMenu" style="background:#3a2a15;border-color:#f5b301;color:#f5b301;font-weight:600;width:100%;text-align:left">📊 Estadísticas</button>
+        <button class="btn" id="btnLibroRegMenu" style="background:#152a3a;border-color:#7ec8ff;color:#7ec8ff;font-weight:600;width:100%;text-align:left">📖 Libro de Registro</button>
       </div>
     </div>
     <button class="btn" id="btnSms" style="background:linear-gradient(90deg,#059669 0%,#10b981 100%);color:#fff;border-color:transparent;font-weight:700" title="Avisos SMS / WhatsApp de renovació">📱 Avisos</button>
@@ -592,8 +592,7 @@ function shiftDate(delta){const d=new Date(currentDate);d.setDate(d.getDate()+de
 $('#btnPrevDay').onclick=()=>shiftDate(-1);$('#btnNextDay').onclick=()=>shiftDate(1);$('#btnToday').onclick=()=>setDate(isoToday());$('#fecha').onchange=e=>setDate(e.target.value);
 $('#cTrafic').onclick=()=>switchCompany('trafic');
 $('#cCempla').onclick=()=>switchCompany('cempla');
-$('#cStats').onclick=()=>openStats();
-$('#cLibroReg').onclick=()=>openLibroRegistro();
+// Handlers de #cStats i #cLibroReg eliminats: ambdós accessos ara viuen dins de "Contabilidad ▼"
 
 // ============ ESTADÍSTIQUES AUTOESCOLES CEMPLA CB ============
 const STATS_KEY='caja.stats.v1';
@@ -1136,6 +1135,8 @@ $('#btnLedger').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLe
 $('#btnIrpf').onclick=()=>{$('#btnAccountingMenu').style.display='none';openIRPF()};
 $('#btnAnnualReport').onclick=()=>{$('#btnAccountingMenu').style.display='none';openAnnualReport()};
 $('#btnCambio').onclick=()=>{$('#btnAccountingMenu').style.display='none';openCambio()};
+$('#btnStatsMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';openStats()};
+$('#btnLibroRegMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLibroRegistro()};
 $('#btnAccountingToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnAccountingMenu');m.style.display=(m.style.display==='none'||!m.style.display)?'flex':'none'};
 document.addEventListener('click',(e)=>{const box=$('#btnAccounting');const menu=$('#btnAccountingMenu');if(menu&&box&&!box.contains(e.target))menu.style.display='none'});
 
