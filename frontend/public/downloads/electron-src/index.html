@@ -320,6 +320,7 @@
           <input type="date" id="filterTo" title="Hasta" style="background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 6px;font-size:11px" />
           <button id="filterApply" class="btn" style="padding:4px 10px;font-size:11px" title="Aplicar filtro por rango">Aplicar</button>
           <button id="filterReset" class="btn" style="padding:4px 10px;font-size:11px;background:#2a3040" title="Volver al día actual">Solo hoy</button>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;cursor:pointer;margin-left:8px;padding:4px 10px;background:#0e1117;border:1px solid #2a3040;border-radius:8px" title="Si está activo, las entradas con importe 0€ también se cuentan en el resumen"><input type="checkbox" id="chkCountZero" style="cursor:pointer;accent-color:#3ddc97" /> Contar 0€</label>
           <span id="filterInfo" style="color:#7ee3aa;font-size:11px;margin-left:auto"></span>
         </div>
         <div style="max-height:62vh;overflow:auto">
@@ -646,6 +647,7 @@ function openLibroRegistro(){
         <button class="btn" data-lr-preset="year" style="padding:6px 10px;font-size:11px">Año</button>
         <button class="btn" data-lr-preset="all" style="padding:6px 10px;font-size:11px">Todo</button>
       </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;cursor:pointer;padding:4px 10px;background:#0e1117;border:1px solid #2a3040;border-radius:8px" title="Incluir entradas con importe 0€ en los recuentos"><input type="checkbox" id="lrCountZero" style="cursor:pointer;accent-color:#3ddc97" /> Contar 0€</label>
       <button class="btn btn-primary" id="lrPrint">🖨️ Imprimir</button>
       <button class="btn" data-no>✕ Cerrar</button>
     </div>
@@ -677,6 +679,9 @@ function openLibroRegistro(){
         if(e.retorno)return;
         if(e.kind!=='TRAF')return;
         if(e._csv!==true)return;
+        // Filtre 0€: si el checkbox NO està activat, exclou entrades amb importe=0 i tasa=0
+        const subt=(e.importe||0)-(e.descuento||0)+(e.tasa||0);
+        if(subt<=0&&!getCountZero())return;
         filtered.push({...e,_date:d});
       });
     });
@@ -737,6 +742,7 @@ function openLibroRegistro(){
       </table>`;
   };
   renderLibro();
+  const chkZ=back.querySelector('#lrCountZero');if(chkZ){chkZ.checked=getCountZero();chkZ.onchange=()=>{setCountZero(chkZ.checked);renderLibro();}}
   back.querySelector('#lrFrom').onchange=renderLibro;
   back.querySelector('#lrTo').onchange=renderLibro;
   back.querySelector('#lrPrint').onclick=()=>{const w=window.open('','_blank');w.document.write(`<html><head><title>Libro de Registro</title><style>body{font-family:Arial,sans-serif;padding:20px}h1{text-align:center}table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}th,td{border:1px solid #333;padding:6px}th{background:#333;color:#fff}</style></head><body>${$('#lrBody').innerHTML}<script>setTimeout(()=>window.print(),400)<\/script></body></html>`);w.document.close()};
@@ -894,6 +900,14 @@ $('#btnImport').onclick=()=>$('#fileInput').click();
 $('#fileInput').onchange=async ev=>{const f=ev.target.files[0];if(!f)return;try{const name=(f.name||'').toLowerCase();const buf=await f.arrayBuffer();if(name.endsWith('.xlsx')||name.endsWith('.xls')){if(typeof XLSX==='undefined'){toast('❌ Lector Excel no disponible — usa CSV');return}const wb=XLSX.read(buf,{type:'array'});const sheet=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:false,defval:''});importTrafficRows(rows)}else{let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){text=new TextDecoder('windows-1252').decode(buf)}if(/Ã[©±¡³]/.test(text)){text=new TextDecoder('windows-1252').decode(buf)}const rows=parseCSV(text);importTrafficRows(rows)}}catch(err){toast('Error al importar: '+err.message,3500)}ev.target.value=''};
 function parseCSV(text){const out=[];let row=[],cell='',inQ=false;for(let i=0;i<text.length;i++){const c=text[i];if(inQ){if(c==='"'){if(text[i+1]==='"'){cell+='"';i++}else inQ=false}else cell+=c}else{if(c==='"')inQ=true;else if(c===';'){row.push(cell);cell=''}else if(c==='\n'){row.push(cell);out.push(row);row=[];cell=''}else if(c==='\r'){}else cell+=c}}if(cell.length||row.length){row.push(cell);out.push(row)}return out.filter(r=>r.some(x=>x&&x.trim()!==''))}
 function importTrafficRows(rows){if(!rows.length){toast('Archivo vacío');return}const header=rows[0].map(s=>String(s).trim().toUpperCase());const idx=name=>header.findIndex(h=>h===name||h.startsWith(name));const iFecha=idx('FECHA'),iNombre=idx('NOMBRE'),iAp1=idx('APELLIDO1'),iAp2=idx('APELLIDO2'),iTipo=idx('TIPO'),iGrupo=idx('GRUPO'),iImporte=idx('IMPORTE');
+  // Detecta la columna del sufix (Normal/Profesional) — busca CATEGORIA/CATEGORÍA/CLASE o
+  // examina si la columna immediatament posterior a TIPO té els valors esperats.
+  let iCateg=idx('CATEGORIA');if(iCateg<0)iCateg=idx('CATEGORÍA');if(iCateg<0)iCateg=idx('CLASE');
+  if(iCateg<0&&iTipo>=0&&rows.length>1){
+    const nextIdx=iTipo+1;
+    const sample=[];for(let i=1;i<Math.min(rows.length,20);i++){const v=String((rows[i]||[])[nextIdx]||'').trim().toLowerCase();if(v)sample.push(v)}
+    if(sample.some(v=>v.includes('profesion')||v==='normal'))iCateg=nextIdx;
+  }
   // Detectar TOTES les columnes de tasa (TASA, TASAS, TASA1, TASA2, TASA_TOTAL, TASA_COMPL, etc.)
   const iTasas=[];header.forEach((h,i)=>{if(/^TASA/.test(h))iTasas.push(i)});
   const iTasa=iTasas[0]||-1;// mantinc per compatibilitat
@@ -919,12 +933,15 @@ function importTrafficRows(rows){if(!rows.length){toast('Archivo vacío');return
   const data=rows.slice(1);const grouped={};let total=0,dates=new Set();
   // Normaliza FP: si el valor viene entero como "EFECTIVO"/"TARJETA"/"BIZUM"/"TRANSFERENCIA", extrae primera letra correcta
   const normFp=v=>{const s=String(v||'').trim().toUpperCase();if(!s)return 'E';if(/^TAR/.test(s)||s==='T')return 'T';if(/^BIZ/.test(s)||s==='B')return 'B';if(/^TRA/.test(s)||s==='X')return 'X';if(/^EFE/.test(s)||s==='E')return 'E';return s[0]||'E'};
-  data.forEach(r=>{const fechaRaw=String(r[iFecha]||'').trim();if(!fechaRaw)return;const m=fechaRaw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);if(!m)return;let[_,d,mo,y]=m;if(y.length===2)y='20'+y;const iso=`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;const nombre=[String(r[iNombre]||'').trim(),String(r[iAp1]||'').trim(),String(r[iAp2]||'').trim()].filter(Boolean).join(' ').replace(/\s+/g,' ').trim()||'(sin nombre)';const fpVal=iFp>=0?normFp(r[iFp]):'E';const fpTasaVal=iFpTasa>=0?normFp(r[iFpTasa]):fpVal;const e={id:uid(),kind:'TRAF',_csv:true,tipo:String(r[iTipo]||'').trim()||'Otro',grupo:String(r[iGrupo]||'').trim()||'-',nombre,importe:num(r[iImporte]),descuento:0,tasa:iTasas.length?iTasas.reduce((s,i)=>s+num(r[i]),0):0,fp:fpVal,fpTasa:fpTasaVal,retorno:false};if(e.importe===0&&e.tasa===0&&!nombre)return;(grouped[iso]||=[]).push(e);total++;dates.add(iso)});
+  data.forEach(r=>{const fechaRaw=String(r[iFecha]||'').trim();if(!fechaRaw)return;const m=fechaRaw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);if(!m)return;let[_,d,mo,y]=m;if(y.length===2)y='20'+y;const iso=`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;const nombre=[String(r[iNombre]||'').trim(),String(r[iAp1]||'').trim(),String(r[iAp2]||'').trim()].filter(Boolean).join(' ').replace(/\s+/g,' ').trim()||'(sin nombre)';const fpVal=iFp>=0?normFp(r[iFp]):'E';const fpTasaVal=iFpTasa>=0?normFp(r[iFpTasa]):fpVal;let tipoRaw=String(r[iTipo]||'').trim()||'Otro';if(iCateg>=0){const cat=String(r[iCateg]||'').trim();if(cat&&!tipoRaw.toLowerCase().includes(cat.toLowerCase()))tipoRaw=tipoRaw+', '+cat;}const e={id:uid(),kind:'TRAF',_csv:true,tipo:tipoRaw,grupo:String(r[iGrupo]||'').trim()||'-',nombre,importe:num(r[iImporte]),descuento:0,tasa:iTasas.length?iTasas.reduce((s,i)=>s+num(r[i]),0):0,fp:fpVal,fpTasa:fpTasaVal,retorno:false};if(e.importe===0&&e.tasa===0&&!nombre)return;(grouped[iso]||=[]).push(e);total++;dates.add(iso)});
   if(!total){toast('No se han encontrado filas válidas');return}
   let added=0,skipped=0;for(const[date,arr]of Object.entries(grouped)){const list=entriesOf(date);for(const e of arr){const dup=list.some(x=>x._csv&&x.nombre===e.nombre&&x.tipo===e.tipo&&x.importe===e.importe&&x.tasa===e.tasa);if(dup){skipped++;continue}list.push(e);added++}}
   saveState();const first=[...dates].sort()[0];if(first)setDate(first);else render();
   toast(`✅ Importado: ${added} entrada(s)${skipped?`, ${skipped} duplicada(s) ignorada(s)`:''}${detectMsg}`,3800)
 }
+// Helper: setting global "count zero" per computar 0€ com entrada o no (default: false)
+function getCountZero(){return localStorage.getItem('caja.count_zero')==='1'}
+function setCountZero(v){localStorage.setItem('caja.count_zero',v?'1':'0')}
 // Filtre d'entrades: tipus+grup + rang de dates
 const entryFilter = { types: new Set(), from: null, to: null };
 function _entryKey(e){
@@ -981,10 +998,11 @@ function renderFilterChips(){
   }
 }
 function wireFilterControls(){
-  const fFrom = $('#filterFrom'), fTo = $('#filterTo'), fApply=$('#filterApply'), fReset=$('#filterReset');
+  const fFrom = $('#filterFrom'), fTo = $('#filterTo'), fApply=$('#filterApply'), fReset=$('#filterReset'), fZero=$('#chkCountZero');
   if(!fFrom) return;
   if(entryFilter.from) fFrom.value = entryFilter.from; else fFrom.value = '';
   if(entryFilter.to)   fTo.value   = entryFilter.to;   else fTo.value = '';
+  if(fZero){fZero.checked=getCountZero();fZero.onchange=()=>{setCountZero(fZero.checked);render();toast(fZero.checked?'✅ Entradas 0€ ahora se cuentan':'ℹ️ Entradas 0€ no se cuentan',2500);}}
   fApply.onclick = ()=>{
     entryFilter.from = fFrom.value || null;
     entryFilter.to   = fTo.value   || null;
@@ -1018,7 +1036,7 @@ function isTramiteDGT(entry){
   return /RENOV|EXPED|CANJE|CANVI|RECUPER|OBTEN/.test(s);
 }
 function computeTotals(list){const t={bruto:0,dto:0,tasas:0,neto:0,byFp:{E:0,T:0,B:0,X:0},tasasByFp:{E:0,T:0,B:0,X:0},haber:0,debe:0,cnt:list.length,retornos:0,brutoDGT:0,tasasDGT:0,cntDGT:0,brutoOtros:0,cntOtros:0};list.forEach(e=>{if(e.retorno){t.retornos++;return}if(e.kind==='DH'){const fp=e.fp||'E';if(e.tipo==='HABER'){t.haber+=e.importe;t.byFp[fp]=(t.byFp[fp]||0)+e.importe;t.neto+=e.importe}else{t.debe+=e.importe;t.byFp[fp]=(t.byFp[fp]||0)-e.importe;t.neto-=e.importe}return}const subt=e.importe-(e.descuento||0);t.bruto+=e.importe;t.dto+=e.descuento||0;t.tasas+=e.tasa||0;const fp=e.fp||'E';t.byFp[fp]=(t.byFp[fp]||0)+subt;const fpt=e.fpTasa||fp;t.tasasByFp[fpt]=(t.tasasByFp[fpt]||0)+(e.tasa||0);t.neto+=subt+(e.tasa||0);// Comptem al comptador (cntDGT/cntOtros) només si l'entrada té import > 0 (les de 0€ són invisibles al resum però es guarden per traçabilitat).
-if(isTramiteDGT(e)){t.brutoDGT+=subt;t.tasasDGT+=(e.tasa||0);if(subt>0)t.cntDGT++}else{t.brutoOtros+=subt;if(subt>0)t.cntOtros++}});return t}
+if(isTramiteDGT(e)){t.brutoDGT+=subt;t.tasasDGT+=(e.tasa||0);if(subt>0||getCountZero())t.cntDGT++}else{t.brutoOtros+=subt;if(subt>0||getCountZero())t.cntOtros++}});return t}
 function dfKey(){return currentCompany==='cempla'?'caja.cempla.datafono':'caja.datafono'}
 function getDatafono(date){try{return (JSON.parse(localStorage.getItem(dfKey())||'{}'))[date]||0}catch(e){return 0}}
 function setDatafono(date,amount){const all=JSON.parse(localStorage.getItem(dfKey())||'{}');if(amount>0)all[date]=amount;else delete all[date];localStorage.setItem(dfKey(),JSON.stringify(all));pushSnapshot('auto');scheduleFileAutoSave()}
