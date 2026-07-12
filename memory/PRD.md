@@ -9,6 +9,9 @@ powershell -ExecutionPolicy Bypass -File .\publish-safe.ps1
 ```
 
 **Última versió publicada**: v2.0.26 (10/07/2026)
+**Pròxima versió (pendent de publicar per Marc)**: v2.0.27 amb:
+- 📊 Nova secció **Tráfico** dins Estadísticas · gràfics mensual/anual + taula desglossada per tipus + KPIs (importe, tasas)
+- 🎁 Modal **¿Novedades?** · auto-mostrat en actualitzar + accés manual des de *Contabilidad ▸ Novedades*
 
 ### Pipeline 5-passos (tot dins publish-safe.ps1):
 1. `sync.js` — Baixa fitxers font del servidor via `/api/electron/download/*` amb User-Agent Mozilla. Aborta si algun fitxer no passa signatures. **MAI barreja versions.**
@@ -75,6 +78,7 @@ Efecte immediat en tots els clients (main.js consulta abans d'auto-actualitzar).
 ## Pendents / Backlog
 
 ### P1 (properes tasques)
+- Publicar v2.0.27 (Marc): `powershell -ExecutionPolicy Bypass -File .\publish-safe.ps1`
 - Screenshots reals de l'app a `medicarplus.es`
 - Google Search Console per SEO
 - Verificar propagació DNS (ja hauria d'estar propagat)
@@ -105,3 +109,20 @@ Efecte immediat en tots els clients (main.js consulta abans d'auto-actualitzar).
 - **09/07**: `sync.js` corromplent builds → resolt amb signatures + exit 3 + endpoint /api/electron/download bypassant Cloudflare
 - **09/07**: Boot-guard mostrant "app aturada" en pantalla completa → ELIMINAT (selectors buggy)
 - **10/07**: GH_TOKEN perdut a nova sessió → documentat `setx` permanent
+
+## 📝 Nous features (11/07/2026)
+
+### 📊 Estadísticas · Sección Tráfico
+- Nou toggle dins del modal d'Estadísticas: **🚗 Autoescolas** (existing) / **🚦 Tráfico** (nou)
+- Agrega automàticament totes les entrades importades del CSV DGT (`kind:'TRAF' && _csv:true`) de `caja.v1`
+- **Vista anual**: gràfic de barres per mesos + gràfic per tipus + 4 KPIs (entrades, importes, tasas, total) + taula 12 mesos × [total, renov, exped, dupli, canje, otro, importe, tasas]
+- **Vista mensual**: gràfic diari + tipus + KPIs + taula per dia
+- Impressió separada per la secció Tráfico
+- Funció de test: `renderTrafficTable()` a v2.html línies ~800–990
+
+### 🎁 Modal ¿Novedades?
+- CHANGELOG in-app amb entrades semver (versió + data + highlights)
+- Auto-show quan `caja.last_seen_version` < versió actual (i no és primera instal·lació)
+- Accés manual: menú *Contabilidad ▸ 🎁 Novedades* (mostra les 3 més recents)
+- Botó "Entendido" tanca i actualitza `caja.last_seen_version`
+- Test IDs: `whats-new-modal`, `whats-new-ok`, `btn-whats-new`, `st-section-switch`, `traffic-stats-year`, `traffic-stats-month`
