@@ -346,7 +346,7 @@ export default function LandingPage() {
           >
             El programa <span style={{ color: C.gold }}>especializado</span>
             <br />
-            para <span style={{ color: C.gold }}>centros de reconocimiento</span>
+            para <span style={{ color: C.gold }}>centros médicos de reconocimientos para conductores</span>
           </h1>
           <p
             style={{
@@ -463,7 +463,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div style={{ marginTop: 14, color: C.gold, fontSize: 11 }}>
-              → 3 IMPORTACIONES DGT · 24 CERTIFICADOS · IRPF 15%
+              → 3 IMPORTACIONES DGT · 24 CERTIFICADOS
             </div>
           </div>
         </div>
