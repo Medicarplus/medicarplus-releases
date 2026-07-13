@@ -138,6 +138,11 @@
   /* Override per als inputs de data del Llibreta (fons clar, tema paper) */
   #ldFrom,#ldTo,#ldRefFrom,#ldRefTo{background:#fff !important;color:#1a1a1a !important;border:1px solid #8b6f47 !important;color-scheme:light}
   #ldFrom:focus,#ldTo:focus,#ldRefFrom:focus,#ldRefTo:focus{background:#fff !important;color:#1a1a1a !important;border-color:#5a3a1a !important;box-shadow:0 0 0 3px rgba(139,111,71,.2) !important}
+  /* Override per als inputs del modal IRPF (tema paper cremós) */
+  .irpf-modal input[type=text],.irpf-modal input[type=number],.irpf-modal input[type=date]{background:#fff !important;color:#1a1a1a !important;border:1px solid #d4a373 !important;color-scheme:light;padding:6px 8px !important;border-radius:4px !important}
+  .irpf-modal input[type=text]:focus,.irpf-modal input[type=number]:focus,.irpf-modal input[type=date]:focus{background:#fffef5 !important;color:#1a1a1a !important;border-color:#78350f !important;box-shadow:0 0 0 3px rgba(180,83,9,.25) !important}
+  .irpf-modal input[data-f="nom"]{color:#78350f !important;font-weight:700 !important;font-family:Georgia,serif !important}
+  .irpf-modal input:disabled{background:#f0e6d2 !important;color:#78350f !important;opacity:.55;cursor:not-allowed}
   /* Taula amb rows més "cards" */
   tbody tr{transition:background .15s ease,transform .15s ease}
   tbody tr:hover{background:linear-gradient(90deg,rgba(var(--tint),.08) 0%,rgba(var(--tint),.02) 100%);transform:translateX(2px)}
@@ -1941,7 +1946,7 @@ function openIRPF(){
   const compColor=(c)=>c==='cempla'?'#1e5aa8':'#166534';
   const compBg=(c)=>c==='cempla'?'#dbeafe':'#dcfce7';
   const monthLabel=ym=>{const [y,m]=ym.split('-');const names=['gen','feb','març','abr','maig','juny','jul','ago','set','oct','nov','des'];return `${names[parseInt(m)-1]}-${y.slice(2)}`};
-  back.innerHTML=`<div class="modal" style="max-width:1400px;width:98%;max-height:96vh;display:flex;flex-direction:column;padding:16px;background:#faf6e8;color:#1a1a1a">
+  back.innerHTML=`<div class="modal irpf-modal" style="max-width:1400px;width:98%;max-height:96vh;display:flex;flex-direction:column;padding:16px;background:#faf6e8;color:#1a1a1a">
     <div id="irpfTitleBar" style="padding:10px 14px;margin:-16px -16px 12px -16px;border-radius:12px 12px 0 0;background:${compBg(irpfComp)};border-bottom:3px solid ${compColor(irpfComp)};display:flex;align-items:center;gap:14px">
       <h3 style="margin:0;color:${compColor(irpfComp)};font-family:Georgia,serif;flex:1">📋 IRPF · Retencions trimestrals · <span id="irpfCompName">${compName(irpfComp)}</span></h3>
       <div style="display:flex;gap:6px;background:#fff;padding:4px;border-radius:8px;border:1px solid #999">
@@ -2071,7 +2076,10 @@ function openIRPF(){
         </tr>
         </tbody>
       </table>
-      <div style="margin:12px 0"><button class="btn" id="irpfAdd" style="background:#166534;color:#fff;border-color:#166534;padding:8px 16px;font-weight:700">+ Afegir persona</button></div>
+      <div style="margin:14px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn" id="irpfAdd" data-testid="irpf-add-person" style="background:#166534;color:#fff;border:none;padding:12px 22px;font-weight:700;font-size:14px;border-radius:8px;box-shadow:0 2px 6px rgba(22,101,52,.3);cursor:pointer">➕ Afegir persona</button>
+        <span style="color:#78350f;font-size:12px;font-style:italic">💡 Consell: prem <b>Tab</b> per saltar al següent camp · Escriu amb <b>coma</b> o <b>punt</b> (ex: 1500,50 o 1500.50)</span>
+      </div>
       <div style="background:#fff8e6;border:2px solid #b45309;border-radius:8px;padding:14px;margin-top:16px">
         <h3 style="margin:0 0 12px 0;color:#78350f;font-family:Georgia,serif">🗓️ Resum trimestral · ${q} ${qData.paid?'<span style="background:#166534;color:#fff;padding:3px 10px;border-radius:4px;font-size:12px;margin-left:8px">✓ INGRESSAT A HISENDA</span>':'<span style="background:#b45309;color:#fff;padding:3px 10px;border-radius:4px;font-size:12px;margin-left:8px">⏳ PENDENT</span>'}</h3>
         <table style="width:100%;border-collapse:collapse">
@@ -2110,11 +2118,79 @@ function openIRPF(){
     }
     back.querySelectorAll('[data-pct]').forEach(b=>b.onclick=(ev)=>{ev.preventDefault();setIrpfPct(irpfComp,b.dataset.pct);render()});
     back.querySelectorAll('input[data-i]').forEach(inp=>{
-      inp.oninput=()=>{const i=parseInt(inp.dataset.i),f=inp.dataset.f;const val=f==='nom'?inp.value:(f==='cert'?(parseInt(String(inp.value).replace(/[^0-9-]/g,''))||0):num(inp.value));const d2=loadIrpf();if(!d2[irpfComp].months[m])d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);d2[irpfComp].months[m].entries[i][f]=val;saveIrpf(d2)};
-      inp.onblur=()=>render();
+      inp.oninput=()=>{
+        const i=parseInt(inp.dataset.i),f=inp.dataset.f;
+        const val=f==='nom'?inp.value:(f==='cert'?(parseInt(String(inp.value).replace(/[^0-9-]/g,''))||0):num(inp.value));
+        const d2=loadIrpf();
+        if(!d2[irpfComp].months[m])d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);
+        d2[irpfComp].months[m].entries[i][f]=val;
+        saveIrpf(d2);
+        // Update calculated cells of this row live (no re-render, no focus loss)
+        const tr=inp.closest('tr');
+        if(tr){
+          const c=irpfCalc(d2[irpfComp].months[m].entries[i],pct);
+          const cells=tr.querySelectorAll('td');
+          // cells[4]=TOTAL, [5]=IRPF, [6]=NET, [8]=TOTAL FINAL
+          if(cells[4])cells[4].textContent=c.hasSs?fmt(c.total):'—';
+          if(cells[5])cells[5].textContent=fmt(c.irpf);
+          if(cells[6])cells[6].textContent=fmt(c.net);
+          if(cells[8])cells[8].textContent=c.hasSs?fmt(c.totalFinal):'—';
+          // Toggle netSS input enabled state
+          const netSsInp=tr.querySelector('input[data-f="netSS"]');
+          if(netSsInp){
+            netSsInp.disabled=!c.hasSs;
+            netSsInp.style.background=c.hasSs?'#fff':'#f0e6d2';
+            netSsInp.style.opacity=c.hasSs?'1':'.55';
+            netSsInp.style.cursor=c.hasSs?'text':'not-allowed';
+            netSsInp.placeholder=c.hasSs?'0,00':'—';
+          }
+        }
+        // Update TOTALS MES row live
+        updateTotalsRow();
+      };
+      // Tab/Enter → next input
+      inp.onkeydown=(ev)=>{
+        if(ev.key==='Enter'){ev.preventDefault();const inputs=[...back.querySelectorAll('input[data-i]:not([disabled])')];const idx=inputs.indexOf(inp);if(idx>=0&&idx<inputs.length-1)inputs[idx+1].focus()}
+      };
     });
-    back.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const i=parseInt(b.dataset.del);const d2=loadIrpf();d2[irpfComp].months[m].entries.splice(i,1);saveIrpf(d2);render()});
-    back.querySelector('#irpfAdd').onclick=()=>{const d2=loadIrpf();if(!d2[irpfComp].months[m])d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);d2[irpfComp].months[m].entries.push({nom:'',cert:0,brut:0,ss:0,netSS:0});saveIrpf(d2);render()};
+    // Helper: update TOTALS MES row after inline edit
+    function updateTotalsRow(){
+      const d2=loadIrpf();
+      const md2=d2[irpfComp].months[m]||{entries:[]};
+      const t=(md2.entries||[]).reduce((a,e)=>{const c=irpfCalc(e,pct);a.brut+=Number(e.brut)||0;a.ss+=Number(e.ss)||0;if(c.hasSs){a.total+=c.total;a.netSS+=c.netSS;a.totalFinal+=c.totalFinal}a.irpf+=c.irpf;a.net+=c.net;return a},{brut:0,ss:0,total:0,irpf:0,net:0,netSS:0,totalFinal:0});
+      const totRow=back.querySelector('#irpfBody table tbody tr:last-child');
+      if(totRow){
+        const tds=totRow.querySelectorAll('td');
+        // tds: [colspan=2][BRUT][SS][TOTAL][IRPF][NET][NETSS][TOTALFINAL][blank]
+        if(tds[1])tds[1].textContent=fmt(t.brut);
+        if(tds[2])tds[2].textContent=fmt(t.ss);
+        if(tds[3])tds[3].textContent=fmt(t.total);
+        if(tds[4])tds[4].textContent=fmt(t.irpf);
+        if(tds[5])tds[5].textContent=fmt(t.net);
+        if(tds[6])tds[6].textContent=fmt(t.netSS);
+        if(tds[7])tds[7].textContent=fmt(t.totalFinal);
+      }
+    }
+    back.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
+      const i=parseInt(b.dataset.del);
+      const d2=loadIrpf();
+      const nom=(d2[irpfComp].months[m]&&d2[irpfComp].months[m].entries[i]&&d2[irpfComp].months[m].entries[i].nom)||'(sense nom)';
+      confirmModal('Eliminar persona',`Segur que vols eliminar <b>${escapeHtml(nom)}</b> del mes actual?<br><br>Aquesta acció no afecta els altres mesos.`,()=>{
+        const d3=loadIrpf();d3[irpfComp].months[m].entries.splice(i,1);saveIrpf(d3);render();
+      },'Sí, eliminar');
+    });
+    back.querySelector('#irpfAdd').onclick=()=>{
+      const d2=loadIrpf();
+      if(!d2[irpfComp].months[m])d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);
+      d2[irpfComp].months[m].entries.push({nom:'',cert:0,brut:0,ss:0,netSS:0});
+      saveIrpf(d2);
+      render();
+      // Auto-focus the NOM input of the new row
+      setTimeout(()=>{
+        const inputs=back.querySelectorAll('input[data-f="nom"]');
+        if(inputs.length)inputs[inputs.length-1].focus();
+      },50);
+    };
     back.querySelector('#irpfTC').oninput=(ev)=>{const d2=loadIrpf();if(!d2[irpfComp].months[m])d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);d2[irpfComp].months[m].totalCertificats=parseInt(String(ev.target.value).replace(/[^0-9-]/g,''))||0;saveIrpf(d2)};
     back.querySelector('#irpfTCB').oninput=(ev)=>{const d2=loadIrpf();if(!d2[irpfComp].months[m])d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);d2[irpfComp].months[m].totalCertfBombers=parseInt(String(ev.target.value).replace(/[^0-9-]/g,''))||0;saveIrpf(d2)};
     const payBtn=back.querySelector('#irpfPay');if(payBtn)payBtn.onclick=()=>{
@@ -4038,6 +4114,12 @@ const LAST_SEEN_VERSION_KEY = 'caja.last_seen_version';
 // IMPORTANT: L'ordre importa. La primera entrada ha de ser la MÉS RECENT.
 // Cada versió té: { version, date (dd/mm/aaaa), highlights (array de strings HTML curts) }
 const CHANGELOG = [
+  { version:'2.0.28', date:'13/07/2026', highlights:[
+    '📋 <b>IRPF · Interfície millorada</b>: camps ara amb fons blanc llegible (adéu al bug dels quadres negres).',
+    '⌨️ <b>Escriu amb coma o punt</b> indistintament (ex: <code>1500,50</code> o <code>1500.50</code>) · càlculs actualitzats en viu mentre escrius.',
+    '🎯 <b>Auto-focus</b> al nou nom quan afegeixes una persona · confirmació abans d\'eliminar (evita pèrdues accidentals).',
+    '🌐 Landing <i>medicarplus.es</i>: banderes España + Catalunya en SVG, captures reals del programa al clicar cada característica.',
+  ]},
   { version:'2.0.27', date:'11/07/2026', highlights:[
     '📊 <b>Estadísticas · Sección Tráfico</b>: nueva vista con gráfico y tabla mensual/anual de todas las entradas de Tráfico (importes, tasas y desglose por tipo).',
     '🎁 <b>Modal de Novedades</b>: cada vez que actualices la app verás automáticamente qué hemos mejorado. También accesible desde <i>Contabilidad ▸ Novedades</i>.',
