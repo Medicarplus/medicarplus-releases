@@ -337,6 +337,17 @@ def build_router(db):
             ]
         return doc
 
+    @router.delete("/campaigns/{campaign_id}")
+    async def delete_campaign(
+        campaign_id: str,
+        x_admin_token: Optional[str] = Header(None),
+    ):
+        _admin(x_admin_token)
+        res = await db.sms_campaigns.delete_one({"_id": campaign_id})
+        if res.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="not found")
+        return {"ok": True, "deleted_id": campaign_id}
+
     @router.get("/stats")
     async def stats(x_admin_token: Optional[str] = Header(None)):
         _admin(x_admin_token)

@@ -626,8 +626,23 @@ function saveStats(s){localStorage.setItem(STATS_KEY,JSON.stringify(s));pushSnap
 // LIBRO DE REGISTRO · Llegeix les entrades del CSV DGT ja importades a Tráfico
 // Agrupa per Tipo · Grupo + secció especial Profesionales/Normales
 // ============================================================================
-const CARNETS_PROFESIONALES=['D+E','D1+E','D','C+E','C1+E','C','C1'];
-const CARNETS_NORMALES=['B+E','B','B1','A','A2','A1','AM'];
+const CARNETS_PROFESIONALES=['C','C1','D','D1','C+E','C1+E','D+E','D1+E'];
+const CARNETS_NORMALES=['B+E','B','B1','A','A2','A1','AM','BTP'];
+// Un carnet es PROFESIONAL si:
+//   (a) la columna Categoría del CSV DGT conté "Profesional" (queda annexat al tipo), o
+//   (b) el sufix del tipo (part després de la coma) coincideix EXACTAMENT amb una classe pro (C, C1, D, D1, C+E, C1+E, D+E, D1+E).
+// Es fa split per comes i comparació de token exacte per evitar el bug històric on "Renovación" (conté 'C')
+// es marcava com professional. "Renovación, B" o "Renovación, BTP" es queden com Normal.
+function _esCarnetProfesional(tipo){
+  const parts = String(tipo||'').split(',').map(s => s.trim());
+  for(const p of parts){
+    if(!p) continue;
+    if(p.toLowerCase().includes('profesion')) return true;
+    const norm = p.toUpperCase().replace(/\s+/g,'');
+    if(CARNETS_PROFESIONALES.includes(norm)) return true;
+  }
+  return false;
+}
 function isoTodayLR(){return new Date().toISOString().slice(0,10)}
 function openLibroRegistro(){
   const today=isoTodayLR();
@@ -1192,7 +1207,7 @@ function openStats(){
         const inv = c.filtered_invalid ?? c.invalid ?? 0;
         const nm = String(c.name || '—').replace(/</g, '&lt;');
         const mode = c.twilio_used ? '<span style="background:#1e40af;color:#fff;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:800">REAL</span>' : '<span style="background:#4c1d95;color:#fff;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:800">MOCK</span>';
-        return `<tr class="st-sms-row" data-testid="st-sms-row" data-id="${c.id}" style="border-bottom:1px solid #2a3040;cursor:pointer;transition:background .15s"><td style="padding:9px 12px;font-size:12px;color:#e2e8f0;font-weight:600">${nm}</td><td style="padding:9px 12px;font-size:11px;color:#94a3b8">${dt} ${mode}</td><td style="padding:9px 12px;text-align:right;font-weight:700;color:#22c55e">${sent}</td><td style="padding:9px 12px;text-align:right;font-weight:700;color:#ef4444">${err}</td><td style="padding:9px 12px;text-align:right;font-weight:600;color:#94a3b8">${inv}</td><td style="padding:9px 12px;text-align:right"><span style="color:#7ec8ff;font-size:11px">👁️ Ver e imprimir</span></td></tr>`;
+        return `<tr class="st-sms-row" data-testid="st-sms-row" data-id="${c.id}" style="border-bottom:1px solid #2a3040;cursor:pointer;transition:background .15s"><td style="padding:9px 12px;font-size:12px;color:#e2e8f0;font-weight:600">${nm}</td><td style="padding:9px 12px;font-size:11px;color:#94a3b8">${dt} ${mode}</td><td style="padding:9px 12px;text-align:right;font-weight:700;color:#22c55e">${sent}</td><td style="padding:9px 12px;text-align:right;font-weight:700;color:#ef4444">${err}</td><td style="padding:9px 12px;text-align:right;font-weight:600;color:#94a3b8">${inv}</td><td style="padding:9px 12px;text-align:right"><span style="color:#7ec8ff;font-size:11px;margin-right:8px">👁️ Ver</span><button class="st-sms-del" data-testid="st-sms-del" data-id="${c.id}" data-name="${nm.replace(/"/g,'&quot;')}" style="background:#7f1d1d;color:#fecaca;border:1px solid #b91c1c;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700" title="Eliminar campaña">🗑</button></td></tr>`;
       }).join('');
       body.innerHTML = `
         <div data-testid="sms-stats-embed" style="display:flex;flex-direction:column;gap:14px">
@@ -1233,7 +1248,25 @@ function openStats(){
       body.querySelectorAll('.st-sms-row').forEach(r => {
         r.onmouseenter = () => { r.style.background = '#1a1e26' };
         r.onmouseleave = () => { r.style.background = '' };
-        r.onclick = () => openSmsCampaignDetail(r.dataset.id);
+        r.onclick = (ev) => {
+          // Ignora click si s'ha polsat el botó de borrar
+          if(ev.target && ev.target.closest && ev.target.closest('.st-sms-del')) return;
+          openSmsCampaignDetail(r.dataset.id);
+        };
+      });
+      body.querySelectorAll('.st-sms-del').forEach(b => {
+        b.onclick = async (ev) => {
+          ev.stopPropagation();
+          const id = b.dataset.id;
+          const nm = b.dataset.name || 'esta campaña';
+          if(!confirm('¿Eliminar la campaña "' + nm + '"?\n\nEsta acción NO se puede deshacer.\nSe borrará también el histórico de envíos.')) return;
+          try{
+            await apiSms('/campaigns/' + encodeURIComponent(id), { method: 'DELETE' });
+            renderSmsInStats(); // Refresca la llista
+          }catch(e){
+            alert('Error al eliminar: ' + e.message);
+          }
+        };
       });
     }catch(e){
       body.innerHTML = `<div style="color:#ef4444;text-align:center;padding:40px">Error cargando avisos: ${e.message}</div>`;
@@ -3183,21 +3216,33 @@ function openSmsModal(){
       const rows=items.map(c=>{
         const dt=new Date(c.created_at).toLocaleString(isCA?'ca-ES':'es-ES');
         const stCol=c.status==='sent'?'#22c55e':(c.status==='partial'?'#f97316':'#ef4444');
+        const cName=(c.name||'').replace(/</g,'&lt;').replace(/"/g,'&quot;');
         return `<tr class="sms-row" data-id="${c.id}" style="cursor:pointer;border-bottom:1px solid #1e293b" onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background=''">
-          <td style="padding:10px;color:#e2e8f0"><b>${(c.name||'').replace(/</g,'&lt;')}</b><div style="font-size:11px;color:#64748b">${dt}</div></td>
+          <td style="padding:10px;color:#e2e8f0"><b>${cName}</b><div style="font-size:11px;color:#64748b">${dt}</div></td>
           <td style="padding:10px;text-align:center;color:#22c55e;font-weight:700">${c.sent_count||0}</td>
           <td style="padding:10px;text-align:center;color:#f97316">${c.error_count||0}</td>
           <td style="padding:10px;text-align:center;color:#94a3b8">${c.filtered_invalid||0}</td>
           <td style="padding:10px;text-align:center"><span style="background:${stCol};color:#0f172a;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:800">${(c.status||'').toUpperCase()}</span></td>
+          <td style="padding:10px;text-align:center"><button class="sms-row-del" data-testid="sms-list-del" data-id="${c.id}" data-name="${cName}" style="background:#7f1d1d;color:#fecaca;border:1px solid #b91c1c;padding:4px 9px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700" title="${isCA?'Eliminar campanya':'Eliminar campaña'}">🗑</button></td>
         </tr>`;
       }).join('');
       body.innerHTML=twilioBanner+`
         <div style="font-size:13px;color:#94a3b8;margin-bottom:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase">${T.hist} (${items.length})</div>
         <table style="width:100%;border-collapse:collapse;background:#0e1a2e;border:1px solid #1e293b;border-radius:8px;overflow:hidden">
-          <thead><tr style="background:#1e293b"><th style="padding:10px;text-align:left;color:#f5b301;font-size:11px;text-transform:uppercase">${isCA?'Campanya':'Campaña'}</th><th style="padding:10px;color:#22c55e;font-size:11px">✓ ${isCA?'Enviats':'Enviados'}</th><th style="padding:10px;color:#f97316;font-size:11px">✗ Errors</th><th style="padding:10px;color:#94a3b8;font-size:11px">${isCA?'Invàlids':'Inválidos'}</th><th style="padding:10px;color:#cbd5e1;font-size:11px">Status</th></tr></thead>
+          <thead><tr style="background:#1e293b"><th style="padding:10px;text-align:left;color:#f5b301;font-size:11px;text-transform:uppercase">${isCA?'Campanya':'Campaña'}</th><th style="padding:10px;color:#22c55e;font-size:11px">✓ ${isCA?'Enviats':'Enviados'}</th><th style="padding:10px;color:#f97316;font-size:11px">✗ Errors</th><th style="padding:10px;color:#94a3b8;font-size:11px">${isCA?'Invàlids':'Inválidos'}</th><th style="padding:10px;color:#cbd5e1;font-size:11px">Status</th><th style="padding:10px;color:#fecaca;font-size:11px">${isCA?'Accions':'Acciones'}</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
-      body.querySelectorAll('.sms-row').forEach(r=>r.onclick=()=>renderSmsDetail(r.dataset.id));
+      body.querySelectorAll('.sms-row').forEach(r=>r.onclick=(ev)=>{
+        if(ev.target && ev.target.closest && ev.target.closest('.sms-row-del')) return;
+        renderSmsDetail(r.dataset.id);
+      });
+      body.querySelectorAll('.sms-row-del').forEach(b=>b.onclick=async(ev)=>{
+        ev.stopPropagation();
+        const id=b.dataset.id, nm=b.dataset.name||'esta campaña';
+        if(!confirm((isCA?'Eliminar la campanya "':'¿Eliminar la campaña "')+nm+'"?\n\n'+(isCA?'Aquesta acció NO es pot desfer.':'Esta acción NO se puede deshacer.')+'\n'+(isCA?'S\'esborrarà l\'històric d\'enviaments.':'Se borrará el histórico de envíos.'))) return;
+        try{ await apiSms('/campaigns/'+encodeURIComponent(id),{method:'DELETE'}); renderSmsList(); }
+        catch(e){ alert('Error: '+e.message); }
+      });
     }catch(e){
       body.innerHTML='<div style="color:#ef4444;text-align:center;padding:40px">Error: '+e.message+'</div>';
     }
@@ -3217,7 +3262,7 @@ function openSmsModal(){
         const inv = c.filtered_invalid ?? c.invalid ?? 0;
         const nm = String(c.name||'—').replace(/</g,'&lt;');
         const mode = c.twilio_used ? '<span style="background:#1e40af;color:#fff;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:800">REAL</span>' : '<span style="background:#4c1d95;color:#fff;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:800">MOCK</span>';
-        return `<tr class="sms-camp-row" data-testid="sms-camp-row" data-id="${c.id}" style="border-bottom:1px solid #1e293b;cursor:pointer;transition:background .15s"><td style="padding:9px 12px;font-size:12px;color:#e2e8f0">${nm}</td><td style="padding:9px 12px;font-size:11px;color:#64748b">${dt} ${mode}</td><td style="padding:9px 12px;text-align:right;font-weight:700;color:#22c55e">${sent}</td><td style="padding:9px 12px;text-align:right;font-weight:700;color:#ef4444">${err}</td><td style="padding:9px 12px;text-align:right;font-weight:600;color:#cbd5e1">${inv}</td><td style="padding:9px 12px;text-align:right"><span style="color:#7ec8ff;font-size:11px">👁️ ${isCA?'Veure':'Ver'}</span></td></tr>`;
+        return `<tr class="sms-camp-row" data-testid="sms-camp-row" data-id="${c.id}" style="border-bottom:1px solid #1e293b;cursor:pointer;transition:background .15s"><td style="padding:9px 12px;font-size:12px;color:#e2e8f0">${nm}</td><td style="padding:9px 12px;font-size:11px;color:#64748b">${dt} ${mode}</td><td style="padding:9px 12px;text-align:right;font-weight:700;color:#22c55e">${sent}</td><td style="padding:9px 12px;text-align:right;font-weight:700;color:#ef4444">${err}</td><td style="padding:9px 12px;text-align:right;font-weight:600;color:#cbd5e1">${inv}</td><td style="padding:9px 12px;text-align:right"><span style="color:#7ec8ff;font-size:11px;margin-right:8px">👁️ ${isCA?'Veure':'Ver'}</span><button class="sms-camp-del" data-testid="sms-stats-del" data-id="${c.id}" data-name="${nm.replace(/"/g,'&quot;')}" style="background:#7f1d1d;color:#fecaca;border:1px solid #b91c1c;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700" title="${isCA?'Eliminar campanya':'Eliminar campaña'}">🗑</button></td></tr>`;
       }).join('');
       body.innerHTML=`
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
@@ -3245,7 +3290,17 @@ function openSmsModal(){
       body.querySelectorAll('.sms-camp-row').forEach(r=>{
         r.onmouseenter=()=>{r.style.background='#111827'};
         r.onmouseleave=()=>{r.style.background=''};
-        r.onclick=()=>renderSmsDetail(r.dataset.id);
+        r.onclick=(ev)=>{
+          if(ev.target && ev.target.closest && ev.target.closest('.sms-camp-del')) return;
+          renderSmsDetail(r.dataset.id);
+        };
+      });
+      body.querySelectorAll('.sms-camp-del').forEach(b=>b.onclick=async(ev)=>{
+        ev.stopPropagation();
+        const id=b.dataset.id, nm=b.dataset.name||'esta campaña';
+        if(!confirm((isCA?'Eliminar la campanya "':'¿Eliminar la campaña "')+nm+'"?\n\n'+(isCA?'Aquesta acció NO es pot desfer.':'Esta acción NO se puede deshacer.'))) return;
+        try{ await apiSms('/campaigns/'+encodeURIComponent(id),{method:'DELETE'}); renderSmsStats(); }
+        catch(e){ alert('Error: '+e.message); }
       });
     }catch(e){
       body.innerHTML='<div style="color:#ef4444;text-align:center;padding:40px">Error: '+e.message+'</div>';
@@ -3363,6 +3418,7 @@ function openSmsModal(){
           <button onclick="document.getElementById('smsBody').innerHTML='';document.getElementById('smsClose').click();openSmsModal();" style="background:#1e293b;color:#e2e8f0;border:1px solid #475569;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">← ${isCA?'Tornar al llistat':'Volver al listado'}</button>
           <div style="flex:1"></div>
           <button data-testid="sms-print-campaign" id="btnPrintSmsCamp" style="background:linear-gradient(90deg,#059669,#10b981);color:#fff;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">🖨️ ${isCA?'Imprimir informe':'Imprimir informe'}</button>
+          <button data-testid="sms-delete-campaign" id="btnDelSmsCamp" style="background:linear-gradient(90deg,#b91c1c,#7f1d1d);color:#fecaca;border:1px solid #ef4444;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">🗑 ${isCA?'Eliminar campanya':'Eliminar campaña'}</button>
         </div>
         <div style="background:#0e1a2e;padding:18px;border-radius:12px;border:1px solid #1e293b;margin-bottom:16px">
           <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:14px">
@@ -3402,6 +3458,18 @@ function openSmsModal(){
       };
       const printBtn=document.getElementById('btnPrintSmsCamp');
       if(printBtn) printBtn.onclick=()=>printSmsCampaign(d);
+      const delBtn=document.getElementById('btnDelSmsCamp');
+      if(delBtn) delBtn.onclick=async()=>{
+        const nm=(d.name||'esta campaña').replace(/</g,'&lt;');
+        if(!confirm((isCA?'Eliminar la campanya "':'¿Eliminar la campaña "')+nm+'"?\n\n'+(isCA?'Aquesta acció NO es pot desfer.':'Esta acción NO se puede deshacer.')+'\n'+(isCA?'S\'esborrarà l\'històric d\'enviaments.':'Se borrará el histórico de envíos.'))) return;
+        try{
+          await apiSms('/campaigns/'+encodeURIComponent(d.id),{method:'DELETE'});
+          // Tornar al llistat
+          renderSmsList();
+        }catch(e){
+          alert('Error: '+e.message);
+        }
+      };
     }catch(e){
       body.innerHTML='<div style="color:#ef4444;text-align:center;padding:40px">Error: '+e.message+'</div>';
     }
