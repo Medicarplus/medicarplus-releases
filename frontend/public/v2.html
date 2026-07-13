@@ -693,16 +693,12 @@ function openLibroRegistro(){
     filtered.forEach(e=>{const k=`${(e.tipo||'?').trim()} · ${(e.grupo||'-').trim()}`;groups.set(k,(groups.get(k)||0)+1)});
     const sorted=[...groups.entries()].sort((a,b)=>b[1]-a[1]);
     const totalAll=filtered.length;
-    // Carnets de conducir: detecció "Profesional"/"Normal" al camp TIPO
+    // Carnets de conducir: detecció "Profesional" o classe C/C1/D/D1/C+E/C1+E/D+E/D1+E
     const conducirEntries=filtered.filter(e=>String(e.grupo||'').toLowerCase().includes('conduc'));
     const profs=new Map(),norms=new Map();
     conducirEntries.forEach(e=>{
       const t=String(e.tipo||'').trim();
-      const tLow=t.toLowerCase();
-      // Un carnet és PROFESIONAL només si el CSV DGT indica explícitament "Profesional" a la Categoría
-      // (que ja s'ha annexat al camp TIPO durant la importació, ex: "Renovación, Profesional").
-      // Per defecte tot és NORMAL (carnets B/A/AM… sense sufix a la Categoría).
-      if(tLow.includes('profesion')) profs.set(t,(profs.get(t)||0)+1);
+      if(_esCarnetProfesional(t)) profs.set(t,(profs.get(t)||0)+1);
       else norms.set(t,(norms.get(t)||0)+1);
     });
     const totalProf=[...profs.values()].reduce((s,v)=>s+v,0),totalNorm=[...norms.values()].reduce((s,v)=>s+v,0);
@@ -723,12 +719,12 @@ function openLibroRegistro(){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
         <div style="background:#0f172a;border:1px solid #dc2626;border-radius:10px;padding:14px">
           <div style="color:#fca5a5;font-size:12px;font-weight:600;text-transform:uppercase;margin-bottom:6px">👔 Profesionales (${totalProf})</div>
-          <div style="color:#94a3b8;font-size:10px;margin-bottom:8px">Categoría CSV contiene "Profesional" (C+E, D, D+E, etc.)</div>
+          <div style="color:#94a3b8;font-size:10px;margin-bottom:8px">Clases C · C1 · D · D1 · C+E · C1+E · D+E · D1+E · o "Profesional"</div>
           ${[...profs.entries()].sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed #1e293b"><span style="color:#e2e8f0">${escapeHtml(k)}</span><b style="color:#f5b301">${v}</b></div>`).join('')||'<div style="color:#7a8394;font-size:12px">Sin datos</div>'}
         </div>
         <div style="background:#0f172a;border:1px solid #2563eb;border-radius:10px;padding:14px">
           <div style="color:#93c5fd;font-size:12px;font-weight:600;text-transform:uppercase;margin-bottom:6px">🚙 Normales (${totalNorm})</div>
-          <div style="color:#94a3b8;font-size:10px;margin-bottom:8px">Todos los demás (B, A1, A2, AM, sin sufijo)</div>
+          <div style="color:#94a3b8;font-size:10px;margin-bottom:8px">Todo lo demás (B, A1, A2, AM, BTP, etc.)</div>
           ${[...norms.entries()].sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed #1e293b"><span style="color:#e2e8f0">${escapeHtml(k)}</span><b style="color:#3ddc97">${v}</b></div>`).join('')||'<div style="color:#7a8394;font-size:12px">Sin datos</div>'}
         </div>
       </div>
@@ -929,7 +925,7 @@ function openStats(){
     if(!t) return 'Otro';
     const lc = t.toLowerCase();
     if(lc.startsWith('renov')) return 'Renovación';
-    if(lc.startsWith('exped')) return 'Expedición';
+    if(lc.startsWith('exped') || lc.startsWith('obten')) return 'Expedición';
     if(lc.startsWith('dupl')) return 'Duplicado';
     if(lc.startsWith('canj')) return 'Canje';
     return 'Otro';
