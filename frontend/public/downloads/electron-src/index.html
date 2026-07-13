@@ -321,7 +321,7 @@
           <input type="date" id="filterTo" title="Hasta" style="background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 6px;font-size:11px" />
           <button id="filterApply" class="btn" style="padding:4px 10px;font-size:11px" title="Aplicar filtro por rango">Aplicar</button>
           <button id="filterReset" class="btn" style="padding:4px 10px;font-size:11px;background:#2a3040" title="Volver al día actual">Solo hoy</button>
-          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;cursor:pointer;margin-left:8px;padding:4px 10px;background:#0e1117;border:1px solid #2a3040;border-radius:8px" title="Si está activo, las entradas con importe 0€ también se cuentan en el resumen"><input type="checkbox" id="chkCountZero" style="cursor:pointer;accent-color:#3ddc97" /> Contar 0€ <span title="Cuando está desactivado (por defecto): las entradas con importe 0€ NO se cuentan como 'Entradas Tráfico'.&#10;&#10;Cuando está activado: las entradas con importe 0€ SÍ se cuentan (útil si quieres registrar visitas gratuitas).&#10;&#10;Afecta tanto al resumen del día como al Libro de Registro (están sincronizados)." style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:#2a3040;color:#7ec8ff;font-size:9px;font-weight:700;cursor:help;border:1px solid #7ec8ff;user-select:none">?</span></label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;cursor:pointer;margin-left:8px;padding:4px 10px;background:#0e1117;border:1px solid #2a3040;border-radius:8px"><input type="checkbox" id="chkCountZero" style="cursor:pointer;accent-color:#3ddc97" /> Contar 0€ <span class="tt" data-tt="Desactivat (per defecte): les entrades amb import 0€ NO es compten com 'Entradas Tráfico'. Activat: SÍ es compten (útil si vols registrar visites gratuïtes). Sincronitzat amb el Libro de Registro.">?</span></label>
           <span id="filterInfo" style="color:#7ee3aa;font-size:11px;margin-left:auto"></span>
         </div>
         <div style="max-height:62vh;overflow:auto">
@@ -648,7 +648,7 @@ function openLibroRegistro(){
         <button class="btn" data-lr-preset="year" style="padding:6px 10px;font-size:11px">Año</button>
         <button class="btn" data-lr-preset="all" style="padding:6px 10px;font-size:11px">Todo</button>
       </div>
-      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;cursor:pointer;padding:4px 10px;background:#0e1117;border:1px solid #2a3040;border-radius:8px" title="Incluir entradas con importe 0€ en los recuentos"><input type="checkbox" id="lrCountZero" style="cursor:pointer;accent-color:#3ddc97" /> Contar 0€ <span title="Cuando está desactivado (por defecto): las entradas con importe 0€ NO se cuentan.&#10;&#10;Cuando está activado: las entradas con importe 0€ SÍ se cuentan (útil si quieres contabilizar visitas gratuitas).&#10;&#10;Este ajuste está sincronizado con el mismo checkbox del panel principal de Tráfico." style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:#2a3040;color:#7ec8ff;font-size:9px;font-weight:700;cursor:help;border:1px solid #7ec8ff;user-select:none">?</span></label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;cursor:pointer;padding:4px 10px;background:#0e1117;border:1px solid #2a3040;border-radius:8px"><input type="checkbox" id="lrCountZero" style="cursor:pointer;accent-color:#3ddc97" /> Contar 0€ <span class="tt" data-tt="Desactivat (per defecte): les entrades amb import 0€ NO es compten. Activat: SÍ es compten (útil si vols comptabilitzar visites gratuïtes). Sincronitzat amb el panell principal de Tráfico.">?</span></label>
       <button class="btn btn-primary" id="lrPrint">🖨️ Imprimir</button>
       <button class="btn" data-no>✕ Cerrar</button>
     </div>
@@ -699,13 +699,11 @@ function openLibroRegistro(){
     conducirEntries.forEach(e=>{
       const t=String(e.tipo||'').trim();
       const tLow=t.toLowerCase();
+      // Un carnet és PROFESIONAL només si el CSV DGT indica explícitament "Profesional" a la Categoría
+      // (que ja s'ha annexat al camp TIPO durant la importació, ex: "Renovación, Profesional").
+      // Per defecte tot és NORMAL (carnets B/A/AM… sense sufix a la Categoría).
       if(tLow.includes('profesion')) profs.set(t,(profs.get(t)||0)+1);
-      else if(tLow.includes('normal')) norms.set(t,(norms.get(t)||0)+1);
-      else {
-        const tU=t.toUpperCase().replace(/\s+/g,'');
-        if(CARNETS_PROFESIONALES.some(p=>tU.includes(p.replace(/\s+/g,'')))) profs.set(t,(profs.get(t)||0)+1);
-        else norms.set(t,(norms.get(t)||0)+1);
-      }
+      else norms.set(t,(norms.get(t)||0)+1);
     });
     const totalProf=[...profs.values()].reduce((s,v)=>s+v,0),totalNorm=[...norms.values()].reduce((s,v)=>s+v,0);
     const rangeStr=`<span style="color:#7ec8ff;font-size:12px">📅 ${from.split('-').reverse().join('/')} → ${to.split('-').reverse().join('/')}</span>`;
@@ -725,12 +723,12 @@ function openLibroRegistro(){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
         <div style="background:#0f172a;border:1px solid #dc2626;border-radius:10px;padding:14px">
           <div style="color:#fca5a5;font-size:12px;font-weight:600;text-transform:uppercase;margin-bottom:6px">👔 Profesionales (${totalProf})</div>
-          <div style="color:#94a3b8;font-size:10px;margin-bottom:8px">Detectado por texto: contiene "Profesional"</div>
+          <div style="color:#94a3b8;font-size:10px;margin-bottom:8px">Categoría CSV contiene "Profesional" (C+E, D, D+E, etc.)</div>
           ${[...profs.entries()].sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed #1e293b"><span style="color:#e2e8f0">${escapeHtml(k)}</span><b style="color:#f5b301">${v}</b></div>`).join('')||'<div style="color:#7a8394;font-size:12px">Sin datos</div>'}
         </div>
         <div style="background:#0f172a;border:1px solid #2563eb;border-radius:10px;padding:14px">
           <div style="color:#93c5fd;font-size:12px;font-weight:600;text-transform:uppercase;margin-bottom:6px">🚙 Normales (${totalNorm})</div>
-          <div style="color:#94a3b8;font-size:10px;margin-bottom:8px">Detectado por texto: contiene "Normal"</div>
+          <div style="color:#94a3b8;font-size:10px;margin-bottom:8px">Todos los demás (B, A1, A2, AM, sin sufijo)</div>
           ${[...norms.entries()].sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed #1e293b"><span style="color:#e2e8f0">${escapeHtml(k)}</span><b style="color:#3ddc97">${v}</b></div>`).join('')||'<div style="color:#7a8394;font-size:12px">Sin datos</div>'}
         </div>
       </div>
