@@ -1,0 +1,40 @@
+{
+  "summary": "Frontend-only E2E validation of MediCar Plus v2.html (v2.0.38 candidate) before publish-safe.ps1. 9 of 10 test scenarios PASS. ONE CRITICAL blocker found: the new _esCarnetProfesional(tipo) function is CALLED at v2.html:701 but never defined anywhere in the file. Any user opening Libro de Registro with ≥1 imported DGT CSV entry that matches the date/amount filter triggers a JS ReferenceError, the renderLibro() body stops executing and the modal renders BLANK. This is a hard regression of the reported classification bug and BLOCKS publishing v2.0.38.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Libro de Registro (v2.html renderLibro)",
+        "issue": "ReferenceError: _esCarnetProfesional is not defined. Function called at line 701 but never declared. As soon as filtered.length > 0 the body renders blank (script throws before body.innerHTML is set). Blocks the 'Profesionales vs Normales' classification feature entirely — reproduces the exact bug the change was supposed to fix.",
+        "selector": "#lrBody (rendered from #btnLibroRegMenu)",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/frontend/public/v2.html (line 701 — undefined _esCarnetProfesional)",
+    "/app/frontend/public/v2.html (line 629 — CARNETS_PROFESIONALES constant is defined but unused)"
+  ],
+  "action_items": [
+    "URGENT — DO NOT publish v2.0.38 until the missing _esCarnetProfesional(tipo) function is defined. Recommended implementation (place near line 629 next to CARNETS_PROFESIONALES): function _esCarnetProfesional(t){ const s=String(t||'').toLowerCase(); if(s.includes('profesional'))return true; const parts=s.split(',').map(p=>p.trim()); const CLASES=['d+e','d1+e','d1','d','c+e','c1+e','c1','c']; return parts.some(part=>CLASES.some(cl=>new RegExp('(^|[^a-z0-9])'+cl.replace(/\\+/g,'\\\\+')+'($|[^a-z0-9])','i').test(part))); } — this correctly rejects 'Renovación, B' (no C word-boundary match), rejects 'Renovación, BTP' (BTP is not in list), and accepts 'Obtención, C+E', 'Renovación, C1', etc.",
+    "After adding the function, re-verify (a) 12 NORMAL + 1 PROFESIONAL seed → Prof=1, Norm=12; (b) 9 explicit professional classes (C, C1, D, D1, C+E, C1+E, D+E, D1+E, Profesional) → Prof=9, Norm=0; (c) 'Renovación, B' + 'Renovación, BTP' → Norm=2, Prof=0 (regression: BTP must NOT match)."
+  ],
+  "critical_code_review_comments": [
+    "CRITICAL: v2.html line 701 calls _esCarnetProfesional(t) but the function is missing from the file — grep '_esCarnetProfesional' returns only the call site. This is a hard breakage, not a subtle bug.",
+    "The constant CARNETS_PROFESIONALES at line 629 = ['D+E','D1+E','D','C+E','C1+E','C','C1'] is defined but never referenced anywhere else in the file — the intended _esCarnetProfesional function likely uses it. When implementing the fix, prefer to reference this constant to keep a single source of truth.",
+    "Word-boundary matching is critical: 'Renovación' literally contains the substring 'C' — a naive s.includes('C') check was the ORIGINAL bug. The new function MUST use a regex with word boundaries or split on comma and only look at the class token (part after the comma).",
+    "renderLibro() has no try/catch around the body.innerHTML assignment — when _esCarnetProfesional throws, the modal is left empty. Consider adding a defensive try/catch or a top-level window.onerror hook in v2 that surfaces a Catalan/Spanish 'Error de render — recarrega la pàgina' instead of a silent blank body.",
+    "The date-range filter default of 'today→today' is often misleading: users with imported historical CSVs see 'No hay entradas' on open. This is a UX polish item, not a bug — consider defaulting to 'this month' or 'all' on open.",
+    "The .tt tooltip is implemented via CSS-only :hover::after with data-tt attribute — works but is not keyboard-accessible. Non-blocking for v2.0.38 but worth flagging."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only)", "frontend": "90% (9/10 scenarios pass; 1 blocking critical bug)"},
+  "test_credentials": "Master Key: MB-MASTER-BRUGULAT-2026-OWNER · Admin Token: MB-ADMIN-BRUGULAT-2026-4F8E2A1C (not needed for this frontend-only run — localStorage seeding bypasses activation)",
+  "seed_data_creation": "During E2E: localStorage seeded caja.license.v1 (MASTER), caja.config.v1 (configured=true), caja.company='trafic', caja.v1 with 13 DGT-CSV entries under today's key. All in-browser localStorage only — no MongoDB writes.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The critical blocker is a missing JS function definition. To re-verify after main agent's fix: (1) open https://project-helper-47.preview.emergentagent.com/v2.html; (2) evaluate the localStorage seed block from Libro test (caja.v1 with today's date key = array of 13 entries: 12 normals + 1 'Obtención, C+E', all with importe=27, kind=TRAF, _csv=true, grupo='Conducir'); (3) reload; (4) click #btnAccountingToggle → #btnLibroRegMenu; (5) read #lrBody innerText and match /Profesionales\\s*\\((\\d+)\\)/ and /Normales\\s*\\((\\d+)\\)/ — must be Prof=1, Norm=12. (6) Add explicit-class regression: seed with 'Renovación, BTP' and 'Renovación, B' + 'Obtención, C+E' → must NOT count BTP or B as professional. All other flows (SMS embed, whats-new, tabs, tooltip, RECUPERACION column, top-bar buttons) verified passing in this iteration — no need to retest unless main agent touches those areas.",
+  "rca of the issue": "Root cause: /app/frontend/public/v2.html line 701 calls `_esCarnetProfesional(t)` inside renderLibro() but the function is never declared anywhere in the file (verified with grep — only the call site matches). The constant CARNETS_PROFESIONALES exists at line 629 as scaffolding but the corresponding function was omitted in the recent refactor. Reproduction (100% deterministic): (a) open v2.html; (b) seed license+config+caja.company='trafic'; (c) seed caja.v1 with byDate[today] = [{tipo:'Renovación, B', grupo:'Conducir', kind:'TRAF', _csv:true, importe:27, ...}]; (d) reload; (e) Contabilidad → 📖 Libro de Registro; (f) observe browser console → 'Uncaught ReferenceError: _esCarnetProfesional is not defined' at v2.html:701, and #lrBody stays empty. Mitigation: define the function next to CARNETS_PROFESIONALES (see action_items for a correct word-boundary implementation that passes both the reported regression ('Renovación' must NOT match 'C') and the coverage of all 8 professional classes + explicit 'Profesional' keyword)."
+}
