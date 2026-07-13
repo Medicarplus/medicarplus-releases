@@ -918,8 +918,8 @@ function openStats(){
   // Secció TRÁFICO · Agrega les entrades del CSV DGT del panell principal
   // ============================================================================
   // Categories base de "tipo" (extreu part abans de la coma per gestionar "Renovación, Profesional")
-  const TRAF_CATS = ['Renovación','Expedición','Duplicado','Canje','Otro'];
-  const TRAF_COLORS = { 'Renovación':'#3ddc97', 'Expedición':'#7ec8ff', 'Duplicado':'#f5b301', 'Canje':'#c084fc', 'Otro':'#94a3b8' };
+  const TRAF_CATS = ['Renovación','Expedición','Duplicado','Canje','Recuperación','Otro'];
+  const TRAF_COLORS = { 'Renovación':'#3ddc97', 'Expedición':'#7ec8ff', 'Duplicado':'#f5b301', 'Canje':'#c084fc', 'Recuperación':'#f472b6', 'Otro':'#94a3b8' };
   function _trafBaseCat(tipo){
     const t = String(tipo||'').split(',')[0].trim();
     if(!t) return 'Otro';
@@ -928,6 +928,7 @@ function openStats(){
     if(lc.startsWith('exped') || lc.startsWith('obten')) return 'Expedición';
     if(lc.startsWith('dupl')) return 'Duplicado';
     if(lc.startsWith('canj')) return 'Canje';
+    if(lc.startsWith('recup')) return 'Recuperación';
     return 'Otro';
   }
   // Agrega totes les entrades CSV DGT (kind:'TRAF' && _csv:true) del state.byDate
@@ -1178,13 +1179,27 @@ $('#btnImport').onclick=()=>$('#fileInput').click();
 $('#fileInput').onchange=async ev=>{const f=ev.target.files[0];if(!f)return;try{const name=(f.name||'').toLowerCase();const buf=await f.arrayBuffer();if(name.endsWith('.xlsx')||name.endsWith('.xls')){if(typeof XLSX==='undefined'){toast('❌ Lector Excel no disponible — usa CSV');return}const wb=XLSX.read(buf,{type:'array'});const sheet=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:false,defval:''});importTrafficRows(rows)}else{let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){text=new TextDecoder('windows-1252').decode(buf)}if(/Ã[©±¡³]/.test(text)){text=new TextDecoder('windows-1252').decode(buf)}const rows=parseCSV(text);importTrafficRows(rows)}}catch(err){toast('Error al importar: '+err.message,3500)}ev.target.value=''};
 function parseCSV(text){const out=[];let row=[],cell='',inQ=false;for(let i=0;i<text.length;i++){const c=text[i];if(inQ){if(c==='"'){if(text[i+1]==='"'){cell+='"';i++}else inQ=false}else cell+=c}else{if(c==='"')inQ=true;else if(c===';'){row.push(cell);cell=''}else if(c==='\n'){row.push(cell);out.push(row);row=[];cell=''}else if(c==='\r'){}else cell+=c}}if(cell.length||row.length){row.push(cell);out.push(row)}return out.filter(r=>r.some(x=>x&&x.trim()!==''))}
 function importTrafficRows(rows){if(!rows.length){toast('Archivo vacío');return}const header=rows[0].map(s=>String(s).trim().toUpperCase());const idx=name=>header.findIndex(h=>h===name||h.startsWith(name));const iFecha=idx('FECHA'),iNombre=idx('NOMBRE'),iAp1=idx('APELLIDO1'),iAp2=idx('APELLIDO2'),iTipo=idx('TIPO'),iGrupo=idx('GRUPO'),iImporte=idx('IMPORTE');
-  // Detecta la columna del sufix (Normal/Profesional) — busca CATEGORIA/CATEGORÍA/CLASE o
-  // examina si la columna immediatament posterior a TIPO té els valors esperats.
-  let iCateg=idx('CATEGORIA');if(iCateg<0)iCateg=idx('CATEGORÍA');if(iCateg<0)iCateg=idx('CLASE');
+  // Detecta la columna del sufix (Normal/Profesional/Classe) — busca noms coneguts o
+  // examina si alguna columna té valors reconeguts (Profesional / classes C, D, C+E, etc.)
+  const CATEG_NAMES=['CATEGORIA','CATEGORÍA','CLASE','PERMISO','TIPO_CARNET','CATEGORIA_CARNET','CLASE_CARNET','CARNET','PROFESIONAL'];
+  let iCateg=-1;for(const n of CATEG_NAMES){const i=idx(n);if(i>=0){iCateg=i;break}}
+  const CLASS_TOKENS_PROF=new Set(['C','C1','D','D1','C+E','C1+E','D+E','D1+E']);
+  const CLASS_TOKENS_NORM=new Set(['B','B+E','A','A1','A2','AM','BTP']);
   if(iCateg<0&&iTipo>=0&&rows.length>1){
-    const nextIdx=iTipo+1;
-    const sample=[];for(let i=1;i<Math.min(rows.length,20);i++){const v=String((rows[i]||[])[nextIdx]||'').trim().toLowerCase();if(v)sample.push(v)}
-    if(sample.some(v=>v.includes('profesion')||v==='normal'))iCateg=nextIdx;
+    // Escaneja TOTES les columnes buscant una que sembli la de classe (auto-detecció)
+    for(let c=0;c<header.length;c++){
+      if(c===iTipo||c===iGrupo||c===iFecha||c===iImporte||c===iNombre||c===iAp1||c===iAp2)continue;
+      let matches=0,checked=0;
+      for(let r=1;r<Math.min(rows.length,30);r++){
+        const raw=String((rows[r]||[])[c]||'').trim();
+        if(!raw)continue;
+        checked++;
+        const lc=raw.toLowerCase();
+        const up=raw.toUpperCase().replace(/\s+/g,'');
+        if(lc.includes('profesion')||lc==='normal'||CLASS_TOKENS_PROF.has(up)||CLASS_TOKENS_NORM.has(up))matches++;
+      }
+      if(checked>=3&&matches/checked>=0.5){iCateg=c;break}
+    }
   }
   // Detectar TOTES les columnes de tasa (TASA, TASAS, TASA1, TASA2, TASA_TOTAL, TASA_COMPL, etc.)
   const iTasas=[];header.forEach((h,i)=>{if(/^TASA/.test(h))iTasas.push(i)});
