@@ -60,10 +60,33 @@ def _render_html(
 
         <p style="color:#cbd5e1;font-size:14px;margin-top:22px;line-height:1.55">
           <b style="color:#f5b301">Com activar-la:</b><br>
-          1. Obre l'aplicació <b>MediCar Plus</b>.<br>
-          2. Al modal de "Activació de llicència", enganxa la clau completa i prem <b>Activar</b>.<br>
-          3. L'app quedarà desbloquejada per aquesta instal·lació.
+          1. Descarrega l'aplicació MediCar Plus des de <a href="https://github.com/Medicarplus/medicarplus-releases/releases/latest" style="color:#f5b301;text-decoration:underline">aquest enllaç</a>.<br>
+          2. Instal·la l'executable (segueix la <a href="https://medicarplus.es/guia-client-installacio.html" style="color:#f5b301;text-decoration:underline">guia d'instal·lació de 5 minuts</a>).<br>
+          3. Al modal "Activació de llicència", enganxa la clau completa i prem <b>Activar</b>.<br>
+          4. Consulta el <a href="https://medicarplus.es/manual-usuari.html" style="color:#f5b301;text-decoration:underline">manual d'usuari complet</a> quan tinguis qualsevol dubte.
         </p>
+
+        <table width="100%" cellpadding="12" cellspacing="0" style="margin-top:20px">
+          <tr>
+            <td style="background:#0f172a;border:1px solid #f5b301;border-radius:8px;padding:14px;text-align:center;width:33%">
+              <a href="https://github.com/Medicarplus/medicarplus-releases/releases/latest" style="color:#f5b301;text-decoration:none;font-size:13px;font-weight:700">
+                📥 Descarregar<br>l'aplicació
+              </a>
+            </td>
+            <td style="width:2%"></td>
+            <td style="background:#0f172a;border:1px solid #22c55e;border-radius:8px;padding:14px;text-align:center;width:33%">
+              <a href="https://medicarplus.es/guia-client-installacio.html" style="color:#22c55e;text-decoration:none;font-size:13px;font-weight:700">
+                📥 Guia<br>d'instal·lació
+              </a>
+            </td>
+            <td style="width:2%"></td>
+            <td style="background:#0f172a;border:1px solid #7ec8ff;border-radius:8px;padding:14px;text-align:center;width:33%">
+              <a href="https://medicarplus.es/manual-usuari.html" style="color:#7ec8ff;text-decoration:none;font-size:13px;font-weight:700">
+                📘 Manual<br>d'usuari
+              </a>
+            </td>
+          </tr>
+        </table>
 
         <p style="color:#64748b;font-size:12px;margin-top:26px;padding-top:18px;border-top:1px solid #334155;line-height:1.5">
           Aquesta clau està vinculada al teu Install ID. Si canvies d'ordinador, contacta amb el proveïdor per traspassar-la.<br>

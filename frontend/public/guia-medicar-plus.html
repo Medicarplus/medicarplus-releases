@@ -57,19 +57,44 @@
   .tab-panel{display:none}
   .tab-panel.active{display:block;animation:fadeIn .25s ease}
   @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  /* Search bar */
+  .search-wrap{position:sticky;top:78px;z-index:9;margin:0 0 16px}
+  .search-input{width:100%;padding:12px 44px 12px 44px;background:#fff;border:2px solid #cbd5e1;border-radius:10px;font-size:14px;color:#0f172a;font-family:inherit;box-shadow:0 2px 6px rgba(0,0,0,.05);transition:border-color .15s}
+  .search-input:focus{outline:none;border-color:#f5b301;box-shadow:0 2px 8px rgba(245,179,1,.15)}
+  .search-wrap::before{content:"🔍";position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:17px;pointer-events:none}
+  .search-clear{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:#0f172a;color:#f5b301;border:none;border-radius:50%;width:26px;height:26px;font-size:14px;cursor:pointer;display:none}
+  .search-clear.visible{display:inline-flex;align-items:center;justify-content:center}
+  .search-results{background:#fff;border:1px solid #cbd5e1;border-radius:10px;margin-top:8px;max-height:340px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.08);display:none}
+  .search-results.visible{display:block}
+  .search-item{padding:10px 14px;border-bottom:1px solid #e2e8f0;cursor:pointer;transition:background .1s}
+  .search-item:hover{background:#f8fafc}
+  .search-item:last-child{border:none}
+  .search-item .r-tab{font-size:11px;color:#f5b301;text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:2px}
+  .search-item .r-title{font-size:14px;color:#0f172a;font-weight:600}
+  .search-item .r-snippet{font-size:12px;color:#64748b;margin-top:2px}
+  .search-item mark{background:#fef3c7;color:#78350f;padding:0 2px;border-radius:3px}
+  .search-empty{padding:18px;text-align:center;color:#94a3b8;font-size:13px;font-style:italic}
 </style>
 
 <nav class="tab-nav" role="tablist" aria-label="Seccions de la guia">
   <button class="tab-btn active" data-tab="visio" data-testid="tab-visio">📌 Visió general</button>
+  <button class="tab-btn" data-tab="panell" data-testid="tab-panell">🎛️ Panell mestre</button>
   <button class="tab-btn" data-tab="links" data-testid="tab-links">🔗 Links & Claus</button>
   <button class="tab-btn" data-tab="novetats" data-testid="tab-novetats">🎉 Novetats</button>
   <button class="tab-btn" data-tab="vendes" data-testid="tab-vendes">💰 Vendes</button>
   <button class="tab-btn" data-tab="distribucio" data-testid="tab-distribucio">📦 Distribució</button>
   <button class="tab-btn" data-tab="sms" data-testid="tab-sms">📱 SMS</button>
   <button class="tab-btn" data-tab="admin" data-testid="tab-admin">📊 Admin panel</button>
+  <button class="tab-btn" data-tab="clients" data-testid="tab-clients">👥 Guies clients</button>
   <button class="tab-btn" data-tab="proteccio" data-testid="tab-proteccio">🛡️ Protecció</button>
   <button class="tab-btn" data-tab="guies" data-testid="tab-guies">📚 Més guies</button>
 </nav>
+
+<div class="search-wrap" style="position:relative">
+  <input type="search" class="search-input" id="guideSearch" data-testid="guide-search" placeholder="🔍 Buscar en la guia (ex: HWID, IRPF, SMS, llicència...)" autocomplete="off">
+  <button class="search-clear" id="guideSearchClear" aria-label="Esborrar cerca">✕</button>
+  <div class="search-results" id="guideSearchResults" role="listbox"></div>
+</div>
 
 <div id="tab-container">
 
@@ -149,6 +174,35 @@ Amb 2 clients pagant STD anual (299,90€×2 = 599,80€) ja tens el fix cobert 
 <hr>
 
 </div><!-- /visio -->
+
+<!-- ============ TAB: PANELL MESTRE ============ -->
+<div class="tab-panel" data-panel="panell">
+<h1>🎛️ Panell Mestre · Tots els enllaços</h1>
+<p style="color:#64748b">Accés ràpid a totes les eines i seccions. Tot centralitzat aquí.</p>
+
+<h2 class="blue" style="color:#065f46;margin-top:20px;padding:8px 14px;background:linear-gradient(90deg,#dcfce7,transparent);border-left:5px solid #22c55e">🔗 Eines diàries</h2>
+<ul style="line-height:2.4;list-style:none;padding-left:0">
+  <li>🏠 <a href="/v2.html" target="_blank"><b>Aplicació de caixa</b></a> — obrir MediCar Plus (per proves)</li>
+  <li>🔐 <a href="/admin" target="_blank"><b>Admin panel</b></a> — llicències, sol·licituds, estadístiques MRR/ARR</li>
+  <li>🌐 <a href="https://medicarplus.es" target="_blank"><b>Landing pública</b></a> — medicarplus.es</li>
+  <li>📊 <a href="/caja_del_dia.html" target="_blank"><b>App v1</b></a> — versió personal antiga</li>
+</ul>
+
+<h2 style="color:#065f46;margin-top:20px;padding:8px 14px;background:linear-gradient(90deg,#dcfce7,transparent);border-left:5px solid #22c55e">📚 Guies del sistema</h2>
+<ul style="line-height:2.4;list-style:none;padding-left:0">
+  <li>📖 <b>Guia Admin (aquesta)</b> — la que estàs llegint. Bookmark ràpid: <code>/guia-medicar-plus.html</code></li>
+  <li>👤 <a href="/guia-client-installacio.html" target="_blank"><b>Guia Client d'instal·lació</b></a> — envia-la a cada client nou</li>
+  <li>📘 <a href="/manual-usuari.html" target="_blank"><b>Manual d'Usuari (nou)</b></a> — 9 pestanyes explicant l'app dia a dia · <b>envia-la també al client</b></li>
+</ul>
+
+<h2 style="color:#065f46;margin-top:20px;padding:8px 14px;background:linear-gradient(90deg,#dcfce7,transparent);border-left:5px solid #22c55e">🔧 Guies tècniques (setup)</h2>
+<ul style="line-height:2.4;list-style:none;padding-left:0">
+  <li>🚀 <a href="/guia-deploy.html" target="_blank"><b>Deploy a producció + domini propi</b></a></li>
+  <li>💳 <a href="/guia-stripe-setup.html" target="_blank"><b>Configurar Stripe Subscriptions</b></a></li>
+  <li>📦 <a href="/guia-github-releases.html" target="_blank"><b>Auto-updates amb GitHub Releases</b></a></li>
+  <li>📕 <a href="/guia-publicar-versions.html" target="_blank"><b>Publicar versions (publish-safe.ps1)</b></a></li>
+</ul>
+</div><!-- /panell -->
 
 <!-- ============ TAB: LINKS & CLAUS ============ -->
 <div class="tab-panel" data-panel="links">
@@ -433,6 +487,37 @@ Nova pestanya <b>📊 Estadístiques</b> al admin panel. Inclou:
 
 </div><!-- /admin -->
 
+<!-- ============ TAB: GUIES CLIENTS ============ -->
+<div class="tab-panel" data-panel="clients">
+<h1>👥 Guies per als teus clients</h1>
+<p>Aquests són els <b>2 documents que has d'enviar</b> a cada client nou (ara ja s'envien automàticament a l'email d'aprovació de llicència):</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0">
+  <div style="background:#f0f9ff;border:2px solid #0284c7;border-radius:10px;padding:18px">
+    <h3 style="margin-top:0;color:#0369a1">📥 Guia d'instal·lació</h3>
+    <p style="color:#0c4a6e;font-size:13px">6 passos per instal·lar l'app en 5 minuts, amb resolució de problemes comuns (Windows Defender, etc.).</p>
+    <p style="margin-top:10px"><a href="/guia-client-installacio.html" target="_blank" style="background:#0284c7;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:700;font-size:13px">Obrir guia →</a></p>
+    <div style="margin-top:10px;font-family:'Courier New',monospace;font-size:11px;color:#0c4a6e;background:#e0f2fe;padding:6px 10px;border-radius:4px;user-select:all">https://medicarplus.es/guia-client-installacio.html</div>
+  </div>
+  <div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:10px;padding:18px">
+    <h3 style="margin-top:0;color:#15803d">📘 Manual d'Usuari <span style="background:#22c55e;color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:4px">NOU</span></h3>
+    <p style="color:#065f46;font-size:13px">Guia completa amb 9 pestanyes: Empezar · Tráfico · Revisiones · Cierre · Contabilidad · Libro · SMS · Config · Ayuda.</p>
+    <p style="margin-top:10px"><a href="/manual-usuari.html" target="_blank" style="background:#16a34a;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:700;font-size:13px">Obrir manual →</a></p>
+    <div style="margin-top:10px;font-family:'Courier New',monospace;font-size:11px;color:#065f46;background:#d1fae5;padding:6px 10px;border-radius:4px;user-select:all">https://medicarplus.es/manual-usuari.html</div>
+  </div>
+</div>
+
+<h2 style="color:#065f46">📧 Email automàtic al client (v2.0.37)</h2>
+<p>Quan aprovis una sol·licitud amb <b>send_email=true</b>, l'email que rep el client conté automàticament:</p>
+<ul>
+  <li>✅ La <b>clau de llicència</b> (JWT)</li>
+  <li>✅ Enllaç per <b>descarregar l'app</b> des de GitHub Releases</li>
+  <li>✅ Botó a la <b>Guia d'instal·lació</b> (medicarplus.es)</li>
+  <li>✅ Botó al <b>Manual d'Usuari</b> (medicarplus.es)</li>
+</ul>
+<p style="color:#64748b;font-size:13px"><b>Requisit:</b> tenir <code>RESEND_API_KEY</code> configurat a les variables d'entorn del backend. Si no, l'email no s'envia (podràs enviar-lo manualment amb "Enviar per email" del panell admin).</p>
+</div><!-- /clients -->
+
 <!-- ============ TAB: PROTECCIÓ ============ -->
 <div class="tab-panel" data-panel="proteccio">
 <h1 id="proteccio">11. Protecció del codi</h1>
@@ -540,9 +625,9 @@ Absolutament. Cada centre té la seva llicència JWT única. Tot el sistema est�
       url.searchParams.set('tab', name);
       history.replaceState(null, '', url);
     }
-    // Scroll to top when switching tabs
     window.scrollTo({top: 0, behavior: 'smooth'});
   }
+  window.__setTab = setTab;
   btns.forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab, true)));
   // Restaura pestanya des de ?tab= o hash #estat, #links, etc.
   const url = new URL(location.href);
@@ -565,6 +650,91 @@ Absolutament. Cada centre té la seva llicència JWT única. Tot el sistema est�
     setTab(anchorMap[h], false);
     setTimeout(() => { const t = document.getElementById(h); if(t) t.scrollIntoView({behavior:'smooth'}); }, 100);
   }
+})();
+
+// Cercador global (busca dins tots els panells)
+(function(){
+  const inp = document.getElementById('guideSearch');
+  const clearBtn = document.getElementById('guideSearchClear');
+  const results = document.getElementById('guideSearchResults');
+  if(!inp || !results) return;
+  const panels = Array.from(document.querySelectorAll('.tab-panel[data-panel]'));
+  // Índex: [{ tab, title, text, headings }]
+  const index = panels.map(p => {
+    const tab = p.dataset.panel;
+    const btn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+    const tabName = btn ? btn.textContent.trim() : tab;
+    // Extreu totes les seccions (h1/h2/h3) i el text que segueix
+    const items = [];
+    const headings = p.querySelectorAll('h1, h2, h3');
+    headings.forEach(h => {
+      const title = h.textContent.trim();
+      let text = '';
+      let sib = h.nextElementSibling;
+      while(sib && !['H1','H2','H3'].includes(sib.tagName)){
+        text += ' ' + (sib.textContent || '');
+        sib = sib.nextElementSibling;
+      }
+      items.push({ tab, tabName, title, text: text.slice(0, 500), heading: h });
+    });
+    return items;
+  }).flat();
+  function highlight(text, q){
+    if(!q) return text;
+    const esc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return text.replace(new RegExp('(' + esc + ')', 'gi'), '<mark>$1</mark>');
+  }
+  function doSearch(){
+    const q = (inp.value || '').trim();
+    clearBtn.classList.toggle('visible', q.length > 0);
+    if(q.length < 2){ results.classList.remove('visible'); results.innerHTML = ''; return; }
+    const qLower = q.toLowerCase();
+    const matches = index
+      .map(it => {
+        const inTitle = it.title.toLowerCase().includes(qLower);
+        const inText = it.text.toLowerCase().includes(qLower);
+        if(!inTitle && !inText) return null;
+        // Snippet: 60 chars around first match in text
+        let snippet = '';
+        const idx = it.text.toLowerCase().indexOf(qLower);
+        if(idx >= 0){
+          const start = Math.max(0, idx - 40);
+          snippet = (start > 0 ? '…' : '') + it.text.substr(start, 120) + (it.text.length > start + 120 ? '…' : '');
+        }
+        return { ...it, snippet, score: (inTitle ? 10 : 0) + (inText ? 1 : 0) };
+      })
+      .filter(Boolean)
+      .sort((a,b) => b.score - a.score)
+      .slice(0, 12);
+    if(matches.length === 0){
+      results.innerHTML = '<div class="search-empty">Sense resultats per "' + q + '"</div>';
+    }else{
+      results.innerHTML = matches.map(m => `<div class="search-item" data-tab="${m.tab}" data-heading-idx="${index.indexOf(m)}"><div class="r-tab">${m.tabName}</div><div class="r-title">${highlight(m.title, q)}</div>${m.snippet ? '<div class="r-snippet">' + highlight(m.snippet, q) + '</div>' : ''}</div>`).join('');
+      results.querySelectorAll('.search-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const targetTab = el.dataset.tab;
+          const hIdx = +el.dataset.headingIdx;
+          if(window.__setTab) window.__setTab(targetTab, true);
+          results.classList.remove('visible');
+          setTimeout(() => {
+            const heading = index[hIdx]?.heading;
+            if(heading) heading.scrollIntoView({behavior:'smooth', block:'start'});
+          }, 200);
+        });
+      });
+    }
+    results.classList.add('visible');
+  }
+  inp.addEventListener('input', doSearch);
+  clearBtn.addEventListener('click', () => { inp.value = ''; doSearch(); inp.focus(); });
+  // Escape to close
+  inp.addEventListener('keydown', (e) => { if(e.key === 'Escape'){ inp.value = ''; doSearch(); inp.blur(); } });
+  // Click outside to close
+  document.addEventListener('click', (e) => {
+    if(!results.contains(e.target) && e.target !== inp && e.target !== clearBtn){
+      results.classList.remove('visible');
+    }
+  });
 })();
 </script>
 
