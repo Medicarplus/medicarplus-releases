@@ -47,25 +47,34 @@
 <body>
 
 <h1 style="text-align:center;border:none;margin-top:0">🎛️ MediCar Plus · Guia Admin</h1>
-<p style="text-align:center;color:#64748b">Sistema complet · Llicències · Pagaments · SMS · Distribució · <b>Actualitzada 08/07/2026</b></p>
+<p style="text-align:center;color:#64748b">Sistema complet · Llicències · Pagaments · SMS · Distribució · <b>Actualitzada 13/07/2026 · v2.0.37</b></p>
 
-<div class="toc">
-<h3>📚 Índex</h3>
-<a href="#estat">0. Estat actual del sistema (visió general)</a>
-<a href="#pendents">🚨 1. Les 4 coses pendents (quan tinguis empresa)</a>
-<a href="#links">2. Els teus links importants</a>
-<a href="#claus">3. Claus i credencials</a>
-<a href="#novetats">4. Últimes novetats (juliol 2026)</a>
-<a href="#flux">5. Flux complet de venda pas a pas</a>
-<a href="#pagaments">6. Sistema de pagaments (3 mètodes)</a>
-<a href="#enviar-app">7. Distribució de l'app</a>
-<a href="#sms">8. Mòdul SMS/WhatsApp</a>
-<a href="#estadistiques">9. Panell d'estadístiques (MRR/ARR)</a>
-<a href="#preus">10. Preus i plans configurats</a>
-<a href="#proteccio">11. Protecció del codi + HWID lock</a>
-<a href="#faq">12. Preguntes freqüents</a>
-<a href="#guies">13. Guies tècniques enllaçades</a>
-</div>
+<style>
+  .tab-nav{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;gap:6px;padding:12px 4px;margin:20px 0 24px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .tab-btn{background:transparent;border:1px solid transparent;color:#475569;padding:9px 14px;border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
+  .tab-btn:hover{background:#e2e8f0;color:#0f172a}
+  .tab-btn.active{background:#0f172a;color:#f5b301;border-color:#0f172a;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+  .tab-panel{display:none}
+  .tab-panel.active{display:block;animation:fadeIn .25s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+</style>
+
+<nav class="tab-nav" role="tablist" aria-label="Seccions de la guia">
+  <button class="tab-btn active" data-tab="visio" data-testid="tab-visio">📌 Visió general</button>
+  <button class="tab-btn" data-tab="links" data-testid="tab-links">🔗 Links & Claus</button>
+  <button class="tab-btn" data-tab="novetats" data-testid="tab-novetats">🎉 Novetats</button>
+  <button class="tab-btn" data-tab="vendes" data-testid="tab-vendes">💰 Vendes</button>
+  <button class="tab-btn" data-tab="distribucio" data-testid="tab-distribucio">📦 Distribució</button>
+  <button class="tab-btn" data-tab="sms" data-testid="tab-sms">📱 SMS</button>
+  <button class="tab-btn" data-tab="admin" data-testid="tab-admin">📊 Admin panel</button>
+  <button class="tab-btn" data-tab="proteccio" data-testid="tab-proteccio">🛡️ Protecció</button>
+  <button class="tab-btn" data-tab="guies" data-testid="tab-guies">📚 Més guies</button>
+</nav>
+
+<div id="tab-container">
+
+<!-- ============ TAB: VISIÓ GENERAL ============ -->
+<div class="tab-panel active" data-panel="visio">
 
 <h1 id="estat">0. Estat actual del sistema</h1>
 
@@ -139,6 +148,10 @@ Amb 2 clients pagant STD anual (299,90€×2 = 599,80€) ja tens el fix cobert 
 
 <hr>
 
+</div><!-- /visio -->
+
+<!-- ============ TAB: LINKS & CLAUS ============ -->
+<div class="tab-panel" data-panel="links">
 <h1 id="links">2. Els teus links importants</h1>
 
 <table>
@@ -177,6 +190,10 @@ Amb 2 clients pagant STD anual (299,90€×2 = 599,80€) ja tens el fix cobert 
 <hr>
 
 <!-- ================================================================================ -->
+</div><!-- /links -->
+
+<!-- ============ TAB: NOVETATS ============ -->
+<div class="tab-panel" data-panel="novetats">
 <h1 id="novetats">4. Últimes novetats (juliol 2026)</h1>
 
 <h3>🔒 HWID Lock anti-pirateig <span class="badge badge-new">NOU</span></h3>
@@ -253,6 +270,10 @@ El símbol <code>?</code> al costat de "Saldo anterior caja" ara mostra la seva 
 
 <hr>
 
+</div><!-- /novetats -->
+
+<!-- ============ TAB: VENDES ============ -->
+<div class="tab-panel" data-panel="vendes">
 <h1 id="flux">5. Flux complet de venda pas a pas</h1>
 
 <div class="step">
@@ -303,6 +324,10 @@ L'app fa ping cada 15 dies. Si tu revoques la llicència o el HWID no coincideix
 
 <hr>
 
+</div><!-- /vendes -->
+
+<!-- ============ TAB: DISTRIBUCIÓ ============ -->
+<div class="tab-panel" data-panel="distribucio">
 <h1 id="enviar-app">7. Distribució de l'app</h1>
 
 <h3>Opció actual: WeTransfer / Google Drive</h3>
@@ -337,6 +362,10 @@ M. Brugulat Lopez · MediCar Plus</pre>
 
 <hr>
 
+</div><!-- /distribucio -->
+
+<!-- ============ TAB: SMS ============ -->
+<div class="tab-panel" data-panel="sms">
 <h1 id="sms">8. Mòdul SMS/WhatsApp</h1>
 
 <h3>Què fa</h3>
@@ -367,6 +396,10 @@ Usa <b>📤 Exportar CSV</b> i puja el fitxer a:
 
 <hr>
 
+</div><!-- /sms -->
+
+<!-- ============ TAB: ADMIN PANEL ============ -->
+<div class="tab-panel" data-panel="admin">
 <h1 id="estadistiques">9. Panell d'estadístiques</h1>
 
 Nova pestanya <b>📊 Estadístiques</b> al admin panel. Inclou:
@@ -398,6 +431,10 @@ Nova pestanya <b>📊 Estadístiques</b> al admin panel. Inclou:
 
 <hr>
 
+</div><!-- /admin -->
+
+<!-- ============ TAB: PROTECCIÓ ============ -->
+<div class="tab-panel" data-panel="proteccio">
 <h1 id="proteccio">11. Protecció del codi</h1>
 
 <h3>Què tens protegit</h3>
@@ -469,6 +506,10 @@ Absolutament. Cada centre té la seva llicència JWT única. Tot el sistema est�
 
 <hr>
 
+</div><!-- /proteccio -->
+
+<!-- ============ TAB: MÉS GUIES ============ -->
+<div class="tab-panel" data-panel="guies">
 <h1 id="guies">13. Guies tècniques enllaçades</h1>
 <ul style="line-height:2">
 <li>🚀 <a href="/guia-deploy.html" target="_blank"><b>Deploy a producció + domini propi</b></a> ⭐ — pas a pas per passar del preview al servidor real. <b>Passa-ho al teu informàtic.</b></li>
@@ -476,9 +517,59 @@ Absolutament. Cada centre té la seva llicència JWT única. Tot el sistema est�
 <li>🚀 <a href="/guia-github-releases.html" target="_blank"><b>Auto-updates amb GitHub Releases</b></a> — 7 passos per publicació automàtica</li>
 <li>👤 <a href="/guia-client-installacio.html" target="_blank"><b>Guia d'instal·lació per clients</b></a> — envia-la a cada client nou</li>
 </ul>
+</div><!-- /guies -->
+</div><!-- /tab-container -->
+
+<script>
+// Sistema de pestanyes: mostra un panell alhora i sincronitza amb URL hash (?tab=...)
+(function(){
+  const btns = document.querySelectorAll('.tab-btn');
+  const panels = document.querySelectorAll('.tab-panel');
+  function setTab(name, updateHash){
+    if(!name) return;
+    let found = false;
+    btns.forEach(b => {
+      const active = b.dataset.tab === name;
+      b.classList.toggle('active', active);
+      if(active) found = true;
+    });
+    if(!found){ setTab('visio', false); return; }
+    panels.forEach(p => p.classList.toggle('active', p.dataset.panel === name));
+    if(updateHash){
+      const url = new URL(location.href);
+      url.searchParams.set('tab', name);
+      history.replaceState(null, '', url);
+    }
+    // Scroll to top when switching tabs
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  }
+  btns.forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab, true)));
+  // Restaura pestanya des de ?tab= o hash #estat, #links, etc.
+  const url = new URL(location.href);
+  const q = url.searchParams.get('tab');
+  const h = location.hash.replace('#','');
+  // Mapeja anchors antics als nous tabs
+  const anchorMap = {
+    estat:'visio', pendents:'visio',
+    links:'links', claus:'links',
+    novetats:'novetats',
+    flux:'vendes', pagaments:'vendes',
+    'enviar-app':'distribucio',
+    sms:'sms',
+    estadistiques:'admin', preus:'admin',
+    proteccio:'proteccio', faq:'proteccio',
+    guies:'guies'
+  };
+  if(q) setTab(q, false);
+  else if(h && anchorMap[h]){
+    setTab(anchorMap[h], false);
+    setTimeout(() => { const t = document.getElementById(h); if(t) t.scrollIntoView({behavior:'smooth'}); }, 100);
+  }
+})();
+</script>
 
 <div class="footer">
-Guia MediCar Plus v2 · M.Brugulat Lopez · Actualitzada 08/07/2026<br>
+Guia MediCar Plus v2 · M.Brugulat Lopez · Actualitzada 13/07/2026 · v2.0.37<br>
 Contacte: info@medicarplus.es
 </div>
 

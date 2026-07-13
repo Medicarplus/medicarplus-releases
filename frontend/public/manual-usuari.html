@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>📘 Manual de Usuario · MediCar Plus</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:'Segoe UI',Calibri,Arial,sans-serif;max-width:960px;margin:0 auto;padding:24px 20px;color:#0f172a;line-height:1.6;background:#f8fafc}
+  header{text-align:center;padding:28px 20px;background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:14px;margin-bottom:24px;color:#fff;box-shadow:0 4px 16px rgba(0,0,0,.15)}
+  header h1{margin:0 0 6px;font-family:Georgia,serif;font-size:32px;color:#f5b301}
+  header p{margin:0;color:#cbd5e1;font-size:14px}
+  .tab-nav{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;gap:6px;padding:12px 6px;margin:0 0 24px;background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .tab-btn{background:transparent;border:1px solid transparent;color:#475569;padding:10px 14px;border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
+  .tab-btn:hover{background:#e2e8f0;color:#0f172a}
+  .tab-btn.active{background:#0f172a;color:#f5b301;border-color:#0f172a;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+  .tab-panel{display:none;background:#fff;padding:24px 28px;border-radius:12px;border:1px solid #cbd5e1;box-shadow:0 2px 12px rgba(0,0,0,.05)}
+  .tab-panel.active{display:block;animation:fadeIn .25s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  h1{color:#0f172a;font-family:Georgia,serif;font-size:24px;margin:0 0 14px;padding-bottom:10px;border-bottom:3px solid #f5b301}
+  h2{color:#065f46;font-size:17px;margin-top:24px;padding:6px 10px;background:linear-gradient(90deg,#dcfce7,transparent);border-left:4px solid #10b981}
+  h3{color:#0f172a;font-size:15px;margin-top:20px}
+  .step{background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:16px 20px;margin:14px 0}
+  .step-num{display:inline-block;background:#10b981;color:#fff;width:28px;height:28px;border-radius:50%;text-align:center;line-height:28px;font-weight:700;margin-right:10px;font-size:14px}
+  .callout{background:#fef3c7;border-left:5px solid #f59e0b;padding:12px 16px;margin:14px 0;border-radius:6px;font-size:14px}
+  .callout-blue{background:#dbeafe;border-left-color:#2563eb}
+  .callout-green{background:#dcfce7;border-left-color:#16a34a}
+  .callout-red{background:#fee2e2;border-left-color:#dc2626}
+  code{background:#0f172a;color:#f5b301;padding:2px 8px;border-radius:5px;font-family:'Courier New',monospace;font-size:13px}
+  kbd{background:#e2e8f0;border:1px solid #94a3b8;border-radius:4px;padding:2px 6px;font-family:'Courier New',monospace;font-size:12px;box-shadow:0 1px 0 #cbd5e1}
+  b,strong{color:#0f172a}
+  a{color:#2563eb;font-weight:600}
+  ul,ol{padding-left:22px}
+  li{margin-bottom:6px}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.5px;background:#fff}
+  th{background:#0f172a;color:#f5b301;padding:9px;text-align:left;font-weight:700}
+  td{padding:9px 10px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+  tr:nth-child(even) td{background:#f8fafc}
+  .tip{background:#f0f9ff;border-left:4px solid #0284c7;padding:10px 14px;border-radius:5px;font-size:13.5px;margin:12px 0;color:#0c4a6e}
+  .tip::before{content:"💡 ";font-weight:700}
+  .btn-icon{display:inline-block;background:#0f172a;color:#f5b301;padding:2px 8px;border-radius:5px;font-size:12px;font-weight:700}
+  footer{text-align:center;margin-top:36px;padding:20px;color:#64748b;font-size:12px;border-top:1px solid #cbd5e1}
+  footer a{color:#f5b301}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📘 Manual de Usuario · MediCar Plus</h1>
+  <p>Guía completa para usar el programa día a día · Versión 2.0.37 · Actualizado 13/07/2026</p>
+</header>
+
+<nav class="tab-nav" role="tablist" aria-label="Manual de usuario">
+  <button class="tab-btn active" data-tab="inicio" data-testid="tab-inicio">🚀 Empezar</button>
+  <button class="tab-btn" data-tab="trafico" data-testid="tab-trafico">🚦 Tráfico</button>
+  <button class="tab-btn" data-tab="revisiones" data-testid="tab-revisiones">🩺 Revisiones</button>
+  <button class="tab-btn" data-tab="cierre" data-testid="tab-cierre">💰 Cierre del día</button>
+  <button class="tab-btn" data-tab="contabilidad" data-testid="tab-contabilidad">📊 Contabilidad</button>
+  <button class="tab-btn" data-tab="libro" data-testid="tab-libro">📖 Libro Registro</button>
+  <button class="tab-btn" data-tab="sms" data-testid="tab-sms">🔔 Avisos SMS</button>
+  <button class="tab-btn" data-tab="config" data-testid="tab-config">⚙️ Configuración</button>
+  <button class="tab-btn" data-tab="faq" data-testid="tab-faq">🆘 Ayuda</button>
+</nav>
+
+<!-- ============ TAB: EMPEZAR ============ -->
+<div class="tab-panel active" data-panel="inicio">
+  <h1>🚀 Primeros pasos</h1>
+  <p>Bienvenido a <b>MediCar Plus</b>. Si es la primera vez que abres el programa, sigue estos pasos:</p>
+
+  <div class="step">
+    <h3><span class="step-num">1</span>Activar la licencia</h3>
+    <p>Al abrir la aplicación por primera vez verás una pantalla pidiendo la <b>clave de licencia</b>. Es la clave larga que empieza por <code>eyJhb...</code> que te envió tu proveedor por email.</p>
+    <ul>
+      <li>Copia la clave completa (con clic derecho → Copiar)</li>
+      <li>Pégala en el campo de la aplicación (<kbd>Ctrl</kbd> + <kbd>V</kbd>)</li>
+      <li>Clic en <b>Activar</b></li>
+    </ul>
+    <div class="callout callout-green"><b>✓ La licencia queda vinculada a este ordenador.</b> No hay que activarla cada día. Si un día cambias de ordenador, contacta con tu proveedor para transferir la licencia.</div>
+  </div>
+
+  <div class="step">
+    <h3><span class="step-num">2</span>Configuración inicial (una sola vez)</h3>
+    <p>Aparecerá un asistente pidiendo:</p>
+    <ul>
+      <li><b>Nombre de la empresa 1</b> — la principal (ej: <i>Marc Brugulat · Gestoría</i>)</li>
+      <li><b>Nombre de la empresa 2</b> — opcional (déjalo vacío si no lo usas)</li>
+      <li><b>Socios/reparto</b> — opcional (para calcular porcentajes de reparto anual)</li>
+    </ul>
+    <div class="tip">Todo se puede cambiar más adelante desde el botón <span class="btn-icon">⚙️ Configuración</span> arriba a la izquierda.</div>
+  </div>
+
+  <div class="step">
+    <h3><span class="step-num">3</span>Elegir idioma</h3>
+    <p>Por defecto la aplicación está en <b>español</b>. Puedes cambiar a <b>catalán</b> con el botón 🌐 arriba a la derecha.</p>
+  </div>
+
+  <div class="step">
+    <h3><span class="step-num">4</span>Conocer la interfaz</h3>
+    <table>
+      <tr><th>Zona</th><th>Qué hace</th></tr>
+      <tr><td><b>Barra superior</b></td><td>Asesor IA, Imprimir, Configuración, Guardar/Restaurar copia, Historial, Contabilidad, Avisos SMS, Auditoría</td></tr>
+      <tr><td><b>Selector de empresa</b></td><td>Cambia entre Empresa 1 (Tráfico) y Empresa 2 (Revisiones). Cada una tiene su propia caja y datos.</td></tr>
+      <tr><td><b>Pestañas de entrada</b></td><td>3 tipos: <b>Tráfico</b> (Renov/Exped), <b>Revisiones/Certificados</b>, <b>Debe/Haber</b></td></tr>
+      <tr><td><b>Lista de entradas</b></td><td>Todas las transacciones del día. Cada fila se puede editar (✏️), duplicar (⟳) o eliminar (🗑).</td></tr>
+      <tr><td><b>Cierre del día</b> (panel derecho)</td><td>Cálculo automático de todos los totales, formas de pago, IRPF, saldo, tasas DGT desglosadas.</td></tr>
+    </table>
+  </div>
+
+  <div class="callout callout-blue">
+    <b>🎁 ¿Novedades?</b> — Cada vez que se actualice la aplicación, verás automáticamente un modal explicando qué se ha añadido. También accesible desde <i>Contabilidad ▸ 🎁 Novedades</i>.
+  </div>
+</div>
+
+<!-- ============ TAB: TRÁFICO ============ -->
+<div class="tab-panel" data-panel="trafico">
+  <h1>🚦 Gestión de Tráfico (Renov/Exped)</h1>
+  <p>La pestaña <b>Tráfico</b> gestiona todos los trámites de la DGT: renovaciones, expediciones, canjes, duplicados, recuperaciones.</p>
+
+  <h2>📥 Importar CSV de la DGT</h2>
+  <div class="step">
+    <ol>
+      <li>Desde tu programa DGT (GIC o similar) <b>exporta el CSV del día</b>.</li>
+      <li>En MediCar Plus, en la lista de <i>ENTRADAS DEL DÍA</i>, clic en <b>📥 Importar CSV / Excel</b>.</li>
+      <li>Selecciona el archivo. La aplicación detecta automáticamente las columnas y clasifica cada entrada:
+        <ul>
+          <li><b>Renovación</b> · <b>Expedición</b> · <b>Obtención</b> · <b>Duplicado</b> · <b>Canje</b> · <b>Recuperación</b></li>
+          <li>Grupo: Conducir · Armas · Náutica · Otros</li>
+        </ul>
+      </li>
+      <li>Se calculan automáticamente <b>importes</b>, <b>tasas DGT</b> y <b>formas de pago</b>.</li>
+    </ol>
+    <div class="tip">Si tu CSV tiene una columna <b>Categoría</b> o <b>Clase</b> con el tipo de carnet (B, C+E, D, "Profesional"...), la aplicación lo usa para clasificar en <b>Libro de Registro</b>.</div>
+  </div>
+
+  <h2>✏️ Añadir entrada manualmente</h2>
+  <p>Rellena el formulario en la parte superior:</p>
+  <ul>
+    <li><b>CONCEPTO</b>: Renovación · Expedición · Duplicado · etc.</li>
+    <li><b>GRUPO</b>: Conducir · Armas · Náutica · etc.</li>
+    <li><b>NOMBRE</b>: apellidos y nombre del cliente</li>
+    <li><b>IMPORTE (€)</b>: lo que cobras al cliente</li>
+    <li><b>TASA DGT (€)</b>: la tasa oficial de la DGT (24,58 · 14,75 · 10,00 · etc.)</li>
+    <li><b>F. PAGO</b>: Efectivo · Tarjeta · Bizum · Transferencia</li>
+  </ul>
+  <p>Clic en <b>+ Añadir entrada</b>. Se añade a la lista y se recalculan totales.</p>
+
+  <h2>🔍 Filtros</h2>
+  <ul>
+    <li><b>Por Tipo·Grupo</b> — clica los chips (ej: <code>RENOVACIÓN·CONDUCIR (10)</code>)</li>
+    <li><b>Por rango de fechas</b> — desde/hasta</li>
+    <li><b>Solo hoy</b> — botón que resetea al día actual</li>
+    <li><b>Contar 0€</b> — checkbox para incluir entradas con importe 0€ en los recuentos (útil si registras visitas gratuitas)</li>
+  </ul>
+</div>
+
+<!-- ============ TAB: REVISIONES ============ -->
+<div class="tab-panel" data-panel="revisiones">
+  <h1>🩺 Revisiones y Certificados médicos</h1>
+  <p>La pestaña <b>Revisiones/Certificados/Otros</b> es para todo lo que <i>no</i> son trámites DGT: certificados de armas, náutica, buceo, seguridad privada, escolar, etc.</p>
+
+  <div class="step">
+    <h3>Añadir una revisión</h3>
+    <ol>
+      <li>Selecciona <b>TIPO</b> (Reconocimiento carnet · Renovación · Certificado armas · etc.)</li>
+      <li>Rellena <b>NOMBRE</b> del cliente</li>
+      <li><b>IMPORTE</b> — lo que cobras</li>
+      <li><b>IRPF</b> — el % configurado (7%, 15%, 19% o custom) se aplica automáticamente</li>
+      <li><b>Forma de pago</b> y <b>+ Añadir entrada</b></li>
+    </ol>
+  </div>
+
+  <div class="callout callout-blue"><b>Cambio de IRPF por empresa:</b> desde <i>⚙️ Configuración</i> puedes definir el % IRPF por defecto de cada empresa. Se aplica automáticamente a cada nueva entrada.</div>
+</div>
+
+<!-- ============ TAB: CIERRE ============ -->
+<div class="tab-panel" data-panel="cierre">
+  <h1>💰 Cierre del día</h1>
+  <p>El panel derecho de la pantalla principal muestra el <b>cierre automático</b> del día. Se actualiza en tiempo real con cada entrada que añades.</p>
+
+  <h2>📌 Qué muestra</h2>
+  <table>
+    <tr><th>Fila</th><th>Qué es</th></tr>
+    <tr><td>Entradas Tráfico</td><td>Cantidad de trámites del día (excluye retornos)</td></tr>
+    <tr><td>Total Certificados Tráfico</td><td>Suma de importes de trámites DGT</td></tr>
+    <tr><td>Descuentos</td><td>Total descontado</td></tr>
+    <tr><td><b>Tasas DGT</b> <span style="color:#059669">⭐ NUEVO</span></td><td>
+      Total tasas cobradas, con <b>desglose por importe</b>:<br>
+      <code style="font-size:11px">4×24,58 = 98,32 · 3×14,75 = 44,25</code><br>
+      Ignora las entradas con tasa 0€.
+    </td></tr>
+    <tr><td>💰 TOTAL TRÁFICO</td><td>Suma total DGT + tasas</td></tr>
+    <tr><td>🧾 TOTAL COBRADO</td><td>Todo lo cobrado (Tráfico + Otros + Ingresos manuales)</td></tr>
+    <tr><td>💵 Efectivo · 💳 Tarjeta · 📱 Bizum · 🏦 Transferencia</td><td>Desglose por forma de pago</td></tr>
+    <tr><td>Saldo anterior caja / Saldo anterior</td><td>Saldo con el que empezaste el día (metálico y total)</td></tr>
+    <tr><td>🟢 CAJA FÍSICA</td><td>Dinero en efectivo que debe haber en caja al final del día</td></tr>
+    <tr><td>🔵 CUENTA BANCO</td><td>Dinero que debe haber en el banco</td></tr>
+    <tr><td>TOTAL DÍA (facturación)</td><td>Facturación total del día</td></tr>
+  </table>
+
+  <h2>🖨️ Imprimir el cierre</h2>
+  <p>Clic en el botón <b>🖨️ Imprimir</b> arriba a la izquierda. Genera un PDF A4 con todo el cierre del día para archivar.</p>
+
+  <div class="tip">Si cobras a un cliente con tarjeta y el importe manual del datáfono no coincide, edita el campo <code>manu</code> junto a "Tarjeta → Banc" para introducir el total real.</div>
+</div>
+
+<!-- ============ TAB: CONTABILIDAD ============ -->
+<div class="tab-panel" data-panel="contabilidad">
+  <h1>📊 Contabilidad · Estadísticas</h1>
+  <p>Desde el botón <b>Contabilidad ▾</b> accedes a un menú con 3 opciones:</p>
+
+  <h2>📊 Estadísticas</h2>
+  <p>Modal con <b>3 pestañas</b> en la parte superior:</p>
+
+  <h3>🚗 Autoescolas</h3>
+  <ul>
+    <li>Tabla anual (12 meses × autoescoles) con certificados emitidos</li>
+    <li>Vista mensual: detalle día a día</li>
+    <li>Importa CSV, añade/edita autoescoles manualmente</li>
+    <li>Imprime informe A4</li>
+  </ul>
+
+  <h3>🚦 Tráfico</h3>
+  <ul>
+    <li>Gráfico de barras por mes con todas las entradas DGT del año</li>
+    <li>Desglose por tipo: Renovación, Expedición, Duplicado, Canje, Recuperación</li>
+    <li>KPIs: Total entradas · Total importes · Total tasas DGT · Facturado + Tasas</li>
+    <li>Tabla 12 meses × categorías + Importe + Tasas</li>
+    <li>Vista mensual: gráfico diario + desglose día a día</li>
+  </ul>
+
+  <h3>🔔 Avisos SMS <span style="color:#059669">⭐ NUEVO</span></h3>
+  <ul>
+    <li>4 KPIs: Campañas · Enviados OK · Errores · Sin móvil</li>
+    <li>Envíos por mes</li>
+    <li>Campañas recientes clicables → ver detalle e imprimir informe</li>
+    <li>Botón 🗑 para eliminar campañas con confirmación</li>
+  </ul>
+
+  <h2>📖 Libro de Registro</h2>
+  <p>Ver pestaña <b>Libro Registro</b> arriba para el detalle.</p>
+
+  <h2>🎁 Novedades</h2>
+  <p>Modal que muestra las mejoras de la versión actual y anteriores.</p>
+</div>
+
+<!-- ============ TAB: LIBRO REGISTRO ============ -->
+<div class="tab-panel" data-panel="libro">
+  <h1>📖 Libro de Registro</h1>
+  <p>Documento fiscal que registra automáticamente todas las entradas de <b>Conducir</b> importadas del CSV DGT, clasificadas por tipo.</p>
+
+  <h2>📋 Cómo se clasifica</h2>
+  <table>
+    <tr><th>Categoría</th><th>Cuándo</th></tr>
+    <tr><td><b>👔 PROFESIONALES</b></td><td>
+      El CSV tiene el texto <b>"Profesional"</b> en la columna Categoría, <b>o</b><br>
+      la clase de carnet es exactamente: <b>C · C1 · D · D1 · C+E · C1+E · D+E · D1+E</b>
+    </td></tr>
+    <tr><td><b>🚙 NORMALES</b></td><td>Todo lo demás: B · B1 · A · A1 · A2 · AM · BTP · etc.</td></tr>
+  </table>
+
+  <div class="callout callout-green">
+    <b>✓ Fix v2.0.37:</b> Anteriormente, la palabra "Renovación" (que contiene la letra C) se detectaba erróneamente como carnet profesional C. Ahora la clasificación es exacta.
+  </div>
+
+  <h2>🔧 Requisitos del CSV</h2>
+  <p>Para que la clasificación funcione correctamente, tu CSV DGT debe tener una columna con la clase del carnet. Nombres reconocidos automáticamente:</p>
+  <ul>
+    <li><code>CATEGORIA</code> · <code>CATEGORÍA</code> · <code>CLASE</code></li>
+    <li><code>PERMISO</code> · <code>TIPO_CARNET</code> · <code>CATEGORIA_CARNET</code></li>
+    <li><code>CLASE_CARNET</code> · <code>CARNET</code> · <code>PROFESIONAL</code></li>
+  </ul>
+  <p>Si tu CSV no tiene esa columna con esos nombres, la app <b>auto-detecta</b> qué columna contiene las clases (buscando C+E, D, Profesional, B, etc.).</p>
+
+  <h2>🖨️ Impresión</h2>
+  <p>Botón <b>Imprimir</b> genera un PDF A4 con:</p>
+  <ul>
+    <li>Cabecera con empresa, fecha, rango</li>
+    <li>Tabla PROFESIONALES: tipo · cantidad</li>
+    <li>Tabla NORMALES: tipo · cantidad</li>
+    <li>Totales</li>
+  </ul>
+
+  <h2>✅ Filtros</h2>
+  <ul>
+    <li><b>Rango de fechas</b> (por defecto hoy)</li>
+    <li><b>Contar 0€</b> — sincronizado con el mismo del panel principal</li>
+  </ul>
+</div>
+
+<!-- ============ TAB: SMS ============ -->
+<div class="tab-panel" data-panel="sms">
+  <h1>🔔 Avisos SMS · Recordatorios de renovación</h1>
+  <p>Envía SMS masivos a tus clientes cuando les toca renovar el carnet (avisa 1 mes antes, por ejemplo).</p>
+
+  <div class="callout callout-blue"><b>Modo actual: PRUEBA (Mock)</b>. Los SMS no se envían de verdad — se guardan en el histórico como si se hubieran enviado. Para envío real, hay que activar Twilio (ver con tu proveedor).</div>
+
+  <h2>📤 Crear una campaña</h2>
+  <div class="step">
+    <ol>
+      <li>Clic en <span class="btn-icon">📱 Avisos</span> arriba a la derecha</li>
+      <li>Clic en <b>➕ Nueva campaña</b></li>
+      <li><b>Nombre</b> — ej: "Renovaciones junio 2026"</li>
+      <li><b>Mensaje</b> — puedes usar plantillas: <code>{{nom}}</code> · <code>{{nom_complet}}</code> · <code>{{data_caducitat}}</code> · <code>{{mobil}}</code></li>
+      <li><b>Contactos</b> — pega desde Excel o sube un CSV con columnas: nombre, apellido1, apellido2, mobile, revision_date</li>
+      <li>Clic en <b>Enviar</b>. La aplicación filtra contactos sin móvil válido y muestra el resultado.</li>
+    </ol>
+  </div>
+
+  <h2>📊 Ver histórico</h2>
+  <p>Todas las campañas quedan guardadas. Desde el modal SMS puedes:</p>
+  <ul>
+    <li><b>Clic en una campaña</b> → ver detalle: mensaje, contactos, estado (Enviado/Error), fecha</li>
+    <li>Botón <b>🖨️ Imprimir informe</b> → PDF A4 con KPIs, mensaje y tabla detallada de envíos</li>
+    <li>Botón <b>🗑 Eliminar campaña</b> → borra el registro (con confirmación)</li>
+  </ul>
+
+  <h2>📊 Estadísticas</h2>
+  <p>Dentro del modal SMS, botón <b>📊 Estadísticas</b>:</p>
+  <ul>
+    <li>KPIs totales: Campañas · Enviados · Errores · Sin móvil</li>
+    <li>Envíos por mes</li>
+    <li>Campañas recientes con todos sus datos</li>
+  </ul>
+  <div class="tip">También accesible desde <i>Contabilidad ▸ 📊 Estadísticas ▸ pestaña 🔔 Avisos SMS</i>.</div>
+</div>
+
+<!-- ============ TAB: CONFIGURACIÓN ============ -->
+<div class="tab-panel" data-panel="config">
+  <h1>⚙️ Configuración</h1>
+  <p>Desde el botón <b>⚙️ Configuración</b> arriba a la izquierda puedes cambiar:</p>
+
+  <table>
+    <tr><th>Sección</th><th>Ajuste</th></tr>
+    <tr><td>Empresas</td><td>Nombres de Empresa 1 y Empresa 2 (opcional)</td></tr>
+    <tr><td>Socios</td><td>Añadir/quitar socios con % de reparto (para informe anual)</td></tr>
+    <tr><td>IRPF</td><td>% por empresa (7% · 15% · 19% · custom)</td></tr>
+    <tr><td>Reserva de cambio</td><td>Dinero fijo en efectivo que dejas cada día para cambio</td></tr>
+    <tr><td>Idioma</td><td>Botón 🌐 arriba a la derecha: Español · Català</td></tr>
+    <tr><td>Backup manual</td><td>Botón <b>Guardar copia</b> → descarga un JSON con todos los datos</td></tr>
+    <tr><td>Restaurar</td><td>Botón <b>Restaurar copia</b> → sube un JSON previamente guardado</td></tr>
+  </table>
+
+  <h2>💾 Ubicación de los datos</h2>
+  <div class="callout callout-blue">
+    Los datos se guardan en <code>localStorage</code> del navegador Electron (nunca salen del ordenador). Cada actualización de la app <b>preserva todos los datos</b>. Aún así, se recomienda <b>guardar una copia semanal</b> con el botón <i>Guardar copia</i>.
+  </div>
+
+  <h2>🔒 Licencia</h2>
+  <p>La licencia queda vinculada al hardware del ordenador (HWID lock). No puedes usarla en 2 PCs a la vez. Si cambias de ordenador, contacta con tu proveedor para transferirla.</p>
+</div>
+
+<!-- ============ TAB: FAQ ============ -->
+<div class="tab-panel" data-panel="faq">
+  <h1>🆘 Preguntas frecuentes y ayuda</h1>
+
+  <h3>❓ ¿Cómo actualizo la aplicación?</h3>
+  <p>Se actualiza <b>sola</b> en segundo plano cuando hay una versión nueva en GitHub. Cierra y vuelve a abrir la aplicación después. Verás un modal <b>🎁 ¿Novedades?</b> explicando qué se ha añadido.</p>
+
+  <h3>❓ ¿Y si no tengo internet?</h3>
+  <p>La aplicación <b>funciona sin conexión</b>. Solo necesitas internet para:</p>
+  <ul>
+    <li>Verificar licencia (una vez cada 30 días, silencioso)</li>
+    <li>Recibir actualizaciones</li>
+    <li>Enviar avisos SMS (obviamente)</li>
+  </ul>
+
+  <h3>❓ ¿Cómo hago backup?</h3>
+  <ol>
+    <li>Botón <b>Guardar copia</b> arriba a la izquierda</li>
+    <li>Guarda el archivo <code>medicar-backup-YYYY-MM-DD.json</code> en un pendrive o disco externo</li>
+    <li>Repite <b>semanalmente</b></li>
+  </ol>
+
+  <h3>❓ ¿Cómo cambio el % de IRPF?</h3>
+  <ol>
+    <li>Clic en <b>⚙️ Configuración</b></li>
+    <li>Sección Empresa 2 (o donde apliques IRPF)</li>
+    <li>Escribe el % (ej: 15) y guarda</li>
+  </ol>
+  <p>El nuevo IRPF se aplica a partir de la siguiente entrada. Las anteriores no se recalculan.</p>
+
+  <h3>❓ ¿Puedo usar la aplicación en Mac?</h3>
+  <div class="callout callout-red"><b>Actualmente no.</b> La aplicación está compilada solo para Windows 10/11 (64 bits). Si necesitas Mac, contáctanos.</div>
+
+  <h3>❓ Errores frecuentes</h3>
+  <table>
+    <tr><th>Error</th><th>Solución</th></tr>
+    <tr><td>"Licencia inválida"</td><td>La clave está mal copiada. Cópiala de nuevo del email original.</td></tr>
+    <tr><td>"Sin conexión al servidor"</td><td>El servidor de verificación de licencias está temporalmente caído. La app sigue funcionando offline. Vuelve a intentarlo en 1 hora.</td></tr>
+    <tr><td>CSV no importa bien</td><td>Verifica que tenga los headers correctos (FECHA · DNI · NOMBRE · TIPO · GRUPO · IMPORTE · TASA · FP). Ver pestaña <i>🚦 Tráfico</i>.</td></tr>
+    <tr><td>Libro de Registro muestra todo como Profesional</td><td>Bug ya corregido en v2.0.37. Actualiza la app (se actualiza sola al reiniciar).</td></tr>
+  </table>
+
+  <h3>❓ ¿Cómo contacto con soporte?</h3>
+  <p>Email: <a href="mailto:info@medicarplus.es">info@medicarplus.es</a></p>
+  <p>Web: <a href="https://medicarplus.es" target="_blank">medicarplus.es</a></p>
+</div>
+
+<footer>
+Manual de Usuario MediCar Plus v2.0.37 · Actualizado 13/07/2026<br>
+<a href="/guia-client-installacio.html">📥 Guía de instalación</a> · <a href="mailto:info@medicarplus.es">📧 Soporte</a>
+</footer>
+
+<script>
+// Sistema de pestañas
+(function(){
+  const btns = document.querySelectorAll('.tab-btn');
+  const panels = document.querySelectorAll('.tab-panel');
+  function setTab(name, updateHash){
+    if(!name) return;
+    let found = false;
+    btns.forEach(b => {
+      const active = b.dataset.tab === name;
+      b.classList.toggle('active', active);
+      if(active) found = true;
+    });
+    if(!found){ setTab('inicio', false); return; }
+    panels.forEach(p => p.classList.toggle('active', p.dataset.panel === name));
+    if(updateHash){
+      const url = new URL(location.href);
+      url.searchParams.set('tab', name);
+      history.replaceState(null, '', url);
+    }
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  }
+  btns.forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab, true)));
+  const url = new URL(location.href);
+  const q = url.searchParams.get('tab');
+  if(q) setTab(q, false);
+})();
+</script>
+
+</body>
+</html>
