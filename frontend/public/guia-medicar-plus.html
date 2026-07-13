@@ -124,44 +124,48 @@
 
 <!-- ================================================================================ -->
 <div class="pending-box">
-<h3 id="pendents">🚨 Les 4 coses que ens falten (quan tinguis empresa constituïda)</h3>
-<p style="color:#fde68a;margin:8px 0 16px 0">Aquestes són les úniques peces que et falten per tenir un negoci 100% automàtic. Totes estan <b>bloquejades esperant a tu</b>: cap de les 4 la puc fer jo sol.</p>
+<h3 id="pendents">📋 Estat actual · Què queda per completar el negoci 100% automàtic</h3>
+<p style="color:#fde68a;margin:8px 0 16px 0">Actualitzat 13/07/2026 · <b>v2.0.37</b>. Bones notícies: la landing i el sistema d'auto-updates ja funcionen. Només queden 2 peces per a un negoci totalment automàtic.</p>
 
-<div class="pending-item">
-<b>1️⃣ 🚀 DEPLOY A PRODUCCIÓ</b> · ~15€/mes<br>
-Passar del <i>preview sandbox</i> (que s'adorm i causa flashos) a un servidor real amb domini propi <code>medicarplus.com</code>.<br>
-<b>Requereix:</b> targeta de crèdit + comprar domini (~10€/any).<br>
-<b>Guia dedicada:</b> <a href="/guia-deploy.html" target="_blank" style="color:#f5b301;text-decoration:underline">/guia-deploy.html</a> (passa-la al teu informàtic).
+<div class="pending-item" style="background:rgba(34,197,94,0.15);border-left-color:#22c55e">
+<b>✅ 1️⃣ LANDING PÚBLICA <code>medicarplus.es</code></b> · <span style="color:#22c55e">FET</span><br>
+Servida via GitHub Pages amb HTTPS. Auto-actualitzada quan pujaves els fitxers a <a href="https://github.com/Medicarplus/medicarplus.es" target="_blank" style="color:#f5b301">Medicarplus/medicarplus.es</a>. Menú hamburguesa mòbil + hero rediseñat.
+</div>
+
+<div class="pending-item" style="background:rgba(34,197,94,0.15);border-left-color:#22c55e">
+<b>✅ 2️⃣ AUTO-UPDATES GITHUB RELEASES</b> · <span style="color:#22c55e">FET</span><br>
+<code>publish-safe.ps1</code> compila i puja automàticament a <a href="https://github.com/Medicarplus/medicarplus-releases" target="_blank" style="color:#f5b301">medicarplus-releases</a>. Els clients reben l'update silenciós via <code>electron-updater</code>. Última versió: <b>v2.0.36</b>.
+</div>
+
+<div class="pending-item" style="background:rgba(59,130,246,0.15);border-left-color:#3b82f6">
+<b>ℹ️ 3️⃣ BACKEND EN PROVA (Emergent preview)</b> · <span style="color:#3b82f6">EN PROVA</span><br>
+El backend (API llicències, admin panel, SMS, verificació HWID) està al servidor de proves <code>project-helper-47.preview.emergentagent.com</code>. Funciona 100% però pot dormir puntualment.<br>
+<b>Quan escalar-lo a producció:</b> quan tinguis 5+ clients de pagament o notis alguna caiguda.<br>
+<b>Cost estimat:</b> ~15€/mes + domini <code>api.medicarplus.es</code> (~10€/any).<br>
+<b>Guia:</b> <a href="/guia-deploy.html" target="_blank" style="color:#f5b301;text-decoration:underline">/guia-deploy.html</a>
 </div>
 
 <div class="pending-item">
-<b>2️⃣ 💳 STRIPE SUBSCRIPTIONS</b> · pagaments recurrents automàtics<br>
+<b>⏸️ 4️⃣ STRIPE SUBSCRIPTIONS</b> · <span style="color:#fed7aa">PENDENT · esperant IBAN empresa</span><br>
 Quan un client paga, Stripe li cobra <b>sol cada mes/any</b> i el JWT es renova sol via webhooks. Zero feina teva.<br>
 <b>Requereix:</b> empresa constituïda + IBAN empresa + compte Stripe verificat.<br>
-<b>Guia dedicada:</b> <a href="/guia-stripe-setup.html" target="_blank" style="color:#f5b301;text-decoration:underline">/guia-stripe-setup.html</a>
+<b>Guia:</b> <a href="/guia-stripe-setup.html" target="_blank" style="color:#f5b301;text-decoration:underline">/guia-stripe-setup.html</a>
 </div>
 
 <div class="pending-item">
-<b>3️⃣ 📱 TWILIO SMS/WHATSAPP</b> · enviament automàtic<br>
-Els avisos de renovació carnet, revisions caducades, etc. s'envien amb 1 clic. Sense Twilio, ara mateix ja pots <b>exportar CSV</b> i pujar-lo a LabsMobile per ~0,03€/SMS.<br>
-<b>Requereix:</b> compte Twilio + número de telèfon (~1$/mes) + verificació.<br>
+<b>⏸️ 5️⃣ TWILIO SMS REAL</b> · <span style="color:#fed7aa">PENDENT · quan compris crèdits</span><br>
+Actualment els SMS estan en <b>mode prova (mock)</b>. Els avisos es guarden però no s'envien de veritat. Per activar l'enviament real:<br>
+<b>Requereix:</b> compte Twilio + número de telèfon (~1$/mes) + <code>TWILIO_ACCOUNT_SID</code> i <code>TWILIO_AUTH_TOKEN</code> a variables d'entorn del backend.<br>
 <b>Cost SMS:</b> ~0,05€/SMS · WhatsApp ~0,05€/conversa.
 </div>
 
-<div class="pending-item">
-<b>4️⃣ 🔄 AUTO-UPDATES GITHUB RELEASES</b> · zero feina distribuir noves versions<br>
-Ara mateix, quan actualitzes l'app has d'enviar per WeTransfer a cada client. Amb això configurat: <code>git tag v2.0.1</code> → tots els clients reben l'update automàticament.<br>
-<b>Requereix:</b> compte GitHub (gratis) + Personal Access Token.<br>
-<b>Guia dedicada:</b> <a href="/guia-github-releases.html" target="_blank" style="color:#f5b301;text-decoration:underline">/guia-github-releases.html</a>
-</div>
-
 <div style="background:rgba(0,0,0,0.3);padding:12px 16px;border-radius:8px;margin-top:16px;color:#fef3c7">
-<b>📋 Ordre recomanat un cop tinguis empresa:</b>
+<b>📋 Ordre recomanat de què activar quan:</b>
 <ol style="margin:6px 0">
-<li>Deploy + domini + emails (prioritat màxima — sense això tot depèn del preview)</li>
-<li>Stripe Subscriptions (per cobrar automàtic des del dia 1)</li>
-<li>Twilio (quan tinguis 5+ clients i comenci a compensar el fix mensual)</li>
-<li>GitHub Releases (quan facis la 1a update important)</li>
+<li><b>Ara</b>: pots vendre llicències manualment i cobrar per Bizum/transferència. L'app està completa i estable.</li>
+<li><b>Al tenir empresa + IBAN</b>: activar Stripe Subscriptions per cobrar automàtic.</li>
+<li><b>Al tenir 5+ clients</b>: comprar crèdits Twilio i activar SMS reals.</li>
+<li><b>Quan notis inestabilitat</b>: fer deploy del backend a producció.</li>
 </ol>
 </div>
 
@@ -222,7 +226,7 @@ Amb 2 clients pagant STD anual (299,90€×2 = 599,80€) ja tens el fix cobert 
 </table>
 
 <div class="callout callout-blue">
-<b>💡 Un cop facis el deploy</b>, aquests links tots canviaran de <code>project-helper-47.preview.emergentagent.com</code> a <code>medicarplus.com</code> (o el domini que triïs). Els avisaré al xat i actualitzaré totes les guies automàticament.
+<b>💡 La landing pública</b> (medicarplus.es) està a GitHub Pages i funciona perfectament. El backend (API llicències, admin panel, SMS) està al sandbox Emergent. Quan facis deploy del backend, aquests links canviaran de <code>project-helper-47.preview.emergentagent.com</code> a <code>api.medicarplus.es</code> (o similar).
 </div>
 
 <hr>
@@ -406,7 +410,7 @@ Adjunt li envio la seva llicència:
    [link WeTransfer o GitHub Releases]
 
 3. GUIA D'INSTAL·LACIÓ (5 minuts):
-   https://medicarplus.com/guia-client-installacio.html
+   https://medicarplus.es/guia-client-installacio.html
 
 Un cop instal·lada, la clau queda vinculada al seu PC (HWID Lock).
 Si canvia d'ordinador, escrigui'ns i li desbloquejarem al moment.
