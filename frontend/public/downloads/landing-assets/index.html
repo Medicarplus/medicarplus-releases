@@ -130,9 +130,51 @@ h2{font-size:clamp(28px,4vw,42px);font-weight:800;line-height:1.15;margin-bottom
 .features{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
 .feature{
   background:var(--card);border:1px solid var(--border);border-radius:14px;
-  padding:28px 24px;transition:all .2s;
+  padding:28px 24px;transition:all .2s;position:relative;
 }
+.feature[data-shot]{cursor:zoom-in}
+.feature[data-shot]:hover{transform:translateY(-4px);border-color:var(--gold);box-shadow:0 12px 32px rgba(245,179,1,.15)}
 .feature:hover{transform:translateY(-4px);border-color:var(--gold)}
+.feature-view{
+  display:inline-block;margin-top:14px;font-size:12px;font-weight:700;letter-spacing:.5px;
+  color:var(--gold);opacity:0;transform:translateX(-6px);transition:all .25s;
+}
+.feature[data-shot]:hover .feature-view{opacity:1;transform:translateX(0)}
+@media(max-width:768px){.feature-view{opacity:.8;transform:none}}
+
+/* LIGHTBOX */
+.shot-lightbox{
+  position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.88);backdrop-filter:blur(6px);
+  display:none;align-items:center;justify-content:center;padding:24px;
+  animation:shotFade .22s ease;
+}
+.shot-lightbox.open{display:flex}
+@keyframes shotFade{from{opacity:0}to{opacity:1}}
+.shot-lightbox-inner{
+  max-width:1280px;width:100%;position:relative;
+  animation:shotZoom .28s cubic-bezier(.2,1,.3,1);
+}
+@keyframes shotZoom{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
+.shot-lightbox-title{
+  color:var(--gold);font-family:Georgia,serif;font-size:18px;margin-bottom:14px;
+  text-align:center;letter-spacing:.5px;
+}
+.shot-lightbox img{
+  width:100%;height:auto;border-radius:12px;
+  border:1px solid var(--border);
+  box-shadow:0 24px 80px rgba(0,0,0,.6),0 0 0 1px rgba(245,179,1,.15);
+  display:block;
+}
+.shot-lightbox-close{
+  position:absolute;top:-46px;right:0;
+  background:transparent;border:1px solid var(--border);color:var(--text);
+  width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:20px;
+  display:flex;align-items:center;justify-content:center;transition:all .2s;
+}
+.shot-lightbox-close:hover{background:var(--gold);color:#0f172a;border-color:var(--gold)}
+.shot-lightbox-caption{
+  margin-top:12px;text-align:center;color:var(--muted);font-size:12px;
+}
 .feature-icon{
   width:48px;height:48px;border-radius:10px;
   background:linear-gradient(135deg,rgba(245,179,1,.15),rgba(245,179,1,.05));
@@ -245,7 +287,24 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
       <div class="stat"><div class="stat-num">GIC</div><div class="stat-lbl">Compatible</div></div>
       <div class="stat"><div class="stat-num">Offline</div><div class="stat-lbl">Sin conexión</div></div>
       <div class="stat"><div class="stat-num">30d</div><div class="stat-lbl">Prueba gratuita</div></div>
-      <div class="stat"><div class="stat-num">🇪🇸 🇦🇩</div><div class="stat-lbl">Español · Català</div></div>
+      <div class="stat">
+        <div class="stat-num" style="display:inline-flex;gap:8px;align-items:center;line-height:1">
+          <!-- Bandera España (SVG) -->
+          <svg width="34" height="24" viewBox="0 0 6 4" xmlns="http://www.w3.org/2000/svg" style="border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.4)" aria-label="España">
+            <rect width="6" height="4" fill="#c60b1e"/>
+            <rect y="1" width="6" height="2" fill="#ffc400"/>
+          </svg>
+          <!-- Bandera Catalunya (SVG) - Senyera -->
+          <svg width="34" height="24" viewBox="0 0 9 6" xmlns="http://www.w3.org/2000/svg" style="border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.4)" aria-label="Catalunya">
+            <rect width="9" height="6" fill="#fcdd09"/>
+            <rect y="0.6" width="9" height="0.6" fill="#da121a"/>
+            <rect y="1.8" width="9" height="0.6" fill="#da121a"/>
+            <rect y="3.0" width="9" height="0.6" fill="#da121a"/>
+            <rect y="4.2" width="9" height="0.6" fill="#da121a"/>
+          </svg>
+        </div>
+        <div class="stat-lbl">Español · Català</div>
+      </div>
     </div>
   </div>
 </section>
@@ -258,66 +317,79 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
       <h2>Todo lo que necesita tu centro de reconocimientos médicos</h2>
       <p class="section-sub">Sistema completo diseñado desde la práctica diaria de los profesionales del sector de reconocimientos médicos.</p>
     </div>
+    <p class="section-hint" style="text-align:center;color:#94a3b8;font-size:13px;margin:-16px 0 24px;font-style:italic">💡 Haz clic en cualquier tarjeta para ver una captura real del programa</p>
     <div class="features">
-      <div class="feature">
+      <div class="feature" data-shot="screenshots/libro-registro.jpg" data-shot-title="Importación CSV DGT · Libro de Registro" data-testid="feature-csv">
         <div class="feature-icon">📥</div>
         <h3>Importación CSV DGT</h3>
         <p>Sube el fichero de la DGT y el sistema clasifica automáticamente: renovaciones, expediciones, canjes, duplicados. Cada uno con su tasa correcta.</p>
+        <span class="feature-view">Ver captura →</span>
       </div>
-      <div class="feature">
+      <div class="feature" data-shot="screenshots/main-cierre.jpg" data-shot-title="Cuadre de caja diario · Vista principal" data-testid="feature-caja">
         <div class="feature-icon">💰</div>
         <h3>Cuadre de caja diario</h3>
         <p>Efectivo, tarjeta, Bizum, transferencia. Saldo anterior, ingresos del día, IRPF a descontar, caja física. Todo cuadrado al céntimo.</p>
+        <span class="feature-view">Ver captura →</span>
       </div>
-      <div class="feature">
+      <div class="feature" data-shot="screenshots/contabilidad.jpg" data-shot-title="Menú Contabilidad · IRPF · Libreta · Estadísticas" data-testid="feature-irpf">
         <div class="feature-icon">📋</div>
         <h3>IRPF configurable</h3>
         <p>Elige el % (7%, 15%, 19% o custom) por empresa. Se aplica automáticamente en cada asiento y suma anual disponible.</p>
+        <span class="feature-view">Ver captura →</span>
       </div>
-      <div class="feature">
+      <div class="feature" data-shot="screenshots/estadisticas.jpg" data-shot-title="Estadísticas · Tráfico · Autoescolas · SMS" data-testid="feature-conta">
         <div class="feature-icon">📊</div>
         <h3>Contabilidad completa</h3>
         <p>Libreta anual, reparto de socios por porcentajes, reserva de cambio, informe anual con gráficos, auditoría de tasas.</p>
+        <span class="feature-view">Ver captura →</span>
       </div>
-      <div class="feature">
+      <div class="feature" data-shot="screenshots/sms-avisos.jpg" data-shot-title="Avisos SMS · Campañas Twilio" data-testid="feature-sms">
         <div class="feature-icon">📱</div>
         <h3>Avisos SMS · WhatsApp</h3>
         <p>Envía recordatorios automáticos a los pacientes cuando toca renovar carnet, certificado o cualquier tipo de reconocimiento médico. Integrado con Twilio.</p>
+        <span class="feature-view">Ver captura →</span>
       </div>
-      <div class="feature">
+      <div class="feature" data-shot="screenshots/main-cierre.jpg" data-shot-title="Búsqueda inteligente por nombre" data-testid="feature-search">
         <div class="feature-icon">🔎</div>
         <h3>Búsqueda inteligente</h3>
         <p>Encuentra cualquier paciente por nombre o apellidos en el histórico completo. Ve todas sus visitas, tipos de reconocimiento y pagos.</p>
+        <span class="feature-view">Ver captura →</span>
       </div>
-      <div class="feature">
+      <div class="feature" data-shot="screenshots/auditoria.jpg" data-shot-title="Auditoría de tasas · Impresión" data-testid="feature-print">
         <div class="feature-icon">🖨️</div>
         <h3>Impresión & backup</h3>
         <p>Imprime cierre diario, exporta copias de seguridad JSON, historial protegido con snapshots automáticos.</p>
+        <span class="feature-view">Ver captura →</span>
       </div>
-      <div class="feature">
+      <div class="feature" data-shot="screenshots/main-cierre.jpg" data-shot-title="Licencia hardware-locked · 1 licencia = 1 PC" data-testid="feature-license">
         <div class="feature-icon">🔒</div>
         <h3>Licencia hardware-locked</h3>
         <p>1 licencia = 1 ordenador. Impide piratería. Datos siempre locales en tu PC, cumple con LOPD/RGPD.</p>
+        <span class="feature-view">Ver captura →</span>
       </div>
-      <div class="feature">
+      <div class="feature" data-shot="screenshots/asesor-ia.jpg" data-shot-title="Asesor IA · Buscar descuadre con Google Gemini" data-testid="feature-ia">
         <div class="feature-icon">🤖</div>
         <h3>Asesor IA integrado</h3>
         <p>Pregunta en lenguaje natural: "¿cuánto he facturado este mes?" o "¿quién me debe dinero?". Respuesta en segundos.</p>
+        <span class="feature-view">Ver captura →</span>
       </div>
-      <div class="feature">
+      <div class="feature" data-shot="screenshots/main-cierre.jpg" data-shot-title="Actualizaciones automáticas · v2.0" data-testid="feature-updates">
         <div class="feature-icon">🔄</div>
         <h3>Actualizaciones automáticas</h3>
         <p>Nuevas funcionalidades y mejoras llegan solas. Sin reinstalar. Sin perder datos. Sin fricción.</p>
+        <span class="feature-view">Ver captura →</span>
       </div>
-      <div class="feature">
+      <div class="feature" data-shot="screenshots/main-cierre.jpg" data-shot-title="Bilingüe Español · Català" data-testid="feature-lang">
         <div class="feature-icon">🌐</div>
         <h3>Español · Català</h3>
         <p>Interfaz completamente traducida. Cambia idioma con un clic. Ideal para centros bilingües.</p>
+        <span class="feature-view">Ver captura →</span>
       </div>
-      <div class="feature">
+      <div class="feature" data-shot="screenshots/main-cierre.jpg" data-shot-title="100% offline · Datos siempre locales" data-testid="feature-offline">
         <div class="feature-icon">💾</div>
         <h3>Funciona offline</h3>
         <p>La app es 100% local. No depende de tu conexión. Solo verifica licencia cada 7 días online.</p>
+        <span class="feature-view">Ver captura →</span>
       </div>
     </div>
   </div>
@@ -478,8 +550,8 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
           <div>
-            <label for="c-empresa">Centro / Autoescuela</label>
-            <input type="text" id="c-empresa" placeholder="Nombre del negocio">
+            <label for="c-empresa">Centro médico</label>
+            <input type="text" id="c-empresa" placeholder="Nombre del centro de reconocimientos">
           </div>
           <div>
             <label for="c-tel">Teléfono</label>
@@ -585,6 +657,36 @@ function sendContact(e){
   document.addEventListener('keydown', (e) => { if(e.key === 'Escape') setOpen(false) });
   // Tanca en redimensionar a desktop
   window.addEventListener('resize', () => { if(window.innerWidth > 768) setOpen(false) });
+})();
+</script>
+
+<!-- LIGHTBOX: Screenshots del programa -->
+<div class="shot-lightbox" id="shotLightbox" role="dialog" aria-modal="true" aria-labelledby="shotTitle" data-testid="feature-lightbox">
+  <div class="shot-lightbox-inner">
+    <button class="shot-lightbox-close" id="shotClose" aria-label="Cerrar" data-testid="lightbox-close">✕</button>
+    <div class="shot-lightbox-title" id="shotTitle"></div>
+    <img id="shotImg" src="" alt="Captura MediCar Plus" data-testid="lightbox-image">
+    <div class="shot-lightbox-caption">🖱️ Clic fuera de la imagen o pulsa ESC para cerrar</div>
+  </div>
+</div>
+<script>
+(function(){
+  const lb=document.getElementById('shotLightbox');
+  const img=document.getElementById('shotImg');
+  const title=document.getElementById('shotTitle');
+  const closeBtn=document.getElementById('shotClose');
+  const open=(src,t)=>{img.src=src;title.textContent=t||'';lb.classList.add('open');document.body.style.overflow='hidden'};
+  const close=()=>{lb.classList.remove('open');img.src='';document.body.style.overflow=''};
+  document.querySelectorAll('.feature[data-shot]').forEach(el=>{
+    el.setAttribute('role','button');
+    el.setAttribute('tabindex','0');
+    const openFn=()=>open(el.getAttribute('data-shot'),el.getAttribute('data-shot-title'));
+    el.addEventListener('click',openFn);
+    el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openFn()}});
+  });
+  closeBtn.addEventListener('click',close);
+  lb.addEventListener('click',e=>{if(e.target===lb)close()});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&lb.classList.contains('open'))close()});
 })();
 </script>
 
