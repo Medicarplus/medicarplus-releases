@@ -751,6 +751,7 @@ function openStats(){
       <div id="stSectionSwitch" data-testid="st-section-switch" style="display:inline-flex;gap:0;margin-left:12px;background:#0e1117;border:1px solid #2a3040;border-radius:8px;padding:3px">
         <button class="btn" data-section="autos" data-testid="st-section-autos" style="background:#3a2a15;border-color:#f5b301;color:#f5b301;font-weight:700;padding:6px 12px;font-size:12px;border-radius:6px">🚗 Autoescolas</button>
         <button class="btn" data-section="traffic" data-testid="st-section-traffic" style="background:transparent;border-color:transparent;color:#94a3b8;font-weight:600;padding:6px 12px;font-size:12px;border-radius:6px">🚦 Tráfico</button>
+        <button class="btn" data-section="sms" data-testid="st-section-sms" style="background:transparent;border-color:transparent;color:#94a3b8;font-weight:600;padding:6px 12px;font-size:12px;border-radius:6px">🔔 Avisos SMS</button>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
@@ -780,10 +781,12 @@ function openStats(){
     currentSection = sec;
     back.querySelectorAll('#stSectionSwitch button').forEach(b => {
       const active = b.dataset.section === sec;
+      const themeMap = { autos:{bg:'#3a2a15',bo:'#f5b301',co:'#f5b301'}, traffic:{bg:'#152a3a',bo:'#7ec8ff',co:'#7ec8ff'}, sms:{bg:'#0f3a20',bo:'#22c55e',co:'#22c55e'} };
       if(active){
-        b.style.background = sec === 'traffic' ? '#152a3a' : '#3a2a15';
-        b.style.borderColor = sec === 'traffic' ? '#7ec8ff' : '#f5b301';
-        b.style.color = sec === 'traffic' ? '#7ec8ff' : '#f5b301';
+        const th = themeMap[sec] || themeMap.autos;
+        b.style.background = th.bg;
+        b.style.borderColor = th.bo;
+        b.style.color = th.co;
         b.style.fontWeight = '700';
       }else{
         b.style.background = 'transparent';
@@ -794,14 +797,22 @@ function openStats(){
     });
     // Show/hide autos-only controls (import CSV / add autoescola / clear all)
     back.querySelectorAll('.st-autos-only').forEach(el => { el.style.display = sec === 'autos' ? '' : 'none' });
+    // Hide year/mode/month/prev/next/print/label for SMS section
+    ['#stYear','#stMode','#stMonth','#stPrev','#stNext','#stPrint'].forEach(sel => { const el = back.querySelector(sel); if(el) el.style.display = sec === 'sms' ? 'none' : (sel==='#stMonth' && back.querySelector('#stMode')?.value!=='month' ? 'none' : '') });
+    // Hide the "ANY:" label when in sms section
+    const yearLabels = back.querySelectorAll('label.small');
+    yearLabels.forEach(l => { if(l.textContent.trim().startsWith('ANY')) l.style.display = sec === 'sms' ? 'none' : '' });
     // Update footer hint
     back.querySelector('#stFooterHint').innerHTML = sec === 'traffic'
       ? '💡 Los datos de Tráfico se calculan automáticamente desde el CSV DGT importado en el panel principal.'
+      : sec === 'sms'
+      ? '💡 Clica en una campaña para ver el detalle e imprimir el informe con enviados, errores y contactos.'
       : '💡 Fes clic en qualsevol casella per editar. Els totals es calculen automàticament.';
     renderTable();
   };
   const renderTable=()=>{
     if(currentSection === 'traffic'){ renderTrafficTable(); return; }
+    if(currentSection === 'sms'){ renderSmsInStats(); return; }
     const st=loadStats();
     const year=$('#stYear').value;
     const mode=$('#stMode').value;
@@ -1158,6 +1169,83 @@ function openStats(){
       }
       const totCells = TRAF_CATS.map(c => `<td>${agg.byCat[c] || ''}</td>`).join('');
       w.document.write(`<html><head><title>Tráfico ${MESOS[monthSel-1]} ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #333;padding:6px;text-align:center}th{background:#1e3a5f;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:12px}tfoot td{background:#333;color:#fff;font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>TRÁFICO · ${MESOS[monthSel-1].toUpperCase()} ${year}</h1><table><thead><tr><th>DÍA</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS</th></tr></thead><tbody>${rows.length ? rows.join('') : `<tr><td colspan="${3 + TRAF_CATS.length}" style="text-align:center;font-style:italic;color:#666">Sin entradas en este mes</td></tr>`}</tbody><tfoot><tr><td>TOTAL</td><td>${agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table><script>setTimeout(()=>window.print(),500)<\/script></body></html>`);
+    }
+  }
+  // ============================================================================
+  // Secció SMS/Avisos · Reutilitza els endpoints /api/sms/stats + /api/sms/campaigns
+  // ============================================================================
+  async function renderSmsInStats(){
+    const body = $('#stBody');
+    body.innerHTML = `<div data-testid="sms-stats-embed" style="padding:20px;text-align:center;color:#94a3b8">Cargando avisos SMS…</div>`;
+    try{
+      const [statsRes, listRes] = await Promise.all([
+        apiSms('/stats').catch(() => ({})),
+        apiSms('/campaigns').catch(() => ({ campaigns: [] })),
+      ]);
+      const d = statsRes || {};
+      const campaigns = (listRes.campaigns || listRes.items || []).slice(0, 100);
+      const monthRows = (d.by_month || []).slice(0, 12).map(m => `<tr><td style="padding:8px 12px;font-family:'Consolas',monospace">${m.month}</td><td style="padding:8px 12px;text-align:right;font-weight:700;color:#22c55e">${m.sent}</td></tr>`).join('');
+      const campRows = campaigns.map(c => {
+        const dt = c.created_at ? new Date(c.created_at).toLocaleString('es-ES', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+        const sent = c.sent_count ?? c.sent ?? 0;
+        const err = c.error_count ?? c.errors ?? 0;
+        const inv = c.filtered_invalid ?? c.invalid ?? 0;
+        const nm = String(c.name || '—').replace(/</g, '&lt;');
+        const mode = c.twilio_used ? '<span style="background:#1e40af;color:#fff;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:800">REAL</span>' : '<span style="background:#4c1d95;color:#fff;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:800">MOCK</span>';
+        return `<tr class="st-sms-row" data-testid="st-sms-row" data-id="${c.id}" style="border-bottom:1px solid #2a3040;cursor:pointer;transition:background .15s"><td style="padding:9px 12px;font-size:12px;color:#e2e8f0;font-weight:600">${nm}</td><td style="padding:9px 12px;font-size:11px;color:#94a3b8">${dt} ${mode}</td><td style="padding:9px 12px;text-align:right;font-weight:700;color:#22c55e">${sent}</td><td style="padding:9px 12px;text-align:right;font-weight:700;color:#ef4444">${err}</td><td style="padding:9px 12px;text-align:right;font-weight:600;color:#94a3b8">${inv}</td><td style="padding:9px 12px;text-align:right"><span style="color:#7ec8ff;font-size:11px">👁️ Ver e imprimir</span></td></tr>`;
+      }).join('');
+      body.innerHTML = `
+        <div data-testid="sms-stats-embed" style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+            <div style="padding:12px 14px;background:#0e1117;border:1px solid #2a3040;border-left:3px solid #f5b301;border-radius:6px">
+              <div class="small" style="color:#94a3b8;letter-spacing:.4px">Campañas</div>
+              <div style="font-size:24px;font-weight:700;color:#f5b301;font-family:'Consolas',monospace">${d.total_campaigns || 0}</div>
+            </div>
+            <div style="padding:12px 14px;background:#0e1117;border:1px solid #2a3040;border-left:3px solid #22c55e;border-radius:6px">
+              <div class="small" style="color:#94a3b8;letter-spacing:.4px">✓ Enviados OK</div>
+              <div style="font-size:24px;font-weight:700;color:#22c55e;font-family:'Consolas',monospace">${d.total_sent || 0}</div>
+            </div>
+            <div style="padding:12px 14px;background:#0e1117;border:1px solid #2a3040;border-left:3px solid #ef4444;border-radius:6px">
+              <div class="small" style="color:#94a3b8;letter-spacing:.4px">✗ Errores</div>
+              <div style="font-size:24px;font-weight:700;color:#ef4444;font-family:'Consolas',monospace">${d.total_errors || 0}</div>
+            </div>
+            <div style="padding:12px 14px;background:#0e1117;border:1px solid #2a3040;border-left:3px solid #64748b;border-radius:6px">
+              <div class="small" style="color:#94a3b8;letter-spacing:.4px">Sin móvil</div>
+              <div style="font-size:24px;font-weight:700;color:#cbd5e1;font-family:'Consolas',monospace">${d.total_invalid || 0}</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 2fr;gap:12px;align-items:start">
+            <div style="background:#0e1117;border:1px solid #2a3040;border-radius:8px;padding:14px">
+              <div class="small" style="margin-bottom:8px;color:#f5b301;font-weight:700;letter-spacing:.5px">📅 ENVÍOS POR MES</div>
+              <table style="width:100%;border-collapse:collapse;font-size:12px">${monthRows || '<tr><td style="padding:14px;color:#64748b;text-align:center;font-style:italic">Sin datos</td></tr>'}</table>
+            </div>
+            <div style="background:#0e1117;border:1px solid #2a3040;border-radius:8px;padding:14px">
+              <div class="small" style="margin-bottom:8px;color:#f5b301;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:8px">📋 CAMPAÑAS RECIENTES <span style="color:#64748b;font-size:10px;font-weight:400">(clic en fila → detalle + imprimir)</span></div>
+              <div style="max-height:420px;overflow-y:auto">
+                <table style="width:100%;border-collapse:collapse;font-size:12px">
+                  <thead><tr style="background:#1a1e26;position:sticky;top:0"><th style="padding:9px 12px;text-align:left;color:#f5b301;font-size:10px;text-transform:uppercase">Nombre</th><th style="padding:9px 12px;text-align:left;color:#f5b301;font-size:10px;text-transform:uppercase">Fecha</th><th style="padding:9px 12px;text-align:right;color:#22c55e;font-size:10px;text-transform:uppercase">✓ Env.</th><th style="padding:9px 12px;text-align:right;color:#ef4444;font-size:10px;text-transform:uppercase">✗ Err.</th><th style="padding:9px 12px;text-align:right;color:#cbd5e1;font-size:10px;text-transform:uppercase">S/M</th><th style="padding:9px 12px;text-align:right"></th></tr></thead>
+                  <tbody>${campRows || '<tr><td colspan="6" style="padding:20px;color:#64748b;text-align:center;font-style:italic">Aún sin campañas enviadas</td></tr>'}</tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      body.querySelectorAll('.st-sms-row').forEach(r => {
+        r.onmouseenter = () => { r.style.background = '#1a1e26' };
+        r.onmouseleave = () => { r.style.background = '' };
+        r.onclick = () => openSmsCampaignDetail(r.dataset.id);
+      });
+    }catch(e){
+      body.innerHTML = `<div style="color:#ef4444;text-align:center;padding:40px">Error cargando avisos: ${e.message}</div>`;
+    }
+  }
+  // Obre el modal SMS al detall directament d'una campanya (des d'aquí)
+  async function openSmsCampaignDetail(id){
+    if(!id) return;
+    back.remove();
+    if(typeof openSmsModal === 'function'){
+      openSmsModal();
+      setTimeout(() => { if(typeof window._renderSmsDetail === 'function') window._renderSmsDetail(id); }, 250);
     }
   }
   // Wire up section switch buttons
@@ -3077,6 +3165,9 @@ function openSmsModal(){
   document.getElementById('smsBtnStats').onclick=()=>renderSmsStats();
 
   renderSmsList();
+  // Exposa renderSmsDetail globalment perquè `openSmsCampaignDetail` (des del modal
+  // d'Estadístiques ▸ Avisos) el pugui invocar per obrir el detall directament.
+  window._renderSmsDetail = renderSmsDetail;
 
   async function renderSmsList(){
     const body=document.getElementById('smsBody');
@@ -3116,8 +3207,18 @@ function openSmsModal(){
     const body=document.getElementById('smsBody');
     body.innerHTML='<div style="text-align:center;padding:40px;color:#94a3b8">'+T.loading+'</div>';
     try{
-      const d=await apiSms('/stats');
+      const [d, listRes] = await Promise.all([apiSms('/stats'), apiSms('/campaigns').catch(()=>({campaigns:[]}))]);
       const monthRows=(d.by_month||[]).slice(0,12).map(m=>`<tr><td style="padding:8px 12px">${m.month}</td><td style="padding:8px 12px;text-align:right;font-weight:700;color:#22c55e">${m.sent}</td></tr>`).join('');
+      const campaigns = (listRes.campaigns||listRes.items||[]).slice(0, 50);
+      const campRows = campaigns.map(c => {
+        const dt = c.created_at ? new Date(c.created_at).toLocaleString(isCA?'ca-ES':'es-ES', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '-';
+        const sent = c.sent_count ?? c.sent ?? 0;
+        const err = c.error_count ?? c.errors ?? 0;
+        const inv = c.filtered_invalid ?? c.invalid ?? 0;
+        const nm = String(c.name||'—').replace(/</g,'&lt;');
+        const mode = c.twilio_used ? '<span style="background:#1e40af;color:#fff;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:800">REAL</span>' : '<span style="background:#4c1d95;color:#fff;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:800">MOCK</span>';
+        return `<tr class="sms-camp-row" data-testid="sms-camp-row" data-id="${c.id}" style="border-bottom:1px solid #1e293b;cursor:pointer;transition:background .15s"><td style="padding:9px 12px;font-size:12px;color:#e2e8f0">${nm}</td><td style="padding:9px 12px;font-size:11px;color:#64748b">${dt} ${mode}</td><td style="padding:9px 12px;text-align:right;font-weight:700;color:#22c55e">${sent}</td><td style="padding:9px 12px;text-align:right;font-weight:700;color:#ef4444">${err}</td><td style="padding:9px 12px;text-align:right;font-weight:600;color:#cbd5e1">${inv}</td><td style="padding:9px 12px;text-align:right"><span style="color:#7ec8ff;font-size:11px">👁️ ${isCA?'Veure':'Ver'}</span></td></tr>`;
+      }).join('');
       body.innerHTML=`
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
           <div style="background:#0e1a2e;padding:20px;border-radius:10px;border:1px solid #1e293b;text-align:center"><div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">${isCA?'Campanyes':'Campañas'}</div><div style="font-size:32px;font-weight:800;color:#f5b301">${d.total_campaigns||0}</div></div>
@@ -3125,12 +3226,27 @@ function openSmsModal(){
           <div style="background:#3a1a06;padding:20px;border-radius:10px;border:1px solid #f97316;text-align:center"><div style="font-size:12px;color:#fed7aa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">✗ Errors</div><div style="font-size:32px;font-weight:800;color:#f97316">${d.total_errors||0}</div></div>
           <div style="background:#1e293b;padding:20px;border-radius:10px;border:1px solid #475569;text-align:center"><div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">${isCA?'Sense mòbil':'Sin móvil'}</div><div style="font-size:32px;font-weight:800;color:#cbd5e1">${d.total_invalid||0}</div></div>
         </div>
-        <div style="background:#0e1a2e;padding:20px;border-radius:10px;border:1px solid #1e293b">
+        <div style="background:#0e1a2e;padding:20px;border-radius:10px;border:1px solid #1e293b;margin-bottom:20px">
           <div style="font-size:13px;color:#f5b301;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;font-weight:700">📅 ${isCA?'Enviaments per mes':'Envíos por mes'}</div>
           <table style="width:100%;border-collapse:collapse">${monthRows||'<tr><td style="padding:20px;color:#64748b;text-align:center">'+(isCA?'Encara sense dades':'Aún sin datos')+'</td></tr>'}</table>
         </div>
+        <div style="background:#0e1a2e;padding:20px;border-radius:10px;border:1px solid #1e293b">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <div style="font-size:13px;color:#f5b301;text-transform:uppercase;letter-spacing:.5px;font-weight:700;flex:1">📋 ${isCA?'Campanyes recents':'Campañas recientes'} <span style="color:#64748b;font-size:11px;font-weight:400;margin-left:6px">${isCA?'(clica una fila per veure el detall i imprimir)':'(clic en una fila para ver el detalle e imprimir)'}</span></div>
+            <span style="color:#64748b;font-size:11px">${campaigns.length}</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr style="background:#1e293b"><th style="padding:9px 12px;text-align:left;font-size:11px;color:#f5b301;text-transform:uppercase">${isCA?'Campanya':'Campaña'}</th><th style="padding:9px 12px;text-align:left;font-size:11px;color:#f5b301;text-transform:uppercase">${isCA?'Data':'Fecha'}</th><th style="padding:9px 12px;text-align:right;font-size:11px;color:#22c55e;text-transform:uppercase">✓ ${isCA?'Env.':'Env.'}</th><th style="padding:9px 12px;text-align:right;font-size:11px;color:#ef4444;text-transform:uppercase">✗ ${isCA?'Err.':'Err.'}</th><th style="padding:9px 12px;text-align:right;font-size:11px;color:#cbd5e1;text-transform:uppercase">${isCA?'S/M':'S/M'}</th><th style="padding:9px 12px;text-align:right;font-size:11px;color:#f5b301;text-transform:uppercase"></th></tr></thead>
+            <tbody>${campRows||'<tr><td colspan="6" style="padding:20px;color:#64748b;text-align:center">'+(isCA?'Encara sense campanyes':'Aún sin campañas')+'</td></tr>'}</tbody>
+          </table>
+        </div>
         <div style="text-align:center;margin-top:20px"><button onclick="document.getElementById('smsBody').innerHTML='';document.getElementById('smsClose').click();openSmsModal();" style="background:#1e293b;color:#e2e8f0;border:1px solid #475569;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">← ${isCA?'Tornar':'Volver'}</button></div>
       `;
+      body.querySelectorAll('.sms-camp-row').forEach(r=>{
+        r.onmouseenter=()=>{r.style.background='#111827'};
+        r.onmouseleave=()=>{r.style.background=''};
+        r.onclick=()=>renderSmsDetail(r.dataset.id);
+      });
     }catch(e){
       body.innerHTML='<div style="color:#ef4444;text-align:center;padding:40px">Error: '+e.message+'</div>';
     }
@@ -3243,7 +3359,11 @@ function openSmsModal(){
       }
       const dt=new Date(d.created_at).toLocaleString(isCA?'ca-ES':'es-ES');
       body.innerHTML=`
-        <div style="margin-bottom:16px"><button onclick="document.getElementById('smsBody').innerHTML='';document.getElementById('smsClose').click();openSmsModal();" style="background:#1e293b;color:#e2e8f0;border:1px solid #475569;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">← ${isCA?'Tornar al llistat':'Volver al listado'}</button></div>
+        <div style="margin-bottom:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button onclick="document.getElementById('smsBody').innerHTML='';document.getElementById('smsClose').click();openSmsModal();" style="background:#1e293b;color:#e2e8f0;border:1px solid #475569;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">← ${isCA?'Tornar al llistat':'Volver al listado'}</button>
+          <div style="flex:1"></div>
+          <button data-testid="sms-print-campaign" id="btnPrintSmsCamp" style="background:linear-gradient(90deg,#059669,#10b981);color:#fff;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">🖨️ ${isCA?'Imprimir informe':'Imprimir informe'}</button>
+        </div>
         <div style="background:#0e1a2e;padding:18px;border-radius:12px;border:1px solid #1e293b;margin-bottom:16px">
           <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:14px">
             <div>
@@ -3280,9 +3400,87 @@ function openSmsModal(){
         document.getElementById('smsRows').innerHTML=drawRows(filt);
         document.getElementById('smsResultCount').textContent=filt.length+' '+(isCA?'contactes':'contactos');
       };
+      const printBtn=document.getElementById('btnPrintSmsCamp');
+      if(printBtn) printBtn.onclick=()=>printSmsCampaign(d);
     }catch(e){
       body.innerHTML='<div style="color:#ef4444;text-align:center;padding:40px">Error: '+e.message+'</div>';
     }
+  }
+  function printSmsCampaign(d){
+    const w=window.open('','_blank');
+    if(!w) return;
+    const dt=d.created_at ? new Date(d.created_at).toLocaleString(isCA?'ca-ES':'es-ES') : '-';
+    const total=(d.sent_count||0)+(d.error_count||0);
+    const successRate=total>0?Math.round(((d.sent_count||0)/total)*100):0;
+    const rowsHtml=(d.contacts||[]).map((c,i)=>{
+      const nom=[c.name,c.surname1,c.surname2].filter(Boolean).join(' ');
+      const tel=c.mobile||c.landline||'—';
+      const st=c.sent?'ENVIADO':'ERROR';
+      const stColor=c.sent?'#15803d':'#b91c1c';
+      const sd=c.sent_at?new Date(c.sent_at).toLocaleString(isCA?'ca-ES':'es-ES'):'—';
+      return `<tr><td style="padding:5px 8px">${i+1}</td><td style="padding:5px 8px">${nom}</td><td style="padding:5px 8px;font-family:'Courier New',monospace">${tel}</td><td style="padding:5px 8px;color:${stColor};font-weight:700">${st}</td><td style="padding:5px 8px;font-size:10px;color:#555">${sd}</td></tr>`;
+    }).join('');
+    const brand = (window.CFG && CFG.company1 && CFG.company1.name) || 'MediCar Plus';
+    const title = (d.name||'').replace(/</g,'&lt;');
+    const msg = (d.template||'').replace(/</g,'&lt;');
+    const modeLabel = d.twilio_used ? 'ENVÍO REAL (Twilio)' : 'MODO PRUEBA (Mock)';
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Informe SMS · ${title}</title><style>
+      *{box-sizing:border-box}
+      body{font-family:Arial,Helvetica,sans-serif;padding:20mm 15mm;color:#000;margin:0}
+      .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:14px}
+      .brand{font-size:11px;color:#666}
+      h1{margin:0;color:#111;font-size:20px}
+      h2{margin:2px 0 0;font-size:13px;color:#666;font-weight:400}
+      .meta{margin:12px 0 18px;font-size:11px;color:#333;line-height:1.6}
+      .meta b{color:#000}
+      .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0 20px}
+      .kpi{border:1px solid #333;padding:10px;text-align:center;border-radius:4px}
+      .kpi .lb{font-size:9px;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+      .kpi .vl{font-size:22px;font-weight:800}
+      .k-green .vl{color:#15803d}
+      .k-red .vl{color:#b91c1c}
+      .k-gray .vl{color:#4b5563}
+      .k-blue .vl{color:#1e40af}
+      .msg{border:1px dashed #999;padding:10px;background:#fafafa;font-size:12px;color:#222;margin-bottom:18px;white-space:pre-wrap}
+      table{width:100%;border-collapse:collapse;font-size:11px}
+      thead th{background:#111;color:#fff;padding:6px 8px;text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase}
+      tbody tr:nth-child(even){background:#f5f5f5}
+      tbody td{border-bottom:1px solid #ddd}
+      .foot{margin-top:18px;font-size:9px;color:#666;text-align:center;border-top:1px solid #ccc;padding-top:8px}
+      @media print{body{padding:10mm}}
+    </style></head><body>
+      <div class="head">
+        <div>
+          <h1>${brand} · Informe SMS</h1>
+          <h2>${title}</h2>
+        </div>
+        <div class="brand" style="text-align:right">
+          <div><b>${dt}</b></div>
+          <div>${modeLabel}</div>
+        </div>
+      </div>
+      <div class="kpis">
+        <div class="kpi k-blue"><div class="lb">Total contactos</div><div class="vl">${total + (d.filtered_invalid||0)}</div></div>
+        <div class="kpi k-green"><div class="lb">✓ Enviados OK</div><div class="vl">${d.sent_count||0}</div></div>
+        <div class="kpi k-red"><div class="lb">✗ Errores</div><div class="vl">${d.error_count||0}</div></div>
+        <div class="kpi k-gray"><div class="lb">Sin móvil</div><div class="vl">${d.filtered_invalid||0}</div></div>
+      </div>
+      <div class="meta">
+        <b>Tasa de éxito:</b> ${successRate}% (${d.sent_count||0} de ${total} envíos intentados)<br>
+        <b>Fecha campaña:</b> ${dt}<br>
+        <b>Modo:</b> ${modeLabel}
+      </div>
+      <div style="font-size:11px;color:#333;margin-bottom:4px"><b>MENSAJE ENVIADO:</b></div>
+      <div class="msg">${msg}</div>
+      <div style="font-size:11px;color:#333;margin:14px 0 4px"><b>DETALLE DE ENVÍOS (${(d.contacts||[]).length}):</b></div>
+      <table>
+        <thead><tr><th>#</th><th>Nombre</th><th>Móvil</th><th>Estado</th><th>Enviado</th></tr></thead>
+        <tbody>${rowsHtml||'<tr><td colspan="5" style="padding:12px;text-align:center;color:#666;font-style:italic">Sin contactos</td></tr>'}</tbody>
+      </table>
+      <div class="foot">Informe generado el ${new Date().toLocaleString(isCA?'ca-ES':'es-ES')} · ${brand}</div>
+      <script>setTimeout(()=>window.print(),400);<\/script>
+    </body></html>`);
+    w.document.close();
   }
 }
 if($('#btnSms')){$('#btnSms').onclick=openSmsModal}
