@@ -238,6 +238,19 @@ El botó 🔎 Auditoría ara categoritza automàticament els clients repetits en
 <h3>💡 Tooltips instantanis amb CSS <span class="badge badge-new">NOU</span></h3>
 El símbol <code>?</code> al costat de "Saldo anterior caja" ara mostra la seva explicació <b>al moment</b> quan passes el ratolí per sobre (abans el <code>title=</code> nadiu triga 1-2 segons a aparèixer o no funciona bé al Windows). Tooltip amb fons negre, text groc i fletxa direccional.
 
+<h3>🎉 Novetats v2.0.37 <span class="badge badge-new">NOU</span></h3>
+<ul>
+<li>💰 <b>Desglossament de Tasas DGT</b> al Cierre del día — mostra la suma per import (ex: <code>4×24,58 = 98,32</code> · <code>3×14,75 = 44,25</code>) i el total a la dreta. Ignora entrades amb tasa 0€.</li>
+<li>📊 <b>Nova pestanya "🔔 Avisos SMS"</b> dins <i>Contabilidad ▸ Estadísticas</i> — al costat de Autoescolas i Tráfico. Mostra KPIs (Campanyes / Enviats / Errors / Sense mòbil), envios per mes i llistat clickable de campanyes recents.</li>
+<li>🖨️ <b>Imprimir informe SMS</b> — dins el detall d'una campanya, botó verd genera un PDF A4 amb capçalera, 4 KPIs, missatge enviat, taxa d'èxit i taula detallada amb # / Nom / Mòbil / Estat / Data d'enviament.</li>
+<li>🗑 <b>Eliminar campanyes SMS</b> — botó de borrar amb confirmació disponible al llistat del modal, a la vista de detall i al panell d'Estadístiques SMS. Elimina el registre a MongoDB.</li>
+<li>📖 <b>Fix crític · Libro de Registro</b> — la classificació Profesional/Normal ara és exacta. Detecta professional per: (a) text "Profesional" al camp Categoría del CSV DGT, o (b) classe exacta C, C1, D, D1, C+E, C1+E, D+E, D1+E. Corregeix el bug on "Renovación" (que conté la lletra C) marcava tot com professional.</li>
+<li>📁 <b>Parser CSV DGT flexible</b> — reconeix més noms de columna (CATEGORIA, CLASE, PERMISO, TIPO_CARNET, CATEGORIA_CARNET, CLASE_CARNET, CARNET, PROFESIONAL) i té <b>auto-detecció</b>: escaneja totes les columnes i utilitza la que té ≥50% de valors reconeguts com a classe de carnet.</li>
+<li>🚦 <b>"Recuperación" reconegut</b> a Estadístiques · Tráfico — abans queia a "Otro"; ara té la seva pròpia columna amb color rosa 🔸.</li>
+<li>🎁 <b>Modal ¿Novedades?</b> — es mostra automàticament la primera vegada que l'usuari obre l'app després d'una actualització. Enumera les novetats de cada versió. Accessible manualment des de <i>Contabilidad ▸ 🎁 Novedades</i>.</li>
+<li>🛡️ <b>Protecció defensiva</b> — <code>renderLibro()</code> ara té try/catch. Si algun helper falla, es mostra un missatge d'error clar en comptes d'una pantalla en blanc.</li>
+</ul>
+
 <hr>
 
 <h1 id="flux">5. Flux complet de venda pas a pas</h1>

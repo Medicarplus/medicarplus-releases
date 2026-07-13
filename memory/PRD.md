@@ -8,10 +8,16 @@ cd C:\medicarplus\electron
 powershell -ExecutionPolicy Bypass -File .\publish-safe.ps1
 ```
 
-**Última versió publicada**: v2.0.26 (10/07/2026)
-**Pròxima versió (pendent de publicar per Marc)**: v2.0.27 amb:
-- 📊 Nova secció **Tráfico** dins Estadísticas · gràfics mensual/anual + taula desglossada per tipus + KPIs (importe, tasas)
-- 🎁 Modal **¿Novedades?** · auto-mostrat en actualitzar + accés manual des de *Contabilidad ▸ Novedades*
+**Última versió publicada**: v2.0.36 (13/07/2026)
+**Pròxima versió (pendent de publicar per Marc)**: v2.0.37 amb:
+- 💰 Desglossament de **Tasas DGT** al Cierre del día (`4×24,58 = 98,32 · 3×14,75 = 44,25`) amb total a la dreta
+- 📊 Nova pestanya **"🔔 Avisos SMS"** dins Estadístiques (al costat d'Autoescolas i Tráfico)
+- 🖨️ Botó **Imprimir informe** al detall de campanya SMS (A4 amb KPIs + taula detallada)
+- 🗑 Botó **Eliminar campanya** (3 llocs: llistat, detall, estadístiques embed) amb confirmació
+- 🐛 Fix crític **classificació Profesional/Normal** al Libro de Registro (letra C dins "Renovación" ja no falseja)
+- 📁 Parser CSV DGT amb detecció automàtica de la classe del carnet
+- 🚦 **"Recuperación"** com a categoria reconeguda a Estadísticas · Tráfico
+- 🛡️ Try/catch defensiu al renderLibro
 
 ### Pipeline 5-passos (tot dins publish-safe.ps1):
 1. `sync.js` — Baixa fitxers font del servidor via `/api/electron/download/*` amb User-Agent Mozilla. Aborta si algun fitxer no passa signatures. **MAI barreja versions.**
