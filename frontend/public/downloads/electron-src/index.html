@@ -606,44 +606,67 @@ function toast(msg,ms=2200){const t=document.createElement('div');t.className='t
 // srcdoc, i disparem contentWindow.print() després del load. Funciona 100%.
 function printHtml(html, opts={}){
   try{
-    // Iframe amagat off-screen, sense modal intermig. El diàleg d'impressió del
-    // sistema apareix directament. Al tancar el diàleg, l'iframe s'elimina.
-    const iframe=document.createElement('iframe');
-    iframe.setAttribute('data-print-frame','1');
-    iframe.style.cssText='position:fixed;left:-9999px;top:-9999px;width:1200px;height:900px;border:0;visibility:hidden;pointer-events:none';
-    document.body.appendChild(iframe);
+    // Estratègia definitiva: injectar el HTML al DOM principal com un div ocult,
+    // aplicar CSS @media print que amaga tota la resta i mostra només aquest div,
+    // cridar window.print() del document principal. Així el diàleg de Windows
+    // pot fer una VISTA PRÈVIA correcta (perquè imprimeix el document actual,
+    // no un iframe extern).
+    //
+    // Un cop imprès (o cancel·lat), restaura el DOM.
+
+    // Extreu només el body content del html rebut
+    const parser=new DOMParser();
+    const parsed=parser.parseFromString(html,'text/html');
+    const bodyHtml=parsed.body?parsed.body.innerHTML:html;
+    // Extreu <style> tags del head del contingut generat
+    const styleBlocks=Array.from(parsed.head?parsed.head.querySelectorAll('style'):[]).map(s=>s.outerHTML).join('\n');
+    const docTitle=parsed.title||'MediCar Plus';
+
+    // 1) Crear contenidor del print
+    const printRoot=document.createElement('div');
+    printRoot.id='_print_root';
+    printRoot.innerHTML=bodyHtml;
+
+    // 2) Crear/injectar estil de print (amaga tot menys #_print_root, activa @page)
+    const style=document.createElement('style');
+    style.id='_print_style';
+    style.textContent=`
+      @media print {
+        body > *:not(#_print_root) { display:none !important; visibility:hidden !important; }
+        #_print_root { display:block !important; visibility:visible !important; position:static !important; }
+        #_print_root, #_print_root * { visibility:visible !important; }
+      }
+      @media screen {
+        #_print_root { display:none !important; }
+      }
+      ${styleBlocks.replace(/<style[^>]*>|<\/style>/g,'')}
+    `;
+
+    // 3) Título temporal (esdevé nom del fitxer per defecte al "Guardar com PDF")
+    const originalTitle=document.title;
+    document.title=docTitle;
+
+    document.head.appendChild(style);
+    document.body.appendChild(printRoot);
 
     const cleanup=()=>{
-      try{ iframe.remove() }catch(e){}
-      document.body.style.overflow='';
+      try{style.remove()}catch(e){}
+      try{printRoot.remove()}catch(e){}
+      document.title=originalTitle;
+      window.removeEventListener('afterprint',cleanup);
     };
+    window.addEventListener('afterprint',cleanup);
+    // Fallback: si afterprint no dispara, netegem als 60s
+    setTimeout(()=>{if(document.getElementById('_print_root'))cleanup()},60000);
 
-    // Al carregar-se el contingut, disparem print(). El navegador mostra el
-    // seu diàleg amb "Destination" (Impressora / Guardar com PDF).
-    iframe.onload=()=>{
-      try{
-        // Petit delay per assegurar que el layout s'ha renderitzat
-        setTimeout(()=>{
-          try{
-            iframe.contentWindow.focus();
-            iframe.contentWindow.print();
-            // Cleanup uns segons després que l'usuari tanqui el diàleg
-            const afterPrint=()=>{cleanup();try{iframe.contentWindow.removeEventListener('afterprint',afterPrint)}catch(e){}};
-            try{iframe.contentWindow.addEventListener('afterprint',afterPrint)}catch(e){}
-            setTimeout(cleanup, 60000); // fallback: netegem al minut
-          }catch(e){
-            console.error('[printHtml] print() failed:',e);
-            toast(currentLang==='ca'?'❌ Error imprimint':'❌ Error imprimiendo');
-            cleanup();
-          }
-        }, 200);
-      }catch(e){
-        console.error('[printHtml] onload err:',e);
+    // 4) Petit delay perquè el navegador renderitzi abans de disparar print
+    setTimeout(()=>{
+      try{window.print()}catch(e){
+        console.error('[printHtml] window.print() failed:',e);
+        toast(currentLang==='ca'?'❌ Error imprimint':'❌ Error imprimiendo');
         cleanup();
       }
-    };
-    // Escrivim el contingut via srcdoc (més fiable que doc.write en Electron)
-    iframe.srcdoc=html;
+    },100);
   }catch(err){
     console.error('[printHtml] Fatal:',err);
     toast(currentLang==='ca'?'❌ No s\'ha pogut imprimir':'❌ No se ha podido imprimir');
@@ -5011,7 +5034,7 @@ setTimeout(()=>{ try{ showWhatsNew(false) }catch(e){ console.warn('showWhatsNew'
 const API_BASE_HARDCODED='https://project-helper-47.preview.emergentagent.com';
 // App version (hardcoded — s'actualitza a cada release). Serveix per invalidar
 // caché de descoberta al detectar que l'usuari acaba d'actualitzar l'app.
-const APP_VERSION='2.1.8';
+const APP_VERSION='2.1.9';
 // Múltiples fonts de descoberta. La primera que respongui vàlidament guanya.
 // L'orden importa:
 // 1) raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json

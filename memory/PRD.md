@@ -58,16 +58,25 @@ powershell -ExecutionPolicy Bypass -File .\publish-safe.ps1
 **Última versió publicada**: v2.0.36 (13/07/2026)
 **Pròxima versió (pendent de publicar per Marc)**: v2.1.7 amb:
 
-## 🖨️ IMPRESSIÓ WYSIWYG UNIVERSAL + DIÀLEG DIRECTE (14/07/2026)
+## 🖨️ IMPRESSIÓ · SOLUCIÓ DEFINITIVA (v2.1.9 · 14/07/2026)
 
-**Iteracions v2.1.7 → v2.1.8**:
-1. **v2.1.7**: nova funció `printVisibleElement(el, opts)` que clona el DOM visible i imprimeix — WYSIWYG a IRPF, Estadístiques, Libro Registro, Llibreta, Cierre.
-2. **v2.1.8 (aquest fix)**: eliminat el modal de vista prèvia intermedi. Ara al clicar 'Imprimir', el diàleg d'impressió del sistema apareix DIRECTAMENT sobre l'app (l'iframe és off-screen amagat). El diàleg natiu ja té la seva pròpia previsualització + destinació "Guardar com PDF".
+**Bug reportat**: "Esta aplicación no admite la vista previa de impresión" al diàleg de Windows.
+
+**Root cause**: intent d'imprimir un iframe (off-screen o inline). Windows/Electron mostren aquest error perquè no poden generar preview d'un iframe extern.
+
+**Solució definitiva**:
+- Injectem el HTML del print com un `<div id="_print_root">` dins el DOM principal
+- Afegim CSS `@media print` que amaga tot el document EXCEPTE aquest div durant la impressió
+- Cridem `window.print()` del document principal
+- Al finalitzar (afterprint), netegem el div i l'estil
 
 **Beneficis**:
-- Menys clics per l'usuari (era 2 clics: Imprimir → Imprimir ara. Ara 1: Imprimir → diàleg directe)
-- Impossibles els bugs de "el diàleg queda darrere del modal"
-- Consistent amb comportament de qualsevol altra app Windows/Mac
+- ✅ Windows fa preview correcta (imprimeix el document actual, no un iframe)
+- ✅ Consistent amb comportament de qualsevol app web professional
+- ✅ Zero clics intermedis: 1 clic → diàleg amb preview → Imprimir/PDF/Cancel·lar
+- ✅ Compatible amb Electron + navegadors + macOS
+
+**Aplicat automàticament a**: Cierre diari, IRPF, Estadístiques, Libro Registro, Llibreta, SMS report.
 
 ## 🤖 SISTEMA AUTO-REPARACIÓ D'URL (v2.1.6 · manteniu)
 
