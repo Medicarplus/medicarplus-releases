@@ -1,0 +1,37 @@
+{
+  "summary": "MediCar Plus v2.1.0 regression + security backend testing after SSRF hardening and RRULE expansion in POST /api/calendar/fetch. 31/31 tests PASSED. All requested behaviours confirmed: SSRF rejection (localhost/private/loopback/link-local/file://), webcal:// → https:// normalisation, date_to inclusive fix (Assumption of Mary on 2026-08-15 present in same-day range), Feast of Saint James 2026-07-25 returned in Jul-Aug window, sources_failed now includes both url + label fields, 5 URLs accepted / 6 URLs rejected 422, range >60 days rejected 400, regression endpoints (/api/, /api/electron/download/package.json v2.1.0, index.html, /api/sms/campaigns, /api/sms/stats) all healthy.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/calendar/fetch", "issue": "SSRF _is_url_safe scheme check allows both http and https, but the module docstring at line 18 states 'Només HTTPS'. Docstring/behaviour mismatch — either enforce https-only in production or update the comment (currently http is kept 'as an escape hatch for edge cases like local testing'). Also, an attacker can bypass the private-IP check by using a public host that resolves to a private IP (DNS rebinding), because the IP resolved at validation time is not the IP used by httpx (which resolves again). Consider passing the resolved IP to httpx via transport override, or re-checking after connection."},
+      {"endpoint": "POST /api/calendar/fetch", "issue": "IPv6 loopback (::1) and IPv6 private addresses (fc00::/7, fe80::/10) are handled correctly via ipaddress.is_loopback/is_link_local/is_private, but there is no explicit test/lockdown for IPv6 literals in the URL host like http://[::1]/. Consider adding an explicit IPv6 test if IPv6 egress is a concern."},
+      {"endpoint": "POST /api/calendar/fetch", "issue": "recurring_ical_events.of(cal).between() catches ANY Exception and falls back to non-recurring cal.walk('VEVENT'). This silently masks real parsing bugs (e.g. malformed RRULE). Consider logging the exception before falling back, and/or surfacing a 'partial_expansion: true' flag per source."},
+      {"endpoint": "POST /api/calendar/fetch", "issue": "MAX_EVENTS_PER_CAL=500 silently truncates events (unchanged from iter 8). Highly-recurring calendars (e.g. daily slots for 60 days = 60 events fine, but 15-min slots × 8h × 60d = 1920) will drop after the 500th. Consider returning a 'truncated: true' flag per source. Not blocking."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_calendar_sync.py",
+    "/app/test_reports/pytest/pytest_calendar_sync.xml"
+  ],
+  "action_items": [
+    "(Optional / low priority) Guard against DNS rebinding by resolving hostname once and pinning that IP for the httpx request, or re-check the connected peer IP against private ranges.",
+    "(Optional) Log the exception when recurring_ical_events fallback is triggered so future RRULE regressions are observable.",
+    "(Optional) Add 'truncated: true' per-source flag when MAX_EVENTS_PER_CAL cap is hit.",
+    "(Nit) Reconcile docstring 'Només HTTPS (no HTTP pla)' vs. actual behaviour which allows http too."
+  ],
+  "critical_code_review_comments": [
+    "SSRF check is executed inside _fetch_ics BEFORE the httpx call — good. However, HTTPException raised for a rejected URL is caught by the per-URL try/except and pushed into sources_failed with 'URL rebutjada: …' prefix. Confirmed via tests. Clean pattern.",
+    "date_to inclusive fix: line 198 correctly does `date_to + timedelta(days=1)` and then re-filters with `ev_date_obj > date_to` on line 215. This is defensive and correct — verified with same-day range test (from==to==2026-08-15 returns Assumption of Mary).",
+    "sources_failed now carries both 'url' (truncated to 60 chars + ellipsis) and 'label' fields per entry — verified by all SSRF tests and labeling parametrized tests. This resolves the iter-8 finding about frontend correlation.",
+    "url_display truncation is done to 60 chars for privacy, good. It preserves the readable prefix (scheme + host), which is what the frontend needs.",
+    "recurring-ical-events==3.8.2 is pinned in requirements.txt — versioned dependency, reproducible. Verified the import works at runtime (Spain holidays parse test passed 5.79s total)."
+  ],
+  "updated_files": ["/app/backend/tests/test_calendar_sync.py"],
+  "success_rate": {"backend": "100% (31/31)", "frontend": "N/A (skipped per request)"},
+  "test_credentials": "Not required — endpoint is public.",
+  "seed_data_creation": "None. Tests use the public Spain holidays Google Calendar iCal URL.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_calendar_sync.py now has 31 tests covering v2.1.0 SSRF + RRULE + inclusive date_to fix. The new TestCalendarFetchSSRF class covers localhost, private 192.168.x.x, private 10.x.x.x, loopback 127.x.x.x, link-local 169.254.169.254 (AWS metadata), file://, .local hostnames, and webcal:// scheme normalisation. sources_failed entries carry both 'url' (original URL truncated to 60ch) and 'label' now — the labeling parametrized test uses e.get('label') directly. When bumping to v2.1.1, update TestHealthAndRegression::test_electron_package_json_version version pin. External URL: https://project-helper-47.preview.emergentagent.com."
+}
