@@ -597,6 +597,53 @@ function num(v){if(v==null||v==='')return 0;if(typeof v==='number')return v;let 
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function entriesOf(d){return state.byDate[d]||=[]}
 function toast(msg,ms=2200){const t=document.createElement('div');t.className='toast';t.textContent=msg;$('#toast').appendChild(t);setTimeout(()=>t.remove(),ms)}
+
+// ============================================================================
+// printHtml(html) — Impressió UNIVERSAL compatible amb Electron + navegador
+// ============================================================================
+// Motiu: window.open('','_blank') no és fiable a Electron (popup blocker,
+// context isolation, etc). Usem un iframe amagat que carrega l'HTML via
+// srcdoc, i disparem contentWindow.print() després del load. Funciona 100%.
+function printHtml(html){
+  try{
+    const iframe=document.createElement('iframe');
+    iframe.style.position='fixed';
+    iframe.style.right='0';
+    iframe.style.bottom='0';
+    iframe.style.width='0';
+    iframe.style.height='0';
+    iframe.style.border='0';
+    iframe.style.opacity='0';
+    iframe.setAttribute('aria-hidden','true');
+    iframe.setAttribute('data-print-frame','1');
+    document.body.appendChild(iframe);
+    let printed=false;
+    const doPrint=()=>{
+      if(printed)return;printed=true;
+      try{
+        const w=iframe.contentWindow;
+        w.focus();
+        w.print();
+      }catch(e){
+        console.error('[printHtml] print() failed:',e);
+        toast(currentLang==='ca'?'❌ Error imprimint':'❌ Error imprimiendo');
+      }
+      // Neteja després que el diàleg d'impressió es tanqui
+      setTimeout(()=>{try{iframe.remove()}catch(e){}},2000);
+    };
+    iframe.onload=()=>setTimeout(doPrint,250);
+    // Fallback timeout per si onload no dispara mai
+    setTimeout(doPrint,2500);
+    // Escrivim el contingut
+    const doc=iframe.contentWindow.document;
+    doc.open();
+    doc.write(html);
+    doc.close();
+  }catch(err){
+    console.error('[printHtml] Fatal:',err);
+    toast(currentLang==='ca'?'❌ No s\'ha pogut imprimir':'❌ No se ha podido imprimir');
+  }
+}
 function setDate(d){currentDate=d;$('#fecha').value=d;render()}
 function shiftDate(delta){const d=new Date(currentDate);d.setDate(d.getDate()+delta);setDate(d.toISOString().slice(0,10))}
 $('#btnPrevDay').onclick=()=>shiftDate(-1);$('#btnNextDay').onclick=()=>shiftDate(1);$('#btnToday').onclick=()=>setDate(isoToday());$('#fecha').onchange=e=>setDate(e.target.value);
@@ -769,7 +816,7 @@ function openLibroRegistro(){
   const chkZ=back.querySelector('#lrCountZero');if(chkZ){chkZ.checked=getCountZero();chkZ.onchange=()=>{setCountZero(chkZ.checked);renderLibro();}}
   back.querySelector('#lrFrom').onchange=renderLibro;
   back.querySelector('#lrTo').onchange=renderLibro;
-  back.querySelector('#lrPrint').onclick=()=>{const w=window.open('','_blank','width=1200,height=800');if(!w){toast(currentLang==='ca'?'⚠️ Pop-ups bloquejats':'⚠️ Pop-ups bloqueados');return}w.document.write(`<html><head><title>Libro de Registro</title><style>body{font-family:Arial,sans-serif;padding:20px}h1{text-align:center}table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}th,td{border:1px solid #333;padding:6px}th{background:#333;color:#fff}</style></head><body>${$('#lrBody').innerHTML}<script>setTimeout(()=>window.print(),400)<\/script></body></html>`);w.document.close()};
+  back.querySelector('#lrPrint').onclick=()=>{printHtml(`<html><head><title>Libro de Registro</title><style>body{font-family:Arial,sans-serif;padding:20px}h1{text-align:center}table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}th,td{border:1px solid #333;padding:6px}th{background:#333;color:#fff}</style></head><body>${$('#lrBody').innerHTML}</body></html>`)};
 }
 function openStats(){
   const s=loadStats();
@@ -944,21 +991,20 @@ function openStats(){
   back.querySelector('#stPrint').onclick=()=>{
     if(currentSection === 'traffic'){ printTrafficReport(); return; }
     const year=$('#stYear').value;const st=loadStats();const mode=$('#stMode').value;const monthSel=+$('#stMonth').value;
-    const w=window.open('','_blank','width=1200,height=800');
-    if(!w){toast(currentLang==='ca'?'⚠️ Pop-ups bloquejats':'⚠️ Pop-ups bloqueados');return}
+    let html='';
     if(mode==='month'){
       const key=`${year}-${String(monthSel).padStart(2,'0')}`;
       const monthData=st.data[key]||{};
       const rows=st.autoescoles.map(name=>{const v=monthData[name]||0;return `<tr><td style="text-align:left;font-weight:600">${name}</td><td>${v||''}</td></tr>`}).join('');
       const total=Object.values(monthData).reduce((s,v)=>s+(+v||0),0);
-      w.document.write(`<html><head><title>Estadístiques ${MESOS[monthSel-1]} ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #333;padding:8px;text-align:center}th{background:#333;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:12px}tfoot td{background:#444;color:#fff;font-weight:700;font-size:15px}@media print{body{padding:5mm}}</style></head><body><h1>ESTADÍSTIQUES · ${MESOS[monthSel-1].toUpperCase()} ${year}</h1><table><thead><tr><th>AUTOESCOLES</th><th>CERTIFICATS</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL ${MESOS[monthSel-1].toUpperCase()} ${year}</td><td>${total}</td></tr></tfoot></table><script>setTimeout(()=>window.print(),500)<\/script></body></html>`);
+      html=`<html><head><title>Estadístiques ${MESOS[monthSel-1]} ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #333;padding:8px;text-align:center}th{background:#333;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:12px}tfoot td{background:#444;color:#fff;font-weight:700;font-size:15px}@media print{body{padding:5mm}}</style></head><body><h1>ESTADÍSTIQUES · ${MESOS[monthSel-1].toUpperCase()} ${year}</h1><table><thead><tr><th>AUTOESCOLES</th><th>CERTIFICATS</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL ${MESOS[monthSel-1].toUpperCase()} ${year}</td><td>${total}</td></tr></tfoot></table></body></html>`;
     }else{
       const rows=st.autoescoles.map(name=>{let tot=0;const cells=MESOS.map((_,mi)=>{const key=`${year}-${String(mi+1).padStart(2,'0')}`;const v=(st.data[key]||{})[name]||0;tot+=v;return `<td>${v||''}</td>`}).join('');return `<tr><td style="text-align:left;font-weight:600">${name}</td>${cells}<td style="font-weight:700;background:#ffe6a8">${tot||''}</td></tr>`}).join('');
       const colTot=MESOS.map((_,mi)=>{const key=`${year}-${String(mi+1).padStart(2,'0')}`;const d=st.data[key]||{};return Object.values(d).reduce((s,v)=>s+(+v||0),0)});
       const grand=colTot.reduce((s,v)=>s+v,0);
-      w.document.write(`<html><head><title>Estadístiques ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #333;padding:5px;text-align:center}th{background:#333;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:10px}tfoot td{background:#444;color:#fff;font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>ESTADÍSTIQUES AUTOESCOLES ${year}</h1><table><thead><tr><th>AUTOESCOLES</th>${MESOS.map(m=>`<th>${m.slice(0,4).toUpperCase()}</th>`).join('')}<th style="background:#b8860b">TOTAL</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL CERTIFICATS</td>${colTot.map(v=>`<td>${v||''}</td>`).join('')}<td>${grand}</td></tr></tfoot></table><script>setTimeout(()=>window.print(),500)<\/script></body></html>`);
+      html=`<html><head><title>Estadístiques ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #333;padding:5px;text-align:center}th{background:#333;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:10px}tfoot td{background:#444;color:#fff;font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>ESTADÍSTIQUES AUTOESCOLES ${year}</h1><table><thead><tr><th>AUTOESCOLES</th>${MESOS.map(m=>`<th>${m.slice(0,4).toUpperCase()}</th>`).join('')}<th style="background:#b8860b">TOTAL</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL CERTIFICATS</td>${colTot.map(v=>`<td>${v||''}</td>`).join('')}<td>${grand}</td></tr></tfoot></table></body></html>`;
     }
-    w.document.close();
+    printHtml(html);
   };
   // ============================================================================
   // Secció TRÁFICO · Agrega les entrades del CSV DGT del panell principal
@@ -1180,8 +1226,7 @@ function openStats(){
     const year = +$('#stYear').value;
     const mode = $('#stMode').value;
     const monthSel = +$('#stMonth').value;
-    const w = window.open('','_blank','width=1200,height=800');
-    if(!w){toast(currentLang==='ca'?'⚠️ Pop-ups bloquejats':'⚠️ Pop-ups bloqueados');return}
+    let html='';
     if(mode === 'year'){
       const agg = _trafAggregate(year);
       const rows = MESOS.map((mName, mi) => {
@@ -1191,7 +1236,7 @@ function openStats(){
         return `<tr><td style="text-align:left;font-weight:600">${mName}</td><td>${md.count || ''}</td>${cells}<td style="text-align:right">${md.importe ? _fmtEur(md.importe) : ''}</td><td style="text-align:right">${md.tasas ? _fmtEur(md.tasas) : ''}</td></tr>`;
       }).join('');
       const totCells = TRAF_CATS.map(c => `<td>${agg.byCat[c] || ''}</td>`).join('');
-      w.document.write(`<html><head><title>Estadísticas Tráfico ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #333;padding:6px;text-align:center}th{background:#1e3a5f;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:12px}tfoot td{background:#333;color:#fff;font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>ESTADÍSTICAS TRÁFICO · ${year}</h1><table><thead><tr><th>MES</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS DGT</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL ${year}</td><td>${agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table><script>setTimeout(()=>window.print(),500)<\/script></body></html>`);
+      html=`<html><head><title>Estadísticas Tráfico ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #333;padding:6px;text-align:center}th{background:#1e3a5f;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:12px}tfoot td{background:#333;color:#fff;font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>ESTADÍSTICAS TRÁFICO · ${year}</h1><table><thead><tr><th>MES</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS DGT</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL ${year}</td><td>${agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table></body></html>`;
     }else{
       const agg = _trafAggregate(year, monthSel);
       const daysInMonth = new Date(year, monthSel, 0).getDate();
@@ -1204,9 +1249,9 @@ function openStats(){
         rows.push(`<tr><td style="text-align:left;font-weight:600">Día ${d}</td><td>${dd.count}</td>${cells}<td style="text-align:right">${dd.importe ? _fmtEur(dd.importe) : ''}</td><td style="text-align:right">${dd.tasas ? _fmtEur(dd.tasas) : ''}</td></tr>`);
       }
       const totCells = TRAF_CATS.map(c => `<td>${agg.byCat[c] || ''}</td>`).join('');
-      w.document.write(`<html><head><title>Tráfico ${MESOS[monthSel-1]} ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #333;padding:6px;text-align:center}th{background:#1e3a5f;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:12px}tfoot td{background:#333;color:#fff;font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>TRÁFICO · ${MESOS[monthSel-1].toUpperCase()} ${year}</h1><table><thead><tr><th>DÍA</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS</th></tr></thead><tbody>${rows.length ? rows.join('') : `<tr><td colspan="${3 + TRAF_CATS.length}" style="text-align:center;font-style:italic;color:#666">Sin entradas en este mes</td></tr>`}</tbody><tfoot><tr><td>TOTAL</td><td>${agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table><script>setTimeout(()=>window.print(),500)<\/script></body></html>`);
+      html=`<html><head><title>Tráfico ${MESOS[monthSel-1]} ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #333;padding:6px;text-align:center}th{background:#1e3a5f;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:12px}tfoot td{background:#333;color:#fff;font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>TRÁFICO · ${MESOS[monthSel-1].toUpperCase()} ${year}</h1><table><thead><tr><th>DÍA</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS</th></tr></thead><tbody>${rows.length ? rows.join('') : `<tr><td colspan="${3 + TRAF_CATS.length}" style="text-align:center;font-style:italic;color:#666">Sin entradas en este mes</td></tr>`}</tbody><tfoot><tr><td>TOTAL</td><td>${agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table></body></html>`;
     }
-    w.document.close();
+    printHtml(html);
   }
   // ============================================================================
   // Secció SMS/Avisos · Reutilitza els endpoints /api/sms/stats + /api/sms/campaigns
@@ -2023,10 +2068,7 @@ function openLedger(){
     const balP={};rows.forEach(r=>{if(!balP[r.debeAcct])balP[r.debeAcct]={debe:0,haber:0};balP[r.debeAcct].debe+=r.debeAmt;if(!balP[r.haberAcct])balP[r.haberAcct]={debe:0,haber:0};balP[r.haberAcct].haber+=r.haberAmt});
     let sCaixaP=0,sBancP=0;
     const balTrs=Object.entries(balP).sort(([a],[b])=>a.localeCompare(b)).map(([acct,v])=>{const s=v.debe-v.haber;if(acct.startsWith('570'))sCaixaP+=s;if(acct.startsWith('572'))sBancP+=s;return `<tr><td><b>${acct.split(' ')[0]}</b> ${acct.split(' ').slice(1).join(' ')}</td><td class="num" style="color:#8b1a1a">${fmt(v.debe)}</td><td class="num" style="color:#1a5a2a">${fmt(v.haber)}</td><td class="num"><b>${s>0.005?'D ':s<-0.005?'H ':''}${fmt(Math.abs(s))}</b></td></tr>`}).join('');
-    const w=window.open('','_blank','width=1200,height=800');
-    if(!w){toast(currentLang==='ca'?'⚠️ Pop-ups bloquejats':'⚠️ Pop-ups bloqueados');return}
-    w.document.write(`<html><head><title>Llibreta ${compName(ledgerComp)}</title><style>body{font-family:Georgia,serif;padding:10mm;color:#000;font-size:10px}h1{text-align:center;font-family:Georgia,serif;margin:4px;color:${headerColor(ledgerComp)}}.sub{text-align:center;font-size:11px;margin-bottom:10px}.book{display:grid;grid-template-columns:1fr 1fr;gap:0;border:2px solid #333}.book>div{border-right:2px solid #333}.book>div:last-child{border-right:none}.hdr-d{background:#8b1a1a;color:#fff;padding:5px;text-align:center;letter-spacing:3px;font-weight:700}.hdr-h{background:#1a5a2a;color:#fff;padding:5px;text-align:center;letter-spacing:3px;font-weight:700}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px dashed #999;padding:3px 5px;font-size:9px;vertical-align:top}th{background:#eee;font-size:9px}td.num{text-align:right;font-family:'Courier New',monospace;font-weight:700;width:70px}.tot{background:#333;color:#fff;padding:6px;text-align:right;font-weight:700;font-family:'Courier New',monospace}.foot{grid-column:1/-1;background:${cuadra?'#1a5a2a':'#8b1a1a'};color:#fff;padding:6px;text-align:center;font-weight:700}.balHdr{grid-column:1/-1;background:#333;color:#fff;padding:5px;text-align:center;letter-spacing:3px;font-weight:700;margin-top:8px}.balSummary{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:0}.balSummary>div{padding:8px;text-align:center;font-weight:700;color:#fff}@media print{body{padding:8mm}}</style></head><body><h1>LLIBRETA · ${compName(ledgerComp)}</h1><div class="sub">Període: ${from.split('-').reverse().join('/')} → ${to.split('-').reverse().join('/')}</div><div class="book"><div><div class="hdr-d">D E B E</div><table><thead><tr><th>Data</th><th>Compte / Concepte</th><th>Import</th></tr></thead><tbody>${debeTrs}</tbody></table></div><div><div class="hdr-h">H A B E R</div><table><thead><tr><th>Data</th><th>Compte / Concepte</th><th>Import</th></tr></thead><tbody>${haberTrs}</tbody></table></div><div class="tot">Total DEBE: ${fmt(totD)}</div><div class="tot">Total HABER: ${fmt(totH)}</div><div class="foot">${cuadra?`✓ QUADRA · ${rows.length} assentaments · Saldo: ${fmt(totD-totH)}`:`⚠ NO QUADRA · Diferència: ${fmt(Math.abs(totD-totH))}`}</div></div><div style="margin-top:12px;border:2px solid #333"><div class="balHdr">B A L A N Ç · P E R · C O M P T E S</div><table><thead><tr><th>Compte</th><th style="text-align:right;color:#8b1a1a">DEBE</th><th style="text-align:right;color:#1a5a2a">HABER</th><th style="text-align:right">SALDO</th></tr></thead><tbody>${balTrs}</tbody></table><div style="display:grid;grid-template-columns:1fr 1fr;gap:0"><div style="background:#8b1a1a;color:#fff;padding:8px;text-align:center;font-weight:700">💵 Caixa (570): ${fmt(sCaixaP)}</div><div style="background:#1e5aa8;color:#fff;padding:8px;text-align:center;font-weight:700">🏦 Bancs (572): ${fmt(sBancP)}</div></div></div><script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
-    w.document.close();
+    printHtml(`<html><head><title>Llibreta ${compName(ledgerComp)}</title><style>body{font-family:Georgia,serif;padding:10mm;color:#000;font-size:10px}h1{text-align:center;font-family:Georgia,serif;margin:4px;color:${headerColor(ledgerComp)}}.sub{text-align:center;font-size:11px;margin-bottom:10px}.book{display:grid;grid-template-columns:1fr 1fr;gap:0;border:2px solid #333}.book>div{border-right:2px solid #333}.book>div:last-child{border-right:none}.hdr-d{background:#8b1a1a;color:#fff;padding:5px;text-align:center;letter-spacing:3px;font-weight:700}.hdr-h{background:#1a5a2a;color:#fff;padding:5px;text-align:center;letter-spacing:3px;font-weight:700}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px dashed #999;padding:3px 5px;font-size:9px;vertical-align:top}th{background:#eee;font-size:9px}td.num{text-align:right;font-family:'Courier New',monospace;font-weight:700;width:70px}.tot{background:#333;color:#fff;padding:6px;text-align:right;font-weight:700;font-family:'Courier New',monospace}.foot{grid-column:1/-1;background:${cuadra?'#1a5a2a':'#8b1a1a'};color:#fff;padding:6px;text-align:center;font-weight:700}.balHdr{grid-column:1/-1;background:#333;color:#fff;padding:5px;text-align:center;letter-spacing:3px;font-weight:700;margin-top:8px}.balSummary{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:0}.balSummary>div{padding:8px;text-align:center;font-weight:700;color:#fff}@media print{body{padding:8mm}}</style></head><body><h1>LLIBRETA · ${compName(ledgerComp)}</h1><div class="sub">Període: ${from.split('-').reverse().join('/')} → ${to.split('-').reverse().join('/')}</div><div class="book"><div><div class="hdr-d">D E B E</div><table><thead><tr><th>Data</th><th>Compte / Concepte</th><th>Import</th></tr></thead><tbody>${debeTrs}</tbody></table></div><div><div class="hdr-h">H A B E R</div><table><thead><tr><th>Data</th><th>Compte / Concepte</th><th>Import</th></tr></thead><tbody>${haberTrs}</tbody></table></div><div class="tot">Total DEBE: ${fmt(totD)}</div><div class="tot">Total HABER: ${fmt(totH)}</div><div class="foot">${cuadra?`✓ QUADRA · ${rows.length} assentaments · Saldo: ${fmt(totD-totH)}`:`⚠ NO QUADRA · Diferència: ${fmt(Math.abs(totD-totH))}`}</div></div><div style="margin-top:12px;border:2px solid #333"><div class="balHdr">B A L A N Ç · P E R · C O M P T E S</div><table><thead><tr><th>Compte</th><th style="text-align:right;color:#8b1a1a">DEBE</th><th style="text-align:right;color:#1a5a2a">HABER</th><th style="text-align:right">SALDO</th></tr></thead><tbody>${balTrs}</tbody></table><div style="display:grid;grid-template-columns:1fr 1fr;gap:0"><div style="background:#8b1a1a;color:#fff;padding:8px;text-align:center;font-weight:700">💵 Caixa (570): ${fmt(sCaixaP)}</div><div style="background:#1e5aa8;color:#fff;padding:8px;text-align:center;font-weight:700">🏦 Bancs (572): ${fmt(sBancP)}</div></div></div></body></html>`);
   };
   renderLedger();
 }
@@ -2386,10 +2428,7 @@ function openIRPF(){
     const pct=irpfPct(irpfComp);
     const rows=(md.entries||[]).map(e=>{const c=irpfCalc(e,pct);return `<tr><td><b>${escapeHtml(e.nom||'')}</b></td><td class="num">${e.cert||''}</td><td class="num">${fmt(Number(e.brut)||0)}</td><td class="num">${fmt(Number(e.ss)||0)}</td><td class="num">${c.hasSs?fmt(c.total):''}</td><td class="num" style="background:#fef3c7">${fmt(c.irpf)}</td><td class="num">${fmt(c.net)}</td><td class="num">${c.hasSs?fmt(c.netSS):''}</td><td class="num">${c.hasSs?fmt(c.totalFinal):''}</td></tr>`}).join('');
     const totals=(md.entries||[]).reduce((a,e)=>{const c=irpfCalc(e,pct);a.brut+=Number(e.brut)||0;a.ss+=Number(e.ss)||0;if(c.hasSs){a.total+=c.total;a.netSS+=c.netSS;a.totalFinal+=c.totalFinal;a.net+=c.net;}else{a.net+=c.net;}a.irpf+=c.irpf;return a},{brut:0,ss:0,total:0,irpf:0,net:0,netSS:0,totalFinal:0});
-    const w=window.open('','_blank','width=1200,height=800');
-    if(!w){toast(currentLang==='ca'?'⚠️ Pop-ups bloquejats. Activa\'ls i torna a intentar-ho.':'⚠️ Pop-ups bloqueados. Actívalos e inténtalo de nuevo.');return}
-    w.document.write(`<html><head><title>IRPF ${compName(irpfComp)} · ${monthLabel(currentMonth)}</title><style>body{font-family:Georgia,serif;padding:10mm;font-size:11px}h1{text-align:center;color:#78350f}h2{text-align:center;color:#78350f;margin:6px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border:1px solid #333;padding:5px 7px}th{background:#78350f;color:#fff}td.num{text-align:right;font-family:'Courier New',monospace;font-weight:700}.tot{background:#fef3c7;font-weight:700}.hd{font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>IRPF · ${compName(irpfComp)}</h1><h2>${monthLabel(currentMonth).toUpperCase()}</h2><div style="margin:10px 0"><b>TOTAL CERTIFICATS:</b> ${md.totalCertificats||0} &nbsp;&nbsp;·&nbsp;&nbsp; <b>TOTAL CERTF. BOMBERS:</b> ${md.totalCertfBombers||0}</div><table><thead><tr><th>NOM</th><th>CERT.</th><th>BRUT</th><th>S.S.</th><th>TOTAL</th><th style="background:#b45309">IRPF ${pct}%</th><th>NET</th><th>NET S.S.</th><th>TOTAL</th></tr></thead><tbody>${rows}<tr class="tot"><td colspan="2" style="text-align:right">TOTALS:</td><td class="num">${fmt(totals.brut)}</td><td class="num">${fmt(totals.ss)}</td><td class="num">${fmt(totals.total)}</td><td class="num" style="background:#b45309;color:#fff">${fmt(totals.irpf)}</td><td class="num">${fmt(totals.net)}</td><td class="num">${fmt(totals.netSS)}</td><td class="num">${fmt(totals.totalFinal)}</td></tr></tbody></table><div style="margin-top:16px;text-align:right;font-size:14px"><b>TOTAL IRPF DEL MES:</b> ${fmt(totals.irpf)} €</div><script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
-    w.document.close();
+    printHtml(`<html><head><title>IRPF ${compName(irpfComp)} · ${monthLabel(currentMonth)}</title><style>body{font-family:Georgia,serif;padding:10mm;font-size:11px}h1{text-align:center;color:#78350f}h2{text-align:center;color:#78350f;margin:6px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border:1px solid #333;padding:5px 7px}th{background:#78350f;color:#fff}td.num{text-align:right;font-family:'Courier New',monospace;font-weight:700}.tot{background:#fef3c7;font-weight:700}.hd{font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>IRPF · ${compName(irpfComp)}</h1><h2>${monthLabel(currentMonth).toUpperCase()}</h2><div style="margin:10px 0"><b>TOTAL CERTIFICATS:</b> ${md.totalCertificats||0} &nbsp;&nbsp;·&nbsp;&nbsp; <b>TOTAL CERTF. BOMBERS:</b> ${md.totalCertfBombers||0}</div><table><thead><tr><th>NOM</th><th>CERT.</th><th>BRUT</th><th>S.S.</th><th>TOTAL</th><th style="background:#b45309">IRPF ${pct}%</th><th>NET</th><th>NET S.S.</th><th>TOTAL</th></tr></thead><tbody>${rows}<tr class="tot"><td colspan="2" style="text-align:right">TOTALS:</td><td class="num">${fmt(totals.brut)}</td><td class="num">${fmt(totals.ss)}</td><td class="num">${fmt(totals.total)}</td><td class="num" style="background:#b45309;color:#fff">${fmt(totals.irpf)}</td><td class="num">${fmt(totals.net)}</td><td class="num">${fmt(totals.netSS)}</td><td class="num">${fmt(totals.totalFinal)}</td></tr></tbody></table><div style="margin-top:16px;text-align:right;font-size:14px"><b>TOTAL IRPF DEL MES:</b> ${fmt(totals.irpf)} €</div></body></html>`);
   };
 
   render();
@@ -3710,8 +3749,6 @@ function openSmsModal(){
     }
   }
   function printSmsCampaign(d){
-    const w=window.open('','_blank');
-    if(!w) return;
     const dt=d.created_at ? new Date(d.created_at).toLocaleString(isCA?'ca-ES':'es-ES') : '-';
     const total=(d.sent_count||0)+(d.error_count||0);
     const successRate=total>0?Math.round(((d.sent_count||0)/total)*100):0;
@@ -3727,7 +3764,7 @@ function openSmsModal(){
     const title = (d.name||'').replace(/</g,'&lt;');
     const msg = (d.template||'').replace(/</g,'&lt;');
     const modeLabel = d.twilio_used ? 'ENVÍO REAL (Twilio)' : 'MODO PRUEBA (Mock)';
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Informe SMS · ${title}</title><style>
+    printHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Informe SMS · ${title}</title><style>
       *{box-sizing:border-box}
       body{font-family:Arial,Helvetica,sans-serif;padding:20mm 15mm;color:#000;margin:0}
       .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:14px}
@@ -3781,9 +3818,7 @@ function openSmsModal(){
         <tbody>${rowsHtml||'<tr><td colspan="5" style="padding:12px;text-align:center;color:#666;font-style:italic">Sin contactos</td></tr>'}</tbody>
       </table>
       <div class="foot">Informe generado el ${new Date().toLocaleString(isCA?'ca-ES':'es-ES')} · ${brand}</div>
-      <script>setTimeout(()=>window.print(),400);<\/script>
     </body></html>`);
-    w.document.close();
   }
 }
 if($('#btnSms')){$('#btnSms').onclick=openSmsModal}
