@@ -2921,7 +2921,26 @@ function _cambioBulkOp(data,rerender,mode){
   };
 }
 $('#btnClearDay').onclick=()=>{if(!entriesOf(currentDate).length){toast('No hay entradas que vaciar');return}const cnt=entriesOf(currentDate).length;confirmModal('🗑️ Vaciar día',`Se borrarán las <b>${cnt} entrada(s)</b> del día <b>${currentDate.split('-').reverse().join('/')}</b>.<br><br>✅ Se guardará una copia de seguridad automática antes de borrar.`,()=>{pushSnapshot('preClear');delete state.byDate[currentDate];saveState();render();toast('Día vaciado ✅ (copia de seguridad guardada en 🛡️ Historial)',3500)},'Sí, vaciar día')};
-$('#btnPrint').onclick=()=>window.print();
+$('#btnPrint').onclick=()=>{
+  // WYSIWYG: imprimeix el dashboard tal com es veu
+  const main=document.querySelector('main')||document.body;
+  const dateStr=new Date().toLocaleDateString(currentLang==='ca'?'ca-ES':'es-ES',{day:'2-digit',month:'long',year:'numeric'});
+  const header=document.createElement('div');
+  header.innerHTML=`<div style="text-align:center;padding:0 0 12px 0;border-bottom:2px solid #333;margin-bottom:12px"><h1 style="margin:0;font-family:Georgia,serif;font-size:22px">Cierre diario · ${currentDate.split('-').reverse().join('/')}</h1><div style="font-size:11px;color:#666;margin-top:4px">${dateStr}</div></div>`;
+  const wrapper=document.createElement('div');
+  wrapper.appendChild(header);
+  wrapper.appendChild(main.cloneNode(true));
+  printVisibleElement(wrapper, {
+    title:`Cierre diario · ${currentDate}`,
+    landscape:true,
+    margins:'8mm',
+    extraCss:`header, .no-print, #btnPrint, #btnClearDay, #btnAdd, #btnHistorial, #btnBackup, [data-icon-btn], .panel-actions button { display:none !important }
+      /* Amaga la barra de navegació superior */
+      nav, aside { display:none !important }
+      /* Sense colors de fons als botons */
+      button { background:transparent !important; color:#000 !important; border:none !important }`
+  });
+};
 // ============ SAVE HANDLE (File System Access API) ============
 async function _idb(op){return new Promise((res)=>{const r=indexedDB.open('caja-io',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{const tx=r.result.transaction('kv',op.mode);const s=tx.objectStore('kv');const req=op.fn(s);req.onsuccess=()=>res(req.result);req.onerror=()=>res(null)};r.onerror=()=>res(null)})}
 async function getStoredHandle(){return _idb({mode:'readonly',fn:s=>s.get('backupHandle')})}

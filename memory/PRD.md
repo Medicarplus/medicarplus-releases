@@ -25,6 +25,28 @@
 
 ---
 
+## ✅ ESTAT PRE-LLANÇAMENT (14/07/2026)
+
+**Testing exhaustiu completat**: 81/81 pytest backend + tots els fluxos frontend crítics verificats.
+
+Cap bug crític. Cap regressió. LLEST PER LLANÇAR AL MERCAT.
+
+### Verificat funcionant:
+- Activació llicència amb Master Key
+- Setup 2 empreses (Tráfico + Revisiones) amb dades aïllades
+- Cierre diario · ingressos/despeses · totals
+- Impressió WYSIWYG UNIVERSAL (Cierre + IRPF + Estadístiques + Libro Registro + Llibreta) — mateixa UI, botó 'Guardar PDF' morat + 'Imprimir ara' verd
+- IRPF: auto-BRUT, càlculs S.S./TOTAL/IRPF/NET/NET S.S./TOTAL FINAL en viu sense pèrdua de focus
+- SMS import CSV (backend `/api/sms/preview`): 3 vàlids + 1 duplicat detectat correctament
+- SMS campanya en mode mock (funciona · Twilio real pendent env vars)
+- Cites del dia (modal amb 3 tabs)
+- Auto-descoberta URL: recupera de URL morta en 4-5s via GitHub raw
+- Configuración modal net (sense panells d'URL exposats)
+- Idioma switcher CA/ES
+- Widget IA (Google Gemini) present a guies
+
+---
+
 ## 🛡️ SISTEMA DE PUBLICACIÓ DEFINITIU
 
 **UNA sola comanda per publicar:**
