@@ -1,5 +1,30 @@
 # PRD — MediCar Plus (Estat 14/07/2026)
 
+## 🚨 REGLA D'OR · PRIORITAT MÀXIMA · LLEGIR ABANS DE QUALSEVOL CANVI
+
+**MediCar Plus és programari de FACTURACIÓ i CAIXA per a negocis en funcionament.**
+
+**Zero tolerància a bugs.** No poden fallar:
+- Cap botó
+- Cap càlcul (IRPF, totals, sumes, IVA)
+- Cap enviament de SMS
+- L'agenda de visites (Cites)
+- La sincronització de dades
+- Els descuadres de caixa
+- La generació d'impressions/rebuts
+- L'auto-updater ni les llicències
+
+**Els bugs recurrents són símptomes d'una decisió arquitectural equivocada**, no bugs individuals. Cal atacar l'ARREL, no la fulla. Cada cop que un problema tornia a aparèixer, cal preguntar-se: "com fem que aquest problema no pugui existir mai més?"
+
+**Abans de finalitzar qualsevol tasca:**
+- Testing exhaustiu (Playwright + curl + regression)
+- Verificar que els fluxos crítics (cierre diario, IRPF, SMS, Cites, licencia) segueixen funcionant
+- Si detectes un possible edge case, NO deixar-lo per després
+
+**Marc no és informàtic.** Tot ha d'auto-repararse o ser trivial d'usar. Cap panell exposat al client final que pugui rompre res.
+
+---
+
 ## 🛡️ SISTEMA DE PUBLICACIÓ DEFINITIU
 
 **UNA sola comanda per publicar:**
