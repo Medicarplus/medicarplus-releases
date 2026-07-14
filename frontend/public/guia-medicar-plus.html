@@ -87,6 +87,7 @@
   <button class="tab-btn" data-tab="admin" data-testid="tab-admin">📊 Admin panel</button>
   <button class="tab-btn" data-tab="clients" data-testid="tab-clients">👥 Guies clients</button>
   <button class="tab-btn" data-tab="proteccio" data-testid="tab-proteccio">🛡️ Protecció</button>
+  <button class="tab-btn" data-tab="errors" data-testid="tab-errors">🆘 Errors 404 / URL</button>
   <button class="tab-btn" data-tab="guies" data-testid="tab-guies">📚 Més guies</button>
 </nav>
 
@@ -617,9 +618,88 @@ Absolutament. Cada centre té la seva llicència JWT única. Tot el sistema est�
 
 </div><!-- /proteccio -->
 
+<!-- ============ TAB: ERRORS 404 / URL ============ -->
+<div class="tab-panel" data-panel="errors">
+<h1 id="errors">13. 🆘 Errors 404 · Reparació URL del servidor</h1>
+
+<div class="callout callout-red">
+<b>Problema:</b> l'aplicació ensenya <b>"Error: HTTP 404"</b> o <b>"Failed to fetch"</b> quan obres SMS, Cites, o Asesor IA.
+</div>
+
+<div class="callout callout-blue">
+<b>Per què passa?</b> Emergent (el servei que allotja el backend) rota les URLs de preview cada cert temps. L'app instal·lada als PCs dels clients queda apuntant a una URL que ja no existeix.
+</div>
+
+<h2>✅ Solució permanent (des de v2.1.6)</h2>
+
+<p>L'app ara detecta la URL correcta del backend automàticament de dues formes:</p>
+
+<ol>
+<li>Al arrencar, consulta <code>https://medicarplus.es/api-endpoint.json</code></li>
+<li>A cada error 404, torna a consultar aquest fitxer per si la URL ha canviat</li>
+</ol>
+
+<p><b>Això vol dir que:</b> si algun dia Emergent torna a canviar la URL, només cal <b>editar aquest únic fitxer</b> al repo GitHub Pages de <code>medicarplus.es</code> — tots els clients es reajusten sols sense reinstal·lar res.</p>
+
+<div class="step">
+<div class="step-title">📋 PAS 1 · Publicar api-endpoint.json a medicarplus.es (una sola vegada)</div>
+<ol>
+<li>Descarrega el fitxer des de: <a href="/downloads/landing-assets/api-endpoint.json" target="_blank"><code>/downloads/landing-assets/api-endpoint.json</code></a></li>
+<li>Puja'l a l'arrel del teu repo <b>GitHub Pages</b> (el que serveix <code>medicarplus.es</code>).</li>
+<li>Commit + push. En 1-2 minuts es publica.</li>
+<li>Verifica que respon: <a href="https://medicarplus.es/api-endpoint.json" target="_blank">https://medicarplus.es/api-endpoint.json</a></li>
+</ol>
+</div>
+
+<div class="step">
+<div class="step-title">🔄 PAS 2 · Si algun dia veus 404 als clients (canvi de URL Emergent)</div>
+<ol>
+<li>Obre el repo de <code>medicarplus.es</code> a GitHub.</li>
+<li>Edita <code>api-endpoint.json</code>:
+<pre>{
+  "api": "https://NOVA-URL-EMERGENT.preview.emergentagent.com",
+  "updated": "2026-MM-DD"
+}</pre>
+</li>
+<li>Commit + push. Tots els clients Electron ho detectaran automàticament (immediat en obrir SMS/Cites, o màxim 24h).</li>
+</ol>
+</div>
+
+<h2>🩹 Solució temporal (client concret amb 404)</h2>
+
+<p>Si un client no vol esperar a que la caché es refresqui automàticament (24h), poden forçar la nova URL manualment:</p>
+
+<ol>
+<li>Obre l'app MediCar Plus.</li>
+<li>Ves a <b>⚙️ Configuración</b>.</li>
+<li>Baixa fins a <b>🔧 Diagnóstico · URL del servidor (avanzado)</b>. Fes clic per obrir.</li>
+<li>Enganxa la URL nova al camp de text i clica <b>Guardar</b>.</li>
+<li>Tanca i torna a obrir l'app. SMS/Cites ja funcionen.</li>
+</ol>
+
+<div class="callout callout-green">
+<b>💡 Recomanació:</b> el més bo és el <b>PAS 1</b> (fitxer JSON a medicarplus.es). Un cop fet, mai més t'hauràs de preocupar. Tots els clients existents i futurs es reajusten sols.
+</div>
+
+<h2>🔍 Com saber quina URL està usant l'app ara mateix</h2>
+
+<p>Ves a <b>⚙️ Configuración → 🔧 Diagnóstico</b>. Al camp <b>"URL actual"</b> es mostra la URL que l'app està usant en aquest moment. Si la URL sembla morta, clica <b>🔄 Auto</b> per forçar re-detecció.</p>
+
+<h2>📁 On viu cada URL</h2>
+
+<table>
+<tr><th>Component</th><th>Ubicació</th><th>Freqüència de canvi</th></tr>
+<tr><td>URL hardcoded a l'app</td><td>Dins <code>v2.html</code> / index.html d'Electron</td><td>Cada release (auto-updater ho actualitza)</td></tr>
+<tr><td>URL de descoberta</td><td><code>medicarplus.es/api-endpoint.json</code></td><td>Estable · només editar quan Emergent rota</td></tr>
+<tr><td>URL cachada</td><td>localStorage del PC del client</td><td>Refresc automàtic cada 24h</td></tr>
+<tr><td>Override manual</td><td>localStorage · via Configuración</td><td>Només si el client ho posa</td></tr>
+</table>
+
+</div><!-- /errors -->
+
 <!-- ============ TAB: MÉS GUIES ============ -->
 <div class="tab-panel" data-panel="guies">
-<h1 id="guies">13. Guies tècniques enllaçades</h1>
+<h1 id="guies">14. Guies tècniques enllaçades</h1>
 <ul style="line-height:2">
 <li>🚀 <a href="/guia-deploy.html" target="_blank"><b>Deploy a producció + domini propi</b></a> ⭐ — pas a pas per passar del preview al servidor real. <b>Passa-ho al teu informàtic.</b></li>
 <li>💳 <a href="/guia-stripe-setup.html" target="_blank"><b>Configurar Stripe Subscriptions</b></a> — 6 passos per activar pagaments recurrents</li>
@@ -763,9 +843,11 @@ Absolutament. Cada centre té la seva llicència JWT única. Tot el sistema est�
 </script>
 
 <div class="footer">
-Guia MediCar Plus v2 · M.Brugulat Lopez · Actualitzada 14/07/2026 · v2.1.0<br>
+Guia MediCar Plus v2 · M.Brugulat Lopez · Actualitzada 14/07/2026 · v2.1.6<br>
 Contacte: info@medicarplus.es
 </div>
+
+<script src="/guia-ai-widget.js"></script>
 
 </body>
 </html>

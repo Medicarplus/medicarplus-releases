@@ -1,0 +1,5 @@
+{
+  "api": "https://project-helper-47.preview.emergentagent.com",
+  "updated": "2026-07-14",
+  "notes": "Si l'app Electron falla amb 404, actualitza aquest fitxer amb la URL actual del preview i fes commit al repo GitHub Pages. L'app recollirà el canvi en obrir-se (o al cap de màxim 1h en apps ja obertes)."
+}
