@@ -3412,25 +3412,6 @@ function openSettingsModal(){
           <div id="setSupportStatus" style="margin-top:8px;font-size:12px;text-align:center;min-height:16px"></div>
         </div>
 
-        <!-- Diagnòstic / Backend URL (Avançat) -->
-        <div class="settings-section" style="background:linear-gradient(135deg,#0f172a 0%,#020617 100%);border:1px solid #334155;border-radius:10px;padding:14px">
-          <details>
-            <summary style="cursor:pointer;font-size:13px;font-weight:700;color:#94a3b8;letter-spacing:.3px">🔧 ${currentLang==='ca'?'Diagnòstic · URL del servidor':'Diagnóstico · URL del servidor'} (${currentLang==='ca'?'avançat':'avanzado'})</summary>
-            <div style="padding-top:12px">
-              <div style="font-size:12px;color:#cbd5e1;margin-bottom:8px;line-height:1.5">${currentLang==='ca'?'Si l\'aplicació dona errors de connexió (404, "Failed to fetch"), pots forçar una URL de servidor manualment aquí. Deixa-ho buit per usar la detecció automàtica.':'Si la aplicación da errores de conexión (404, "Failed to fetch"), puedes forzar una URL de servidor manualmente aquí. Déjalo vacío para usar la detección automática.'}</div>
-              <div style="font-size:11px;color:#64748b;margin-bottom:8px;font-family:'Courier New',monospace">
-                ${currentLang==='ca'?'URL actual':'URL actual'}: <b id="setApiCurrent" style="color:#22c55e">—</b>
-              </div>
-              <div style="display:flex;gap:6px;margin-bottom:8px">
-                <input id="setApiOverride" type="text" placeholder="https://..." value="${(function(){try{return localStorage.getItem('caja.apibase.override.v1')||''}catch(e){return ''}})()}" style="flex:1;background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:6px;padding:8px;font-family:'Courier New',monospace;font-size:12px" data-testid="set-api-override" />
-                <button id="setApiSave" class="btn" style="background:#0ea5e9;color:#fff;border-color:#0284c7;padding:8px 14px;font-weight:700;font-size:12px" data-testid="set-api-save">${currentLang==='ca'?'Desar':'Guardar'}</button>
-                <button id="setApiAuto" class="btn" style="background:#475569;color:#e2e8f0;border-color:#334155;padding:8px 14px;font-size:12px" data-testid="set-api-auto" title="${currentLang==='ca'?'Esborra l\'override i re-detecta automàticament':'Borra el override y re-detecta automáticamente'}">🔄 ${currentLang==='ca'?'Auto':'Auto'}</button>
-              </div>
-              <div id="setApiStatus" style="font-size:11px;min-height:16px"></div>
-            </div>
-          </details>
-        </div>
-
         <!-- Sortir -->
         <div class="settings-section" style="background:linear-gradient(135deg,#450a0a 0%,#1f0505 100%);border:1px solid #7f1d1d;border-radius:10px;padding:14px">
           <div style="font-size:13px;font-weight:700;color:#fca5a5;letter-spacing:.5px;margin-bottom:4px">${T.logoutSec}</div>
@@ -3529,46 +3510,6 @@ function openSettingsModal(){
       localStorage.removeItem('caja.license.v1');
       localStorage.removeItem('caja.license.lastcheck.v1');
       location.reload();
-    }
-  };
-
-  // Diagnòstic · URL API
-  const apiCurrentEl=document.getElementById('setApiCurrent');
-  if(apiCurrentEl){
-    try{ apiCurrentEl.textContent=(typeof getApiBase==='function')?getApiBase():'—' }catch(e){}
-  }
-  const apiSaveBtn=document.getElementById('setApiSave');
-  if(apiSaveBtn) apiSaveBtn.onclick=async()=>{
-    const inp=document.getElementById('setApiOverride');
-    const st=document.getElementById('setApiStatus');
-    const val=(inp.value||'').trim().replace(/\/$/,'');
-    if(val && !/^https?:\/\//.test(val)){
-      st.innerHTML='<span style="color:#f97316">'+(currentLang==='ca'?'URL invàlida. Ha de començar per http(s)://':'URL inválida. Debe empezar por http(s)://')+'</span>';
-      return;
-    }
-    setApiBaseManualOverride(val);
-    st.innerHTML='<span style="color:#94a3b8">'+(currentLang==='ca'?'Provant...':'Probando...')+'</span>';
-    // Test the URL
-    try{
-      const r=await fetch(val+'/api/', {method:'GET'});
-      st.innerHTML='<span style="color:#22c55e">'+(currentLang==='ca'?'✓ URL desada. Recarrega l\'app perquè tots els mòduls la facin servir.':'✓ URL guardada. Recarga la app para que todos los módulos la usen.')+'</span>';
-    }catch(e){
-      st.innerHTML='<span style="color:#f97316">'+(currentLang==='ca'?'⚠ URL desada, però no responde: ':'⚠ URL guardada, pero no responde: ')+e.message+'</span>';
-    }
-    apiCurrentEl.textContent=getApiBase();
-  };
-  const apiAutoBtn=document.getElementById('setApiAuto');
-  if(apiAutoBtn) apiAutoBtn.onclick=async()=>{
-    setApiBaseManualOverride(''); // clear override + cache
-    const st=document.getElementById('setApiStatus');
-    st.innerHTML='<span style="color:#94a3b8">'+(currentLang==='ca'?'Detectant...':'Detectando...')+'</span>';
-    document.getElementById('setApiOverride').value='';
-    try{
-      const found=await discoverApiBaseWithFallback();
-      apiCurrentEl.textContent=found||getApiBase();
-      st.innerHTML='<span style="color:#22c55e">'+(currentLang==='ca'?'✓ Detectat: ':'✓ Detectado: ')+'<b>'+(found||getApiBase())+'</b></span>';
-    }catch(e){
-      st.innerHTML='<span style="color:#f97316">'+e.message+'</span>';
     }
   };
 }
