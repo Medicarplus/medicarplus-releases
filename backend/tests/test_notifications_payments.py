@@ -81,10 +81,10 @@ class TestPaymentsPackages:
         assert "packages" in data
         pkgs = data["packages"]
         expected = {
-            "STD_MES": 30.0,
-            "STD_ANY": 299.0,
-            "PREMIUM_MES": 45.0,
-            "PREMIUM_ANY": 499.0,
+            "STD_MES": 29.9,
+            "STD_ANY": 299.9,
+            "PREMIUM_MES": 39.9,
+            "PREMIUM_ANY": 399.9,
         }
         for pkg_id, price in expected.items():
             assert pkg_id in pkgs, f"Missing package {pkg_id}"

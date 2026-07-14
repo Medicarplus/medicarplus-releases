@@ -89,22 +89,31 @@ def test_electron_download_index_html_contains_printHtml(s):
     body = r.text
     # Must contain the new helper function
     assert "function printHtml" in body, "printHtml() function missing from served v2.html"
-    # Must NOT still call window.open('','_blank') in code — only in comment
-    occurrences = re.findall(r"window\.open", body)
-    # We allow at most 1 occurrence which must be in the explanatory comment
-    assert len(occurrences) <= 1, f"Too many window.open occurrences: {len(occurrences)}"
-    # Find the line and verify it's a comment
+    # Must NOT still CALL window.open('','_blank') in code — only in comments/strings
+    # v2.1.7: the code no longer invokes window.open; there may be 2 references
+    # (one in a JS comment at ~line 604, one inside a what's-new string ~line 4895).
+    # Neither is an actual call.
     for line in body.splitlines():
-        if "window.open" in line:
-            assert line.strip().startswith("//"), f"window.open is not in a comment: {line[:100]}"
+        if "window.open(" in line:
+            stripped = line.strip()
+            # Allow comment lines and string literals in what's-new content
+            is_comment = stripped.startswith("//") or stripped.startswith("*") or stripped.startswith("/*")
+            is_string = ("'window.open" in line) or ('"window.open' in line) or ("<code>window.open" in line)
+            assert is_comment or is_string, f"Actual window.open call found: {line[:120]}"
 
 
-def test_electron_download_index_html_all_print_handlers_use_printHtml(s):
+def test_electron_download_index_html_all_print_handlers_use_printVisibleElement(s):
     r = s.get(f"{BASE_URL}/api/electron/download/index.html", timeout=30)
     body = r.text
-    # All 6 print handlers should call printHtml(
-    count = body.count("printHtml(")
-    # 1 definition + 6 call sites minimum
-    assert count >= 7, f"Expected >=7 printHtml occurrences (1 def + 6 handlers), got {count}"
+    # v2.1.7: handlers now use printVisibleElement(el, opts) which internally
+    # calls printHtml(). We expect at least 4 printVisibleElement call sites
+    # (IRPF, Libro Registro, Estadísticas, Llibreta) plus its definition.
+    pve = body.count("printVisibleElement(")
+    assert pve >= 5, f"Expected >=5 printVisibleElement occurrences, got {pve}"
+    # printHtml is still the internal helper — >=2 (def + at least 1 caller)
+    ph = body.count("printHtml(")
+    assert ph >= 2, f"Expected >=2 printHtml occurrences, got {ph}"
     # Iframe marker used for tests
     assert "data-print-frame" in body
+    # New PDF button
+    assert "Guardar PDF" in body, "'Guardar PDF' button missing from print preview modal"

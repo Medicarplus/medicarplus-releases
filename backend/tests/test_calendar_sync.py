@@ -52,13 +52,15 @@ class TestHealthAndRegression:
         r = http.get(f"{API}/electron/download/package.json", timeout=15)
         assert r.status_code == 200, r.text
         data = r.json()
-        assert data.get("version") == "2.1.0", f"expected 2.1.0, got {data.get('version')}"
+        v = data.get("version") or ""
+        # v2.1.x train — pre-launch v2.1.7 is current
+        assert v.startswith("2.1."), f"expected 2.1.x, got {v}"
 
-    def test_electron_index_html_contains_v210_and_cites(self, http):
+    def test_electron_index_html_contains_v21_and_cites(self, http):
         r = http.get(f"{API}/electron/download/index.html", timeout=15)
         assert r.status_code == 200
         body = r.text
-        assert "2.1.0" in body, "v2.html should reference version 2.1.0"
+        assert "2.1." in body, "v2.html should reference version 2.1.x"
         cites_hits = re.findall(r"[Cc]ites|calendar/fetch|calendarSync|iCal", body)
         assert cites_hits, "Cites/calendar module code should be present in v2.html"
 

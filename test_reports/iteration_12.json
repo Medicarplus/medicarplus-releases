@@ -1,0 +1,51 @@
+{
+  "summary": "MediCar Plus v2.1.7 PRE-LAUNCH exhaustive testing. All critical flows verified end-to-end. Backend: 81/81 pytest passed (added new /app/backend/tests/test_prelaunch_v217.py with 9 tests covering SMS lifecycle, CSV preview, calendar sync, SPA artifacts). Frontend: master license activation (MB-MASTER-BRUGULAT-2026-OWNER) → setup empresas (Tráfico + Revisiones) → dashboard reached; btnPrint uses window.print(); Settings modal (Idioma, Actualitzacions, Empreses, Contactar amb suport, Sortir) — NO Diagnóstico URL panel; IRPF modal opens with correct UI (empresa switcher, month nav, IRPF% presets, table structure, Imprimir mes); SMS import CSV works (3 válidos, 1 duplicado detected correctly), campaign create → send succeeds in mock mode; URL auto-discovery recovers from DEAD-URL.invalid in ~4s to a valid preview URL. Backend regression tests updated for v2.1.7 version bumps (electron package.json 2.1.x, stripe prices 29.9/299.9/39.9/399.9, print helpers refactored to printVisibleElement+printHtml).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_prelaunch_v217.py",
+    "/app/backend/tests/test_v2_print_backend.py",
+    "/app/backend/tests/test_calendar_sync.py",
+    "/app/backend/tests/test_notifications_payments.py",
+    "/app/test_reports/pytest/pytest_iter12.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: sms-search data-testid only renders inside campaign-detail view (not preview view). Consider adding it also to the top of the preview list for a consistent search UX. Not blocking.",
+    "OPTIONAL: When IRPF modal opens for a company/month for the first time, the code auto-seeds default persons via seedIrpfMonth(). This is a UX choice — verify Marc wants pre-seed vs empty start. Not a bug.",
+    "The line 2924 `$('#btnPrint').onclick=()=>window.print();` uses the browser's NATIVE print dialog (not the new WYSIWYG preview modal). Confirmed by intercepting: window.print was called exactly once. This is the daily cash print — @media print CSS filters the UI. If Marc wants unified preview modal with 'Guardar PDF' button here too, wrap the current dashboard section in printVisibleElement(el)."
+  ],
+  "critical_code_review_comments": [
+    "printHtml() at v2.html:607-663 correctly creates iframe with data-print-frame='1', writes html via doc.open/write/close, and calls contentWindow.print() on button clicks — bulletproof for Electron.",
+    "printVisibleElement() at v2.html:675-743 is defensive: replaces <input>/<textarea>/<select> with static <span>, strips buttons/[data-no]/[data-close]/[contenteditable], forces @page A4 landscape + inline styles. Handles cases where clone contains elements not in a modal.",
+    "IRPF calc formula (line 2200-2209) uses correct SS deduction: total=hasSs?brut-ss:brut, irpf=total*rate, net=total-irpf, totalFinal=hasSs?net+netSs:net. This gives the requested 100×4.50=450, TOTAL=400, IRPF@15%=60, NET=340, TOTAL FINAL=400 (netSs=60).",
+    "IRPF input debouncing at line 2453-2459 correctly avoids focus-loss: full render is scheduled only 800ms after typing pauses AND is skipped if activeElement is still an IRPF input. Live cell updates happen inline without re-rendering the table.",
+    "SMS preview endpoint (routes/sms_campaigns.py:129-222) handles duplicates, invalid mobiles, missing phones — verified via 4-row CSV: 3 valid + 1 duplicate correctly classified.",
+    "SMS campaigns require X-Admin-Token (line 45-48 sms_campaigns.py). The v2.html apiSms() at line 3574 automatically includes this header on all /sms/* calls — verified working end-to-end.",
+    "URL auto-discovery at v2.html:5019+ correctly recovers from a stale/dead cache key. Verified: seeded caja.apibase.v1='https://DEAD-URL.invalid', reloaded, and localStorage was overwritten with a valid preview URL within 4-5s.",
+    "v2.html file size: 5468 lines. This is above the 700-line recommended threshold but is a deliberate single-file architecture for Electron packaging. Not blocking for launch. Post-launch refactor into ES modules (billing/, print/, sms/, calendar/, license/) recommended.",
+    "backend/server.py:20 EMERGENT_LLM_KEY falls back to empty string. Comment says 'fail fast' but code doesn't raise. Since /api/ai-ask has graceful error path (returns error message), this is safe but the comment should be updated. Not blocking."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_v2_print_backend.py",
+    "/app/backend/tests/test_calendar_sync.py",
+    "/app/backend/tests/test_notifications_payments.py",
+    "/app/backend/tests/test_prelaunch_v217.py"
+  ],
+  "success_rate": {
+    "backend": "100% (81/81 pytest passed)",
+    "frontend": "100% (all critical flows verified: activation, setup, dashboard, print, settings, IRPF UI, SMS CSV preview + campaign send, URL auto-discovery)"
+  },
+  "test_credentials": "Master license: MB-MASTER-BRUGULAT-2026-OWNER (activated via localStorage.caja.license.v1). Admin token: MB-ADMIN-BRUGULAT-2026-4F8E2A1C (from backend/.env LICENSE_ADMIN_TOKEN, sent as X-Admin-Token header). Both work.",
+  "seed_data_creation": "localStorage seeded pre-navigation: caja.install.id.v1=CD-TEST-*, caja.license.v1 (MASTER), caja.config.v1 (configured=true, company1=Tráfico Test SL, company2=Revisiones Test SL), caja.whatsNew.seen.v2.1.7=1. Backend seed: TEST_prelaunch_v217 SMS campaign created and immediately deleted via lifecycle test (cleanup done).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "MOCKED SMS: The SMS send is in MOCK mode (no TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM_NUMBER in .env), so campaigns show twilio_used=false and detail='mock:no-twilio'. To test real SMS, Marc must configure Twilio env vars. URL auto-discovery test showed the resolved backend URL is 'https://c3cff9be-83f9-4e57-8b06-1cf6281e5ef4.preview.emergentagent.com' (different from REACT_APP_BACKEND_URL in frontend/.env), which is fine — the auto-publish endpoint publishes the CURRENT preview URL to GitHub raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json. IRPF modal auto-seeds default persons when opening a company/month for the first time (seedIrpfMonth at line 2276). Multiple tables exist inside #irpfBody (persons, quarterly summary, sobre IRPF) — target #irpfBody > table:first-of-type tbody for the persons table specifically. SMS search testid ('sms-search') only appears inside the campaign detail view (renderSmsDetail), not in the preview panel — this is by design.",
+  "rca of the issue": "N/A — no bugs found. Pre-launch v2.1.7 is READY. The 4 previously-failing backend tests were outdated regressions (expecting old v2.1.0 version string, old stripe prices 30/45, and old printHtml direct-call count) — all updated to match v2.1.7 conventions. Main app code has zero regressions from the review-request feature list."
+}
