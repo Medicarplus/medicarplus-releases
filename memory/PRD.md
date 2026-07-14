@@ -9,18 +9,18 @@ powershell -ExecutionPolicy Bypass -File .\publish-safe.ps1
 ```
 
 **Última versió publicada**: v2.0.36 (13/07/2026)
-**Pròxima versió (pendent de publicar per Marc)**: v2.1.0 amb:
-- 📅 **NOU MÒDUL "CITES DEL DIA"** (Premium): sincronització amb Google Calendar, Doctoralia, Calendly, Doctolib, Timify, iCloud i qualsevol calendari amb URL iCal
-  - Un cop enganxada la URL, no cal reintroduir-la (persistida a localStorage)
-  - Auto-refresh cada 15 min + botó manual
-  - Marcatge d'estat per cita: Presentat / No presentat / Realitzat
-  - 3 pestanyes: D'avui · Setmana · Calendaris (config)
-  - Backend endpoint: `POST /api/calendar/fetch` (parseja iCal amb `icalendar` lib)
-- 📋 **IRPF · Fix crític**: camps ja no es veuen negres · CSS específic `.irpf-modal input[type=text]` amb `!important`
-- ⌨️ IRPF accepta coma o punt (`num()` function ja existia)
-- ⚡ IRPF càlculs en viu sense perdre focus (updateRow/updateTotalsRow inline)
-- 🎯 Auto-focus al nou nom + confirmació abans d'eliminar (confirmModal)
-- 🌐 Landing `medicarplus.es`: banderes España + Catalunya SVG, lightbox amb 8 captures reals (main-cierre, contabilidad, estadisticas, libro-registro, sms-avisos, asesor-ia, auditoria, irpf), eliminat "Autoescuela" del contact form
+**Pròxima versió (pendent de publicar per Marc)**: v2.1.4 amb:
+- 🔧 **IRPF · Fix alineació taula TOTALS MES** (14/07/2026): després d'afegir columna `€/CERT`, la fila de totals no s'alineava amb les capçaleres. Ara `colspan="3"` cobreix NOM+CERT+€/CERT i BRUT/S.S./TOTAL/IRPF/NET/NET S.S./TOTAL FINAL s'alineen perfectament sota les seves columnes.
+- 💶 **IRPF · Columna €/CERT** (v2.1.3): càlcul automàtic BRUT = CERT × €/CERT quan es completa la columna
+- 🖨️ **Fix crític impressió Electron**: `window.open` no funcionava a l'app compilada → substituït per `printHtml()` amb iframe ocult. IRPF/Estadísticas/Llibreta imprimeixen amb `@page{size:A4 landscape}` i colors de fons.
+- 👁️ Modal de Print Preview abans del diàleg d'impressió
+- 📅 **MÒDUL "CITES DEL DIA"** (Premium): sincronització amb Google Calendar, Doctoralia, Calendly, Doctolib, Timify, iCloud i qualsevol calendari amb URL iCal
+  - Backend endpoint: `POST /api/calendar/sync` (parseja iCal amb `icalendar` + `recurring-ical-events`)
+  - Badge notificacions no llegides + polling 5 min
+  - Estadístiques històriques de cites al modal principal
+- 📋 IRPF · fix hardcoded català → respecta preferència idioma (Spanish)
+- 🐛 IRPF · Fix regressió: entrades "BRUGULAT" ja no s'eliminen per seed-clearing
+- 🌐 Landing `medicarplus.es`: 8 captures reals amb lightbox
 
 ### Pipeline 5-passos (tot dins publish-safe.ps1):
 1. `sync.js` — Baixa fitxers font del servidor via `/api/electron/download/*` amb User-Agent Mozilla. Aborta si algun fitxer no passa signatures. **MAI barreja versions.**

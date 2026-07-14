@@ -2368,7 +2368,7 @@ function openIRPF(){
       const totRow=back.querySelector('#irpfBody table tbody tr:last-child');
       if(totRow){
         const tds=totRow.querySelectorAll('td');
-        // tds: [colspan=2][BRUT][SS][TOTAL][IRPF][NET][NETSS][TOTALFINAL][blank]
+        // tds: [colspan=3 (NOM+CERT+€/CERT)][BRUT][SS][TOTAL][IRPF][NET][NETSS][TOTALFINAL][blank]
         if(tds[1])tds[1].textContent=fmt(t.brut);
         if(tds[2])tds[2].textContent=fmt(t.ss);
         if(tds[3])tds[3].textContent=fmt(t.total);
@@ -2517,7 +2517,7 @@ function openIRPF(){
         </tbody>
       </table>
       <div class="footer">
-        <div>Document generat per <b>MediCar Plus</b> · v2.1.0 · ${compName(irpfComp)}</div>
+        <div>Document generat per <b>MediCar Plus</b> · v2.1.4 · ${compName(irpfComp)}</div>
         <div>TOTAL IRPF A RETENIR: <span class="total-irpf">${fmt(totals.irpf)} €</span></div>
       </div>
     </body></html>`);
