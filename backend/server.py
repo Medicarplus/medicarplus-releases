@@ -217,6 +217,10 @@ app.include_router(electron_manifest_router, prefix="/api")
 from routes.electron_channel import router as electron_channel_router
 app.include_router(electron_channel_router, prefix="/api")
 
+# Calendar Sync (Premium) — proxy iCal per Google Calendar, Doctoralia, etc.
+from routes.calendar_sync import router as calendar_sync_router
+app.include_router(calendar_sync_router, prefix="/api")
+
 # Stripe webhook (obligatori per playbook: /api/webhook/stripe)
 # Gestiona tant one-off (via emergentintegrations) com subscriptions (via stripe SDK)
 from fastapi import Request as _FastReq

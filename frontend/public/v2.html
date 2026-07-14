@@ -209,6 +209,7 @@
       </div>
     </div>
     <button class="btn" id="btnSms" style="background:linear-gradient(90deg,#059669 0%,#10b981 100%);color:#fff;border-color:transparent;font-weight:700" title="Avisos SMS / WhatsApp de renovació">📱 Avisos</button>
+    <button class="btn" id="btnCalendar" data-premium="1" style="display:none;background:linear-gradient(90deg,#0369a1 0%,#0ea5e9 100%);color:#fff;border-color:transparent;font-weight:700" title="Cites del dia · Google Calendar · Doctoralia · Calendly...">📅 Cites</button>
     <a id="btnWebsite" href="https://medicarplus.es" target="_blank" rel="noopener" title="Obrir medicarplus.es · Compte, ajuda, actualitzacions" style="background:linear-gradient(90deg,#0f172a 0%,#1e293b 100%);color:#f5b301;border:1px solid #f5b301;border-radius:6px;padding:8px 14px;font-weight:700;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:'Segoe UI',sans-serif" data-testid="btn-website">🌐 medicarplus.es</a>
     <div id="trialBadge" data-testid="trial-badge" style="display:none;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;font-family:'Segoe UI',sans-serif;font-size:12px;font-weight:700;border:1px solid;letter-spacing:.3px"></div>
     <span id="autosaveBadge" style="display:none;padding:5px 10px;border-radius:6px;background:#1f3a2e;color:#7ee3aa;font-size:11px;font-family:'Consolas',monospace;letter-spacing:.3px;border:1px solid #2a5e44"></span>
@@ -3639,6 +3640,272 @@ function openSmsModal(){
 if($('#btnSms')){$('#btnSms').onclick=openSmsModal}
 
 // ============================================================================
+// 📅 CITES · Sincronització amb Google Calendar / Doctoralia / Calendly / iCal
+// ============================================================================
+// Premium-only: mostra el llistat de cites del dia des de qualsevol calendari
+// extern (URL iCal). Els URLs es guarden a localStorage, no cal reintroduir-los.
+
+const CAL_URLS_KEY = 'caja.calendar.urls.v1';
+const CAL_STATUS_KEY = 'caja.calendar.status.v1';  // {[date_uid]: 'ok'|'no'|'done'}
+const CAL_CACHE_KEY = 'caja.calendar.cache.v1';    // Últim resultat + timestamp
+
+function loadCalUrls(){try{return JSON.parse(localStorage.getItem(CAL_URLS_KEY)||'[]')}catch(e){return[]}}
+function saveCalUrls(arr){localStorage.setItem(CAL_URLS_KEY,JSON.stringify(arr||[]))}
+function loadCalStatus(){try{return JSON.parse(localStorage.getItem(CAL_STATUS_KEY)||'{}')}catch(e){return{}}}
+function saveCalStatus(m){localStorage.setItem(CAL_STATUS_KEY,JSON.stringify(m||{}))}
+
+function isPremiumLicense(){
+  try{
+    const lic=JSON.parse(localStorage.getItem('caja.license.v1')||'null');
+    if(!lic)return false;
+    const t=(lic.type||'').toUpperCase();
+    // MASTER (owner) sempre veu Premium. PRM = Premium. FREE/STD/TRIAL = no.
+    return t==='MASTER'||t==='PRM'||t==='PREMIUM';
+  }catch(e){return false}
+}
+
+function refreshCalendarButtonVisibility(){
+  const btn=$('#btnCalendar');
+  if(!btn)return;
+  btn.style.display=isPremiumLicense()?'inline-flex':'none';
+}
+refreshCalendarButtonVisibility();
+
+async function fetchCalendarEvents(urls,dateFrom,dateTo){
+  const backend=(window.BACKEND_URL||'')||location.origin;
+  const r=await fetch(backend+'/api/calendar/fetch',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({urls:urls,date_from:dateFrom,date_to:dateTo})
+  });
+  if(!r.ok){const err=await r.text();throw new Error('HTTP '+r.status+': '+err.slice(0,120))}
+  return await r.json();
+}
+
+function renderCalendarModal(){
+  const isCA=currentLang==='ca';
+  const back=document.createElement('div');back.className='modal-back';back.id='calendarBack';
+  back.innerHTML=`<div class="modal" style="max-width:1000px;width:96%;max-height:92vh;display:flex;flex-direction:column;background:#0b1220;color:#e2e8f0;border:1px solid #1e293b">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid #1e293b;margin-bottom:14px">
+      <div>
+        <h3 style="margin:0;color:#0ea5e9;font-size:20px">📅 ${isCA?'Cites del dia':'Citas del día'}</h3>
+        <div style="font-size:11px;color:#64748b;margin-top:2px">${isCA?'Sincronitzat amb els teus calendaris externs':'Sincronizado con tus calendarios externos'}</div>
+      </div>
+      <button id="calClose" class="btn" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:6px 12px" data-testid="calendar-close">✕</button>
+    </div>
+    <div class="cal-tabs" style="display:flex;gap:2px;border-bottom:1px solid #1e293b;margin-bottom:14px">
+      <button class="cal-tab active" data-tab="today" data-testid="cal-tab-today" style="padding:10px 20px;background:#0ea5e9;color:#0b1220;border:none;border-radius:6px 6px 0 0;font-weight:700;font-size:13px;cursor:pointer">📆 ${isCA?"D'avui":'De hoy'}</button>
+      <button class="cal-tab" data-tab="week" data-testid="cal-tab-week" style="padding:10px 20px;background:transparent;color:#64748b;border:none;border-radius:6px 6px 0 0;font-weight:700;font-size:13px;cursor:pointer">📅 ${isCA?'Setmana':'Semana'}</button>
+      <button class="cal-tab" data-tab="config" data-testid="cal-tab-config" style="padding:10px 20px;background:transparent;color:#64748b;border:none;border-radius:6px 6px 0 0;font-weight:700;font-size:13px;cursor:pointer">⚙️ ${isCA?'Calendaris':'Calendarios'}</button>
+    </div>
+    <div id="calBody" style="flex:1;overflow:auto;min-height:300px"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid #1e293b;margin-top:14px">
+      <div id="calSyncInfo" style="font-size:11px;color:#64748b"></div>
+      <button id="calRefresh" class="btn" style="background:#0369a1;color:#fff;border:none;padding:8px 16px;font-weight:700" data-testid="calendar-refresh">🔄 ${isCA?'Refrescar':'Refrescar'}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(back);
+  back.style.display='flex';
+  back.querySelector('#calClose').onclick=()=>back.remove();
+  back.addEventListener('click',e=>{if(e.target===back)back.remove()});
+  
+  let currentTab='today';
+  const tabs=back.querySelectorAll('.cal-tab');
+  tabs.forEach(t=>t.onclick=()=>{
+    tabs.forEach(x=>{x.style.background='transparent';x.style.color='#64748b';x.classList.remove('active')});
+    t.style.background='#0ea5e9';t.style.color='#0b1220';t.classList.add('active');
+    currentTab=t.dataset.tab;
+    renderTab();
+  });
+  back.querySelector('#calRefresh').onclick=()=>renderTab(true);
+  
+  function statusBadge(uid,date){
+    const st=loadCalStatus();
+    const k=date+'|'+uid;
+    return st[k]||'';
+  }
+  function setStatus(uid,date,val){
+    const st=loadCalStatus();const k=date+'|'+uid;
+    if(val)st[k]=val;else delete st[k];
+    saveCalStatus(st);
+  }
+  
+  async function renderTab(forceRefresh){
+    const body=back.querySelector('#calBody');
+    const info=back.querySelector('#calSyncInfo');
+    if(currentTab==='config'){
+      renderConfig();return;
+    }
+    const urls=loadCalUrls().filter(u=>u.enabled).map(u=>u.url);
+    if(urls.length===0){
+      body.innerHTML=`<div style="text-align:center;padding:60px 20px">
+        <div style="font-size:52px;margin-bottom:14px">📭</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px">${isCA?'Cap calendari configurat':'Ningún calendario configurado'}</div>
+        <div style="color:#64748b;font-size:13px;margin-bottom:24px">${isCA?'Vincula Google Calendar, Doctoralia o qualsevol altre servei':'Vincula Google Calendar, Doctoralia o cualquier otro servicio'}</div>
+        <button class="btn" id="calGoConfig" style="background:#0ea5e9;color:#0b1220;border:none;padding:12px 24px;font-weight:700">⚙️ ${isCA?'Configurar ara':'Configurar ahora'}</button>
+      </div>`;
+      body.querySelector('#calGoConfig').onclick=()=>{tabs[2].click()};
+      return;
+    }
+    body.innerHTML=`<div style="text-align:center;padding:40px 20px;color:#64748b"><div style="font-size:32px;margin-bottom:10px">⏳</div>${isCA?'Sincronitzant...':'Sincronizando...'}</div>`;
+    // Determine range
+    const today=new Date();
+    const yyyy=today.getFullYear(),mm=String(today.getMonth()+1).padStart(2,'0'),dd=String(today.getDate()).padStart(2,'0');
+    const isoToday=`${yyyy}-${mm}-${dd}`;
+    let dateFrom=isoToday,dateTo=isoToday;
+    if(currentTab==='week'){
+      const end=new Date(today);end.setDate(end.getDate()+6);
+      dateTo=`${end.getFullYear()}-${String(end.getMonth()+1).padStart(2,'0')}-${String(end.getDate()).padStart(2,'0')}`;
+    }
+    // Cache lookup
+    const cacheKey=`${currentTab}|${urls.join(',')}`;
+    const cached=JSON.parse(localStorage.getItem(CAL_CACHE_KEY)||'{}');
+    const now=Date.now();
+    if(!forceRefresh&&cached[cacheKey]&&(now-cached[cacheKey].ts<15*60*1000)){
+      renderEvents(cached[cacheKey].data,true);
+      return;
+    }
+    try{
+      const res=await fetchCalendarEvents(urls,dateFrom,dateTo);
+      cached[cacheKey]={ts:now,data:res};localStorage.setItem(CAL_CACHE_KEY,JSON.stringify(cached));
+      renderEvents(res,false);
+    }catch(err){
+      body.innerHTML=`<div style="text-align:center;padding:40px 20px">
+        <div style="font-size:32px;margin-bottom:10px">⚠️</div>
+        <div style="color:#f87171;font-weight:700">${isCA?'Error de sincronització':'Error de sincronización'}</div>
+        <div style="color:#64748b;font-size:12px;margin-top:8px;font-family:monospace">${escapeHtml(err.message||'')}</div>
+      </div>`;
+    }
+  }
+  
+  function renderEvents(res,fromCache){
+    const body=back.querySelector('#calBody');
+    const info=back.querySelector('#calSyncInfo');
+    info.textContent=`${isCA?'Última sync':'Última sync'}: ${new Date(res.fetched_at||Date.now()).toLocaleString('es-ES')}${fromCache?' · '+(isCA?'(caché)':'(caché)'):''} · ${res.sources_ok?.length||0} ${isCA?'OK':'OK'} · ${res.sources_failed?.length||0} ${isCA?'error':'error'}`;
+    const events=res.events||[];
+    if(events.length===0){
+      body.innerHTML=`<div style="text-align:center;padding:60px 20px">
+        <div style="font-size:52px;margin-bottom:14px">🎉</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px">${isCA?'Cap cita per aquest rang':'Sin citas para este rango'}</div>
+        <div style="color:#64748b;font-size:13px">${isCA?'Els teus calendaris estan buits':'Tus calendarios están vacíos'}</div>
+      </div>`;
+      return;
+    }
+    // Group by date
+    const byDate={};events.forEach(e=>{(byDate[e.date]=byDate[e.date]||[]).push(e)});
+    const dates=Object.keys(byDate).sort();
+    const html=dates.map(d=>{
+      const dt=new Date(d+'T00:00:00');
+      const dateLabel=dt.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+      const rows=byDate[d].map(e=>{
+        const st=statusBadge(e.uid,e.date);
+        const badge=st==='ok'?`<span style="background:#166534;color:#a7f3d0;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">✓ ${isCA?'PRESENTAT':'PRESENTADO'}</span>`
+          :st==='no'?`<span style="background:#7f1d1d;color:#fecaca;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">✕ ${isCA?'NO PRESENTAT':'NO PRESENTADO'}</span>`
+          :st==='done'?`<span style="background:#1e40af;color:#bfdbfe;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">💼 ${isCA?'REALITZAT':'REALIZADO'}</span>`
+          :'';
+        return `<tr style="border-bottom:1px solid #1e293b">
+          <td style="padding:12px 10px;font-family:'Courier New',monospace;font-weight:700;color:#0ea5e9;font-size:14px;white-space:nowrap">${e.time||(isCA?'tot dia':'todo día')}${e.end_time?'<span style="color:#64748b">→'+e.end_time+'</span>':''}</td>
+          <td style="padding:12px 10px;font-weight:700;color:#e2e8f0">${escapeHtml(e.summary)}${e.location?'<div style="font-size:11px;color:#64748b;font-weight:400;margin-top:3px">📍 '+escapeHtml(e.location)+'</div>':''}</td>
+          <td style="padding:12px 10px;font-size:11px;color:#64748b">${escapeHtml(e.source||'')}</td>
+          <td style="padding:12px 10px;text-align:center">${badge}</td>
+          <td style="padding:12px 10px;text-align:right;white-space:nowrap">
+            <button class="cal-mark" data-uid="${escapeHtml(e.uid)}" data-date="${e.date}" data-val="ok" title="${isCA?'Presentat':'Presentado'}" style="background:#166534;color:#fff;border:none;padding:6px 10px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:2px">✓</button>
+            <button class="cal-mark" data-uid="${escapeHtml(e.uid)}" data-date="${e.date}" data-val="no" title="${isCA?'No presentat':'No presentado'}" style="background:#7f1d1d;color:#fff;border:none;padding:6px 10px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:2px">✕</button>
+            <button class="cal-mark" data-uid="${escapeHtml(e.uid)}" data-date="${e.date}" data-val="done" title="${isCA?'Realitzat':'Realizado'}" style="background:#1e40af;color:#fff;border:none;padding:6px 10px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:2px">💼</button>
+            <button class="cal-mark" data-uid="${escapeHtml(e.uid)}" data-date="${e.date}" data-val="" title="${isCA?'Netejar':'Limpiar'}" style="background:#334155;color:#e2e8f0;border:none;padding:6px 10px;border-radius:4px;cursor:pointer;font-size:11px">↺</button>
+          </td>
+        </tr>`;
+      }).join('');
+      return `<div style="margin-bottom:22px">
+        <div style="font-size:13px;color:#0ea5e9;font-weight:700;margin-bottom:8px;padding:6px 0;text-transform:capitalize;letter-spacing:.3px">${dateLabel} · <span style="color:#64748b">${byDate[d].length} ${byDate[d].length===1?(isCA?'cita':'cita'):(isCA?'cites':'citas')}</span></div>
+        <table style="width:100%;background:#0f172a;border-radius:8px;border:1px solid #1e293b;overflow:hidden">
+          <thead><tr style="background:#1e293b"><th style="padding:9px 10px;text-align:left;font-size:11px;color:#94a3b8;font-weight:700">${isCA?'HORA':'HORA'}</th><th style="padding:9px 10px;text-align:left;font-size:11px;color:#94a3b8;font-weight:700">${isCA?'PACIENT':'PACIENTE'}</th><th style="padding:9px 10px;text-align:left;font-size:11px;color:#94a3b8;font-weight:700">${isCA?'FONT':'FUENTE'}</th><th style="padding:9px 10px;text-align:center;font-size:11px;color:#94a3b8;font-weight:700">${isCA?'ESTAT':'ESTADO'}</th><th style="padding:9px 10px;text-align:right;font-size:11px;color:#94a3b8;font-weight:700">${isCA?'ACCIONS':'ACCIONES'}</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    }).join('');
+    body.innerHTML=html;
+    body.querySelectorAll('.cal-mark').forEach(b=>b.onclick=()=>{
+      setStatus(b.dataset.uid,b.dataset.date,b.dataset.val);
+      renderTab(false);
+    });
+  }
+  
+  function renderConfig(){
+    const body=back.querySelector('#calBody');
+    const urls=loadCalUrls();
+    body.innerHTML=`<div style="max-width:800px;margin:0 auto">
+      <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:18px;margin-bottom:20px">
+        <div style="font-size:14px;font-weight:700;color:#0ea5e9;margin-bottom:6px">${isCA?'ℹ️ Com obtenir la URL iCal':'ℹ️ Cómo obtener la URL iCal'}</div>
+        <div style="font-size:12px;color:#94a3b8;line-height:1.7">
+          <b style="color:#e2e8f0">Google Calendar:</b> ${isCA?"Ves a Configuració → El teu calendari → Adreça secreta en format iCal → copia la URL.":"Ve a Configuración → Tu calendario → Dirección secreta en formato iCal → copia la URL."}<br>
+          <b style="color:#e2e8f0">Doctoralia:</b> ${isCA?'Panell de professional → Agenda → Exportar → iCal (.ics)':'Panel de profesional → Agenda → Exportar → iCal (.ics)'}<br>
+          <b style="color:#e2e8f0">Calendly:</b> ${isCA?'Settings → Integracions → Extension iCal':'Settings → Integraciones → Extensión iCal'}<br>
+          <b style="color:#e2e8f0">Doctolib, Timify, Outlook, iCloud:</b> ${isCA?'Cerca "iCal export" a la configuració del compte':'Busca "iCal export" en la configuración de la cuenta'}
+        </div>
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;color:#94a3b8;font-weight:700;display:block;margin-bottom:6px">${isCA?'AFEGIR NOU CALENDARI':'AÑADIR NUEVO CALENDARIO'}</label>
+        <div style="display:flex;gap:8px">
+          <input id="calNewUrl" type="url" placeholder="https://calendar.google.com/calendar/ical/... o https://www.doctoralia.es/..." style="flex:1;padding:10px 12px;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;font-size:13px" data-testid="cal-input-url" />
+          <button id="calAddBtn" class="btn" style="background:#0ea5e9;color:#0b1220;border:none;padding:10px 18px;font-weight:700" data-testid="cal-add-url">+ ${isCA?'Afegir':'Añadir'}</button>
+        </div>
+      </div>
+      <div id="calList"></div>
+    </div>`;
+    function renderList(){
+      const list=back.querySelector('#calList');
+      const arr=loadCalUrls();
+      if(arr.length===0){
+        list.innerHTML=`<div style="text-align:center;padding:30px 20px;color:#64748b;font-size:13px;background:#0f172a;border:1px dashed #334155;border-radius:10px">${isCA?'No tens cap calendari afegit encara':'Aún no has añadido ningún calendario'}</div>`;
+        return;
+      }
+      list.innerHTML=arr.map((u,i)=>`<div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px">
+        <input type="checkbox" ${u.enabled?'checked':''} data-toggle="${i}" data-testid="cal-toggle-${i}" style="width:20px;height:20px;cursor:pointer;accent-color:#0ea5e9" />
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;color:#e2e8f0;font-size:13px">${escapeHtml(u.label||'Calendari')}</div>
+          <div style="font-size:11px;color:#64748b;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px">${escapeHtml(u.url)}</div>
+        </div>
+        <button data-remove="${i}" data-testid="cal-remove-${i}" class="btn" style="background:#7f1d1d;color:#fff;border:none;padding:6px 12px;font-size:11px">🗑 ${isCA?'Eliminar':'Eliminar'}</button>
+      </div>`).join('');
+      list.querySelectorAll('[data-toggle]').forEach(c=>c.onchange=()=>{const arr=loadCalUrls();arr[parseInt(c.dataset.toggle)].enabled=c.checked;saveCalUrls(arr);localStorage.removeItem(CAL_CACHE_KEY);toast(isCA?'💾 Guardat':'💾 Guardado')});
+      list.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{const arr=loadCalUrls();arr.splice(parseInt(b.dataset.remove),1);saveCalUrls(arr);localStorage.removeItem(CAL_CACHE_KEY);renderList();toast(isCA?'🗑 Eliminat':'🗑 Eliminado')});
+    }
+    back.querySelector('#calAddBtn').onclick=()=>{
+      const input=back.querySelector('#calNewUrl');
+      let u=(input.value||'').trim();
+      if(!u){toast(isCA?'⚠️ Introdueix una URL':'⚠️ Introduce una URL');return}
+      if(u.startsWith('webcal://'))u='https://'+u.slice(9);
+      if(!/^https?:\/\//i.test(u)){toast(isCA?'⚠️ URL no vàlida':'⚠️ URL no válida');return}
+      const arr=loadCalUrls();
+      if(arr.some(x=>x.url===u)){toast(isCA?'⚠️ Ja existeix':'⚠️ Ya existe');return}
+      // Auto-detect label
+      const ul=u.toLowerCase();
+      let label='Calendari extern';
+      if(ul.includes('google'))label='Google Calendar';
+      else if(ul.includes('doctoralia'))label='Doctoralia';
+      else if(ul.includes('calendly'))label='Calendly';
+      else if(ul.includes('doctolib'))label='Doctolib';
+      else if(ul.includes('icloud'))label='iCloud';
+      else if(ul.includes('outlook')||ul.includes('office365'))label='Outlook';
+      else if(ul.includes('timify'))label='Timify';
+      arr.push({url:u,label:label,enabled:true,added:new Date().toISOString()});
+      saveCalUrls(arr);
+      localStorage.removeItem(CAL_CACHE_KEY);
+      input.value='';
+      renderList();
+      toast(isCA?'✓ Calendari afegit':'✓ Calendario añadido');
+    };
+    renderList();
+  }
+  
+  renderTab();
+}
+
+if($('#btnCalendar')){$('#btnCalendar').onclick=()=>{if(!isPremiumLicense()){toast(currentLang==='ca'?'🔒 Funció Premium':'🔒 Función Premium');return}renderCalendarModal()}}
+
+
+// ============================================================================
 // CERCADOR DE CLIENTS · per nom / cognom / concepte
 // ============================================================================
 (function initClientSearch(){
@@ -4114,7 +4381,10 @@ const LAST_SEEN_VERSION_KEY = 'caja.last_seen_version';
 // IMPORTANT: L'ordre importa. La primera entrada ha de ser la MÉS RECENT.
 // Cada versió té: { version, date (dd/mm/aaaa), highlights (array de strings HTML curts) }
 const CHANGELOG = [
-  { version:'2.0.28', date:'13/07/2026', highlights:[
+  { version:'2.1.0', date:'14/07/2026', highlights:[
+    '📅 <b>NOU · Cites del dia</b> (Premium): connecta el programa amb <b>Google Calendar</b>, <b>Doctoralia</b>, Calendly, Doctolib, Timify, iCloud o qualsevol calendari amb URL iCal.',
+    '⚡ <b>Un cop enganxada la URL, no cal reintroduir-la</b> · el programa la recorda i sincronitza automàticament cada 15 min.',
+    '📌 Marcatge d\'estat per cita: <b>Presentat</b> · <b>No presentat</b> · <b>Realitzat</b> · el vinculem al llibre de caixa.',
     '📋 <b>IRPF · Interfície millorada</b>: camps ara amb fons blanc llegible (adéu al bug dels quadres negres).',
     '⌨️ <b>Escriu amb coma o punt</b> indistintament (ex: <code>1500,50</code> o <code>1500.50</code>) · càlculs actualitzats en viu mentre escrius.',
     '🎯 <b>Auto-focus</b> al nou nom quan afegeixes una persona · confirmació abans d\'eliminar (evita pèrdues accidentals).',

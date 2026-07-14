@@ -1,6 +1,6 @@
-# PRD — MediCar Plus (Estat 10/07/2026)
+# PRD — MediCar Plus (Estat 14/07/2026)
 
-## 🛡️ SISTEMA DE PUBLICACIÓ DEFINITIU (10/07/2026)
+## 🛡️ SISTEMA DE PUBLICACIÓ DEFINITIU
 
 **UNA sola comanda per publicar:**
 ```powershell
@@ -9,15 +9,18 @@ powershell -ExecutionPolicy Bypass -File .\publish-safe.ps1
 ```
 
 **Última versió publicada**: v2.0.36 (13/07/2026)
-**Pròxima versió (pendent de publicar per Marc)**: v2.0.37 amb:
-- 💰 Desglossament de **Tasas DGT** al Cierre del día (`4×24,58 = 98,32 · 3×14,75 = 44,25`) amb total a la dreta
-- 📊 Nova pestanya **"🔔 Avisos SMS"** dins Estadístiques (al costat d'Autoescolas i Tráfico)
-- 🖨️ Botó **Imprimir informe** al detall de campanya SMS (A4 amb KPIs + taula detallada)
-- 🗑 Botó **Eliminar campanya** (3 llocs: llistat, detall, estadístiques embed) amb confirmació
-- 🐛 Fix crític **classificació Profesional/Normal** al Libro de Registro (letra C dins "Renovación" ja no falseja)
-- 📁 Parser CSV DGT amb detecció automàtica de la classe del carnet
-- 🚦 **"Recuperación"** com a categoria reconeguda a Estadísticas · Tráfico
-- 🛡️ Try/catch defensiu al renderLibro
+**Pròxima versió (pendent de publicar per Marc)**: v2.1.0 amb:
+- 📅 **NOU MÒDUL "CITES DEL DIA"** (Premium): sincronització amb Google Calendar, Doctoralia, Calendly, Doctolib, Timify, iCloud i qualsevol calendari amb URL iCal
+  - Un cop enganxada la URL, no cal reintroduir-la (persistida a localStorage)
+  - Auto-refresh cada 15 min + botó manual
+  - Marcatge d'estat per cita: Presentat / No presentat / Realitzat
+  - 3 pestanyes: D'avui · Setmana · Calendaris (config)
+  - Backend endpoint: `POST /api/calendar/fetch` (parseja iCal amb `icalendar` lib)
+- 📋 **IRPF · Fix crític**: camps ja no es veuen negres · CSS específic `.irpf-modal input[type=text]` amb `!important`
+- ⌨️ IRPF accepta coma o punt (`num()` function ja existia)
+- ⚡ IRPF càlculs en viu sense perdre focus (updateRow/updateTotalsRow inline)
+- 🎯 Auto-focus al nou nom + confirmació abans d'eliminar (confirmModal)
+- 🌐 Landing `medicarplus.es`: banderes España + Catalunya SVG, lightbox amb 8 captures reals (main-cierre, contabilidad, estadisticas, libro-registro, sms-avisos, asesor-ia, auditoria, irpf), eliminat "Autoescuela" del contact form
 
 ### Pipeline 5-passos (tot dins publish-safe.ps1):
 1. `sync.js` — Baixa fitxers font del servidor via `/api/electron/download/*` amb User-Agent Mozilla. Aborta si algun fitxer no passa signatures. **MAI barreja versions.**
