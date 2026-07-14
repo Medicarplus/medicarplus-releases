@@ -9,8 +9,11 @@ powershell -ExecutionPolicy Bypass -File .\publish-safe.ps1
 ```
 
 **Última versió publicada**: v2.0.36 (13/07/2026)
-**Pròxima versió (pendent de publicar per Marc)**: v2.1.4 amb:
-- 🔧 **IRPF · Fix alineació taula TOTALS MES** (14/07/2026): després d'afegir columna `€/CERT`, la fila de totals no s'alineava amb les capçaleres. Ara `colspan="3"` cobreix NOM+CERT+€/CERT i BRUT/S.S./TOTAL/IRPF/NET/NET S.S./TOTAL FINAL s'alineen perfectament sota les seves columnes.
+**Pròxima versió (pendent de publicar per Marc)**: v2.1.5 amb:
+- 🐛 **FIX CRÍTIC (14/07/2026)**: quan s'escrivia al camp S.S. (o NET S.S.) el DOM es corrompia perquè els índexs `cells[]` del handler d'actualització en viu eren obsolets (van quedar desalineats després d'afegir la columna €/CERT). Ara els índexs són correctes: `cells[5]=TOTAL, cells[6]=IRPF, cells[7]=NET, cells[9]=TOTAL FINAL`.
+- ⚡ **Auto-BRUT visual immediat**: quan escrius CERT + €/CERT, el camp BRUT s'actualitza visualment a l'instant (abans requeria fer Tab per veure el resultat).
+- ⏱️ **Debounce optimitzat**: full re-render passa de 600ms → 800ms + skip si l'usuari està escrivint. Refresc immediat del resum trimestral en fer blur.
+- 🔧 Fix alineació taula TOTALS MES (colspan=3 cobreix NOM+CERT+€/CERT)
 - 💶 **IRPF · Columna €/CERT** (v2.1.3): càlcul automàtic BRUT = CERT × €/CERT quan es completa la columna
 - 🖨️ **Fix crític impressió Electron**: `window.open` no funcionava a l'app compilada → substituït per `printHtml()` amb iframe ocult. IRPF/Estadísticas/Llibreta imprimeixen amb `@page{size:A4 landscape}` i colors de fons.
 - 👁️ Modal de Print Preview abans del diàleg d'impressió

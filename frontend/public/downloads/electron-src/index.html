@@ -2248,7 +2248,7 @@ function openIRPF(){
         </thead>
         <tbody>${entriesHTML||'<tr><td colspan="10" style="padding:20px;text-align:center;color:#78350f;font-style:italic">Cap persona afegida encara. Fes clic a "+ Afegir persona" per començar.</td></tr>'}
         <tr style="background:#fef3c7;font-weight:700;border-top:3px double #78350f">
-          <td colspan="2" style="padding:8px;border:1px solid #b45309;text-align:right;color:#78350f">TOTALS MES:</td>
+          <td colspan="3" style="padding:8px;border:1px solid #b45309;text-align:right;color:#78350f">TOTALS MES:</td>
           <td style="padding:8px;border:1px solid #b45309;text-align:right;font-family:'Courier New',monospace">${fmt(totals.brut)}</td>
           <td style="padding:8px;border:1px solid #b45309;text-align:right;font-family:'Courier New',monospace">${fmt(totals.ss)}</td>
           <td style="padding:8px;border:1px solid #b45309;text-align:right;font-family:'Courier New',monospace">${fmt(totals.total)}</td>
@@ -2316,6 +2316,17 @@ function openIRPF(){
           const ct=Number(ent.cert)||0;
           if(cp>0&&ct>0){
             ent.brut=+(cp*ct).toFixed(2);
+            // Actualitzem visualment el camp BRUT immediatament (readonly quan auto)
+            const brutInp=inp.closest('tr').querySelector('input[data-f="brut"]');
+            if(brutInp){
+              brutInp.value=ent.brut;
+              brutInp.readOnly=true;
+              brutInp.title='Auto: '+ct+' × '+fmt(cp)+' /cert';
+              brutInp.style.background='#ecfdf5';
+              brutInp.style.color='#065f46';
+              brutInp.style.borderColor='#10b981';
+              brutInp.style.cursor='not-allowed';
+            }
           }
         }
         saveIrpf(d2);
@@ -2324,11 +2335,11 @@ function openIRPF(){
         if(tr){
           const c=irpfCalc(d2[irpfComp].months[m].entries[i],pct);
           const cells=tr.querySelectorAll('td');
-          // cells[4]=TOTAL, [5]=IRPF, [6]=NET, [8]=TOTAL FINAL
-          if(cells[4])cells[4].textContent=c.hasSs?fmt(c.total):'—';
-          if(cells[5])cells[5].textContent=fmt(c.irpf);
-          if(cells[6])cells[6].textContent=fmt(c.net);
-          if(cells[8])cells[8].textContent=c.hasSs?fmt(c.totalFinal):'—';
+          // cells: 0=NOM, 1=CERT, 2=€/CERT, 3=BRUT, 4=S.S., 5=TOTAL, 6=IRPF, 7=NET, 8=NET S.S., 9=TOTAL FINAL, 10=DEL
+          if(cells[5])cells[5].textContent=c.hasSs?fmt(c.total):'—';
+          if(cells[6])cells[6].textContent=fmt(c.irpf);
+          if(cells[7])cells[7].textContent=fmt(c.net);
+          if(cells[9])cells[9].textContent=c.hasSs?fmt(c.totalFinal):'—';
           // Toggle netSS input enabled state
           const netSsInp=tr.querySelector('input[data-f="netSS"]');
           if(netSsInp){
@@ -2341,23 +2352,28 @@ function openIRPF(){
         }
         // Update TOTALS MES row live
         updateTotalsRow();
-        // Also schedule a full render after typing pauses (updates quarterly summary + safety net)
+        // Schedule a full render after typing pauses (updates quarterly summary only)
+        // Debounce 800ms — la fila i totals ja s'actualitzen en viu més amunt.
         clearTimeout(renderTimeout);
         renderTimeout=setTimeout(()=>{
-          const activeId=document.activeElement&&document.activeElement.dataset?{i:document.activeElement.dataset.i,f:document.activeElement.dataset.f}:null;
-          const cursorPos=document.activeElement&&document.activeElement.selectionStart;
+          // Skip full render if user is still actively editing an input in the IRPF body
+          const ae=document.activeElement;
+          if(ae&&ae.tagName==='INPUT'&&ae.dataset&&ae.dataset.i!=null)return;
           render();
-          // Restore focus to same input+cursor position
-          if(activeId&&activeId.i!==undefined){
-            const sel=`input[data-i="${activeId.i}"][data-f="${activeId.f}"]`;
-            const el=back.querySelector(sel);
-            if(el){el.focus();if(cursorPos!=null)try{el.setSelectionRange(cursorPos,cursorPos)}catch(e){}}
-          }
-        },600);
+        },800);
       };
       // Tab/Enter → next input
       inp.onkeydown=(ev)=>{
         if(ev.key==='Enter'){ev.preventDefault();const inputs=[...back.querySelectorAll('input[data-i]:not([disabled])')];const idx=inputs.indexOf(inp);if(idx>=0&&idx<inputs.length-1)inputs[idx+1].focus()}
+      };
+      // On blur: trigger full render (updates quarterly summary + safety net) without disrupting typing
+      inp.onblur=()=>{
+        clearTimeout(renderTimeout);
+        renderTimeout=setTimeout(()=>{
+          const ae=document.activeElement;
+          if(ae&&ae.tagName==='INPUT'&&ae.dataset&&ae.dataset.i!=null)return;
+          render();
+        },150);
       };
     });
     // Helper: update TOTALS MES row after inline edit
@@ -2368,7 +2384,7 @@ function openIRPF(){
       const totRow=back.querySelector('#irpfBody table tbody tr:last-child');
       if(totRow){
         const tds=totRow.querySelectorAll('td');
-        // tds: [colspan=2][BRUT][SS][TOTAL][IRPF][NET][NETSS][TOTALFINAL][blank]
+        // tds: [colspan=3 (NOM+CERT+€/CERT)][BRUT][SS][TOTAL][IRPF][NET][NETSS][TOTALFINAL][blank]
         if(tds[1])tds[1].textContent=fmt(t.brut);
         if(tds[2])tds[2].textContent=fmt(t.ss);
         if(tds[3])tds[3].textContent=fmt(t.total);
@@ -2517,7 +2533,7 @@ function openIRPF(){
         </tbody>
       </table>
       <div class="footer">
-        <div>Document generat per <b>MediCar Plus</b> · v2.1.0 · ${compName(irpfComp)}</div>
+        <div>Document generat per <b>MediCar Plus</b> · v2.1.5 · ${compName(irpfComp)}</div>
         <div>TOTAL IRPF A RETENIR: <span class="total-irpf">${fmt(totals.irpf)} €</span></div>
       </div>
     </body></html>`);
