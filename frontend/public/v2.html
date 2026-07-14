@@ -646,6 +646,86 @@ function printHtml(html){
     toast(currentLang==='ca'?'❌ No s\'ha pogut imprimir':'❌ No se ha podido imprimir');
   }
 }
+
+// ============================================================================
+// printVisibleElement(el, opts) — WYSIWYG · Imprimeix EXACTAMENT el que es veu
+// ----------------------------------------------------------------------------
+// En lloc de generar un HTML separat (que sempre acaba desincronitzant-se),
+// clona l'element visible tal com es veu, converteix els <input> a text
+// llegible, i imprimeix per iframe. Així mai més s'ha de mantenir un layout
+// separat per print — si es veu bé a pantalla, es veu bé imprès.
+//
+// opts: { title?, landscape?=true, margins?='8mm', extraCss?='' }
+// ============================================================================
+function printVisibleElement(el, opts={}){
+  try{
+    if(!el){toast('❌ Res per imprimir');return}
+    const title=opts.title||document.title||'MediCar Plus';
+    const landscape=opts.landscape!==false;
+    const margins=opts.margins||'8mm';
+
+    // 1) Clona l'element visible
+    const clone=el.cloneNode(true);
+
+    // 2) Converteix inputs/textareas/selects a text estàtic (mai no s'imprimeixen bé)
+    clone.querySelectorAll('input, textarea').forEach(inp=>{
+      const span=document.createElement('span');
+      const val=(inp.value!=null&&inp.value!=='')?inp.value:(inp.placeholder&&inp.type!=='password'?inp.placeholder:'');
+      span.textContent=val;
+      // Copia estil bàsic
+      const cs=window.getComputedStyle(inp);
+      span.style.cssText=`display:inline-block;text-align:${cs.textAlign||'left'};font-family:${cs.fontFamily};font-size:${cs.fontSize};font-weight:${cs.fontWeight};color:#000;padding:${cs.padding};background:${cs.backgroundColor==='rgba(0, 0, 0, 0)'?'transparent':cs.backgroundColor};border:none;min-width:${cs.width}`;
+      inp.parentNode.replaceChild(span, inp);
+    });
+    clone.querySelectorAll('select').forEach(sel=>{
+      const span=document.createElement('span');
+      const opt=sel.options[sel.selectedIndex];
+      span.textContent=opt?opt.textContent:'';
+      inp=null;
+      sel.parentNode.replaceChild(span, sel);
+    });
+
+    // 3) Elimina botons i elements interactius que no aporten a un rebut
+    clone.querySelectorAll('button, [data-no], [data-close], .modal-back, [contenteditable]').forEach(b=>{
+      // Excepció: si el botó té classe 'keep-print' el mantenim
+      if(!b.classList||!b.classList.contains('keep-print')) b.remove();
+    });
+
+    // 4) Captura estils inline computats dels elements importants
+    // (per no dependre de stylesheets externs que potser no es carreguen al iframe)
+    const inlineStyleRoots = clone.querySelectorAll('table, th, td, tr, thead, tbody, tfoot, div, span, h1, h2, h3, h4, p, ul, ol, li');
+    inlineStyleRoots.forEach(node=>{
+      // No sobreescriure si ja té style
+      if(!node.getAttribute('style') || node.getAttribute('style').length < 5){
+        // Copia les propietats visuals més importants dels estils originals
+        try{
+          const src=(el.querySelector('[' + (node.id?'id="'+node.id+'"':'') + ']')) || null;
+        }catch(e){}
+      }
+    });
+
+    // 5) Construeix l'HTML complet
+    const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
+<style>
+@page{size:A4 ${landscape?'landscape':'portrait'};margin:${margins}}
+*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;box-sizing:border-box}
+html,body{margin:0;padding:0;background:#fff;color:#000;font-family:'Segoe UI',Arial,sans-serif;font-size:12px;line-height:1.4}
+body{padding:8px}
+table{border-collapse:collapse;width:100%}
+th,td{padding:6px 8px;border:1px solid #999;vertical-align:middle}
+h1,h2,h3{margin:6px 0 10px 0}
+button{display:none !important}
+.modal, [class*="modal"]{background:#fff !important;color:#000 !important;box-shadow:none !important;border:none !important;max-width:none !important;width:auto !important;padding:0 !important;margin:0 !important}
+/* Forçar text negre a printing */
+* {color: inherit}
+${opts.extraCss||''}
+</style></head><body>${clone.outerHTML}</body></html>`;
+    return printHtml(html);
+  }catch(err){
+    console.error('[printVisibleElement] Fatal:',err);
+    toast(currentLang==='ca'?'❌ Error preparant impressió':'❌ Error preparando impresión');
+  }
+}
 function setDate(d){currentDate=d;$('#fecha').value=d;render()}
 function shiftDate(delta){const d=new Date(currentDate);d.setDate(d.getDate()+delta);setDate(d.toISOString().slice(0,10))}
 $('#btnPrevDay').onclick=()=>shiftDate(-1);$('#btnNextDay').onclick=()=>shiftDate(1);$('#btnToday').onclick=()=>setDate(isoToday());$('#fecha').onchange=e=>setDate(e.target.value);
@@ -818,7 +898,15 @@ function openLibroRegistro(){
   const chkZ=back.querySelector('#lrCountZero');if(chkZ){chkZ.checked=getCountZero();chkZ.onchange=()=>{setCountZero(chkZ.checked);renderLibro();}}
   back.querySelector('#lrFrom').onchange=renderLibro;
   back.querySelector('#lrTo').onchange=renderLibro;
-  back.querySelector('#lrPrint').onclick=()=>{printHtml(`<html><head><title>Libro de Registro</title><style>body{font-family:Arial,sans-serif;padding:20px}h1{text-align:center}table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}th,td{border:1px solid #333;padding:6px}th{background:#333;color:#fff}</style></head><body>${$('#lrBody').innerHTML}</body></html>`)};
+  back.querySelector('#lrPrint').onclick=()=>{
+    const modal=back.querySelector('.modal')||back.firstElementChild;
+    printVisibleElement(modal, {
+      title:'Libro de Registro',
+      landscape:true,
+      margins:'8mm',
+      extraCss:'[data-no], [data-close], input[type="date"], input[type="month"], select { display:none !important }'
+    });
+  };
 }
 function openStats(){
   const s=loadStats();
@@ -992,21 +1080,16 @@ function openStats(){
   };
   back.querySelector('#stPrint').onclick=()=>{
     if(currentSection === 'traffic'){ printTrafficReport(); return; }
-    const year=$('#stYear').value;const st=loadStats();const mode=$('#stMode').value;const monthSel=+$('#stMonth').value;
-    let html='';
-    if(mode==='month'){
-      const key=`${year}-${String(monthSel).padStart(2,'0')}`;
-      const monthData=st.data[key]||{};
-      const rows=st.autoescoles.map(name=>{const v=monthData[name]||0;return `<tr><td style="text-align:left;font-weight:600">${name}</td><td>${v||''}</td></tr>`}).join('');
-      const total=Object.values(monthData).reduce((s,v)=>s+(+v||0),0);
-      html=`<html><head><title>Estadístiques ${MESOS[monthSel-1]} ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #333;padding:8px;text-align:center}th{background:#333;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:12px}tfoot td{background:#444;color:#fff;font-weight:700;font-size:15px}@media print{body{padding:5mm}}</style></head><body><h1>ESTADÍSTIQUES · ${MESOS[monthSel-1].toUpperCase()} ${year}</h1><table><thead><tr><th>AUTOESCOLES</th><th>CERTIFICATS</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL ${MESOS[monthSel-1].toUpperCase()} ${year}</td><td>${total}</td></tr></tfoot></table></body></html>`;
-    }else{
-      const rows=st.autoescoles.map(name=>{let tot=0;const cells=MESOS.map((_,mi)=>{const key=`${year}-${String(mi+1).padStart(2,'0')}`;const v=(st.data[key]||{})[name]||0;tot+=v;return `<td>${v||''}</td>`}).join('');return `<tr><td style="text-align:left;font-weight:600">${name}</td>${cells}<td style="font-weight:700;background:#ffe6a8">${tot||''}</td></tr>`}).join('');
-      const colTot=MESOS.map((_,mi)=>{const key=`${year}-${String(mi+1).padStart(2,'0')}`;const d=st.data[key]||{};return Object.values(d).reduce((s,v)=>s+(+v||0),0)});
-      const grand=colTot.reduce((s,v)=>s+v,0);
-      html=`<html><head><title>Estadístiques ${year}</title><style>@page{size:A4 landscape;margin:10mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Arial,sans-serif;padding:0;color:#000;font-size:12px}h1{text-align:center;margin-bottom:20px;color:#111}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #333;padding:6px;text-align:center}th{background:#333 !important;color:#fff !important}td:first-child,th:first-child{text-align:left;padding-left:10px}tfoot td{background:#444 !important;color:#fff !important;font-weight:700}</style></head><body><h1>ESTADÍSTIQUES AUTOESCOLES ${year}</h1><table><thead><tr><th>AUTOESCOLES</th>${MESOS.map(m=>`<th>${m.slice(0,4).toUpperCase()}</th>`).join('')}<th style="background:#b8860b !important">TOTAL</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL CERTIFICATS</td>${colTot.map(v=>`<td>${v||''}</td>`).join('')}<td>${grand}</td></tr></tfoot></table></body></html>`;
-    }
-    printHtml(html);
+    // WYSIWYG: imprimeix el contingut visible del modal
+    const modal=back.querySelector('.modal')||back.firstElementChild;
+    const year=$('#stYear').value;const mode=$('#stMode').value;const monthSel=+$('#stMonth').value;
+    const title=mode==='month'?`Estadístiques ${MESOS[monthSel-1]} ${year}`:`Estadístiques ${year}`;
+    printVisibleElement(modal, {
+      title,
+      landscape:true,
+      margins:'8mm',
+      extraCss:'button, select, input, [data-no] { display:none !important } .icon-btn { display:none !important }'
+    });
   };
   // ============================================================================
   // Secció TRÁFICO · Agrega les entrades del CSV DGT del panell principal
@@ -2458,85 +2541,37 @@ function openIRPF(){
   back.querySelector('#irpfMonth').onchange=render;
   back.querySelector('#irpfPrint').onclick=()=>{
     const data=loadIrpf();const md=data[irpfComp].months[currentMonth]||{entries:[]};
-    const pct=irpfPct(irpfComp);
     const entries=md.entries||[];
     if(entries.length===0){
       const isCA=currentLang==='ca';
       toast(isCA?`⚠️ Cap persona a ${compName(irpfComp)} · ${monthLabel(currentMonth)}. Afegeix persones abans d'imprimir.`:`⚠️ Sin personas en ${compName(irpfComp)} · ${monthLabel(currentMonth)}. Añade personas antes de imprimir.`,4000);
       return;
     }
-    const rows=entries.map(e=>{const c=irpfCalc(e,pct);return `<tr><td class="nom"><b>${escapeHtml(e.nom||'')}</b></td><td class="num">${e.cert||''}</td><td class="num">${fmt(Number(e.brut)||0)}</td><td class="num">${fmt(Number(e.ss)||0)}</td><td class="num">${c.hasSs?fmt(c.total):'—'}</td><td class="num irpf-c">${fmt(c.irpf)}</td><td class="num">${fmt(c.net)}</td><td class="num">${c.hasSs?fmt(c.netSS):'—'}</td><td class="num">${c.hasSs?fmt(c.totalFinal):'—'}</td></tr>`}).join('');
-    const totals=entries.reduce((a,e)=>{const c=irpfCalc(e,pct);a.brut+=Number(e.brut)||0;a.ss+=Number(e.ss)||0;if(c.hasSs){a.total+=c.total;a.netSS+=c.netSS;a.totalFinal+=c.totalFinal;a.net+=c.net;}else{a.net+=c.net;}a.irpf+=c.irpf;return a},{brut:0,ss:0,total:0,irpf:0,net:0,netSS:0,totalFinal:0});
-    printHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>IRPF ${compName(irpfComp)} · ${monthLabel(currentMonth)}</title><style>
-      @page{size:A4 landscape;margin:10mm}
-      *{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
-      body{font-family:Georgia,serif;padding:0;margin:0;color:#000;font-size:12px;background:#fff}
-      .head{border-bottom:3px double #78350f;padding-bottom:8px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-end}
-      h1{margin:0;color:#78350f;font-size:24px;letter-spacing:1px}
-      .sub{color:#78350f;font-size:14px;margin-top:4px}
-      .empresa{font-size:11px;color:#666;font-style:italic}
-      .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
-      .kpi{border:1px solid #b45309;padding:10px 14px;background:#fef3c7;text-align:center}
-      .kpi .lb{font-size:9px;color:#78350f;letter-spacing:1px;font-weight:700}
-      .kpi .vl{font-size:20px;color:#000;font-weight:700;margin-top:4px;font-family:'Courier New',monospace}
-      table{width:100%;border-collapse:collapse;font-size:12px}
-      th{background:#78350f !important;color:#fff !important;padding:8px 10px;border:1px solid #78350f;font-size:11px;letter-spacing:.5px}
-      td{border:1px solid #d4a373;padding:7px 10px;background:#fff}
-      td.nom{background:#fef3c7 !important;font-family:Georgia,serif;color:#78350f;min-width:180px}
-      td.num{text-align:right;font-family:'Courier New',monospace;font-weight:700;white-space:nowrap}
-      td.irpf-c{background:#fef3c7 !important;color:#78350f}
-      tr.tot td{background:#78350f !important;color:#fff !important;font-weight:700;font-size:13px}
-      tr.tot td.num{background:#5a2a08 !important}
-      tr.tot td.irpf-c{background:#b45309 !important;color:#fff !important}
-      .footer{margin-top:20px;border-top:2px solid #78350f;padding-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#666}
-      .footer .total-irpf{font-size:18px;color:#78350f;font-weight:700;font-family:'Courier New',monospace}
-    </style></head><body>
-      <div class="head">
-        <div>
-          <h1>IRPF · ${compName(irpfComp)}</h1>
-          <div class="sub"><b>${monthLabel(currentMonth).toUpperCase()}</b> · Retenció ${pct}%</div>
-        </div>
-        <div class="empresa">
-          Data d'impressió: ${new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'})}<br>
-          ${entries.length} persona${entries.length===1?'':'s'} · IRPF ${pct}%
-        </div>
-      </div>
-      <div class="kpis">
-        <div class="kpi"><div class="lb">TOTAL CERTIFICATS DEL MES</div><div class="vl">${md.totalCertificats||0}</div></div>
-        <div class="kpi"><div class="lb">TOTAL CERTF. BOMBERS</div><div class="vl">${md.totalCertfBombers||0}</div></div>
-        <div class="kpi" style="background:#fef3c7"><div class="lb" style="color:#78350f">TOTAL IRPF A RETENIR</div><div class="vl" style="color:#78350f">${fmt(totals.irpf)}</div></div>
-      </div>
-      <table>
-        <thead><tr>
-          <th style="text-align:left">NOM</th>
-          <th>CERT.</th>
-          <th>BRUT (€)</th>
-          <th>S.S. (€)</th>
-          <th>TOTAL (€)</th>
-          <th style="background:#b45309 !important">IRPF ${pct}% (€)</th>
-          <th>NET (€)</th>
-          <th>NET S.S. (€)</th>
-          <th>TOTAL FINAL (€)</th>
-        </tr></thead>
-        <tbody>
-          ${rows}
-          <tr class="tot">
-            <td colspan="2" style="text-align:right;background:#78350f !important">TOTALS DEL MES:</td>
-            <td class="num">${fmt(totals.brut)}</td>
-            <td class="num">${fmt(totals.ss)}</td>
-            <td class="num">${fmt(totals.total)}</td>
-            <td class="num irpf-c">${fmt(totals.irpf)}</td>
-            <td class="num">${fmt(totals.net)}</td>
-            <td class="num">${fmt(totals.netSS)}</td>
-            <td class="num">${fmt(totals.totalFinal)}</td>
-          </tr>
-        </tbody>
-      </table>
-      <div class="footer">
-        <div>Document generat per <b>MediCar Plus</b> · v2.1.6 · ${compName(irpfComp)}</div>
-        <div>TOTAL IRPF A RETENIR: <span class="total-irpf">${fmt(totals.irpf)} €</span></div>
-      </div>
-    </body></html>`);
+    // WYSIWYG: imprimir el contingut visible del modal, tal com es veu
+    const modalContent=back.querySelector('.modal, .irpf-modal') || back.querySelector('#irpfBody')?.closest('.modal') || back.firstElementChild;
+    // Injectem una capçalera contextual abans del clone
+    const dateStr=new Date().toLocaleDateString(currentLang==='ca'?'ca-ES':'es-ES',{day:'2-digit',month:'long',year:'numeric'});
+    const pctVal=irpfPct(irpfComp);
+    const header=`<div style="text-align:center;padding:8px 0 12px 0;border-bottom:2px solid #78350f;margin-bottom:12px"><h1 style="margin:0;color:#78350f;font-family:Georgia,serif;font-size:22px">IRPF · ${escapeHtml(compName(irpfComp))} · ${monthLabel(currentMonth).toUpperCase()}</h1><div style="font-size:11px;color:#666;margin-top:4px">${dateStr} · Retenció ${pctVal}% · ${entries.length} persona${entries.length===1?'':'s'}</div></div>`;
+    // Wrap modal content in a container to attach the header
+    const wrapper=document.createElement('div');
+    wrapper.innerHTML=header;
+    wrapper.appendChild(modalContent.cloneNode(true));
+    printVisibleElement(wrapper, {
+      title:`IRPF ${compName(irpfComp)} · ${monthLabel(currentMonth)}`,
+      landscape:true,
+      margins:'8mm',
+      extraCss:`
+        /* Ocultar barra de navegació superior (mes/prev/next/pct/close) al print */
+        [id^="irpfTitle"], #irpfPrev, #irpfNext, #irpfMonth, [data-icomp], [data-no], [data-pct], #irpfPctInp, [id="irpfPrint"] { display:none !important }
+        /* Ocultar botons + secció sobre IRPF (opcional) al print */
+        #irpfAdd, #irpfPay, #irpfUndo, #sobreAdd, [data-sobredel] { display:none !important }
+        /* Colors forçats */
+        table thead tr { background:#78350f !important; color:#fff !important }
+        table { page-break-inside:auto }
+        tr { page-break-inside:avoid; page-break-after:auto }
+      `
+    });
   };
 
   render();
@@ -4956,7 +4991,7 @@ setTimeout(()=>{ try{ showWhatsNew(false) }catch(e){ console.warn('showWhatsNew'
 const API_BASE_HARDCODED='https://project-helper-47.preview.emergentagent.com';
 // App version (hardcoded — s'actualitza a cada release). Serveix per invalidar
 // caché de descoberta al detectar que l'usuari acaba d'actualitzar l'app.
-const APP_VERSION='2.1.6';
+const APP_VERSION='2.1.7';
 // Múltiples fonts de descoberta. La primera que respongui vàlidament guanya.
 // L'orden importa:
 // 1) raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json

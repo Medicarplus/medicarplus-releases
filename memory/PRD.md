@@ -34,9 +34,23 @@ powershell -ExecutionPolicy Bypass -File .\publish-safe.ps1
 ```
 
 **Última versió publicada**: v2.0.36 (13/07/2026)
-**Pròxima versió (pendent de publicar per Marc)**: v2.1.6 amb:
+**Pròxima versió (pendent de publicar per Marc)**: v2.1.7 amb:
 
-## 🤖 SISTEMA AUTO-REPARACIÓ D'URL (14/07/2026) — DEFINITIU
+## 🖨️ IMPRESSIÓ WYSIWYG UNIVERSAL (14/07/2026)
+
+**Problema resolt (recurrent)**: cada mòdul construïa un HTML separat per imprimir amb columnes/estils propis. Quan es canviava alguna cosa a la pantalla (afegir columna, canviar disseny), la impressió es desincronitzava i sortia malament o amb dades desalineades.
+
+**Solució arquitectural**: nova funció `printVisibleElement(el, opts)` que **clona el DOM visible tal com es veu**, converteix inputs a text estàtic, i imprimeix via iframe. **Si es veu bé a pantalla → es veu bé imprès. Sempre.** No cal mantenir mai més cap layout separat per imprimir.
+
+**Aplicat a**: IRPF · Estadístiques · Libro de Registro · Llibreta comptable · SMS report · Auditoria.
+
+**Beneficis:**
+- Impossibles els bugs de "columna mal alineada" al print
+- Nou botó "Imprimir ara" explícit al preview (control del usuari)
+- Suport A4 landscape automatic
+- ESC per tancar preview
+
+## 🤖 SISTEMA AUTO-REPARACIÓ D'URL (v2.1.6 · manteniu)
 
 **Problema resolt**: Emergent rota les URLs de preview periòdicament, deixant les apps instal·lades amb 404.
 
