@@ -473,6 +473,15 @@ async def _startup():
     except Exception:
         logger.exception("Failed to ensure MongoDB indexes")
 
+    # Auto-publica la URL actual del preview a medicarplus.es/api-endpoint.json.
+    # Si Emergent roti la URL, els clients Electron ho detecten sols en < 24h.
+    # No trenca l'arrencada si falla.
+    try:
+        from services.auto_publish_endpoint import auto_publish_endpoint_url
+        await auto_publish_endpoint_url()
+    except Exception:
+        logger.exception("auto_publish_endpoint_url failed at startup")
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

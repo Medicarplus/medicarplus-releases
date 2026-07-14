@@ -620,80 +620,87 @@ Absolutament. Cada centre té la seva llicència JWT única. Tot el sistema est�
 
 <!-- ============ TAB: ERRORS 404 / URL ============ -->
 <div class="tab-panel" data-panel="errors">
-<h1 id="errors">13. 🆘 Errors 404 · Reparació URL del servidor</h1>
-
-<div class="callout callout-red">
-<b>Problema:</b> l'aplicació ensenya <b>"Error: HTTP 404"</b> o <b>"Failed to fetch"</b> quan obres SMS, Cites, o Asesor IA.
-</div>
-
-<div class="callout callout-blue">
-<b>Per què passa?</b> Emergent (el servei que allotja el backend) rota les URLs de preview cada cert temps. L'app instal·lada als PCs dels clients queda apuntant a una URL que ja no existeix.
-</div>
-
-<h2>✅ Solució permanent (des de v2.1.6)</h2>
-
-<p>L'app ara detecta la URL correcta del backend automàticament de dues formes:</p>
-
-<ol>
-<li>Al arrencar, consulta <code>https://medicarplus.es/api-endpoint.json</code></li>
-<li>A cada error 404, torna a consultar aquest fitxer per si la URL ha canviat</li>
-</ol>
-
-<p><b>Això vol dir que:</b> si algun dia Emergent torna a canviar la URL, només cal <b>editar aquest únic fitxer</b> al repo GitHub Pages de <code>medicarplus.es</code> — tots els clients es reajusten sols sense reinstal·lar res.</p>
-
-<div class="step">
-<div class="step-title">📋 PAS 1 · Publicar api-endpoint.json a medicarplus.es (una sola vegada)</div>
-<ol>
-<li>Descarrega el fitxer des de: <a href="/downloads/landing-assets/api-endpoint.json" target="_blank"><code>/downloads/landing-assets/api-endpoint.json</code></a></li>
-<li>Puja'l a l'arrel del teu repo <b>GitHub Pages</b> (el que serveix <code>medicarplus.es</code>).</li>
-<li>Commit + push. En 1-2 minuts es publica.</li>
-<li>Verifica que respon: <a href="https://medicarplus.es/api-endpoint.json" target="_blank">https://medicarplus.es/api-endpoint.json</a></li>
-</ol>
-</div>
-
-<div class="step">
-<div class="step-title">🔄 PAS 2 · Si algun dia veus 404 als clients (canvi de URL Emergent)</div>
-<ol>
-<li>Obre el repo de <code>medicarplus.es</code> a GitHub.</li>
-<li>Edita <code>api-endpoint.json</code>:
-<pre>{
-  "api": "https://NOVA-URL-EMERGENT.preview.emergentagent.com",
-  "updated": "2026-MM-DD"
-}</pre>
-</li>
-<li>Commit + push. Tots els clients Electron ho detectaran automàticament (immediat en obrir SMS/Cites, o màxim 24h).</li>
-</ol>
-</div>
-
-<h2>🩹 Solució temporal (client concret amb 404)</h2>
-
-<p>Si un client no vol esperar a que la caché es refresqui automàticament (24h), poden forçar la nova URL manualment:</p>
-
-<ol>
-<li>Obre l'app MediCar Plus.</li>
-<li>Ves a <b>⚙️ Configuración</b>.</li>
-<li>Baixa fins a <b>🔧 Diagnóstico · URL del servidor (avanzado)</b>. Fes clic per obrir.</li>
-<li>Enganxa la URL nova al camp de text i clica <b>Guardar</b>.</li>
-<li>Tanca i torna a obrir l'app. SMS/Cites ja funcionen.</li>
-</ol>
+<h1 id="errors">13. 🆘 Errors 404 · Sistema auto-reparació</h1>
 
 <div class="callout callout-green">
-<b>💡 Recomanació:</b> el més bo és el <b>PAS 1</b> (fitxer JSON a medicarplus.es). Un cop fet, mai més t'hauràs de preocupar. Tots els clients existents i futurs es reajusten sols.
+<b>Bones notícies (v2.1.6):</b> el sistema ara <b>s'auto-repara sol</b>. Ja no cal editar cap fitxer, ni res. Els 404 del SMS/Cites es solucionen automàticament sense la teva intervenció.
 </div>
 
-<h2>🔍 Com saber quina URL està usant l'app ara mateix</h2>
+<h2>🤖 Com funciona (per si has de saber-ho)</h2>
 
-<p>Ves a <b>⚙️ Configuración → 🔧 Diagnóstico</b>. Al camp <b>"URL actual"</b> es mostra la URL que l'app està usant en aquest moment. Si la URL sembla morta, clica <b>🔄 Auto</b> per forçar re-detecció.</p>
+<div class="step">
+<div class="step-title">Cada cop que el backend arrenca...</div>
+<ol>
+<li>Detecta la seva pròpia URL (via env var d'Emergent).</li>
+<li>Fa commit del fitxer <code>api-endpoint.json</code> al repo GitHub <b>Medicarplus/medicarplus-releases</b> amb aquesta URL.</li>
+<li>El fitxer és accessible a <a href="https://raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json" target="_blank"><code>raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json</code></a></li>
+</ol>
+</div>
 
-<h2>📁 On viu cada URL</h2>
+<div class="step">
+<div class="step-title">Cada cop que l'app Electron d'un client s'obre...</div>
+<ol>
+<li>Consulta aquest fitxer JSON (URL estable de GitHub, mai canvia).</li>
+<li>Cachea la URL correcta a localStorage per 24h.</li>
+<li>Fa servir aquesta URL per a SMS, Cites, IA, llicència, etc.</li>
+</ol>
+</div>
+
+<div class="step">
+<div class="step-title">Si Emergent roti la URL de preview (esdevé sol de tant en tant)...</div>
+<ol>
+<li>El backend arrenca a la nova URL i auto-publica el JSON amb la URL nova.</li>
+<li>L'app dels clients detecta un 404 momentàni → torna a llegir el JSON → agafa la URL nova.</li>
+<li><b>Zero intervenció manual per part teva.</b> Els clients no noten res.</li>
+</ol>
+</div>
+
+<h2>✅ URLs importants per verificar (només si dubtes)</h2>
 
 <table>
-<tr><th>Component</th><th>Ubicació</th><th>Freqüència de canvi</th></tr>
-<tr><td>URL hardcoded a l'app</td><td>Dins <code>v2.html</code> / index.html d'Electron</td><td>Cada release (auto-updater ho actualitza)</td></tr>
-<tr><td>URL de descoberta</td><td><code>medicarplus.es/api-endpoint.json</code></td><td>Estable · només editar quan Emergent rota</td></tr>
-<tr><td>URL cachada</td><td>localStorage del PC del client</td><td>Refresc automàtic cada 24h</td></tr>
-<tr><td>Override manual</td><td>localStorage · via Configuración</td><td>Només si el client ho posa</td></tr>
+<tr><th>URL</th><th>Què és</th><th>Com verificar-la</th></tr>
+<tr>
+  <td><code>raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json</code></td>
+  <td>La font de descoberta oficial</td>
+  <td>Ha de retornar JSON amb la URL del backend actual</td>
+</tr>
+<tr>
+  <td>URL dins el JSON</td>
+  <td>URL actual del backend (canvia sola)</td>
+  <td>Ha de respondre HTTP 200 en <code>/api/sms/stats</code> amb el token admin</td>
+</tr>
 </table>
+
+<h2>❌ Què fer si un client segueix veient 404 (rarament passa)</h2>
+
+<div class="callout callout-blue">
+<b>Cas 1:</b> el client acaba d'instal·lar una versió MOLT antiga (anterior a v2.1.6). Solució: dis-li que faci <b>⚙️ Configuración → 🔄 Comprobar última versión</b>. Auto-updater descarregarà v2.1.6+ i el sistema d'auto-descoberta s'activa.
+</div>
+
+<div class="callout callout-red">
+<b>Cas 2:</b> el GitHub PAT del backend ha caducat i no pot publicar el JSON. Regenera'l:
+<ol>
+<li>Ves a <a href="https://github.com/settings/tokens?type=beta" target="_blank">github.com/settings/tokens</a></li>
+<li>Nou <b>Fine-grained PAT</b> amb permisos <b>Contents: Read and write</b> al repo <code>medicarplus-releases</code></li>
+<li>Copia el token nou i posa'l al backend a <code>backend/.env</code> com <code>GITHUB_TOKEN=...</code></li>
+<li>Reinicia el backend</li>
+</ol>
+</div>
+
+<h2>🔍 Comandes de diagnòstic ràpid</h2>
+
+<pre># Verifica que el JSON de descoberta és accessible i està actualitzat
+curl https://raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json
+
+# Verifica que la URL del JSON respon
+curl -s -o /dev/null -w "%{http_code}\n" \
+     $(curl -s https://raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json | python -c "import sys,json;print(json.load(sys.stdin)['api'])")/api/sms/stats \
+     -H "X-Admin-Token: MB-ADMIN-BRUGULAT-2026-4F8E2A1C"
+# Ha de retornar 200</pre>
+
+<h2>💬 Última opció: pregunta a la IA</h2>
+
+<p>El widget flotant morat a baix a la dreta d'aquesta guia és una IA gratuïta (Google Gemini · 1.500 consultes/dia). Sap com funciona el programa i pot ajudar-te en temps real amb qualsevol dubte quan no em tinguis a mà.</p>
 
 </div><!-- /errors -->
 

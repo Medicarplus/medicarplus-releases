@@ -9,11 +9,29 @@ powershell -ExecutionPolicy Bypass -File .\publish-safe.ps1
 ```
 
 **Última versió publicada**: v2.0.36 (13/07/2026)
-**Pròxima versió (pendent de publicar per Marc)**: v2.1.5 amb:
-- 🐛 **FIX CRÍTIC (14/07/2026)**: quan s'escrivia al camp S.S. (o NET S.S.) el DOM es corrompia perquè els índexs `cells[]` del handler d'actualització en viu eren obsolets (van quedar desalineats després d'afegir la columna €/CERT). Ara els índexs són correctes: `cells[5]=TOTAL, cells[6]=IRPF, cells[7]=NET, cells[9]=TOTAL FINAL`.
-- ⚡ **Auto-BRUT visual immediat**: quan escrius CERT + €/CERT, el camp BRUT s'actualitza visualment a l'instant (abans requeria fer Tab per veure el resultat).
-- ⏱️ **Debounce optimitzat**: full re-render passa de 600ms → 800ms + skip si l'usuari està escrivint. Refresc immediat del resum trimestral en fer blur.
-- 🔧 Fix alineació taula TOTALS MES (colspan=3 cobreix NOM+CERT+€/CERT)
+**Pròxima versió (pendent de publicar per Marc)**: v2.1.6 amb:
+
+## 🤖 SISTEMA AUTO-REPARACIÓ D'URL (14/07/2026) — DEFINITIU
+
+**Problema resolt**: Emergent rota les URLs de preview periòdicament, deixant les apps instal·lades amb 404.
+
+**Solució 100% automàtica (sense intervenció humana)**:
+1. Backend a l'arrencar detecta la seva pròpia URL via env var `APP_URL`/`preview_endpoint`
+2. Auto-commit del fitxer `api-endpoint.json` al repo GitHub `Medicarplus/medicarplus-releases` (PAT ja té write access)
+3. Fitxer accessible via `raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json` (CDN estable, mai canvia)
+4. App Electron consulta aquest URL a l'iniciar-se, cachea 24h a localStorage
+5. Si rep 404, invalida caché i re-consulta el JSON automàticament
+6. Auto-invalidació de caché al canvi de versió de l'app
+
+**Verificació**: 8/8 tests Playwright OK · Auto-publish funcionant a Github
+
+## Altres fixes v2.1.6
+- 🐛 Fix crític S.S. IRPF: cel·les es sobrescrivien perquè índexs `cells[]` eren obsolets després d'afegir columna €/CERT
+- ⚡ Auto-BRUT visual immediat (CERT × €/CERT)
+- 🔧 Fix alineació taula TOTALS MES (colspan=3)
+- 🎨 Configuración neta: sense panells de URL avançada exposats al client
+- 📚 Guia admin: nova pestanya "🆘 Errors 404" amb explicació del sistema auto-heal
+- 🤖 Widget IA gratuïta a totes les guies (Google Gemini · 1.500 consultes/dia amb clau pròpia)
 - 💶 **IRPF · Columna €/CERT** (v2.1.3): càlcul automàtic BRUT = CERT × €/CERT quan es completa la columna
 - 🖨️ **Fix crític impressió Electron**: `window.open` no funcionava a l'app compilada → substituït per `printHtml()` amb iframe ocult. IRPF/Estadísticas/Llibreta imprimeixen amb `@page{size:A4 landscape}` i colors de fons.
 - 👁️ Modal de Print Preview abans del diàleg d'impressió

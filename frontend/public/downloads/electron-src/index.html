@@ -4958,9 +4958,13 @@ const API_BASE_HARDCODED='https://project-helper-47.preview.emergentagent.com';
 // caché de descoberta al detectar que l'usuari acaba d'actualitzar l'app.
 const APP_VERSION='2.1.6';
 // Múltiples fonts de descoberta. La primera que respongui vàlidament guanya.
-// Les stables (medicarplus.es GitHub Pages) són prioritàries; la del preview és
-// un fallback per si l'usuari encara no ha pujat el fitxer a GitHub Pages.
+// L'orden importa:
+// 1) raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json
+//    — Stable · el backend auto-publica aquí a cada arrencada
+// 2) medicarplus.es/api-endpoint.json (opcional, si mai afegeixes el fitxer)
+// 3) preview mateix (fallback intern)
 const API_DISCOVERY_URLS=[
+  'https://raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json',
   'https://medicarplus.es/api-endpoint.json',
   'https://project-helper-47.preview.emergentagent.com/downloads/landing-assets/api-endpoint.json'
 ];
