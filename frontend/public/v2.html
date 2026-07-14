@@ -2091,21 +2091,6 @@ function loadIrpf(){
     }else{
       out={trafic:raw.trafic||{months:{},quarters:{}},cempla:raw.cempla||{months:{},quarters:{}}};
     }
-    // COMERCIAL: neteja metges pre-cargats no utilitzats (JOSEP BRUGULAT / RAFART / MELLADO)
-    // Només s'eliminen si totes les columnes estan a zero (mai s'han fet servir).
-    const SEED_NAMES=['JOSEP BRUGULAT','JOSEP Mª RAFART','JOSE ANT. MELLADO'];
-    ['trafic','cempla'].forEach(comp=>{
-      const months=out[comp]&&out[comp].months;
-      if(!months)return;
-      Object.keys(months).forEach(m=>{
-        if(!months[m].entries)return;
-        months[m].entries=months[m].entries.filter(e=>{
-          const isSeed=SEED_NAMES.includes((e.nom||'').trim());
-          const empty=(!e.cert||e.cert===0)&&(!e.brut||e.brut===0)&&(!e.ss||e.ss===0)&&(!e.netSS||e.netSS===0);
-          return !(isSeed&&empty);
-        });
-      });
-    });
     return out;
   }catch(e){return {trafic:{months:{},quarters:{}},cempla:{months:{},quarters:{}}}}
 }
@@ -2307,6 +2292,7 @@ function openIRPF(){
       pctInp.onchange=()=>{setIrpfPct(irpfComp,pctInp.value);render()};
     }
     back.querySelectorAll('[data-pct]').forEach(b=>b.onclick=(ev)=>{ev.preventDefault();setIrpfPct(irpfComp,b.dataset.pct);render()});
+    let renderTimeout=null;
     back.querySelectorAll('input[data-i]').forEach(inp=>{
       inp.oninput=()=>{
         const i=parseInt(inp.dataset.i),f=inp.dataset.f;
@@ -2337,6 +2323,19 @@ function openIRPF(){
         }
         // Update TOTALS MES row live
         updateTotalsRow();
+        // Also schedule a full render after typing pauses (updates quarterly summary + safety net)
+        clearTimeout(renderTimeout);
+        renderTimeout=setTimeout(()=>{
+          const activeId=document.activeElement&&document.activeElement.dataset?{i:document.activeElement.dataset.i,f:document.activeElement.dataset.f}:null;
+          const cursorPos=document.activeElement&&document.activeElement.selectionStart;
+          render();
+          // Restore focus to same input+cursor position
+          if(activeId&&activeId.i!==undefined){
+            const sel=`input[data-i="${activeId.i}"][data-f="${activeId.f}"]`;
+            const el=back.querySelector(sel);
+            if(el){el.focus();if(cursorPos!=null)try{el.setSelectionRange(cursorPos,cursorPos)}catch(e){}}
+          }
+        },600);
       };
       // Tab/Enter → next input
       inp.onkeydown=(ev)=>{
@@ -4766,6 +4765,12 @@ const LAST_SEEN_VERSION_KEY = 'caja.last_seen_version';
 // IMPORTANT: L'ordre importa. La primera entrada ha de ser la MÉS RECENT.
 // Cada versió té: { version, date (dd/mm/aaaa), highlights (array de strings HTML curts) }
 const CHANGELOG = [
+  { version:'2.1.1', date:'14/07/2026', highlights:[
+    '🐛 <b>FIX CRÍTIC IRPF · Persones que "no sumen"</b> · un bug rar eliminava entrades amb noms com "JOSEP BRUGULAT" quan encara no tenien valors. Els noms de doctor ja no es filtren mai més.',
+    '📄 <b>Impressió IRPF apaisada</b> · l\'informe surt automàticament en orientació apaisada (A4 landscape) amb tots els colors, KPIs i totals ben clars.',
+    '🖨️ <b>Impressió Estadístiques i Llibreta també apaisades</b> · les taules amb moltes columnes ja no queden aixafades.',
+    '⚠️ <b>Avís abans d\'imprimir buit</b> · si obres IRPF d\'una empresa sense persones, el programa avisa enlloc d\'imprimir un PDF buit.',
+  ]},
   { version:'2.1.0', date:'14/07/2026', highlights:[
     '📅 <b>NOU · Cites del dia</b> (Premium): connecta el programa amb <b>Google Calendar</b>, <b>Doctoralia</b>, Calendly, Doctolib, Timify, iCloud o qualsevol calendari amb URL iCal.',
     '⚡ <b>Un cop enganxada la URL, no cal reintroduir-la</b> · el programa la recorda i sincronitza automàticament cada 15 min.',
