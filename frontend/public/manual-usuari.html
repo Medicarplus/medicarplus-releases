@@ -58,6 +58,7 @@
   <button class="tab-btn" data-tab="contabilidad" data-testid="tab-contabilidad">📊 Contabilidad</button>
   <button class="tab-btn" data-tab="libro" data-testid="tab-libro">📖 Libro Registro</button>
   <button class="tab-btn" data-tab="sms" data-testid="tab-sms">🔔 Avisos SMS</button>
+  <button class="tab-btn" data-tab="cites" data-testid="tab-cites">📅 Citas <span style="background:#0369a1;color:#fff;font-size:10px;padding:1px 5px;border-radius:4px;margin-left:3px;font-weight:800">PRO</span></button>
   <button class="tab-btn" data-tab="config" data-testid="tab-config">⚙️ Configuración</button>
   <button class="tab-btn" data-tab="faq" data-testid="tab-faq">🆘 Ayuda</button>
 </nav>
@@ -324,6 +325,71 @@
   <div class="tip">También accesible desde <i>Contabilidad ▸ 📊 Estadísticas ▸ pestaña 🔔 Avisos SMS</i>.</div>
 </div>
 
+<!-- ============ TAB: CITAS ============ -->
+<div class="tab-panel" data-panel="cites">
+  <h1>📅 Citas online <span style="background:#0369a1;color:#fff;font-size:12px;padding:2px 8px;border-radius:6px;margin-left:8px;font-weight:800;vertical-align:middle">PREMIUM</span></h1>
+  <p>Módulo exclusivo del plan Premium (39,90€/mes) que vincula el programa con <b>Google Calendar</b>, <b>Doctoralia</b>, <b>Calendly</b>, <b>Doctolib</b>, <b>Timify</b>, <b>iCloud</b>, <b>Outlook</b> o cualquier calendario que exporte URL iCal.</p>
+
+  <h2>🎯 ¿Para qué sirve?</h2>
+  <p>Si tu web tiene un botón "Reservar hora" (o usas Doctoralia para reservas), este módulo trae las reservas directamente al programa, sin abrir el navegador ni comprobar el calendario aparte.</p>
+  <ul>
+    <li>Ver todas las citas del día con nombre, hora, fuente</li>
+    <li>Notificación <b>automática</b> cuando un paciente reserva (badge rojo sobre 📅 Cites)</li>
+    <li>Marcar estado por cita: ✓ Presentado / ✕ No presentado / 💼 Realizado</li>
+    <li>Buscar por nombre en histórico completo de citas</li>
+    <li>Estadísticas: total, presentados, no presentados, gráfica mensual</li>
+  </ul>
+
+  <h2>🔗 Cómo vincular tu calendario (una sola vez)</h2>
+  <div class="step">
+    <div class="step-title">PASO 1 · Consigue la URL iCal de tu calendario</div>
+    <table>
+      <tr><th>Servicio</th><th>Dónde encontrarla</th></tr>
+      <tr><td><b>Google Calendar</b></td><td>Configuración → tu calendario → "Dirección secreta en formato iCal" → Copiar URL</td></tr>
+      <tr><td><b>Doctoralia</b></td><td>Panel profesional → Agenda → Exportar → iCal (.ics)</td></tr>
+      <tr><td><b>Calendly</b></td><td>Settings → Integraciones → Extensión iCal</td></tr>
+      <tr><td><b>Doctolib · Timify · iCloud · Outlook</b></td><td>Busca "iCal export" o "Exportar calendario" en la configuración</td></tr>
+    </table>
+  </div>
+  <div class="step">
+    <div class="step-title">PASO 2 · Añadir la URL al programa</div>
+    <ul>
+      <li>Clic al botón <b>📅 Cites</b> arriba en la barra</li>
+      <li>Pestaña <b>⚙️ Calendarios</b></li>
+      <li>Pega la URL en el campo y clic a <b>+ Añadir</b></li>
+      <li>El programa detecta automáticamente el servicio (Google/Doctoralia/etc.)</li>
+    </ul>
+    <div class="callout callout-blue"><b>Una vez añadida no hace falta volver a pegarla.</b> El programa la recuerda para siempre. Sincroniza cada 5 min en segundo plano.</div>
+  </div>
+  <div class="step">
+    <div class="step-title">PASO 3 · Ver las citas del día</div>
+    <ul>
+      <li>Pestaña <b>📆 De hoy</b>: lista con hora, paciente, fuente, estado</li>
+      <li>Pestaña <b>📅 Semana</b>: próximos 7 días</li>
+      <li>Buscador en la parte superior para filtrar por nombre</li>
+    </ul>
+  </div>
+
+  <h2>🔔 Notificación cuando llega una cita nueva</h2>
+  <p>El programa consulta tus calendarios cada 5 minutos <b>en segundo plano</b>. Si detecta una cita nueva (por ejemplo, un paciente que acaba de reservar online), muestra:</p>
+  <ul>
+    <li>Un <b>badge rojo</b> con el número sobre el botón 📅 Cites</li>
+    <li>Un <b>toast discreto</b> "🔔 1 nueva cita" en la parte inferior</li>
+  </ul>
+  <p>El badge desaparece automáticamente cuando abres el modal.</p>
+
+  <h2>📊 Estadísticas de citas</h2>
+  <p>Desde <i>Contabilidad ▸ 📊 Estadísticas ▸ pestaña 📅 Cites</i> tienes un resumen completo:</p>
+  <ul>
+    <li><b>KPIs</b>: total de citas, presentados, no presentados, realizados, sin marcar (con % del total)</li>
+    <li><b>Gráfico</b> de citas por mes (últimos 12 meses)</li>
+    <li><b>Buscador global</b> por nombre en todo el histórico (útil para consultas del tipo "¿este cliente vino aquella vez?")</li>
+    <li><b>Tabla</b> con las últimas 200 citas ordenadas por fecha con estado</li>
+  </ul>
+
+  <div class="callout callout-green"><b>✓ Función real y automatizada:</b> el sistema no requiere que hagas nada más que pegar la URL una sola vez. Los datos se guardan localmente en tu PC (privacidad total, no pasa por servidores externos, solo se consultan las URLs directas de tus calendarios).</div>
+</div>
+
 <!-- ============ TAB: CONFIGURACIÓN ============ -->
 <div class="tab-panel" data-panel="config">
   <h1>⚙️ Configuración</h1>
@@ -397,7 +463,7 @@
 </div>
 
 <footer>
-Manual de Usuario MediCar Plus v2.0.37 · Actualizado 13/07/2026<br>
+Manual de Usuario MediCar Plus v2.1.0 · Actualizado 14/07/2026<br>
 <a href="/guia-client-installacio.html">📥 Guía de instalación</a> · <a href="mailto:info@medicarplus.es">📧 Soporte</a>
 </footer>
 

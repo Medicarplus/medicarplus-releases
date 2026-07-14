@@ -781,6 +781,7 @@ function openStats(){
         <button class="btn" data-section="autos" data-testid="st-section-autos" style="background:#3a2a15;border-color:#f5b301;color:#f5b301;font-weight:700;padding:6px 12px;font-size:12px;border-radius:6px">🚗 Autoescolas</button>
         <button class="btn" data-section="traffic" data-testid="st-section-traffic" style="background:transparent;border-color:transparent;color:#94a3b8;font-weight:600;padding:6px 12px;font-size:12px;border-radius:6px">🚦 Tráfico</button>
         <button class="btn" data-section="sms" data-testid="st-section-sms" style="background:transparent;border-color:transparent;color:#94a3b8;font-weight:600;padding:6px 12px;font-size:12px;border-radius:6px">🔔 Avisos SMS</button>
+        <button class="btn" data-section="cites" data-testid="st-section-cites" style="background:transparent;border-color:transparent;color:#94a3b8;font-weight:600;padding:6px 12px;font-size:12px;border-radius:6px">📅 Cites</button>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
@@ -810,7 +811,7 @@ function openStats(){
     currentSection = sec;
     back.querySelectorAll('#stSectionSwitch button').forEach(b => {
       const active = b.dataset.section === sec;
-      const themeMap = { autos:{bg:'#3a2a15',bo:'#f5b301',co:'#f5b301'}, traffic:{bg:'#152a3a',bo:'#7ec8ff',co:'#7ec8ff'}, sms:{bg:'#0f3a20',bo:'#22c55e',co:'#22c55e'} };
+      const themeMap = { autos:{bg:'#3a2a15',bo:'#f5b301',co:'#f5b301'}, traffic:{bg:'#152a3a',bo:'#7ec8ff',co:'#7ec8ff'}, sms:{bg:'#0f3a20',bo:'#22c55e',co:'#22c55e'}, cites:{bg:'#0c2a3e',bo:'#0ea5e9',co:'#0ea5e9'} };
       if(active){
         const th = themeMap[sec] || themeMap.autos;
         b.style.background = th.bg;
@@ -826,22 +827,25 @@ function openStats(){
     });
     // Show/hide autos-only controls (import CSV / add autoescola / clear all)
     back.querySelectorAll('.st-autos-only').forEach(el => { el.style.display = sec === 'autos' ? '' : 'none' });
-    // Hide year/mode/month/prev/next/print/label for SMS section
-    ['#stYear','#stMode','#stMonth','#stPrev','#stNext','#stPrint'].forEach(sel => { const el = back.querySelector(sel); if(el) el.style.display = sec === 'sms' ? 'none' : (sel==='#stMonth' && back.querySelector('#stMode')?.value!=='month' ? 'none' : '') });
-    // Hide the "ANY:" label when in sms section
+    // Hide year/mode/month/prev/next/print/label for SMS and Cites sections
+    ['#stYear','#stMode','#stMonth','#stPrev','#stNext','#stPrint'].forEach(sel => { const el = back.querySelector(sel); if(el) el.style.display = (sec === 'sms' || sec === 'cites') ? 'none' : (sel==='#stMonth' && back.querySelector('#stMode')?.value!=='month' ? 'none' : '') });
+    // Hide the "ANY:" label when in sms or cites section
     const yearLabels = back.querySelectorAll('label.small');
-    yearLabels.forEach(l => { if(l.textContent.trim().startsWith('ANY')) l.style.display = sec === 'sms' ? 'none' : '' });
+    yearLabels.forEach(l => { if(l.textContent.trim().startsWith('ANY')) l.style.display = (sec === 'sms' || sec === 'cites') ? 'none' : '' });
     // Update footer hint
     back.querySelector('#stFooterHint').innerHTML = sec === 'traffic'
       ? '💡 Los datos de Tráfico se calculan automáticamente desde el CSV DGT importado en el panel principal.'
       : sec === 'sms'
       ? '💡 Clica en una campaña para ver el detalle e imprimir el informe con enviados, errores y contactos.'
+      : sec === 'cites'
+      ? '💡 Búsqueda por nombre en el histórico de citas. Los estados (presentado/no presentado/realizado) se sincronizan con el módulo Cites.'
       : '💡 Fes clic en qualsevol casella per editar. Els totals es calculen automàticament.';
     renderTable();
   };
   const renderTable=()=>{
     if(currentSection === 'traffic'){ renderTrafficTable(); return; }
     if(currentSection === 'sms'){ renderSmsInStats(); return; }
+    if(currentSection === 'cites'){ renderCitesInStats(); return; }
     const st=loadStats();
     const year=$('#stYear').value;
     const mode=$('#stMode').value;
@@ -1299,6 +1303,141 @@ function openStats(){
   back.querySelectorAll('#stSectionSwitch button').forEach(b => {
     b.onclick = () => setSection(b.dataset.section);
   });
+
+  // ============================================================================
+  // 📅 Cites — Estadístiques dins Estadísticas modal
+  // ============================================================================
+  function renderCitesInStats(){
+    const body = $('#stBody');
+    // Load persistent history from localStorage
+    let history = {};
+    try{ history = JSON.parse(localStorage.getItem('caja.calendar.history.v1')||'{}') }catch(e){ history = {} }
+    let status = {};
+    try{ status = JSON.parse(localStorage.getItem('caja.calendar.status.v1')||'{}') }catch(e){ status = {} }
+    const entries = Object.values(history);
+    const total = entries.length;
+    if(total === 0){
+      body.innerHTML = `<div style="text-align:center;padding:60px 20px;color:#94a3b8">
+        <div style="font-size:56px;margin-bottom:14px">📅</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:#e2e8f0">Sin histórico de citas todavía</div>
+        <div style="font-size:13px;line-height:1.6">
+          Cuando vincules Google Calendar o Doctoralia desde el botón <b style="color:#0ea5e9">📅 Cites</b> de la barra superior,<br>
+          las citas se guardarán aquí automáticamente y podrás ver estadísticas y buscar por nombre.
+        </div>
+        <div style="font-size:11px;color:#64748b;margin-top:20px;font-style:italic">Función Premium</div>
+      </div>`;
+      return;
+    }
+    // Compute KPIs
+    const stat = {presentat:0, no_presentat:0, realitzat:0, sense_marcar:0};
+    entries.forEach(e => {
+      const k = e.date+'|'+e.uid;
+      const s = status[k];
+      if(s==='ok') stat.presentat++;
+      else if(s==='no') stat.no_presentat++;
+      else if(s==='done') stat.realitzat++;
+      else stat.sense_marcar++;
+    });
+    const pct = n => total ? Math.round(n/total*100) : 0;
+    // Group by month for chart
+    const byMonth = {};
+    entries.forEach(e => {
+      const ym = (e.date||'').slice(0,7);
+      if(!ym) return;
+      byMonth[ym] = (byMonth[ym]||0) + 1;
+    });
+    const months = Object.keys(byMonth).sort().slice(-12);  // Last 12 months
+    const maxCount = months.length ? Math.max(...months.map(m => byMonth[m])) : 1;
+    const monthBars = months.map(m => {
+      const c = byMonth[m];
+      const h = Math.round(c/maxCount*100);
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:40px" title="${m}: ${c} cites">
+        <div style="font-size:10px;color:#94a3b8;font-weight:700;margin-bottom:3px">${c}</div>
+        <div style="width:100%;background:linear-gradient(180deg,#0ea5e9 0%,#0369a1 100%);border-radius:4px 4px 0 0;height:${Math.max(h,3)}px;min-height:3px;transition:opacity .2s"></div>
+        <div style="font-size:9px;color:#64748b;margin-top:4px;font-family:monospace;letter-spacing:.2px">${m.slice(5)}/${m.slice(2,4)}</div>
+      </div>`;
+    }).join('');
+    // Build the full body
+    body.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px">
+        <div style="background:linear-gradient(135deg,#0c2a3e 0%,#0369a1 100%);border:1px solid #0ea5e9;border-radius:10px;padding:16px" data-testid="cites-kpi-total">
+          <div style="font-size:10px;color:#7dd3fc;font-weight:700;letter-spacing:1px;margin-bottom:6px">📅 TOTAL CITAS</div>
+          <div style="font-size:36px;font-weight:800;color:#fff;line-height:1">${total}</div>
+          <div style="font-size:11px;color:#7dd3fc;margin-top:4px">Últimos 12 meses</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#052e1c 0%,#166534 100%);border:1px solid #22c55e;border-radius:10px;padding:16px" data-testid="cites-kpi-presentat">
+          <div style="font-size:10px;color:#86efac;font-weight:700;letter-spacing:1px;margin-bottom:6px">✓ PRESENTADOS</div>
+          <div style="font-size:36px;font-weight:800;color:#fff;line-height:1">${stat.presentat}</div>
+          <div style="font-size:11px;color:#86efac;margin-top:4px">${pct(stat.presentat)}% del total</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#450a0a 0%,#7f1d1d 100%);border:1px solid #ef4444;border-radius:10px;padding:16px" data-testid="cites-kpi-no-presentat">
+          <div style="font-size:10px;color:#fca5a5;font-weight:700;letter-spacing:1px;margin-bottom:6px">✕ NO PRESENTADOS</div>
+          <div style="font-size:36px;font-weight:800;color:#fff;line-height:1">${stat.no_presentat}</div>
+          <div style="font-size:11px;color:#fca5a5;margin-top:4px">${pct(stat.no_presentat)}% del total</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#1e3a8a 0%,#3b82f6 100%);border:1px solid #60a5fa;border-radius:10px;padding:16px" data-testid="cites-kpi-realitzat">
+          <div style="font-size:10px;color:#bfdbfe;font-weight:700;letter-spacing:1px;margin-bottom:6px">💼 REALIZADOS</div>
+          <div style="font-size:36px;font-weight:800;color:#fff;line-height:1">${stat.realitzat}</div>
+          <div style="font-size:11px;color:#bfdbfe;margin-top:4px">${pct(stat.realitzat)}% del total</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#1f2937 0%,#374151 100%);border:1px solid #6b7280;border-radius:10px;padding:16px" data-testid="cites-kpi-pendent">
+          <div style="font-size:10px;color:#d1d5db;font-weight:700;letter-spacing:1px;margin-bottom:6px">⚪ SIN MARCAR</div>
+          <div style="font-size:36px;font-weight:800;color:#fff;line-height:1">${stat.sense_marcar}</div>
+          <div style="font-size:11px;color:#d1d5db;margin-top:4px">${pct(stat.sense_marcar)}% del total</div>
+        </div>
+      </div>
+      ${months.length ? `<div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:18px;margin-bottom:20px">
+        <div style="font-size:11px;color:#0ea5e9;font-weight:700;letter-spacing:.5px;margin-bottom:14px">📈 CITAS POR MES (últimos 12)</div>
+        <div style="display:flex;gap:8px;align-items:flex-end;height:120px">${monthBars}</div>
+      </div>` : ''}
+      <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px 16px;margin-bottom:12px">
+        <label style="font-size:11px;color:#94a3b8;font-weight:700;letter-spacing:.5px;display:block;margin-bottom:6px">🔎 BUSCAR POR NOMBRE</label>
+        <input type="search" id="citesSearch" data-testid="cites-search-input" placeholder="Escribe un nombre, DNI o fragmento (ej: García López)..." autocomplete="off" style="width:100%;padding:10px 14px;background:#0b1220;border:1px solid #334155;color:#e2e8f0;border-radius:6px;font-size:14px" />
+        <div id="citesSearchMeta" style="font-size:11px;color:#64748b;margin-top:6px">Escribe para filtrar. Muestra hasta 200 resultados ordenados por fecha (más recientes primero).</div>
+      </div>
+      <div id="citesResults"></div>`;
+    // Wire search
+    const searchInp = body.querySelector('#citesSearch');
+    const resultsDiv = body.querySelector('#citesResults');
+    const metaDiv = body.querySelector('#citesSearchMeta');
+    function renderResults(query){
+      const q = (query||'').trim().toLowerCase();
+      let matches = entries.slice();
+      if(q){
+        matches = matches.filter(e => (e.summary||'').toLowerCase().includes(q) || (e.description||'').toLowerCase().includes(q));
+      }
+      matches.sort((a,b) => (b.date||'').localeCompare(a.date||'') || (b.time||'').localeCompare(a.time||''));
+      const shown = matches.slice(0, 200);
+      metaDiv.textContent = q ? `Encontradas ${matches.length} citas · Mostrando ${shown.length}` : `${entries.length} citas en histórico · Mostrando ${shown.length} (más recientes)`;
+      if(shown.length === 0){
+        resultsDiv.innerHTML = `<div style="text-align:center;padding:40px 20px;color:#64748b;background:#0f172a;border:1px dashed #334155;border-radius:8px">🔍 Ningún resultado para <b>"${escapeHtml(q)}"</b></div>`;
+        return;
+      }
+      const rows = shown.map(e => {
+        const k = e.date+'|'+e.uid;
+        const s = status[k];
+        const badge = s==='ok' ? `<span style="background:#166534;color:#a7f3d0;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">✓ PRESENTADO</span>`
+          : s==='no' ? `<span style="background:#7f1d1d;color:#fecaca;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">✕ NO PRESENTADO</span>`
+          : s==='done' ? `<span style="background:#1e40af;color:#bfdbfe;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">💼 REALIZADO</span>`
+          : `<span style="background:#334155;color:#cbd5e1;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">⚪ SIN MARCAR</span>`;
+        const dt = new Date(e.date+'T00:00:00').toLocaleDateString('es-ES',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+        return `<tr style="border-bottom:1px solid #1e293b">
+          <td style="padding:10px;font-family:monospace;color:#0ea5e9;font-weight:700;white-space:nowrap;text-transform:capitalize">${dt}</td>
+          <td style="padding:10px;font-family:monospace;font-weight:700;color:#7dd3fc">${e.time||'—'}</td>
+          <td style="padding:10px;font-weight:700;color:#e2e8f0">${escapeHtml(e.summary||'(Sin título)')}</td>
+          <td style="padding:10px;font-size:11px;color:#94a3b8">${escapeHtml(e.source||'')}</td>
+          <td style="padding:10px;text-align:center">${badge}</td>
+        </tr>`;
+      }).join('');
+      resultsDiv.innerHTML = `<table style="width:100%;background:#0f172a;border-radius:8px;border:1px solid #1e293b;border-collapse:collapse">
+        <thead><tr style="background:#1e293b"><th style="padding:9px 10px;text-align:left;font-size:11px;color:#94a3b8;font-weight:700">FECHA</th><th style="padding:9px 10px;text-align:left;font-size:11px;color:#94a3b8;font-weight:700">HORA</th><th style="padding:9px 10px;text-align:left;font-size:11px;color:#94a3b8;font-weight:700">PACIENTE</th><th style="padding:9px 10px;text-align:left;font-size:11px;color:#94a3b8;font-weight:700">FUENTE</th><th style="padding:9px 10px;text-align:center;font-size:11px;color:#94a3b8;font-weight:700">ESTADO</th></tr></thead>
+        <tbody>${rows}</tbody></table>`;
+    }
+    let searchTO = null;
+    searchInp.oninput = () => { clearTimeout(searchTO); searchTO = setTimeout(() => renderResults(searchInp.value), 150); };
+    renderResults('');
+  }
+
   renderTable();
 }
 $$('#chips-priv-cempla .chip').forEach(c=>c.onclick=()=>{$$('#chips-priv-cempla .chip').forEach(x=>x.classList.remove('active'));c.classList.add('active');privConcept=c.dataset.c||'';currentPreu=c.dataset.preu||'';currentSplit=c.dataset.split||'45-45-10';$('#p-tipo-custom').value=privConcept;$('#p-preu-custom').value=currentPreu;const[b,cc,m]=currentSplit.split('-');$('#p-pct-b').value=b;$('#p-pct-c').value=cc;$('#p-pct-m').value=m;setTimeout(()=>$('#p-nombre-cempla').focus(),50)});
@@ -3647,6 +3786,21 @@ if($('#btnSms')){$('#btnSms').onclick=openSmsModal}
 // Premium-only: mostra el llistat de cites del dia des de qualsevol calendari
 // extern (URL iCal). Els URLs es guarden a localStorage, no cal reintroduir-los.
 
+const CAL_HISTORY_KEY = 'caja.calendar.history.v1';  // Històric complet {[uid|date]: event}
+function loadCalHistory(){try{return JSON.parse(localStorage.getItem(CAL_HISTORY_KEY)||'{}')}catch(e){return{}}}
+function saveCalHistory(h){localStorage.setItem(CAL_HISTORY_KEY,JSON.stringify(h||{}))}
+function pushEventsToHistory(events){
+  if(!events||!events.length)return;
+  const h=loadCalHistory();
+  events.forEach(e=>{
+    const k=e.date+'|'+e.uid;
+    // Preserve first-seen timestamp
+    const first_seen=h[k]&&h[k].first_seen?h[k].first_seen:new Date().toISOString();
+    h[k]={date:e.date,time:e.time||'',end_time:e.end_time||'',summary:e.summary||'',description:e.description||'',location:e.location||'',source:e.source||'',uid:e.uid,first_seen:first_seen,last_seen:new Date().toISOString()};
+  });
+  saveCalHistory(h);
+}
+
 const CAL_URLS_KEY = 'caja.calendar.urls.v1';
 const CAL_STATUS_KEY = 'caja.calendar.status.v1';  // {[date_uid]: 'ok'|'no'|'done'}
 const CAL_CACHE_KEY = 'caja.calendar.cache.v1';    // Últim resultat + timestamp
@@ -3700,6 +3854,9 @@ function renderCalendarModal(){
       <button class="cal-tab" data-tab="week" data-testid="cal-tab-week" style="padding:10px 20px;background:transparent;color:#64748b;border:none;border-radius:6px 6px 0 0;font-weight:700;font-size:13px;cursor:pointer">📅 ${isCA?'Setmana':'Semana'}</button>
       <button class="cal-tab" data-tab="config" data-testid="cal-tab-config" style="padding:10px 20px;background:transparent;color:#64748b;border:none;border-radius:6px 6px 0 0;font-weight:700;font-size:13px;cursor:pointer">⚙️ ${isCA?'Calendaris':'Calendarios'}</button>
     </div>
+    <div id="calSearchWrap" style="margin-bottom:12px">
+      <input type="search" id="calSearch" data-testid="calendar-search" placeholder="${isCA?'🔎 Buscar per nom del pacient (ex: García)...':'🔎 Buscar por nombre del paciente (ej: García)...'}" autocomplete="off" style="width:100%;padding:9px 14px;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;font-size:13px" />
+    </div>
     <div id="calBody" style="flex:1;overflow:auto;min-height:300px"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid #1e293b;margin-top:14px">
       <div id="calSyncInfo" style="font-size:11px;color:#64748b"></div>
@@ -3712,11 +3869,25 @@ function renderCalendarModal(){
   back.addEventListener('click',e=>{if(e.target===back)back.remove()});
   
   let currentTab='today';
+  let lastFetchedRes=null;  // Cache last fetch for search-filtering
+  let searchQuery='';
   const tabs=back.querySelectorAll('.cal-tab');
+  const searchInp=back.querySelector('#calSearch');
+  const searchWrap=back.querySelector('#calSearchWrap');
+  let searchTO=null;
+  searchInp.oninput=()=>{
+    clearTimeout(searchTO);
+    searchTO=setTimeout(()=>{
+      searchQuery=searchInp.value.trim().toLowerCase();
+      if(lastFetchedRes)renderEvents(lastFetchedRes,true);
+    },150);
+  };
   tabs.forEach(t=>t.onclick=()=>{
     tabs.forEach(x=>{x.style.background='transparent';x.style.color='#64748b';x.classList.remove('active')});
     t.style.background='#0ea5e9';t.style.color='#0b1220';t.classList.add('active');
     currentTab=t.dataset.tab;
+    // Hide search on config tab
+    searchWrap.style.display=currentTab==='config'?'none':'block';
     renderTab();
   });
   back.querySelector('#calRefresh').onclick=()=>renderTab(true);
@@ -3783,19 +3954,25 @@ function renderCalendarModal(){
   function renderEvents(res,fromCache){
     const body=back.querySelector('#calBody');
     const info=back.querySelector('#calSyncInfo');
+    lastFetchedRes=res;  // Save for search re-filter
     // Mark all shown events as SEEN (so background poll won't count them as new)
     if(res.events&&res.events.length){
       const seen=loadSeenUids();
       res.events.forEach(e=>seen.add(e.date+'|'+e.uid));
       saveSeenUids(seen);
+      pushEventsToHistory(res.events);  // Persistent history for stats + search
     }
     info.textContent=`${isCA?'Última sync':'Última sync'}: ${new Date(res.fetched_at||Date.now()).toLocaleString('es-ES')}${fromCache?' · '+(isCA?'(caché)':'(caché)'):''} · ${res.sources_ok?.length||0} ${isCA?'OK':'OK'} · ${res.sources_failed?.length||0} ${isCA?'error':'error'}`;
-    const events=res.events||[];
+    let events=res.events||[];
+    // Apply search filter
+    if(searchQuery){
+      events=events.filter(e=>(e.summary||'').toLowerCase().includes(searchQuery)||(e.description||'').toLowerCase().includes(searchQuery));
+    }
     if(events.length===0){
       body.innerHTML=`<div style="text-align:center;padding:60px 20px">
-        <div style="font-size:52px;margin-bottom:14px">🎉</div>
-        <div style="font-size:16px;font-weight:700;margin-bottom:8px">${isCA?'Cap cita per aquest rang':'Sin citas para este rango'}</div>
-        <div style="color:#64748b;font-size:13px">${isCA?'Els teus calendaris estan buits':'Tus calendarios están vacíos'}</div>
+        <div style="font-size:52px;margin-bottom:14px">${searchQuery?'🔍':'🎉'}</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px">${searchQuery?(isCA?'Cap resultat per aquest nom':'Ningún resultado con ese nombre'):(isCA?'Cap cita per aquest rang':'Sin citas para este rango')}</div>
+        <div style="color:#64748b;font-size:13px">${searchQuery?(isCA?'Prova amb un altre nom o esborra el cercador':'Prueba con otro nombre o vacía el buscador'):(isCA?'Els teus calendaris estan buits':'Tus calendarios están vacíos')}</div>
       </div>`;
       return;
     }
@@ -3956,6 +4133,7 @@ async function pollCalendarInBackground(){
       }
     });
     saveSeenUids(seen);
+    pushEventsToHistory(res.events);  // Persistent history for stats + search
     if(newCount>0){
       const total=getUnread()+newCount;
       setUnread(total);

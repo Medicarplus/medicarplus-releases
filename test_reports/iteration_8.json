@@ -1,0 +1,35 @@
+{
+  "summary": "Backend testing of MediCar Plus v2.1.0 - all 20 tests PASS on POST /api/calendar/fetch plus regressions (electron manifest v2.1.0, index.html Cites module, SMS campaigns, /api/ health). No blocking issues found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/calendar/fetch", "issue": "sources_failed uses domain label (e.g. 'Google Calendar') as the 'url' field instead of the original URL. Makes it hard for the frontend to correlate a failure back to which of the 5 submitted URLs actually failed when the same provider is used twice."},
+      {"endpoint": "POST /api/calendar/fetch", "issue": "Recurring events (RRULE) are not expanded — only the first occurrence's DTSTART is evaluated against the window. Weekly/monthly appointments from Doctoralia/Calendly may be missed. Consider using recurring-ical-events or icalevents package."},
+      {"endpoint": "POST /api/calendar/fetch", "issue": "Timezone-aware DTSTART is converted with _fmt_date via .date() using UTC-naive comparison. An event at 23:30 local time on 15-Aug may serialize as 21:30 UTC and still be OK, but late-night edge events near midnight in DST-shifting zones could shift ±1 day. Consider converting to local tz before formatting."},
+      {"endpoint": "POST /api/calendar/fetch", "issue": "Endpoint is public/unauthenticated — anyone can use it as an open iCal proxy against arbitrary URLs (SSRF risk to internal hosts). Recommend (a) restrict to allowlisted domains, (b) reject non-http(s) schemes, (c) reject private/loopback IPs, and/or (d) gate behind a valid Premium license header like /api/sms/campaigns."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_calendar_sync.py",
+    "/app/test_reports/pytest/pytest_calendar_sync.xml"
+  ],
+  "action_items": [
+    "(Optional) Expand RRULE recurring events in _parse_ics — many Doctoralia/Calendly feeds use RRULE for weekly slots.",
+    "(Security) Consider protecting /api/calendar/fetch against SSRF: block private IP ranges (10.*, 192.168.*, 127.*, ::1, 169.254.*, metadata IPs) and non-http(s) schemes before calling httpx.",
+    "(UX) Include the original URL (or its index in the request array) alongside the domain label in sources_failed entries so the frontend can highlight which of the 5 rows failed."
+  ],
+  "critical_code_review_comments": [
+    "calendar_sync.py:106 raises HTTPException on non-200 upstream, which is then caught and pushed into sources_failed — correct pattern, but note that a real HTTPException from inside a per-URL loop won't cause a 502 response (it's caught). Consider a custom UpstreamError exception for clarity.",
+    "MAX_EVENTS_PER_CAL=500 is a good DoS guard but silently truncates. Log a warning or return a `truncated: true` flag per source so the UI can inform the user.",
+    "Response uses timezone-aware isoformat for fetched_at — good. Consider also adding a per-event `all_day: bool` flag (currently derived by frontend from empty time string, which is brittle).",
+    "Endpoint is unauthenticated; consider adding license validation consistent with the other Premium modules (SMS campaigns, notifications) since Cites is a Premium-only feature per the PRD."
+  ],
+  "updated_files": ["/app/backend/tests/test_calendar_sync.py"],
+  "success_rate": {"backend": "100% (20/20)", "frontend": "N/A (skipped per request)"},
+  "test_credentials": "Not required — endpoint is public. Admin token: MB-ADMIN-BRUGULAT-2026-4F8E2A1C available in /app/backend/.env if needed later.",
+  "seed_data_creation": "None. Tests use the public Spain holidays Google Calendar iCal URL.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_calendar_sync.py is the regression file for v2.1.0 Cites/calendar module. It also asserts /api/electron/download/package.json version==2.1.0 and that index.html contains v2.1.0 changelog + Cites module references. When bumping to v2.1.1+, update the version pin in TestHealthAndRegression::test_electron_package_json_version. The Spain holidays public iCal (https://calendar.google.com/calendar/ical/en.spain%23holiday%40group.v.calendar.google.com/public/basic.ics) is reliable and returns 'Assumption of Mary' on 2026-08-15 which the happy-path test asserts."
+}

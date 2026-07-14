@@ -47,7 +47,7 @@
 <body>
 
 <h1 style="text-align:center;border:none;margin-top:0">🎛️ MediCar Plus · Guia Admin</h1>
-<p style="text-align:center;color:#64748b">Sistema complet · Llicències · Pagaments · SMS · Distribució · <b>Actualitzada 13/07/2026 · v2.0.37</b></p>
+<p style="text-align:center;color:#64748b">Sistema complet · Llicències · Pagaments · SMS · Cites · Distribució · <b>Actualitzada 14/07/2026 · v2.1.0</b></p>
 
 <style>
   .tab-nav{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;gap:6px;padding:12px 4px;margin:20px 0 24px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
@@ -125,7 +125,7 @@
 <!-- ================================================================================ -->
 <div class="pending-box">
 <h3 id="pendents">📋 Estat actual · Què queda per completar el negoci 100% automàtic</h3>
-<p style="color:#fde68a;margin:8px 0 16px 0">Actualitzat 13/07/2026 · <b>v2.0.37</b>. Bones notícies: la landing i el sistema d'auto-updates ja funcionen. Només queden 2 peces per a un negoci totalment automàtic.</p>
+<p style="color:#fde68a;margin:8px 0 16px 0">Actualitzat 14/07/2026 · <b>v2.1.0</b>. Bones notícies: la landing i el sistema d'auto-updates ja funcionen. Nou <b>mòdul Cites</b> integrat amb Google Calendar/Doctoralia disponible al pla Premium. Només queden 2 peces per a un negoci totalment automàtic.</p>
 
 <div class="pending-item" style="background:rgba(34,197,94,0.15);border-left-color:#22c55e">
 <b>✅ 1️⃣ LANDING PÚBLICA <code>medicarplus.es</code></b> · <span style="color:#22c55e">FET</span><br>
@@ -313,7 +313,27 @@ El botó 🔎 Auditoría ara categoritza automàticament els clients repetits en
 <h3>💡 Tooltips instantanis amb CSS <span class="badge badge-new">NOU</span></h3>
 El símbol <code>?</code> al costat de "Saldo anterior caja" ara mostra la seva explicació <b>al moment</b> quan passes el ratolí per sobre (abans el <code>title=</code> nadiu triga 1-2 segons a aparèixer o no funciona bé al Windows). Tooltip amb fons negre, text groc i fletxa direccional.
 
-<h3>🎉 Novetats v2.0.37 <span class="badge badge-new">NOU</span></h3>
+<h3>🎉 Novetats v2.1.0 <span class="badge badge-new">NOU · Premium</span></h3>
+<ul>
+<li>📅 <b>Mòdul "Cites del dia"</b> (només Premium) — nova icona <code>📅 Cites</code> a la barra superior. Vincula el programa amb <b>Google Calendar</b>, <b>Doctoralia</b>, <b>Calendly</b>, <b>Doctolib</b>, <b>Timify</b>, <b>iCloud</b>, <b>Outlook</b> o qualsevol calendari que exporti <b>URL iCal (.ics)</b>. Un cop enganxada la URL, el programa la recorda per sempre.</li>
+<li>🔔 <b>Badge de notificació</b> vermell amb comptador sobre la icona 📅 — quan apareix una cita nova al calendari del client (perquè un pacient ha reservat online), el programa fa polling en segon pla cada 5 min i mostra <b>"3"</b> al badge sense necessitat d'obrir el modal. Toast discret "🔔 3 noves cites".</li>
+<li>🗂️ <b>3 pestanyes</b> al modal: <i>D'avui</i> (cites del dia) · <i>Setmana</i> (7 dies) · <i>Calendaris</i> (configuració d'URLs). Cada URL es pot activar/desactivar amb un checkbox sense eliminar-la.</li>
+<li>📌 <b>Estats per cita</b>: Presentat ✓ · No presentat ✕ · Realitzat 💼 · Netejar ↺. Es guarden localment vinculats a UID+data.</li>
+<li>🌐 <b>Backend endpoint</b> <code>POST /api/calendar/fetch</code> que fa de proxy iCal (evita CORS) i parseja els events amb la lib Python <code>icalendar</code>. Suporta fins a 5 URLs i rang de 60 dies.</li>
+<li>💾 <b>Caché intel·ligent</b>: 15 min de caché al localStorage. Refresc manual amb el botó "Refrescar". Auto-cleanup quan es canvia la config.</li>
+</ul>
+
+<h3>🐛 Fixes v2.1.0</h3>
+<ul>
+<li>📋 <b>IRPF · Camps ja no negres</b> — regla CSS global <code>input[type=text]{background:#0f1218!important}</code> estava sobreescrivint els inline styles del modal IRPF cremós. Fix: nova regla específica <code>.irpf-modal input[type=text]{background:#fff!important}</code> amb classe afegida al modal.</li>
+<li>⌨️ <b>IRPF · Coma o punt indistintament</b> — inputs canviats a <code>type="text" inputmode="decimal"</code> · handlers usen <code>num()</code> que ja gestionava els 2 separadors.</li>
+<li>⚡ <b>IRPF · Càlculs en viu sense perdre focus</b> — abans, <code>onblur</code> disparava un re-render complet que trencava el Tab. Ara actualitza inline els <code>&lt;td&gt;</code> calculats de la fila i la fila de totals, sense re-renderitzar la taula.</li>
+<li>🎯 <b>IRPF · Auto-focus al nou nom</b> quan afegeixes persona · confirmació abans d'eliminar (evita clics accidentals).</li>
+</ul>
+
+<hr>
+
+<h3>🎉 Novetats v2.0.37 <span class="badge">anterior</span></h3>
 <ul>
 <li>💰 <b>Desglossament de Tasas DGT</b> al Cierre del día — mostra la suma per import (ex: <code>4×24,58 = 98,32</code> · <code>3×14,75 = 44,25</code>) i el total a la dreta. Ignora entrades amb tasa 0€.</li>
 <li>📊 <b>Nova pestanya "🔔 Avisos SMS"</b> dins <i>Contabilidad ▸ Estadísticas</i> — al costat de Autoescolas i Tráfico. Mostra KPIs (Campanyes / Enviats / Errors / Sense mòbil), envios per mes i llistat clickable de campanyes recents.</li>
@@ -743,7 +763,7 @@ Absolutament. Cada centre té la seva llicència JWT única. Tot el sistema est�
 </script>
 
 <div class="footer">
-Guia MediCar Plus v2 · M.Brugulat Lopez · Actualitzada 13/07/2026 · v2.0.37<br>
+Guia MediCar Plus v2 · M.Brugulat Lopez · Actualitzada 14/07/2026 · v2.1.0<br>
 Contacte: info@medicarplus.es
 </div>
 
