@@ -2125,7 +2125,7 @@ function openIRPF(){
   const monthLabel=ym=>{const [y,m]=ym.split('-');const names=['gen','feb','març','abr','maig','juny','jul','ago','set','oct','nov','des'];return `${names[parseInt(m)-1]}-${y.slice(2)}`};
   back.innerHTML=`<div class="modal irpf-modal" style="max-width:1400px;width:98%;max-height:96vh;display:flex;flex-direction:column;padding:16px;background:#faf6e8;color:#1a1a1a">
     <div id="irpfTitleBar" style="padding:10px 14px;margin:-16px -16px 12px -16px;border-radius:12px 12px 0 0;background:${compBg(irpfComp)};border-bottom:3px solid ${compColor(irpfComp)};display:flex;align-items:center;gap:14px">
-      <h3 style="margin:0;color:${compColor(irpfComp)};font-family:Georgia,serif;flex:1">📋 IRPF · Retencions trimestrals · <span id="irpfCompName">${compName(irpfComp)}</span></h3>
+      <h3 style="margin:0;color:${compColor(irpfComp)};font-family:Georgia,serif;flex:1">📋 IRPF · ${L('Retencions trimestrals','Retenciones trimestrales')} · <span id="irpfCompName">${compName(irpfComp)}</span></h3>
       <div style="display:flex;gap:6px;background:#fff;padding:4px;border-radius:8px;border:1px solid #999">
         <button class="btn" data-icomp="trafic" style="padding:6px 14px;font-size:12px;font-weight:700;border:none;border-radius:6px">${compName('trafic')}</button>
         <button class="btn" data-icomp="cempla" style="padding:6px 14px;font-size:12px;font-weight:700;border:none;border-radius:6px">${compName('cempla')}</button>
@@ -2209,7 +2209,7 @@ function openIRPF(){
       const c=irpfCalc(e,pct);
       const autoBrut=certPrice>0&&cert>0;
       return `<tr>
-        <td style="padding:4px 6px;border:1px solid #b45309"><input data-i="${i}" data-f="nom" value="${escapeHtml(e.nom||'')}" placeholder="Nom cognoms" style="width:170px;background:#fff;border:1px solid #d4a373;border-radius:4px;font-weight:700;color:#78350f;padding:6px 8px;font-family:Georgia,serif;font-size:13px" /></td>
+        <td style="padding:4px 6px;border:1px solid #b45309"><input data-i="${i}" data-f="nom" value="${escapeHtml(e.nom||'')}" placeholder="${L('Nom cognoms','Nombre apellidos')}" style="width:170px;background:#fff;border:1px solid #d4a373;border-radius:4px;font-weight:700;color:#78350f;padding:6px 8px;font-family:Georgia,serif;font-size:13px" /></td>
         <td style="padding:4px 6px;border:1px solid #b45309;text-align:right"><input data-i="${i}" data-f="cert" type="text" inputmode="numeric" value="${e.cert||''}" placeholder="0" style="width:65px;background:#fff;color:#1a1a1a;border:1px solid #d4a373;border-radius:4px;text-align:right;font-family:'Courier New',monospace;padding:6px 8px;font-size:13px" /></td>
         <td style="padding:4px 6px;border:1px solid #b45309;text-align:right"><input data-i="${i}" data-f="certPrice" type="text" inputmode="decimal" value="${e.certPrice||''}" placeholder="€/cert" title="Preu per certificat (€) — ex: 4 o 4,50" style="width:75px;background:#f0f9ff;color:#0369a1;border:1px solid #0ea5e9;border-radius:4px;text-align:right;font-family:'Courier New',monospace;font-weight:700;padding:6px 8px;font-size:13px" /></td>
         <td style="padding:4px 6px;border:1px solid #b45309;text-align:right"><input data-i="${i}" data-f="brut" type="text" inputmode="decimal" value="${e.brut||''}" placeholder="0,00" ${autoBrut?'readonly title="Auto: '+cert+' × '+fmt(certPrice)+' /cert"':''} style="width:95px;background:${autoBrut?'#ecfdf5':'#fff'};color:${autoBrut?'#065f46':'#1a1a1a'};border:1px solid ${autoBrut?'#10b981':'#d4a373'};border-radius:4px;text-align:right;font-family:'Courier New',monospace;font-weight:700;padding:6px 8px;font-size:13px;${autoBrut?'cursor:not-allowed':''}" /></td>
@@ -2217,9 +2217,9 @@ function openIRPF(){
         <td style="padding:4px 6px;border:1px solid #b45309;text-align:right;background:#f5f5dc;font-family:'Courier New',monospace;font-weight:700;color:#1a1a1a">${c.hasSs?fmt(c.total):'—'}</td>
         <td style="padding:4px 6px;border:1px solid #b45309;text-align:right;background:#fef3c7;font-family:'Courier New',monospace;font-weight:700;color:#78350f">${fmt(c.irpf)}</td>
         <td style="padding:4px 6px;border:1px solid #b45309;text-align:right;background:#f5f5dc;font-family:'Courier New',monospace;font-weight:700;color:#1a1a1a">${fmt(c.net)}</td>
-        <td style="padding:4px 6px;border:1px solid #b45309;text-align:right"><input data-i="${i}" data-f="netSS" type="text" inputmode="decimal" value="${e.netSS||''}" placeholder="${c.hasSs?'0,00':'—'}" ${!c.hasSs?'disabled':''} title="${c.hasSs?'':'Introdueix primer S.S. per activar aquest camp'}" style="width:95px;background:${c.hasSs?'#fff':'#f0e6d2'};color:#1a1a1a;border:1px solid #d4a373;border-radius:4px;text-align:right;font-family:'Courier New',monospace;padding:6px 8px;font-size:13px;${!c.hasSs?'cursor:not-allowed;opacity:.55':''}" /></td>
+        <td style="padding:4px 6px;border:1px solid #b45309;text-align:right"><input data-i="${i}" data-f="netSS" type="text" inputmode="decimal" value="${e.netSS||''}" placeholder="${c.hasSs?'0,00':'—'}" ${!c.hasSs?'disabled':''} title="${c.hasSs?'':L('Introdueix primer S.S. per activar aquest camp','Introduce primero S.S. para activar este campo')}" style="width:95px;background:${c.hasSs?'#fff':'#f0e6d2'};color:#1a1a1a;border:1px solid #d4a373;border-radius:4px;text-align:right;font-family:'Courier New',monospace;padding:6px 8px;font-size:13px;${!c.hasSs?'cursor:not-allowed;opacity:.55':''}" /></td>
         <td style="padding:4px 6px;border:1px solid #b45309;text-align:right;background:#f5f5dc;font-family:'Courier New',monospace;font-weight:700;color:#1a1a1a">${c.hasSs?fmt(c.totalFinal):'—'}</td>
-        <td style="padding:4px 6px;border:1px solid #b45309;text-align:center"><button class="btn" data-del="${i}" title="Eliminar aquesta persona" style="padding:4px 10px;background:#b91c1c;color:#fff;border:none;border-radius:4px;font-size:14px;cursor:pointer">🗑</button></td>
+        <td style="padding:4px 6px;border:1px solid #b45309;text-align:center"><button class="btn" data-del="${i}" title="${L('Eliminar aquesta persona','Eliminar esta persona')}" style="padding:4px 10px;background:#b91c1c;color:#fff;border:none;border-radius:4px;font-size:14px;cursor:pointer">🗑</button></td>
       </tr>`;
     }).join('');
     // Totals mes
@@ -2261,8 +2261,8 @@ function openIRPF(){
         </tbody>
       </table>
       <div style="margin:14px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <button class="btn" id="irpfAdd" data-testid="irpf-add-person" style="background:#166534;color:#fff;border:none;padding:12px 22px;font-weight:700;font-size:14px;border-radius:8px;box-shadow:0 2px 6px rgba(22,101,52,.3);cursor:pointer">➕ Afegir persona</button>
-        <span style="color:#78350f;font-size:12px;font-style:italic">💡 Consell: prem <b>Tab</b> per saltar al següent camp · Escriu amb <b>coma</b> o <b>punt</b> (ex: 1500,50 o 1500.50)</span>
+        <button class="btn" id="irpfAdd" data-testid="irpf-add-person" style="background:#166534;color:#fff;border:none;padding:12px 22px;font-weight:700;font-size:14px;border-radius:8px;box-shadow:0 2px 6px rgba(22,101,52,.3);cursor:pointer">➕ ${L('Afegir persona','Añadir persona')}</button>
+        <span style="color:#78350f;font-size:12px;font-style:italic">💡 ${L('Consell: prem','Consejo: pulsa')} <b>Tab</b> ${L('per saltar al següent camp','para saltar al siguiente campo')} · ${L("Escriu amb",'Escribe con')} <b>${L('coma','coma')}</b> ${L('o','o')} <b>${L('punt','punto')}</b> (ex: 1500,50)</span>
       </div>
       <div style="background:#fff8e6;border:2px solid #b45309;border-radius:8px;padding:14px;margin-top:16px">
         <h3 style="margin:0 0 12px 0;color:#78350f;font-family:Georgia,serif">🗓️ Resum trimestral · ${q} ${qData.paid?'<span style="background:#166534;color:#fff;padding:3px 10px;border-radius:4px;font-size:12px;margin-left:8px">✓ INGRESSAT A HISENDA</span>':'<span style="background:#b45309;color:#fff;padding:3px 10px;border-radius:4px;font-size:12px;margin-left:8px">⏳ PENDENT</span>'}</h3>
@@ -2381,10 +2381,10 @@ function openIRPF(){
     back.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
       const i=parseInt(b.dataset.del);
       const d2=loadIrpf();
-      const nom=(d2[irpfComp].months[m]&&d2[irpfComp].months[m].entries[i]&&d2[irpfComp].months[m].entries[i].nom)||'(sense nom)';
-      confirmModal('Eliminar persona',`Segur que vols eliminar <b>${escapeHtml(nom)}</b> del mes actual?<br><br>Aquesta acció no afecta els altres mesos.`,()=>{
+      const nom=(d2[irpfComp].months[m]&&d2[irpfComp].months[m].entries[i]&&d2[irpfComp].months[m].entries[i].nom)||L('(sense nom)','(sin nombre)');
+      confirmModal(L('Eliminar persona','Eliminar persona'),L(`Segur que vols eliminar <b>${escapeHtml(nom)}</b> del mes actual?<br><br>Aquesta acció no afecta els altres mesos.`,`¿Seguro que quieres eliminar <b>${escapeHtml(nom)}</b> del mes actual?<br><br>Esta acción no afecta a los otros meses.`),()=>{
         const d3=loadIrpf();d3[irpfComp].months[m].entries.splice(i,1);saveIrpf(d3);render();
-      },'Sí, eliminar');
+      },L('Sí, eliminar','Sí, eliminar'));
     });
     back.querySelector('#irpfAdd').onclick=()=>{
       const d2=loadIrpf();
@@ -4783,6 +4783,11 @@ const LAST_SEEN_VERSION_KEY = 'caja.last_seen_version';
 // IMPORTANT: L'ordre importa. La primera entrada ha de ser la MÉS RECENT.
 // Cada versió té: { version, date (dd/mm/aaaa), highlights (array de strings HTML curts) }
 const CHANGELOG = [
+  { version:'2.1.3', date:'14/07/2026', highlights:[
+    '🌐 <b>FIX · IRPF ara respecta l\'idioma seleccionat</b> · abans hi havia textos en català que no es traduïen al castellà (títol "Retencions trimestrals", placeholders, tooltips, confirmació d\'eliminar). Ara tot es tradueix correctament segons l\'idioma configurat.',
+    '💰 Preu per certificat (€/CERT) per metge · BRUT auto-calculat',
+    '🖨️ Vista prèvia d\'impressió amb botó "Imprimir ara" abans del diàleg del sistema',
+  ]},
   { version:'2.1.2', date:'14/07/2026', highlights:[
     '💰 <b>NOU · Preu per certificat (€/CERT)</b> per metge · afegeix una tarifa personalitzada per cada doctor i el BRUT es calcula automàticament (CERT × €/CERT). Els metges amb tarifa fixa ja no cal calcular-los a mà.',
     '🖨️ <b>Vista prèvia d\'impressió</b> · abans d\'imprimir surt una previsualització a pantalla completa amb botó "🖨️ Imprimir ara" i "Tancar" · pots verificar el document abans d\'imprimir o guardar-lo com PDF.',
