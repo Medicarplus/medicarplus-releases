@@ -135,6 +135,8 @@
   /* Inputs amb focus animat */
   input[type=text],input[type=number],input[type=date],select,textarea{background:#0f1218 !important;border:1px solid #2a3040 !important;border-radius:8px !important;padding:8px 12px !important;color:var(--text);transition:border-color .2s ease,box-shadow .2s ease,background .2s ease;font-family:inherit}
   input[type=text]:focus,input[type=number]:focus,input[type=date]:focus,select:focus,textarea:focus{outline:none;border-color:rgb(var(--tint)) !important;box-shadow:0 0 0 3px rgba(var(--tint),.15);background:#141822 !important}
+  /* Notification pulse animation for Cites badge */
+  @keyframes calPulse{0%,100%{transform:scale(1);box-shadow:0 2px 6px rgba(220,38,38,.6)}50%{transform:scale(1.15);box-shadow:0 2px 12px rgba(220,38,38,.9),0 0 0 4px rgba(220,38,38,.15)}}
   /* Override per als inputs de data del Llibreta (fons clar, tema paper) */
   #ldFrom,#ldTo,#ldRefFrom,#ldRefTo{background:#fff !important;color:#1a1a1a !important;border:1px solid #8b6f47 !important;color-scheme:light}
   #ldFrom:focus,#ldTo:focus,#ldRefFrom:focus,#ldRefTo:focus{background:#fff !important;color:#1a1a1a !important;border-color:#5a3a1a !important;box-shadow:0 0 0 3px rgba(139,111,71,.2) !important}
@@ -209,7 +211,7 @@
       </div>
     </div>
     <button class="btn" id="btnSms" style="background:linear-gradient(90deg,#059669 0%,#10b981 100%);color:#fff;border-color:transparent;font-weight:700" title="Avisos SMS / WhatsApp de renovació">📱 Avisos</button>
-    <button class="btn" id="btnCalendar" data-premium="1" style="display:none;background:linear-gradient(90deg,#0369a1 0%,#0ea5e9 100%);color:#fff;border-color:transparent;font-weight:700" title="Cites del dia · Google Calendar · Doctoralia · Calendly...">📅 Cites</button>
+    <button class="btn" id="btnCalendar" data-premium="1" style="display:none;background:linear-gradient(90deg,#0369a1 0%,#0ea5e9 100%);color:#fff;border-color:transparent;font-weight:700;position:relative" title="Cites del dia · Google Calendar · Doctoralia · Calendly...">📅 Cites<span id="calBadge" data-testid="calendar-badge" style="display:none;position:absolute;top:-6px;right:-6px;background:#dc2626;color:#fff;border:2px solid #0b1220;border-radius:999px;min-width:20px;height:20px;padding:0 5px;font-size:11px;font-weight:800;line-height:16px;text-align:center;box-shadow:0 2px 6px rgba(220,38,38,.6);animation:calPulse 2s infinite">0</span></button>
     <a id="btnWebsite" href="https://medicarplus.es" target="_blank" rel="noopener" title="Obrir medicarplus.es · Compte, ajuda, actualitzacions" style="background:linear-gradient(90deg,#0f172a 0%,#1e293b 100%);color:#f5b301;border:1px solid #f5b301;border-radius:6px;padding:8px 14px;font-weight:700;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:'Segoe UI',sans-serif" data-testid="btn-website">🌐 medicarplus.es</a>
     <div id="trialBadge" data-testid="trial-badge" style="display:none;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;font-family:'Segoe UI',sans-serif;font-size:12px;font-weight:700;border:1px solid;letter-spacing:.3px"></div>
     <span id="autosaveBadge" style="display:none;padding:5px 10px;border-radius:6px;background:#1f3a2e;color:#7ee3aa;font-size:11px;font-family:'Consolas',monospace;letter-spacing:.3px;border:1px solid #2a5e44"></span>
@@ -3781,6 +3783,12 @@ function renderCalendarModal(){
   function renderEvents(res,fromCache){
     const body=back.querySelector('#calBody');
     const info=back.querySelector('#calSyncInfo');
+    // Mark all shown events as SEEN (so background poll won't count them as new)
+    if(res.events&&res.events.length){
+      const seen=loadSeenUids();
+      res.events.forEach(e=>seen.add(e.date+'|'+e.uid));
+      saveSeenUids(seen);
+    }
     info.textContent=`${isCA?'Última sync':'Última sync'}: ${new Date(res.fetched_at||Date.now()).toLocaleString('es-ES')}${fromCache?' · '+(isCA?'(caché)':'(caché)'):''} · ${res.sources_ok?.length||0} ${isCA?'OK':'OK'} · ${res.sources_failed?.length||0} ${isCA?'error':'error'}`;
     const events=res.events||[];
     if(events.length===0){
@@ -3903,6 +3911,87 @@ function renderCalendarModal(){
 }
 
 if($('#btnCalendar')){$('#btnCalendar').onclick=()=>{if(!isPremiumLicense()){toast(currentLang==='ca'?'🔒 Funció Premium':'🔒 Función Premium');return}renderCalendarModal()}}
+
+// ============================================================================
+// 📅 CITES · Polling en segon pla + Badge de notificació
+// ============================================================================
+// Cada 5 minuts (i al iniciar l'app), comprova en segon pla si han aparegut
+// cites noves als calendaris configurats. Si hi ha noves (UIDs no vistos), mostra
+// el badge vermell amb el nombre. Es reseteja quan l'usuari obre el modal.
+
+const CAL_SEEN_KEY = 'caja.calendar.seen_uids.v1';   // Set de UIDs ja vistos
+const CAL_UNREAD_KEY = 'caja.calendar.unread.v1';    // Nombre de cites noves no vistes
+const CAL_POLL_INTERVAL_MS = 5 * 60 * 1000;          // 5 minuts
+
+function loadSeenUids(){try{return new Set(JSON.parse(localStorage.getItem(CAL_SEEN_KEY)||'[]'))}catch(e){return new Set()}}
+function saveSeenUids(set){localStorage.setItem(CAL_SEEN_KEY,JSON.stringify([...set]))}
+function getUnread(){return parseInt(localStorage.getItem(CAL_UNREAD_KEY)||'0',10)||0}
+function setUnread(n){localStorage.setItem(CAL_UNREAD_KEY,String(n));updateCalBadge()}
+function updateCalBadge(){
+  const badge=$('#calBadge');
+  if(!badge)return;
+  const n=getUnread();
+  if(n>0){badge.style.display='inline-block';badge.textContent=n>99?'99+':String(n)}
+  else{badge.style.display='none'}
+}
+
+async function pollCalendarInBackground(){
+  if(!isPremiumLicense())return;
+  const urls=loadCalUrls().filter(u=>u.enabled).map(u=>u.url);
+  if(urls.length===0)return;
+  // Fetch from today onwards (30 days ahead)
+  const today=new Date();
+  const end=new Date();end.setDate(end.getDate()+30);
+  const iso=(d)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  try{
+    const res=await fetchCalendarEvents(urls,iso(today),iso(end));
+    const seen=loadSeenUids();
+    const wasEmpty=seen.size===0;  // Track if this is the very first poll ever
+    let newCount=0;
+    (res.events||[]).forEach(e=>{
+      const key=e.date+'|'+e.uid;
+      if(!seen.has(key)){
+        if(!wasEmpty)newCount++;  // Only count as "new" if we've polled before
+        seen.add(key);
+      }
+    });
+    saveSeenUids(seen);
+    if(newCount>0){
+      const total=getUnread()+newCount;
+      setUnread(total);
+      // Optionally show a subtle toast when new appointments arrive
+      const isCA=currentLang==='ca';
+      if(newCount===1)toast(isCA?`🔔 1 nova cita`:`🔔 1 nueva cita`);
+      else toast(isCA?`🔔 ${newCount} noves cites`:`🔔 ${newCount} nuevas citas`);
+    }
+    // Refresh cache too so modal loads instantly
+    const cacheKey=`week|${urls.join(',')}`;
+    const cached=JSON.parse(localStorage.getItem(CAL_CACHE_KEY)||'{}');
+    cached[cacheKey]={ts:Date.now(),data:res};
+    localStorage.setItem(CAL_CACHE_KEY,JSON.stringify(cached));
+  }catch(e){
+    // Silent fail - just try again next poll
+    console.debug('[Calendar] Background poll failed:',e.message||e);
+  }
+}
+
+// Reset unread count when user opens the modal (wrap the click handler)
+if($('#btnCalendar')){
+  const origHandler=$('#btnCalendar').onclick;
+  $('#btnCalendar').onclick=(ev)=>{
+    setUnread(0);  // Clear badge
+    if(origHandler)origHandler.call($('#btnCalendar'),ev);
+  };
+}
+
+// Start background polling (initial + interval) when app loads
+updateCalBadge();  // Show badge on load if there are pending unreads from last session
+if(isPremiumLicense() && loadCalUrls().filter(u=>u.enabled).length>0){
+  // First poll after 15 seconds (let app finish loading)
+  setTimeout(()=>{pollCalendarInBackground()},15000);
+  // Then every 5 minutes
+  setInterval(pollCalendarInBackground,CAL_POLL_INTERVAL_MS);
+}
 
 
 // ============================================================================
