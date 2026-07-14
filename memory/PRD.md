@@ -58,19 +58,16 @@ powershell -ExecutionPolicy Bypass -File .\publish-safe.ps1
 **Última versió publicada**: v2.0.36 (13/07/2026)
 **Pròxima versió (pendent de publicar per Marc)**: v2.1.7 amb:
 
-## 🖨️ IMPRESSIÓ WYSIWYG UNIVERSAL (14/07/2026)
+## 🖨️ IMPRESSIÓ WYSIWYG UNIVERSAL + DIÀLEG DIRECTE (14/07/2026)
 
-**Problema resolt (recurrent)**: cada mòdul construïa un HTML separat per imprimir amb columnes/estils propis. Quan es canviava alguna cosa a la pantalla (afegir columna, canviar disseny), la impressió es desincronitzava i sortia malament o amb dades desalineades.
+**Iteracions v2.1.7 → v2.1.8**:
+1. **v2.1.7**: nova funció `printVisibleElement(el, opts)` que clona el DOM visible i imprimeix — WYSIWYG a IRPF, Estadístiques, Libro Registro, Llibreta, Cierre.
+2. **v2.1.8 (aquest fix)**: eliminat el modal de vista prèvia intermedi. Ara al clicar 'Imprimir', el diàleg d'impressió del sistema apareix DIRECTAMENT sobre l'app (l'iframe és off-screen amagat). El diàleg natiu ja té la seva pròpia previsualització + destinació "Guardar com PDF".
 
-**Solució arquitectural**: nova funció `printVisibleElement(el, opts)` que **clona el DOM visible tal com es veu**, converteix inputs a text estàtic, i imprimeix via iframe. **Si es veu bé a pantalla → es veu bé imprès. Sempre.** No cal mantenir mai més cap layout separat per imprimir.
-
-**Aplicat a**: IRPF · Estadístiques · Libro de Registro · Llibreta comptable · SMS report · Auditoria.
-
-**Beneficis:**
-- Impossibles els bugs de "columna mal alineada" al print
-- Nou botó "Imprimir ara" explícit al preview (control del usuari)
-- Suport A4 landscape automatic
-- ESC per tancar preview
+**Beneficis**:
+- Menys clics per l'usuari (era 2 clics: Imprimir → Imprimir ara. Ara 1: Imprimir → diàleg directe)
+- Impossibles els bugs de "el diàleg queda darrere del modal"
+- Consistent amb comportament de qualsevol altra app Windows/Mac
 
 ## 🤖 SISTEMA AUTO-REPARACIÓ D'URL (v2.1.6 · manteniu)
 

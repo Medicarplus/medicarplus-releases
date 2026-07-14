@@ -606,56 +606,44 @@ function toast(msg,ms=2200){const t=document.createElement('div');t.className='t
 // srcdoc, i disparem contentWindow.print() després del load. Funciona 100%.
 function printHtml(html, opts={}){
   try{
-    const pdfMode = opts.pdfMode === true;
-    // Modal de vista prèvia amb botons Imprimir + Guardar PDF
-    const back=document.createElement('div');
-    back.className='modal-back';
-    back.style.cssText='position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.85);display:flex;flex-direction:column;padding:0';
-    back.innerHTML=`
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:#0b1220;border-bottom:1px solid #334155;color:#e2e8f0">
-        <div>
-          <div style="font-weight:700;font-size:15px;color:#0ea5e9">🖨️ Vista prèvia · ${pdfMode?'Guardar com PDF':'Impressió'}</div>
-          <div style="font-size:11px;color:#94a3b8;margin-top:2px">${pdfMode?'A la propera pantalla, tria <b>"Guardar com PDF"</b> a la destinació':'Revisa el document abans d\'imprimir · pots triar impressora o guardar com PDF'}</div>
-        </div>
-        <div style="display:flex;gap:8px">
-          <button id="printSavePdf" style="background:linear-gradient(90deg,#7c3aed,#a855f7);color:#fff;border:none;padding:10px 22px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 2px 8px rgba(124,58,237,.4)" title="Obre el diàleg d'impressió amb PDF com a destinació">💾 Guardar PDF</button>
-          <button id="printDoIt" style="background:linear-gradient(90deg,#059669,#10b981);color:#fff;border:none;padding:10px 22px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 2px 8px rgba(16,185,129,.4)">🖨️ Imprimir ara</button>
-          <button id="printCancel" style="background:#7f1d1d;color:#fff;border:none;padding:10px 22px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer">✕ Tancar</button>
-        </div>
-      </div>
-      <div style="flex:1;background:#f1f5f9;padding:20px;overflow:auto;display:flex;justify-content:center">
-        <iframe id="printFrame" style="width:100%;max-width:1100px;height:100%;min-height:calc(100vh - 100px);border:0;background:#fff;box-shadow:0 8px 32px rgba(0,0,0,.4);border-radius:4px" data-print-frame="1"></iframe>
-      </div>
-    `;
-    document.body.appendChild(back);
-    document.body.style.overflow='hidden';
-    const iframe=back.querySelector('#printFrame');
-    const doc=iframe.contentWindow.document;
-    doc.open();doc.write(html);doc.close();
-    const close=()=>{try{back.remove()}catch(e){}document.body.style.overflow=''};
-    back.querySelector('#printCancel').onclick=close;
-    const doPrint=(hint)=>{
+    // Iframe amagat off-screen, sense modal intermig. El diàleg d'impressió del
+    // sistema apareix directament. Al tancar el diàleg, l'iframe s'elimina.
+    const iframe=document.createElement('iframe');
+    iframe.setAttribute('data-print-frame','1');
+    iframe.style.cssText='position:fixed;left:-9999px;top:-9999px;width:1200px;height:900px;border:0;visibility:hidden;pointer-events:none';
+    document.body.appendChild(iframe);
+
+    const cleanup=()=>{
+      try{ iframe.remove() }catch(e){}
+      document.body.style.overflow='';
+    };
+
+    // Al carregar-se el contingut, disparem print(). El navegador mostra el
+    // seu diàleg amb "Destination" (Impressora / Guardar com PDF).
+    iframe.onload=()=>{
       try{
-        iframe.contentWindow.focus();
-        // Set document title BEFORE print — becomes default PDF filename
-        if(hint){
-          const cur=iframe.contentDocument.title||'MediCar';
-          iframe.contentDocument.title=cur+' — Guardar com PDF';
-        }
-        iframe.contentWindow.print();
+        // Petit delay per assegurar que el layout s'ha renderitzat
+        setTimeout(()=>{
+          try{
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            // Cleanup uns segons després que l'usuari tanqui el diàleg
+            const afterPrint=()=>{cleanup();try{iframe.contentWindow.removeEventListener('afterprint',afterPrint)}catch(e){}};
+            try{iframe.contentWindow.addEventListener('afterprint',afterPrint)}catch(e){}
+            setTimeout(cleanup, 60000); // fallback: netegem al minut
+          }catch(e){
+            console.error('[printHtml] print() failed:',e);
+            toast(currentLang==='ca'?'❌ Error imprimint':'❌ Error imprimiendo');
+            cleanup();
+          }
+        }, 200);
       }catch(e){
-        console.error('[printHtml] print() failed:',e);
-        toast(currentLang==='ca'?'❌ Error imprimint':'❌ Error imprimiendo');
+        console.error('[printHtml] onload err:',e);
+        cleanup();
       }
     };
-    back.querySelector('#printDoIt').onclick=()=>doPrint(false);
-    back.querySelector('#printSavePdf').onclick=()=>{
-      toast(currentLang==='ca'?'💡 Al diàleg, tria "Guardar com PDF" a Destinació':'💡 En el diálogo, elige "Guardar como PDF" en Destino', 3500);
-      setTimeout(()=>doPrint(true), 500);
-    };
-    // ESC tanca
-    const onEsc=(ev)=>{if(ev.key==='Escape'){close();document.removeEventListener('keydown',onEsc)}};
-    document.addEventListener('keydown',onEsc);
+    // Escrivim el contingut via srcdoc (més fiable que doc.write en Electron)
+    iframe.srcdoc=html;
   }catch(err){
     console.error('[printHtml] Fatal:',err);
     toast(currentLang==='ca'?'❌ No s\'ha pogut imprimir':'❌ No se ha podido imprimir');
@@ -5023,7 +5011,7 @@ setTimeout(()=>{ try{ showWhatsNew(false) }catch(e){ console.warn('showWhatsNew'
 const API_BASE_HARDCODED='https://project-helper-47.preview.emergentagent.com';
 // App version (hardcoded — s'actualitza a cada release). Serveix per invalidar
 // caché de descoberta al detectar que l'usuari acaba d'actualitzar l'app.
-const APP_VERSION='2.1.7';
+const APP_VERSION='2.1.8';
 // Múltiples fonts de descoberta. La primera que respongui vàlidament guanya.
 // L'orden importa:
 // 1) raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json
