@@ -1,0 +1,36 @@
+{
+  "summary": "MediCar Plus v2.1.0 FULL smoke test after IRPF-print bug fix. Backend: 31/31 pytest tests PASSED (calendar_sync SSRF + RRULE + regression). Frontend: All 6 print handlers verified working (popups open with actual content — w.document.close() fix confirmed). IRPF critical bug fix VERIFIED: window.open popup receives full HTML (1896 chars) containing 'IRPF' + person names. All 4 modals (IRPF, Libro de Registro, Estadísticas, Llibreta) + SMS campaign detail print all emit valid HTML into their popup windows. .irpf-modal inputs verified WHITE background (rgb(255,255,255)) via computed style. Cites modal (3 tabs + add URL feature) works and persists to caja.calendar.urls.v1. Cites Stats section renders 5 KPIs correctly when history is present; search input filters (tested 'Garcia' → matched 'Garcia Lopez'). Auditoría modal opens. All toolbar buttons visible; calBadge is display:none when count=0.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_calendar_sync.py",
+    "/app/test_reports/pytest/pytest_iter10.xml"
+  ],
+  "action_items": [
+    "(Optional / low priority) IRPF print button currently has id='irpfPrint' but no data-testid. Review request referenced testid 'irpf-print'. Adding data-testid=\"irpf-print\" would harden future testing; not blocking.",
+    "(Optional) The '¿Novedades?' popup at boot uses the 'Entendido' button — currently we suppress it by setting localStorage.caja.whatsNew.seen.v2.1.0='1' before load; there is no visible dismiss testid on the popup itself. Consider adding data-testid=\"whats-new-dismiss\" on the Entendido button for symmetry with 'btn-whats-new' menu entry."
+  ],
+  "critical_code_review_comments": [
+    "All 6 print handlers (#lrPrint line 772, #stPrint line 944, traffic-print line 1183, #ldPrint line 2026, #irpfPrint line 2384, printSmsCampaign line 3712) correctly call w.document.close() after w.document.write(). Verified by capturing context.on('page') events — popups load with content_len 660–6886 chars in all cases.",
+    "IRPF and llibreta/stats print handlers additionally guard against popup blockers with `if(!w){toast('⚠️ Pop-ups bloquejats');return}`. However #lrPrint (line 772) and printSmsCampaign (line 3712) DO NOT show a toast on popup-blocked — they silently return (SMS uses `if(!w)return;`, lrPrint has no guard at all and would throw). Suggest normalising all 6 handlers to the same pattern to give the user a consistent 'Pop-ups blocked' toast.",
+    ".irpf-modal input styling (v2.html line 144–147) uses `!important` overrides correctly. Computed style verified: rgb(255,255,255) background, rgb(26,26,26) text on all 3 input types (text/number/date). Focus state (line 145) also enforces white bg. Good defensive layer against dark-theme leaks.",
+    "Popup content is minimal (about:blank + document.write) which means the Playwright popup.url is 'about:blank' — that's normal Chromium behaviour, tests were adapted with context.expect_page() rather than URL matching.",
+    "caja.calendar.urls.v1 persistence verified — added URL is written to localStorage as a JSON array with fields url/label/enabled/added. Label auto-detection (Google Calendar) works from URL hostname.",
+    "renderCitesInStats (line 1314) shows empty-state div when Object.values(history).length===0, which correctly hides the KPI cards. Not a bug — the review request implied KPIs are always shown; tested with seeded history to confirm."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (31/31 pytest)", "frontend": "100% (13/13 flows tested)"},
+  "test_credentials": "MASTER license (offline): MB-MASTER-BRUGULAT-2026-OWNER injected via localStorage caja.license.v1. No API auth needed.",
+  "seed_data_creation": "Seeded via localStorage.add_init_script: (1) caja.license.v1 with type=MASTER; (2) caja.config.v1 with configured:true + 2 companies (MediCar Test, Cempla Test); (3) caja.whatsNew.seen.v2.1.0='1' to suppress boot popup; (4) caja.calendar.history.v1 with 3 test entries + caja.calendar.status.v1 with 2 statuses (to render KPIs).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "IRPF print bug (missing w.document.close()) is fixed and verified. All 6 print handlers work. Config bootstrap requires localStorage.caja.config.v1 to have {configured:true, company1:{name}} at TOP level (not nested per-company) or the 'Configuración inicial' setup modal shows. To seed calendar KPIs, populate caja.calendar.history.v1 and caja.calendar.status.v1. Playwright must use context.on('page') to capture popups (URL will be 'about:blank'). Existing SMS campaign 'Test — pots esborrar-me' (id 16366e1b-…) is present on the shared backend — useful for testing SMS detail-print without seeding.",
+  "rca of the issue": "Original bug (pre-fix): window.open('','_blank') + w.document.write(html) leaves the document in 'loading' state until the browser hits an EOF or ReadableStream close. On Chromium/Electron, the popup then never triggers window.print() (script runs but nothing to print), and no assistive script runs reliably. Fix: add w.document.close() immediately after write(). This finalises the document, fires DOMContentLoaded, allows the inline setTimeout(()=>window.print(),400) to run. Verified in all 6 handlers. Bonus: added if(!w){toast(...)} popup-blocker guard on 4 of 6 handlers (recommend adding to lrPrint and printSmsCampaign for consistency)."
+}
