@@ -354,3 +354,22 @@ Efecte immediat en tots els clients (main.js consulta abans d'auto-actualitzar).
 
 ### Versió
 - v2.0.65 amb entrada al changelog explicant els 4 fixes
+
+## 📝 Sessió 15/07/2026 (8a part) · Auto-match assistència cites
+
+### 🤖 Auto-marca vino/no vino al importar CSV DGT
+- `_normalizeName()`: strip accents, lowercase, separadors → sortit net
+- `_nameTokens()`: extreu paraules ≥3 lletres, ignora stopwords (de, la, los, san, etc.)
+- `citaMatchesCsv(cita, csv)`: matching estricte per assegurar que **algun cognom sempre quadra**:
+  - 1 token → cal 1 match
+  - 2+ tokens → cal ≥2 matches (nom + cognom OR 2 cognoms)
+- `autoMarkAttendanceForDate(iso)` i `autoMarkAttendanceForDates(dates)`: després d'importar CSV DGT, per cada dia importat, cita per cita:
+  - Si ja marcada manualment (👤) → no toca res
+  - Si el nom quadra amb algun del CSV → 🤖 marca "vino" (ok)
+  - Si no → 🤖 marca "no vino" (no)
+- Format status v2: `{[date|uid]: {s:'ok'|'no'|'done', src:'manual'|'auto'}}` (backward compat amb strings)
+- UI: icona 👤 (manual) / 🤖 (auto) al costat del badge d'estat
+- Toast del import CSV ampliat: "🤖 Cites auto-marcades: X vinieron, Y no vinieron"
+- **10/10 tests unitaris passats** (matching flexible CA/ES, cognoms verificats, edge cases)
+
+### Versió v2.0.66 amb entrada al changelog

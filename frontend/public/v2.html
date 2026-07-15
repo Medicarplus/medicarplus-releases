@@ -1583,11 +1583,12 @@ function openStats(initialSection){
       </div>`;
       return;
     }
-    // Compute KPIs
+    // Compute KPIs (compatible amb el nou format {s,src} i amb l'antic string)
+    const _readS = (v) => (typeof v === 'string') ? v : ((v && v.s) || '');
     const stat = {presentat:0, no_presentat:0, realitzat:0, sense_marcar:0};
     entries.forEach(e => {
       const k = e.date+'|'+e.uid;
-      const s = status[k];
+      const s = _readS(status[k]);
       if(s==='ok') stat.presentat++;
       else if(s==='no') stat.no_presentat++;
       else if(s==='done') stat.realitzat++;
@@ -1670,10 +1671,15 @@ function openStats(initialSection){
       }
       const rows = shown.map(e => {
         const k = e.date+'|'+e.uid;
-        const s = status[k];
-        const badge = s==='ok' ? `<span style="background:#166534;color:#a7f3d0;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">✓ PRESENTADO</span>`
-          : s==='no' ? `<span style="background:#7f1d1d;color:#fecaca;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">✕ NO PRESENTADO</span>`
-          : s==='done' ? `<span style="background:#1e40af;color:#bfdbfe;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">💼 REALIZADO</span>`
+        const raw = status[k];
+        const s = (typeof raw === 'string') ? raw : ((raw && raw.s) || '');
+        const src = (typeof raw === 'string') ? 'manual' : ((raw && raw.src) || '');
+        const srcIcon = s ? (src==='auto'
+          ? `<span title="Auto-detectado desde CSV DGT" style="margin-left:5px;font-size:10px;opacity:0.85">🤖</span>`
+          : `<span title="Confirmado manualmente" style="margin-left:5px;font-size:10px;opacity:0.85">👤</span>`) : '';
+        const badge = s==='ok' ? `<span style="background:#166534;color:#a7f3d0;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">✓ PRESENTADO</span>${srcIcon}`
+          : s==='no' ? `<span style="background:#7f1d1d;color:#fecaca;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">✕ NO PRESENTADO</span>${srcIcon}`
+          : s==='done' ? `<span style="background:#1e40af;color:#bfdbfe;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">💼 REALIZADO</span>${srcIcon}`
           : `<span style="background:#334155;color:#cbd5e1;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">⚪ SIN MARCAR</span>`;
         const dt = new Date(e.date+'T00:00:00').toLocaleDateString('es-ES',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
         return `<tr style="border-bottom:1px solid #1e293b">
@@ -1709,7 +1715,7 @@ document.addEventListener('click',ev=>{const chip=ev.target.closest('#chips-dh .
 $('#btnImport').onclick=()=>$('#fileInput').click();
 $('#fileInput').onchange=async ev=>{const f=ev.target.files[0];if(!f)return;try{const name=(f.name||'').toLowerCase();const buf=await f.arrayBuffer();if(name.endsWith('.xlsx')||name.endsWith('.xls')){if(typeof XLSX==='undefined'){toast('❌ Lector Excel no disponible — usa CSV');return}const wb=XLSX.read(buf,{type:'array'});const sheet=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:false,defval:''});importTrafficRows(rows)}else{let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){text=new TextDecoder('windows-1252').decode(buf)}if(/Ã[©±¡³]/.test(text)){text=new TextDecoder('windows-1252').decode(buf)}const rows=parseCSV(text);importTrafficRows(rows)}}catch(err){toast('Error al importar: '+err.message,3500)}ev.target.value=''};
 function parseCSV(text){const out=[];let row=[],cell='',inQ=false;for(let i=0;i<text.length;i++){const c=text[i];if(inQ){if(c==='"'){if(text[i+1]==='"'){cell+='"';i++}else inQ=false}else cell+=c}else{if(c==='"')inQ=true;else if(c===';'){row.push(cell);cell=''}else if(c==='\n'){row.push(cell);out.push(row);row=[];cell=''}else if(c==='\r'){}else cell+=c}}if(cell.length||row.length){row.push(cell);out.push(row)}return out.filter(r=>r.some(x=>x&&x.trim()!==''))}
-function importTrafficRows(rows){if(!rows.length){toast('Archivo vacío');return}const header=rows[0].map(s=>String(s).trim().toUpperCase());const idx=name=>header.findIndex(h=>h===name||h.startsWith(name));const iFecha=idx('FECHA'),iNombre=idx('NOMBRE'),iAp1=idx('APELLIDO1'),iAp2=idx('APELLIDO2'),iTipo=idx('TIPO'),iGrupo=idx('GRUPO'),iImporte=idx('IMPORTE');
+async function importTrafficRows(rows){if(!rows.length){toast('Archivo vacío');return}const header=rows[0].map(s=>String(s).trim().toUpperCase());const idx=name=>header.findIndex(h=>h===name||h.startsWith(name));const iFecha=idx('FECHA'),iNombre=idx('NOMBRE'),iAp1=idx('APELLIDO1'),iAp2=idx('APELLIDO2'),iTipo=idx('TIPO'),iGrupo=idx('GRUPO'),iImporte=idx('IMPORTE');
   // Detecta la columna del sufix (Normal/Profesional/Classe) — busca noms coneguts o
   // examina si alguna columna té valors reconeguts (Profesional / classes C, D, C+E, etc.)
   const CATEG_NAMES=['CATEGORIA','CATEGORÍA','CLASE','PERMISO','TIPO_CARNET','CATEGORIA_CARNET','CLASE_CARNET','CARNET','PROFESIONAL'];
@@ -1761,7 +1767,15 @@ function importTrafficRows(rows){if(!rows.length){toast('Archivo vacío');return
   if(!total){toast('No se han encontrado filas válidas');return}
   let added=0,skipped=0;for(const[date,arr]of Object.entries(grouped)){const list=entriesOf(date);for(const e of arr){const dup=list.some(x=>x._csv&&x.nombre===e.nombre&&x.tipo===e.tipo&&x.importe===e.importe&&x.tasa===e.tasa);if(dup){skipped++;continue}list.push(e);added++}}
   saveState();const first=[...dates].sort()[0];if(first)setDate(first);else render();
-  toast(`✅ Importado: ${added} entrada(s)${skipped?`, ${skipped} duplicada(s) ignorada(s)`:''}${detectMsg}`,3800)
+  // 🤖 Auto-match assistència: per cada dia importat, quadra CSV amb cites del calendari
+  let autoMsg='';
+  try{
+    const autoRes = await autoMarkAttendanceForDates([...dates]);
+    if(autoRes.ok || autoRes.no){
+      autoMsg = ` · 🤖 Cites auto-marcades: ${autoRes.ok} vinieron, ${autoRes.no} no vinieron`;
+    }
+  }catch(e){ console.warn('auto-mark failed', e); }
+  toast(`✅ Importado: ${added} entrada(s)${skipped?`, ${skipped} duplicada(s) ignorada(s)`:''}${detectMsg}${autoMsg}`,4500)
 }
 // Helper: setting global "count zero" per computar 0€ com entrada o no (default: false)
 function getCountZero(){return localStorage.getItem('caja.count_zero')==='1'}
@@ -4475,13 +4489,114 @@ function pushEventsToHistory(events){
 }
 
 const CAL_URLS_KEY = 'caja.calendar.urls.v1';
-const CAL_STATUS_KEY = 'caja.calendar.status.v1';  // {[date_uid]: 'ok'|'no'|'done'}
+const CAL_STATUS_KEY = 'caja.calendar.status.v1';  // {[date_uid]: 'ok'|'no'|'done'  |  {s:'ok'|'no'|'done', src:'manual'|'auto'}}
 const CAL_CACHE_KEY = 'caja.calendar.cache.v1';    // Últim resultat + timestamp
 
 function loadCalUrls(){try{return JSON.parse(localStorage.getItem(CAL_URLS_KEY)||'[]')}catch(e){return[]}}
 function saveCalUrls(arr){localStorage.setItem(CAL_URLS_KEY,JSON.stringify(arr||[]))}
 function loadCalStatus(){try{return JSON.parse(localStorage.getItem(CAL_STATUS_KEY)||'{}')}catch(e){return{}}}
 function saveCalStatus(m){localStorage.setItem(CAL_STATUS_KEY,JSON.stringify(m||{}))}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cita status v2: suporta objecte {s, src} amb backward compat de string.
+// Retorna sempre {s:'ok'|'no'|'done'|'', src:'manual'|'auto'|''}
+// ─────────────────────────────────────────────────────────────────────────────
+function getStatusInfo(uid, date){
+  const st = loadCalStatus();
+  const raw = st[date + '|' + uid];
+  if(!raw) return { s:'', src:'' };
+  if(typeof raw === 'string') return { s: raw, src: 'manual' };  // legacy
+  return { s: raw.s || '', src: raw.src || 'manual' };
+}
+function setStatusInfo(uid, date, s, src){
+  const st = loadCalStatus();
+  const k = date + '|' + uid;
+  if(s) st[k] = { s: s, src: src || 'manual' };
+  else delete st[k];
+  saveCalStatus(st);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Matching de noms · flexible (cognoms han de quadrar, nom pot ser diferent CA/ES)
+// ─────────────────────────────────────────────────────────────────────────────
+function _normalizeName(s){
+  return String(s || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // treu accents
+    .toLowerCase()
+    .replace(/[,.;()·\-_\/]/g, ' ')                     // separadors
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+// Extreu paraules "significatives" (≥3 lletres, no articles/preposicions).
+// Els cognoms i noms més comuns amb 2 lletres (Da/De/La/El/Van/Del) queden fora.
+const _NAME_STOPWORDS = new Set(['de','del','la','las','los','el','y','i','al','da','do','das','dos','san','santa','sant','les']);
+function _nameTokens(s){
+  return _normalizeName(s).split(' ').filter(w => w.length >= 3 && !_NAME_STOPWORDS.has(w));
+}
+// Comprova si un nom-cita quadra amb un nom-CSV segons regles flexibles PERÒ estrictes:
+// - 1 token cita → cal 1 match (el token únic)
+// - 2+ tokens cita → cal ≥2 matches (per assegurar que ALMENYS UN COGNOM quadra,
+//   no només el nom que pot ser CA/ES)
+// Cas típic: cita "Marc Brugulat Lopez" vs CSV "BRUGULAT LOPEZ, MARC" → 3 matches ✅
+// Cas típic: cita "Jordi Puig Sanchez" vs CSV "PUIG SANCHEZ, JORGE" → 2 matches ✅
+// Cas límit: cita "Pere Pons" vs CSV "MARTINEZ LOPEZ, PERE" → només 1 match (Pere), no cognom → NO match ✅
+function citaMatchesCsv(citaName, csvName){
+  const cita = _nameTokens(citaName);
+  const csv  = _nameTokens(csvName);
+  if(cita.length === 0 || csv.length === 0) return false;
+  const csvSet = new Set(csv);
+  const matches = cita.filter(t => csvSet.has(t));
+  // 1 token: match total. 2+ tokens: cal ≥2 matches (cognom sempre ha de quadrar).
+  return cita.length === 1 ? matches.length === 1 : matches.length >= 2;
+}
+
+// Auto-marca l'assistència de les cites d'una data segons el CSV DGT importat.
+// - Cites ja marcades MANUALMENT → no es toquen.
+// - Cites sense marcar → si el nom apareix al CSV del dia → 'ok' (auto); si no → 'no' (auto).
+// Retorna {ok, no, skipped}.
+async function autoMarkAttendanceForDate(iso){
+  const result = { ok: 0, no: 0, skipped: 0 };
+  // Obté cites del dia (llegeix del cache del calendari)
+  let citas = [];
+  try{
+    const cache = JSON.parse(localStorage.getItem(CAL_CACHE_KEY) || '{}');
+    const events = (cache && cache.events) ? cache.events : [];
+    citas = events.filter(e => e && e.date === iso);
+  }catch(e){}
+  if(citas.length === 0) return result;
+  // Obté entrades CSV DGT del mateix dia
+  let csvEntries = [];
+  try{
+    const bd = (state && state.byDate) || {};
+    csvEntries = (bd[iso] || []).filter(e => e && e.kind === 'TRAF' && e._csv === true);
+  }catch(e){}
+  const csvNames = csvEntries.map(e => e.nombre || '').filter(Boolean);
+  for(const cita of citas){
+    const info = getStatusInfo(cita.uid, cita.date);
+    if(info.s && info.src === 'manual'){ result.skipped++; continue; }  // no sobreescric manual
+    // Buscar match
+    const citaName = cita.summary || '';
+    const match = csvNames.some(csv => citaMatchesCsv(citaName, csv));
+    if(match){
+      setStatusInfo(cita.uid, cita.date, 'ok', 'auto');
+      result.ok++;
+    } else {
+      setStatusInfo(cita.uid, cita.date, 'no', 'auto');
+      result.no++;
+    }
+  }
+  return result;
+}
+// Auto-marca per múltiples dates (crida després d'importar CSV DGT).
+async function autoMarkAttendanceForDates(datesArr){
+  const totals = { ok: 0, no: 0, skipped: 0, dates: 0 };
+  for(const iso of (datesArr || [])){
+    const r = await autoMarkAttendanceForDate(iso);
+    totals.ok += r.ok; totals.no += r.no; totals.skipped += r.skipped;
+    if(r.ok || r.no) totals.dates++;
+  }
+  return totals;
+}
 
 function isPremiumLicense(){
   try{
@@ -4575,14 +4690,15 @@ function renderCalendarModal(){
   back.querySelector('#calRefresh').onclick=()=>renderTab(true);
   
   function statusBadge(uid,date){
-    const st=loadCalStatus();
-    const k=date+'|'+uid;
-    return st[k]||'';
+    // Retorna sempre l'string 's' (ok/no/done/'') per compatibilitat amb la UI existent
+    return getStatusInfo(uid, date).s || '';
+  }
+  function statusSource(uid,date){
+    return getStatusInfo(uid, date).src || '';  // 'manual' | 'auto' | ''
   }
   function setStatus(uid,date,val){
-    const st=loadCalStatus();const k=date+'|'+uid;
-    if(val)st[k]=val;else delete st[k];
-    saveCalStatus(st);
+    // Marcatge sempre manual quan es fa des dels botons de la UI
+    setStatusInfo(uid, date, val, 'manual');
   }
   
   async function renderTab(forceRefresh){
@@ -4666,9 +4782,13 @@ function renderCalendarModal(){
       const dateLabel=dt.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
       const rows=byDate[d].map(e=>{
         const st=statusBadge(e.uid,e.date);
-        const badge=st==='ok'?`<span style="background:#166534;color:#a7f3d0;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">✓ ${isCA?'PRESENTAT':'PRESENTADO'}</span>`
-          :st==='no'?`<span style="background:#7f1d1d;color:#fecaca;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">✕ ${isCA?'NO PRESENTAT':'NO PRESENTADO'}</span>`
-          :st==='done'?`<span style="background:#1e40af;color:#bfdbfe;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">💼 ${isCA?'REALITZAT':'REALIZADO'}</span>`
+        const src=statusSource(e.uid,e.date);
+        const srcIcon = st ? (src==='auto'
+          ? `<span title="Auto-detectado desde CSV DGT" style="margin-left:6px;font-size:11px;opacity:0.85">🤖</span>`
+          : `<span title="Confirmado manualmente" style="margin-left:6px;font-size:11px;opacity:0.85">👤</span>`) : '';
+        const badge=st==='ok'?`<span style="background:#166534;color:#a7f3d0;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">✓ ${isCA?'PRESENTAT':'PRESENTADO'}</span>${srcIcon}`
+          :st==='no'?`<span style="background:#7f1d1d;color:#fecaca;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">✕ ${isCA?'NO PRESENTAT':'NO PRESENTADO'}</span>${srcIcon}`
+          :st==='done'?`<span style="background:#1e40af;color:#bfdbfe;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">💼 ${isCA?'REALITZAT':'REALIZADO'}</span>${srcIcon}`
           :'';
         return `<tr style="border-bottom:1px solid #1e293b">
           <td style="padding:12px 10px;font-family:'Courier New',monospace;font-weight:700;color:#0ea5e9;font-size:14px;white-space:nowrap">${e.time||(isCA?'tot dia':'todo día')}${e.end_time?'<span style="color:#64748b">→'+e.end_time+'</span>':''}</td>
@@ -5337,14 +5457,19 @@ const LAST_SEEN_VERSION_KEY = 'caja.last_seen_version';
 // IMPORTANT: L'ordre importa. La primera entrada ha de ser la MÉS RECENT.
 // Cada versió té: { version, date (dd/mm/aaaa), highlights (array de strings HTML curts) }
 const CHANGELOG = [
+  { version:'2.0.66', date:'15/07/2026', highlights:[
+    '🤖 <b>NOU · Auto-marca asistencia de citas al importar CSV DGT</b>: al importar el CSV del programa GIC al final del día, se cruzan automáticamente los nombres del CSV con las citas del calendario:<br>&nbsp;&nbsp;&nbsp;&nbsp;• Si el nombre <b>aparece</b> en el CSV → 🤖 marca la cita como "Vino"<br>&nbsp;&nbsp;&nbsp;&nbsp;• Si el nombre <b>no aparece</b> → 🤖 marca "No vino"<br>&nbsp;&nbsp;&nbsp;&nbsp;• Las que ya has marcado manualmente (👤) <b>no se tocan nunca</b><br>Matching flexible: reconoce nombres en catalán/castellano (Jordi→Jorge, Marc→Marcos) siempre que los apellidos coincidan. Sin acentos, sin importar orden.',
+    '🔍 <b>Icono de origen en cada estado de cita</b>: 👤 = confirmado por ti manualmente · 🤖 = detectado automáticamente por el sistema. Así ves de un vistazo cuáles has revisado tú.',
+    '🚨 <b>FIX CRÍTICO · Enlaces resistentes a rotación de URL</b>: los enlaces internos (Admin, Solicitud, Guías) ahora derivan dinámicamente del backend actual vía <code>api-endpoint.json</code>. Se acabaron los 404 aleatorios.',
+    '📊 <b>Dropdown Estadísticas reorganizado</b>: 6 entradas independientes (Facturación · Autoescuelas · Tráfico · SMS · Citas · Comparativa años).',
+    '🏢 <b>Estadísticas aisladas por empresa</b>: Facturación anual y Comparativa años muestran <b>solo los datos de la empresa activa</b>. Se acabó la mezcla.',
+    '🚦 <b>Estadísticas Tráfico ampliadas</b>: detecta automáticamente todas las categorías del CSV DGT (Renovación, Expedición, Marina, Grúas, Animales peligrosos, Conducción, Ciclomotor, Armas, etc.).',
+    '🔒 <b>Privacidad SIEMPRE por defecto</b>: importes CAJA FÍSICA / CUENTA BANCO / TOTAL / SALDO ANTERIOR arrancan difuminados en cada apertura. Botón 👁️/🙈 revela durante la sesión.',
+    '🏷️ TOTAL CAJA (facturación) → simplemente <b>TOTAL</b>.',
+    '📄 Guía + Manual como PDF adjuntos al correo de licencia con portada branded MediCar Plus y Nº Documento correlativo.',
+  ]},
   { version:'2.0.65', date:'15/07/2026', highlights:[
-    '🚨 <b>FIX CRÍTICO · Enlaces resistentes a rotación de URL</b>: los enlaces internos (Admin, Solicitud, Guías) ahora derivan dinámicamente del backend actual vía <code>api-endpoint.json</code> (auto-publicado por el backend en cada arranque). Además, cada guía HTML lleva un script <i>link-healer</i> que reescribe automáticamente enlaces si detecta URLs obsoletas o si el usuario aterriza en medicarplus.es por error. <b>Se acabaron los 404 aleatorios.</b>',
-    '📊 <b>Dropdown Estadísticas reorganizado</b>: cada tipo de estadística tiene ahora su propia entrada en el menú (Autoescuelas / Tráfico / SMS / Citas), sin sub-tabs anidados. Más fácil de encontrar lo que buscas.',
-    '🏢 <b>Estadísticas aisladas por empresa</b>: Facturación e Informe anual y Comparativa años ahora muestran <b>solo los datos de la empresa activa</b> (Tráfic o Cempla según la que tengas seleccionada). Se acabó la mezcla que no tenía sentido.',
-    '🚦 <b>Estadísticas Tráfico ampliadas</b>: ahora detecta automáticamente <b>todas las categorías del CSV DGT</b> (Renovación, Expedición, Duplicado, Canje, Conducción, Marina, Grúas, Animales peligrosos, Ciclomotor, Armas, etc.), no solo las 5 hardcoded. Desglose por categoría + totales mensuales/anuales + comparativa.',
-    '🔒 <b>Privacidad SIEMPRE por defecto</b>: cada vez que abras el programa, los importes de CAJA FÍSICA, CUENTA BANCO, TOTAL y SALDO ANTERIOR arrancan <b>difuminados</b> (comportamiento tipo app de banca). El botón ojo (👁️/🙈) los muestra solo durante la sesión.',
-    '🏷️ <b>Renombrado · TOTAL CAJA (facturación) → TOTAL</b>: el total del panel de cierre ahora se llama simplemente "TOTAL" porque representa la suma real (facturación + saldo anterior − salidas).',
-    '📄 <b>Guía y Manual en PDF adjuntos al correo de licencia</b> con portada branded MediCar Plus y Nº Documento correlativo (<code>MCP-2026-000042</code>).',
+    '🚨 URLs resistentes + Dropdown Estadísticas + Aislamiento empresa + Tráfico dinámico (superado por v2.0.66).',
   ]},
   { version:'2.0.64', date:'15/07/2026', highlights:[
     '🔒 Privacidad por defecto (superado por v2.0.65).',
@@ -5532,7 +5657,7 @@ setTimeout(()=>{ try{ showWhatsNew(false) }catch(e){ console.warn('showWhatsNew'
 const API_BASE_HARDCODED='https://project-helper-47.preview.emergentagent.com';
 // App version (hardcoded — s'actualitza a cada release). Serveix per invalidar
 // caché de descoberta al detectar que l'usuari acaba d'actualitzar l'app.
-const APP_VERSION='2.0.64';
+const APP_VERSION='2.0.66';
 // Múltiples fonts de descoberta. La primera que respongui vàlidament guanya.
 // L'orden importa:
 // 1) raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json
