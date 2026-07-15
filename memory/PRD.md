@@ -329,3 +329,28 @@ Efecte immediat en tots els clients (main.js consulta abans d'auto-actualitzar).
 - Portada actualitzada: cantonada superior dreta amb "Nº DOCUMENTO · MCP-YYYY-NNNNNN" en Courier daurat.
 - `mailer.py` genera el número una vegada per emissió i el comparteix entre guia i manual (mateixa ref. per a ambdós PDFs).
 - **Testejat**: counter incrementa correctament (000001 → 000002 → 000003). Screenshot portada verificat. Correu enviat OK a marcbrugulat@hotmail.com.
+
+## 📝 Sessió 15/07/2026 (7a part) · 4 fixes crítics + reestructuració
+
+### 🚨 #4 · URLs resistents a rotacions (URGENT · FIX ARREL)
+- **Bug arrel**: `auto_publish_endpoint.py::_current_preview_url()` llegia `APP_URL` env var del supervisor (que estava obsolet), no la font canònica `REACT_APP_BACKEND_URL` que Emergent manté al dia.
+- **Fix**: la funció ara llegeix primer `/app/frontend/.env → REACT_APP_BACKEND_URL`, amb fallback a env vars antigues.
+- `link-healer.html` (script standalone) injectat a totes les guies HTML (8 arxius). Auto-reescriu enllaços trencats si la URL rota o si el visitant aterra a medicarplus.es per error.
+- `v2.html`: LIC.REQUEST_URL, LIC.ADMIN_URL, LIC.GUIDE_INSTALL_URL, LIC.MANUAL_URL són getters dinàmics via `getApiBase()`.
+- Auto-heal `fetchWithApiBaseHeal()` i `openBackendUrl()` per re-descobrir la base si un fetch falla.
+- Verificat: api-endpoint.json a GitHub mostra project-helper-47 (URL actual).
+
+### 📊 #2 · Dropdown Estadísticas reorganitzat
+- 6 entrades independents: Facturación · Autoescoles · Tráfico · SMS · Cites · Comparativa años
+- `openStats(section)` accepta paràmetre per pre-seleccionar la secció (autos/traffic/sms/cites)
+
+### 🚦 #3 · Estadístiques Tráfico dinàmiques
+- `_trafDetectedCats()` detecta automàticament totes les categories del CSV DGT (Marina, Grúas, Animales peligrosos, Conducción, Ciclomotor, Armas, etc.)
+- `_trafNormalizeCat()` normalitza sinònims coneguts però preserva categories custom
+- 16 colors de paleta cíclica per categories il·limitades
+
+### 🏢 #1 · Aïllament per empresa
+- `_buildAnnualReport(year)` i `_buildYearComparison(latestYear, count)` ara filtren per `currentCompany` (només Trafic o només Cempla, mai barrejats)
+
+### Versió
+- v2.0.65 amb entrada al changelog explicant els 4 fixes
