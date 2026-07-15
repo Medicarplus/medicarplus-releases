@@ -5226,7 +5226,7 @@ window.updateTrialBadge = function(){
     var expired = daysLeft <= 0;
     var color, bg, border, icon, txt;
     if(expired){
-      color='#fecaca';bg='linear-gradient(90deg,#7f1d1d,#991b1b)';border='#dc2626';icon='⛔';txt='PROVA EXPIRADA';
+      color='#fecaca';bg='linear-gradient(90deg,#7f1d1d,#991b1b)';border='#dc2626';icon='⛔';txt='PRUEBA EXPIRADA';
     }else if(daysLeft <= 3){
       color='#fecaca';bg='linear-gradient(90deg,#7f1d1d,#991b1b)';border='#dc2626';icon='⚠️';txt='Quedan '+daysLeft+' día'+(daysLeft===1?'':'s');
     }else if(daysLeft <= 10){
@@ -5238,7 +5238,7 @@ window.updateTrialBadge = function(){
     el.style.background=bg;
     el.style.color=color;
     el.style.borderColor=border;
-    el.innerHTML = '<span style="font-size:14px">'+icon+'</span><span>'+txt+'</span><a href="https://medicarplus.es/#pricing" target="_blank" rel="noopener" style="background:rgba(255,255,255,.15);color:'+color+';padding:3px 8px;border-radius:4px;text-decoration:none;font-weight:700;font-size:11px;border:1px solid rgba(255,255,255,.2);margin-left:4px" data-testid="trial-buy-btn">Comprar</a>';
+    el.innerHTML = '<span style="font-size:14px">'+icon+'</span><span>'+txt+'</span><button onclick="try{openUpgradeModal()}catch(e){}" style="background:rgba(255,255,255,.15);color:'+color+';padding:3px 8px;border-radius:4px;cursor:pointer;font-weight:700;font-size:11px;border:1px solid rgba(255,255,255,.2);margin-left:4px;font-family:inherit" data-testid="trial-buy-btn">Comprar</button>';
   }catch(e){}
 };
 // Actualitza a l'inici i cada 60s

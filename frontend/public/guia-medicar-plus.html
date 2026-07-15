@@ -116,8 +116,10 @@
 <tr><td>🔒 HWID Lock anti-pirateig</td><td><span class="badge badge-ok">✅ ACTIU</span></td><td>Cap</td></tr>
 <tr><td>🔧 Dropdown Contabilidad + Informe Anual PDF</td><td><span class="badge badge-ok">✅ ACTIU</span></td><td>Cap</td></tr>
 <tr><td>Pagament transferència (manual)</td><td><span class="badge badge-ok">✅ ACTIU</span></td><td>Cap</td></tr>
-<tr><td>Stripe Checkout one-off (targeta única)</td><td><span class="badge badge-wait">⏸️ MODE TEST</span></td><td>Passar a LIVE quan tinguis empresa</td></tr>
-<tr><td>Stripe Subscriptions (recurrent auto)</td><td><span class="badge badge-wait">⏸️ CODI LLEST</span></td><td>Crear compte Stripe + 4 Price IDs</td></tr>
+<tr><td>Stripe Subscriptions (recurrent auto + portal client)</td><td><span class="badge badge-wait">⏸️ MODE TEST · testejat 100%</span></td><td>Posar claus LIVE (checklist pas 1)</td></tr>
+<tr><td>🧾 Verifacti (factures Verifactu → AEAT)</td><td><span class="badge badge-wait">⏸️ DECIDIT · ~2,90€/mes</span></td><td>Registrar-se quan Stripe sigui LIVE (checklist pas 2)</td></tr>
+<tr><td>📧 Recordatoris renovació automàtics (email)</td><td><span class="badge badge-ok">✅ ACTIU</span></td><td>Cap</td></tr>
+<tr><td>🔍 Google Search Console (SEO landing)</td><td><span class="badge badge-wait">⏸️ PENDENT</span></td><td>Verificar domini + sitemap (checklist pas 4)</td></tr>
 <tr><td>Auto-updates GitHub Releases</td><td><span class="badge badge-wait">⏸️ CODI LLEST</span></td><td>Crear repo GitHub + token PAT</td></tr>
 <tr><td>Twilio SMS/WhatsApp (enviament automàtic)</td><td><span class="badge badge-wait">⏸️ ENDPOINT LLEST</span></td><td>Comprar número + credencials</td></tr>
 <tr><td>Deploy a producció (URL estable + domini propi)</td><td><span class="badge badge-wait">⏸️ PENDENT</span></td><td>Botó Deploy Emergent + comprar domini</td></tr>
@@ -146,32 +148,36 @@ El backend (API llicències, admin panel, SMS, verificació HWID) està al servi
 <b>Guia:</b> <a href="/guia-deploy.html" target="_blank" style="color:#f5b301;text-decoration:underline">/guia-deploy.html</a>
 </div>
 
-<div class="pending-item">
-<b>⏸️ 4️⃣ STRIPE SUBSCRIPTIONS</b> · <span style="color:#fed7aa">PENDENT · esperant IBAN empresa</span><br>
-Quan un client paga, Stripe li cobra <b>sol cada mes/any</b> i el JWT es renova sol via webhooks. Zero feina teva.<br>
-<b>Requereix:</b> empresa constituïda + IBAN empresa + compte Stripe verificat.<br>
+<div class="pending-item" style="background:rgba(34,197,94,0.15);border-left-color:#22c55e">
+<b>✅ 4️⃣ STRIPE SUBSCRIPTIONS (mode TEST)</b> · <span style="color:#22c55e">CODI FET I TESTEJAT</span><br>
+Checkout de subscripció, webhook de renovació automàtica, portal del client (cancel·lar/canviar targeta) i email de llicència automàtic: tot funciona en mode test. Només queda posar les <b>claus LIVE</b> el dia de la sortida (pas 1 del checklist de sota).<br>
 <b>Guia:</b> <a href="/guia-stripe-setup.html" target="_blank" style="color:#f5b301;text-decoration:underline">/guia-stripe-setup.html</a>
 </div>
 
-<div class="pending-item">
-<b>⏸️ 5️⃣ TWILIO SMS REAL</b> · <span style="color:#fed7aa">PENDENT · quan compris crèdits</span><br>
-Actualment els SMS estan en <b>mode prova (mock)</b>. Els avisos es guarden però no s'envien de veritat. Per activar l'enviament real:<br>
-<b>Requereix:</b> compte Twilio + número de telèfon (~1$/mes) + <code>TWILIO_ACCOUNT_SID</code> i <code>TWILIO_AUTH_TOKEN</code> a variables d'entorn del backend.<br>
-<b>Cost SMS:</b> ~0,05€/SMS · WhatsApp ~0,05€/conversa.
+<div class="pending-item" style="background:rgba(34,197,94,0.15);border-left-color:#22c55e">
+<b>✅ 5️⃣ RECORDATORIS DE RENOVACIÓ AUTOMÀTICS</b> · <span style="color:#22c55e">NOU · 15/07/2026</span><br>
+El backend revisa cada 24h les llicències actives: si una caduca en ≤7 dies i el client <b>no</b> té subscripció (que renova sola), li envia sol un email en castellà amb l'enllaç de renovació. Zero feina teva, zero clients perduts per oblit.<br>
+<b>Execució manual (per provar):</b> <code>POST /api/admin/renewal-reminders/run</code> amb capçalera <code>X-Admin-Token</code>.
 </div>
 
-<div style="background:rgba(0,0,0,0.3);padding:12px 16px;border-radius:8px;margin-top:16px;color:#fef3c7">
-<b>📋 Ordre recomanat de què activar quan:</b>
-<ol style="margin:6px 0">
-<li><b>Ara</b>: pots vendre llicències manualment i cobrar per Bizum/transferència. L'app està completa i estable.</li>
-<li><b>Al tenir empresa + IBAN</b>: activar Stripe Subscriptions per cobrar automàtic.</li>
-<li><b>Al tenir 5+ clients</b>: comprar crèdits Twilio i activar SMS reals.</li>
-<li><b>Quan notis inestabilitat</b>: fer deploy del backend a producció.</li>
+<!-- ============ CHECKLIST DE SORTIDA AL MERCAT ============ -->
+<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid #f5b301;padding:18px 20px;border-radius:12px;margin-top:20px;color:#fef3c7" id="checklist-sortida">
+<h3 style="margin:0 0 4px 0;color:#f5b301">🚀 CHECKLIST DE SORTIDA AL MERCAT · fes-ho en aquest ordre el dia D</h3>
+<p style="margin:0 0 14px 0;font-size:12px;color:#c7d2fe">Actualitzat 15/07/2026 · Quan tinguis empresa + IBAN, segueix aquests 5 passos i el negoci queda 100% automàtic. Digues-me "fem el pas X" i t'ho guio.</p>
+<ol style="margin:6px 0;line-height:1.8">
+<li><b style="color:#f5b301">Claus Stripe LIVE</b> — Al <a href="https://dashboard.stripe.com" target="_blank" style="color:#93c5fd">Dashboard de Stripe</a>: activa el compte (IBAN empresa), crea els 4 preus en mode live i passa'm: <code>sk_live_...</code>, els 4 <code>price_...</code> i el <code>whsec_...</code> del webhook. Jo els poso al backend. <span style="color:#93c5fd">Guia: /guia-stripe-setup.html</span></li>
+<li><b style="color:#f5b301">Verifacti (factures Verifactu automàtiques)</b> — Registra't a <a href="https://www.verifacti.com/plugins/stripe" target="_blank" style="color:#93c5fd">verifacti.com/plugins/stripe</a> (~2,90€/NIF/mes, prova gratuïta) i instal·la la seva app dins del teu compte Stripe <b>en mode live</b>. A partir d'aquí, cada cobrament genera sol la factura PDF amb QR Verifactu, numeració correlativa, rectificatives, i s'envia a l'AEAT amb el seu certificat. <b>Zero codi, zero feina teva.</b> ⚠️ Fes-ho abans de la 1a venda live perquè totes les factures quedin dins del sistema.</li>
+<li><b style="color:#f5b301">Twilio real (SMS)</b> — Compra un número (~1$/mes) + crèdits a <a href="https://www.twilio.com" target="_blank" style="color:#93c5fd">twilio.com</a> i passa'm <code>TWILIO_ACCOUNT_SID</code> + <code>TWILIO_AUTH_TOKEN</code>. Jo activo l'enviament real (ara està en mode prova). Cost: ~0,05€/SMS.</li>
+<li><b style="color:#f5b301">Google Search Console</b> — Dona d'alta <code>medicarplus.es</code> a <a href="https://search.google.com/search-console" target="_blank" style="color:#93c5fd">search.google.com/search-console</a> (verificació per DNS o fitxer HTML a GitHub Pages) i envia el sitemap. Així Google indexa la landing i comences a rebre visites orgàniques.</li>
+<li><b style="color:#f5b301">Deploy backend a producció</b> — Botó Deploy d'Emergent (~15€/mes) + domini <code>api.medicarplus.es</code>. Fes-ho el mateix dia que posis Stripe en live perquè el webhook apunti a una URL estable. <span style="color:#93c5fd">Guia: /guia-deploy.html</span></li>
 </ol>
+<div style="background:rgba(0,0,0,0.35);padding:10px 14px;border-radius:8px;margin-top:10px;font-size:12.5px">
+💰 <b>Cost fix mensual un cop tot actiu:</b> Deploy ~15€ + Verifacti ~2,90€ + Twilio ~3€ ≈ <b>21€/mes</b>. Amb 1 sol client STD anual (299,90€) ja tens més d'un any cobert.
+</div>
 </div>
 
 <div style="text-align:center;margin-top:16px;color:#fef3c7;font-style:italic;font-size:13px">
-Cost mensual estimat un cop tot activat: <b>~30-45€/mes</b> (Deploy 15€ + Twilio 3€ + Google Workspace 5€ + variables Stripe/SMS).<br>
+Cost mensual estimat un cop tot activat: <b>~21-26€/mes</b> (Deploy 15€ + Verifacti 2,90€ + Twilio 3€ + Google Workspace opcional 5€).<br>
 Amb 2 clients pagant STD anual (299,90€×2 = 599,80€) ja tens el fix cobert un any sencer.
 </div>
 </div>

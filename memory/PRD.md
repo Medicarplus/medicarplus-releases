@@ -272,3 +272,18 @@ Efecte immediat en tots els clients (main.js consulta abans d'auto-actualitzar).
 - S'instal·la dins Stripe, genera factures PDF amb QR Verifactu, numeració correlativa, rectificatives, i envia registres a l'AEAT amb el seu propi certificat. ZERO codi nostre.
 - Alternatives descartades per preu: EasyVerifactu (14,95€/mes), BeeL (15,90€/mes), Billin (12,50€/mes), Holded (15€/mes), Quaderno (49€/mes)
 - ACCIÓ MARC: registrar-se a verifacti.com i instal·lar l'app al seu compte Stripe (quan passi a live mode)
+
+## 📝 Sessió 15/07/2026 (2a part) · Recordatoris renovació + checklist sortida
+
+### 📧 Recordatoris de renovació automàtics (FET + testejat)
+- `/app/backend/services/renewal_reminders.py`: sweep diari (background loop a startup) que envia email castellà als clients amb llicència que caduca en ≤7 dies, sense subscripció Stripe activa. Idempotent (`renewal_reminder_for`).
+- Endpoint manual admin: `POST /api/admin/renewal-reminders/run` (X-Admin-Token). Testejat: sent=1, 2a passada skipped=1, sense token 401. Email real enviat a marcbrugulat@hotmail.com.
+
+### 🎯 Trial badge millorat
+- Botó "Comprar" del badge de prova ara obre `openUpgradeModal()` (checkout in-app) en lloc d'enllaç extern. "PROVA EXPIRADA" → "PRUEBA EXPIRADA" (castellà).
+
+### 📚 Guia personal actualitzada (guia-medicar-plus.html)
+- Nou "🚀 CHECKLIST DE SORTIDA AL MERCAT" (#checklist-sortida) amb 5 passos ordenats: 1) Claus Stripe LIVE, 2) Verifacti (~2,90€/mes, instal·lar quan Stripe sigui live), 3) Twilio real, 4) Google Search Console, 5) Deploy backend producció. Costos actualitzats (~21€/mes).
+- Taula d'estat actualitzada (Stripe test 100% testejat, Verifacti decidit, recordatoris actius, Search Console pendent).
+
+### ✅ Testing agent iteration_13: 100% backend (10/10) + 100% frontend (5/5), zero errors consola. Llest per llançament.

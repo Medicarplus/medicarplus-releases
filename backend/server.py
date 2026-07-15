@@ -508,6 +508,26 @@ async def _startup():
     except Exception:
         logger.exception("auto_publish_endpoint_url failed at startup")
 
+    # Recordatoris automàtics de renovació (sweep diari en background)
+    try:
+        import asyncio as _asyncio
+        from services.renewal_reminders import renewal_reminder_loop
+        _asyncio.create_task(renewal_reminder_loop(db))
+        logger.info("Renewal reminder loop scheduled")
+    except Exception:
+        logger.exception("Failed to schedule renewal reminder loop")
+
+
+@app.post("/api/admin/renewal-reminders/run")
+async def run_renewal_reminders_now(request: _FastReq):
+    """Admin: executa el sweep de recordatoris manualment (X-Admin-Token)."""
+    from fastapi import HTTPException as _HTTPExc
+    token = request.headers.get("X-Admin-Token", "")
+    if not token or token != os.environ.get("LICENSE_ADMIN_TOKEN", ""):
+        raise _HTTPExc(status_code=401, detail="Admin token invàlid o absent")
+    from services.renewal_reminders import run_renewal_reminder_sweep
+    return await run_renewal_reminder_sweep(db)
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
