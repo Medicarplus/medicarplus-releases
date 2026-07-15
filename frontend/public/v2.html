@@ -168,8 +168,9 @@
   ::selection{background:rgba(var(--tint),.35);color:#fff}
   /* Tooltip CSS instantani (millor que title=) */
   .tt{position:relative;display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:#2a3040;color:#7ee3aa;font-size:9px;font-weight:700;cursor:help;border:1px solid #7ee3aa;user-select:none;margin-left:4px}
-  .tt:hover::after{content:attr(data-tt);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#0f172a;color:#f5b301;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:400;line-height:1.5;white-space:normal;width:260px;max-width:280px;text-align:left;z-index:9999;border:1px solid #f5b301;box-shadow:0 4px 16px rgba(0,0,0,.5);pointer-events:none;letter-spacing:0}
-  .tt:hover::before{content:'';position:absolute;bottom:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#f5b301;z-index:9998}
+  /* Tooltip flotant a nivell body (via JS) — mai s'oculta per overflow */
+  #_tt_pop{position:fixed;background:#0f172a;color:#f5b301;padding:10px 14px;border-radius:8px;font-size:12px;font-weight:400;line-height:1.5;white-space:normal;width:280px;max-width:320px;text-align:left;z-index:2147483647;border:1px solid #f5b301;box-shadow:0 8px 24px rgba(0,0,0,.6);pointer-events:none;letter-spacing:0;font-family:'Segoe UI',system-ui,sans-serif}
+  #_tt_pop::before{content:'';position:absolute;top:-6px;left:var(--arrow-x,50%);transform:translateX(-50%);border:6px solid transparent;border-bottom-color:#f5b301}
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -329,7 +330,7 @@
           <input type="date" id="filterTo" title="Hasta" style="background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 6px;font-size:11px" />
           <button id="filterApply" class="btn" style="padding:4px 10px;font-size:11px" title="Aplicar filtro por rango">Aplicar</button>
           <button id="filterReset" class="btn" style="padding:4px 10px;font-size:11px;background:#2a3040" title="Volver al día actual">Solo hoy</button>
-          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;cursor:pointer;margin-left:8px;padding:4px 10px;background:#0e1117;border:1px solid #2a3040;border-radius:8px"><input type="checkbox" id="chkCountZero" style="cursor:pointer;accent-color:#3ddc97" /> Contar 0€ <span class="tt" data-tt="Desactivat (per defecte): les entrades amb import 0€ NO es compten com 'Entradas Tráfico'. Activat: SÍ es compten (útil si vols registrar visites gratuïtes). Sincronitzat amb el Libro de Registro.">?</span></label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;cursor:pointer;margin-left:8px;padding:4px 10px;background:#0e1117;border:1px solid #2a3040;border-radius:8px"><input type="checkbox" id="chkCountZero" style="cursor:pointer;accent-color:#3ddc97" /> Contar 0€ <span class="tt" data-tt="Desactivado (por defecto): las entradas con importe 0€ NO se cuentan como 'Entradas Tráfico'. Activado: SÍ se cuentan (útil si quieres registrar visitas gratuitas). Sincronizado con el Libro de Registro.">?</span></label>
           <span id="filterInfo" style="color:#7ee3aa;font-size:11px;margin-left:auto"></span>
         </div>
         <div style="max-height:62vh;overflow:auto">
@@ -826,7 +827,7 @@ function openLibroRegistro(){
         <button class="btn" data-lr-preset="year" style="padding:6px 10px;font-size:11px">Año</button>
         <button class="btn" data-lr-preset="all" style="padding:6px 10px;font-size:11px">Todo</button>
       </div>
-      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;cursor:pointer;padding:4px 10px;background:#0e1117;border:1px solid #2a3040;border-radius:8px"><input type="checkbox" id="lrCountZero" style="cursor:pointer;accent-color:#3ddc97" /> Contar 0€ <span class="tt" data-tt="Desactivat (per defecte): les entrades amb import 0€ NO es compten. Activat: SÍ es compten (útil si vols comptabilitzar visites gratuïtes). Sincronitzat amb el panell principal de Tráfico.">?</span></label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;cursor:pointer;padding:4px 10px;background:#0e1117;border:1px solid #2a3040;border-radius:8px"><input type="checkbox" id="lrCountZero" style="cursor:pointer;accent-color:#3ddc97" /> Contar 0€ <span class="tt" data-tt="Desactivado (por defecto): las entradas con importe 0€ NO se cuentan. Activado: SÍ se cuentan (útil si quieres contabilizar visitas gratuitas). Sincronizado con el panel principal de Tráfico.">?</span></label>
       <button class="btn btn-primary" id="lrPrint">🖨️ Imprimir</button>
       <button class="btn" data-no>✕ Cerrar</button>
     </div>
@@ -5023,6 +5024,53 @@ function showWhatsNew(force){
 setTimeout(()=>{ try{ showWhatsNew(false) }catch(e){ console.warn('showWhatsNew',e) } }, 1500);
 
 // ============================================================================
+// Tooltip flotant global · mai s'oculta per overflow:hidden
+// ============================================================================
+(function initFloatingTooltip(){
+  let pop=null;
+  function showTt(el){
+    hideTt();
+    const txt=el.getAttribute('data-tt');
+    if(!txt) return;
+    pop=document.createElement('div');
+    pop.id='_tt_pop';
+    pop.textContent=txt;
+    document.body.appendChild(pop);
+    // Calcula posició
+    const r=el.getBoundingClientRect();
+    const pr=pop.getBoundingClientRect();
+    let left=r.left + r.width/2 - pr.width/2;
+    let top=r.bottom + 10;
+    // Clamp horitzontal
+    const margin=8;
+    if(left < margin) left=margin;
+    if(left + pr.width > window.innerWidth - margin) left=window.innerWidth - pr.width - margin;
+    // Si no cap a baix, posa'l a dalt
+    if(top + pr.height > window.innerHeight - margin){
+      top = r.top - pr.height - 10;
+      // Fletxa cap avall (canvia orientació) via pseudo-element JS-controlled
+      pop.classList.add('_tt_up');
+    }
+    pop.style.left=left+'px';
+    pop.style.top=top+'px';
+    // Fletxa X-relativa a l'element
+    const arrowX = Math.max(10, Math.min(pr.width-10, r.left + r.width/2 - left));
+    pop.style.setProperty('--arrow-x', arrowX+'px');
+  }
+  function hideTt(){ if(pop){try{pop.remove()}catch(e){}pop=null} }
+  document.addEventListener('mouseover', ev=>{
+    const el = ev.target && ev.target.classList && ev.target.classList.contains('tt') ? ev.target : null;
+    if(el) showTt(el);
+  });
+  document.addEventListener('mouseout', ev=>{
+    if(ev.target && ev.target.classList && ev.target.classList.contains('tt')) hideTt();
+  });
+  document.addEventListener('scroll', hideTt, true);
+  window.addEventListener('resize', hideTt);
+})();
+
+
+// ============================================================================
 // API URL DISCOVERY · Auto-resolució per si Emergent rota la URL de preview
 // ----------------------------------------------------------------------------
 // Estratègia: al arrencar, mira si tenim URL cachada (< 24h). Si no, o si la
@@ -5034,7 +5082,7 @@ setTimeout(()=>{ try{ showWhatsNew(false) }catch(e){ console.warn('showWhatsNew'
 const API_BASE_HARDCODED='https://project-helper-47.preview.emergentagent.com';
 // App version (hardcoded — s'actualitza a cada release). Serveix per invalidar
 // caché de descoberta al detectar que l'usuari acaba d'actualitzar l'app.
-const APP_VERSION='2.1.9';
+const APP_VERSION='2.2.0';
 // Múltiples fonts de descoberta. La primera que respongui vàlidament guanya.
 // L'orden importa:
 // 1) raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json
