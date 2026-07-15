@@ -259,12 +259,45 @@ STRIPE_PRICE_PREMIUM_ANY=price_1StUvWx...</code></pre>
   </ol>
 
   <div class="ok">
-    <b>✅ Portal del client (self-service)</b><br>
-    Stripe ofereix un portal on el client pot canviar targeta, veure factures i cancel·lar.
-    S'activa a <b>Settings → Billing → Customer portal</b>. L'endpoint per generar sessions
-    ja està preparat al backend com a <code>/api/payments/portal</code> (pendent d'exposar quan el
-    tinguis actiu).
+    <b>✅ Portal del client (self-service) · JA ACTIU · v2.1.10</b><br>
+    Stripe ofereix un portal on el client pot cancel·lar, canviar targeta i veure factures.
+    <b>Ja està implementat</b> al backend com a <code>POST /api/payments/billing-portal</code>
+    i integrat a l'app (⚙️ Configuración → 🧾 Gestionar subscripció) i a la web pública
+    (peu de pàgina → "Gestionar mi suscripción").
+    <br><br>
+    <b>⚠️ CAL configurar-lo un cop a Stripe Dashboard perquè funcioni:</b>
+    <ol>
+      <li>Anar a <b>Stripe Dashboard → Settings → Billing → Customer Portal</b>
+        (<a href="https://dashboard.stripe.com/test/settings/billing/portal" target="_blank">dashboard.stripe.com/test/settings/billing/portal</a> en TEST,
+        <a href="https://dashboard.stripe.com/settings/billing/portal" target="_blank">dashboard.stripe.com/settings/billing/portal</a> en LIVE)</li>
+      <li>Activar les seccions:
+        <ul>
+          <li><b>Customer information</b> — permet al client actualitzar email/adreça de facturació</li>
+          <li><b>Invoice history</b> — permet descarregar factures PDF (obligatori per DGT/Hisenda)</li>
+          <li><b>Payment methods</b> — canviar targeta</li>
+          <li><b>Cancel subscriptions</b> — activar <i>immediately</i> o <i>at end of billing period</i> (recomanat: <b>end of period</b>, així el client segueix usant l'app fins que acabi el mes pagat)</li>
+          <li><b>Update subscriptions</b> (opcional) — permet al client canviar de STD a PREMIUM sense passar per tu</li>
+        </ul>
+      </li>
+      <li>A <b>Business information</b>: afegir nom del negoci "MediCar Plus", email de suport <code>info@medicarplus.es</code>, i URL de la teva Privacy Policy i Terms of Service (obligatori per LIVE mode).</li>
+      <li>Desar canvis. La URL del portal es genera dinàmicament amb cada crida a l'endpoint (session token amb TTL curt).</li>
+    </ol>
+    <b>⚠️ Sense aquest pas, la crida a <code>/api/payments/billing-portal</code> tornarà error 502 de Stripe.</b>
   </div>
+
+  <h2>🧾 Flux complet de cancel·lació</h2>
+  <ol>
+    <li>Client obre app (o web) → clica "Gestionar subscripció"</li>
+    <li>Backend cerca <code>stripe_customer_id</code> a la col·lecció <code>subscriptions</code> per <code>install_id</code> o <code>customer_email</code></li>
+    <li>Backend crida <code>stripe.billing_portal.Session.create(customer=..., return_url=...)</code></li>
+    <li>Backend retorna URL única de sessió (validesa curta, ~1h)</li>
+    <li>Frontend obre la URL a nova pestanya del navegador</li>
+    <li>Client cancel·la des del portal oficial de Stripe</li>
+    <li>Stripe envia webhook <code>customer.subscription.updated</code> amb <code>cancel_at_period_end=true</code></li>
+    <li>Backend actualitza <code>subscriptions.cancel_at_period_end=true</code>, però la llicència segueix activa fins <code>current_period_end</code></li>
+    <li>Al final del període, Stripe envia <code>customer.subscription.deleted</code> → backend marca la llicència com <code>canceled</code></li>
+    <li>Al proper <code>/api/licenses/verify</code>, l'app veu que ha expirat i demana renovar</li>
+  </ol>
 
   <h2>💰 Comissions de Stripe</h2>
   <p>Stripe cobra <b>1,4% + 0,25 €</b> per targetes europees, i <b>2,9% + 0,25 €</b> per no-europees.
