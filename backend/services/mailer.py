@@ -27,6 +27,24 @@ def is_configured() -> bool:
     return bool(_api_key())
 
 
+GUIDE_ATTACHMENTS = [
+    ("guia-client-installacio.html", "/app/frontend/public/guia-client-installacio.html"),
+    ("manual-usuari.html", "/app/frontend/public/manual-usuari.html"),
+]
+
+
+def _load_attachments() -> list[tuple[str, bytes]]:
+    """Llegeix els fitxers de guia/manual per adjuntar-los al correu."""
+    out: list[tuple[str, bytes]] = []
+    for name, path in GUIDE_ATTACHMENTS:
+        try:
+            with open(path, "rb") as fh:
+                out.append((name, fh.read()))
+        except Exception as ex:  # noqa: BLE001
+            logger.warning("attachment missing: %s (%s)", path, ex)
+    return out
+
+
 def _render_html(
     *,
     client_name: str,
@@ -61,9 +79,9 @@ def _render_html(
         <p style="color:#cbd5e1;font-size:14px;margin-top:22px;line-height:1.55">
           <b style="color:#f5b301">Cómo activarla:</b><br>
           1. Descarga la aplicación MediCar Plus desde <a href="https://github.com/Medicarplus/medicarplus-releases/releases/latest" style="color:#f5b301;text-decoration:underline">este enlace</a>.<br>
-          2. Instala el ejecutable (sigue la <a href="https://medicarplus.es/guia-client-installacio.html" style="color:#f5b301;text-decoration:underline">guía de instalación de 5 minutos</a>).<br>
+          2. Instala el ejecutable (sigue la <b style="color:#22c55e">guía de instalación</b> adjunta a este correo — abre el archivo <code style="color:#22c55e">guia-client-installacio.html</code>).<br>
           3. En la pantalla "Activación de licencia", pega la clave completa y pulsa <b>Activar</b>.<br>
-          4. Consulta el <a href="https://medicarplus.es/manual-usuari.html" style="color:#f5b301;text-decoration:underline">manual de usuario completo</a> cuando tengas cualquier duda.
+          4. Consulta el <b style="color:#7ec8ff">manual de usuario completo</b> adjunto (<code style="color:#7ec8ff">manual-usuari.html</code>) cuando tengas cualquier duda.
         </p>
 
         <table width="100%" cellpadding="12" cellspacing="0" style="margin-top:20px">
@@ -75,15 +93,15 @@ def _render_html(
             </td>
             <td style="width:2%"></td>
             <td style="background:#0f172a;border:1px solid #22c55e;border-radius:8px;padding:14px;text-align:center;width:33%">
-              <a href="https://medicarplus.es/guia-client-installacio.html" style="color:#22c55e;text-decoration:none;font-size:13px;font-weight:700">
-                📥 Guía<br>de instalación
-              </a>
+              <span style="color:#22c55e;font-size:13px;font-weight:700">
+                📎 Guía<br>de instalación<br><span style="font-size:10px;color:#94a3b8;font-weight:400">(adjunta)</span>
+              </span>
             </td>
             <td style="width:2%"></td>
             <td style="background:#0f172a;border:1px solid #7ec8ff;border-radius:8px;padding:14px;text-align:center;width:33%">
-              <a href="https://medicarplus.es/manual-usuari.html" style="color:#7ec8ff;text-decoration:none;font-size:13px;font-weight:700">
-                📘 Manual<br>de usuario
-              </a>
+              <span style="color:#7ec8ff;font-size:13px;font-weight:700">
+                📎 Manual<br>de usuario<br><span style="font-size:10px;color:#94a3b8;font-weight:400">(adjunto)</span>
+              </span>
             </td>
           </tr>
         </table>
@@ -107,11 +125,12 @@ def _smtp_configured() -> bool:
     )
 
 
-def _send_smtp(to_email: str, subject: str, html: str) -> tuple[bool, str]:
-    """Envia email via SMTP (IONOS o qualsevol proveïdor SMTP)."""
+def _send_smtp(to_email: str, subject: str, html: str, attachments: list[tuple[str, bytes]] | None = None) -> tuple[bool, str]:
+    """Envia email via SMTP (IONOS o qualsevol proveïdor SMTP) amb adjunts opcionals."""
     import smtplib
     from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
+    from email.mime.application import MIMEApplication
 
     host = os.environ.get("SMTP_HOST", "").strip()
     port = int(os.environ.get("SMTP_PORT", "587").strip() or "587")
@@ -120,11 +139,23 @@ def _send_smtp(to_email: str, subject: str, html: str) -> tuple[bool, str]:
     sender = os.environ.get("SMTP_FROM", user).strip()
 
     try:
-        msg = MIMEMultipart("alternative")
+        # Si hi ha adjunts, usem "mixed" com a wrapper i "alternative" a dins
+        if attachments:
+            msg = MIMEMultipart("mixed")
+            body = MIMEMultipart("alternative")
+            body.attach(MIMEText(html, "html", "utf-8"))
+            msg.attach(body)
+            for fname, data in attachments:
+                part = MIMEApplication(data, _subtype="octet-stream")
+                part.add_header("Content-Disposition", "attachment", filename=fname)
+                msg.attach(part)
+        else:
+            msg = MIMEMultipart("alternative")
+            msg.attach(MIMEText(html, "html", "utf-8"))
+
         msg["From"] = f"MediCar Plus <{sender}>"
         msg["To"] = to_email
         msg["Subject"] = subject
-        msg.attach(MIMEText(html, "html", "utf-8"))
 
         with smtplib.SMTP(host, port, timeout=15) as smtp:
             smtp.ehlo()
@@ -159,19 +190,26 @@ async def send_license_email(
         plan=plan,
         expires_at=expires_at,
     )
+    attachments = _load_attachments()
 
     # 1) Prova Resend
     if is_configured():
         try:
+            import base64 as _b64
             import resend  # type: ignore
 
             resend.api_key = _api_key()
-            params = {
+            params: dict = {
                 "from": _sender(),
                 "to": [to_email],
                 "subject": subject,
                 "html": html,
             }
+            if attachments:
+                params["attachments"] = [
+                    {"filename": fname, "content": _b64.b64encode(data).decode("ascii")}
+                    for fname, data in attachments
+                ]
             result = await asyncio.to_thread(resend.Emails.send, params)
             email_id = result.get("id") if isinstance(result, dict) else None
             return True, email_id or "resend_sent"
@@ -180,7 +218,7 @@ async def send_license_email(
 
     # 2) Fallback SMTP
     if _smtp_configured():
-        ok, info = await asyncio.to_thread(_send_smtp, to_email, subject, html)
+        ok, info = await asyncio.to_thread(_send_smtp, to_email, subject, html, attachments)
         return ok, info
 
     return False, "no_mail_provider_configured"

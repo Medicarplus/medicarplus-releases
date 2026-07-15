@@ -287,3 +287,15 @@ Efecte immediat en tots els clients (main.js consulta abans d'auto-actualitzar).
 - Taula d'estat actualitzada (Stripe test 100% testejat, Verifacti decidit, recordatoris actius, Search Console pendent).
 
 ### ✅ Testing agent iteration_13: 100% backend (10/10) + 100% frontend (5/5), zero errors consola. Llest per llançament.
+
+## 📝 Sessió 15/07/2026 (3a part) · Guia + Manual com a adjunts
+
+### 📎 Correu de llicència ara inclou guia i manual com a ADJUNTS
+- **Problema detectat**: els enllaços `medicarplus.es/guia-client-installacio.html` i `/manual-usuari.html` retornaven 404 perquè aquests arxius mai s'havien pujat al repo GitHub Pages `Medicarplus/medicarplus.es` (i el PAT no té permís d'escriptura en aquest repo).
+- **Solució escollida (opció A)**: adjuntar els dos arxius HTML directament al correu de llicència. Independent de GitHub Pages, funciona sempre.
+- **Canvis a `/app/backend/services/mailer.py`**:
+  - Nova funció `_load_attachments()` que llegeix els 2 HTML de `/app/frontend/public/`.
+  - `_send_smtp()` accepta `attachments` opcionals (multipart/mixed amb `MIMEApplication`).
+  - Resend inclou `attachments` amb el contingut en base64.
+  - Cos del correu actualitzat: enllaços trencats reemplaçats per referències als adjunts (`guia-client-installacio.html`, `manual-usuari.html`).
+- **Testejat**: correu real enviat a marcbrugulat@hotmail.com amb els 2 adjunts (14 KB + 28 KB). Result: `smtp_sent`.
