@@ -252,3 +252,23 @@ Efecte immediat en tots els clients (main.js consulta abans d'auto-actualitzar).
 - Accés manual: menú *Contabilidad ▸ 🎁 Novedades* (mostra les 3 més recents)
 - Botó "Entendido" tanca i actualitza `caja.last_seen_version`
 - Test IDs: `whats-new-modal`, `whats-new-ok`, `btn-whats-new`, `st-section-switch`, `traffic-stats-year`, `traffic-stats-month`
+
+## 📝 Sessió 15/07/2026 · Gemini onboarding + email prova + decisió Verifactu
+
+### 🎁 Popup onboarding clau Gemini gratuïta (FET + testejat)
+- `showGeminiOnboarding()` a v2.html (~línia 3390): modal en castellà que apareix el 1r cop que l'usuari obre l'Asesor IA sense clau guardada
+- Passos guiats + botó "Abrir Google AI Studio" (window.open → interceptat per Electron a shell.openExternal)
+- Guardar clau → valida ≥20 car., desa a `caja.geminiKey`, obre modal IA
+- "Ahora no" → desa `caja.aiOnboardSeen=1`, no torna a molestar
+- Traduïts tots els textos catalans restants del modal IA a castellà
+- Test IDs: `gemini-onboarding-modal`, `gemini-onboarding-open-link`, `gemini-onboarding-key-input`, `gemini-onboarding-save-btn`, `gemini-onboarding-skip-btn`
+- Testejat amb Playwright local (4 fluxos: guardar, saltar, no-reaparició, clau curta rebutjada) ✅
+
+### 📧 Email de llicència de prova (FET)
+- Enviat a marcbrugulat@hotmail.com via SMTP IONOS (`smtp_sent` OK) amb dades demo
+
+### 🧾 Verifactu · Decisió (RECERCA FETA — pendent que Marc creï el compte)
+- Guanyador: **Verifacti** app per Stripe (~2,90€/NIF/mes, prova gratuïta) — verifacti.com/plugins/stripe
+- S'instal·la dins Stripe, genera factures PDF amb QR Verifactu, numeració correlativa, rectificatives, i envia registres a l'AEAT amb el seu propi certificat. ZERO codi nostre.
+- Alternatives descartades per preu: EasyVerifactu (14,95€/mes), BeeL (15,90€/mes), Billin (12,50€/mes), Holded (15€/mes), Quaderno (49€/mes)
+- ACCIÓ MARC: registrar-se a verifacti.com i instal·lar l'app al seu compte Stripe (quan passi a live mode)

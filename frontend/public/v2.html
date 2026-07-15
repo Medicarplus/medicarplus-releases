@@ -3386,32 +3386,66 @@ $('#btnAudit').onclick=()=>{
 
 /* ============ ASESOR IA ============ */
 function getAiEndpoint(){ return getApiBase()+'/api/ai-ask'; }
+function saveGeminiKey(raw){
+  const k=(raw||'').trim().replace(/^["'`]+|["'`]+$/g,'').replace(/\s+/g,'');
+  if(k.length<20){toast('❌ La clave parece demasiado corta ('+k.length+' car.). Debe tener ~39 caracteres.');return false}
+  localStorage.setItem('caja.geminiKey',k);
+  toast('✅ Clave guardada ('+k.length+' car.) — Asesor IA activado GRATIS 🎉');
+  return true;
+}
+function showGeminiOnboarding(){
+  const back=document.createElement('div');back.className='modal-back';
+  back.innerHTML=`<div class="modal" style="max-width:560px" data-testid="gemini-onboarding-modal">
+    <h3 style="color:#a855f7">🎁 Activa tu Asesor IA — 100% GRATIS</h3>
+    <p style="line-height:1.6;font-size:14px">El Asesor IA usa la inteligencia artificial de Google (<b>Gemini</b>). Google regala <b style="color:#3ddc97">1.500 consultas al día gratis</b> con tu propia clave. Solo se configura <b>una vez</b> y tarda 2 minutos:</p>
+    <div style="background:#141821;border:1px solid #2a3040;border-radius:10px;padding:14px 16px;margin:12px 0;font-size:13.5px;line-height:2">
+      <b style="color:#f5b301">1.</b> Pulsa el botón de abajo para abrir <b>Google AI Studio</b><br>
+      <b style="color:#f5b301">2.</b> Inicia sesión con tu cuenta de Google (Gmail)<br>
+      <b style="color:#f5b301">3.</b> Pulsa <b>«Create API Key»</b> y copia la clave (empieza por <code style="color:#5aa9ff">AIza...</code>)<br>
+      <b style="color:#f5b301">4.</b> Pégala aquí abajo y pulsa <b>Guardar</b>
+    </div>
+    <button class="btn" id="aiObOpen" data-testid="gemini-onboarding-open-link" style="width:100%;background:linear-gradient(90deg,#1a73e8 0%,#4285f4 100%);color:#fff;border-color:transparent;padding:11px;font-size:14px;margin-bottom:12px">🔗 Abrir Google AI Studio (gratis)</button>
+    <div style="display:flex;gap:6px;margin-bottom:14px">
+      <input type="text" id="aiObKey" data-testid="gemini-onboarding-key-input" placeholder="Pega aquí tu clave: AIzaSy..." style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;flex:1;font-family:monospace;font-size:12px" />
+      <button class="btn btn-success" id="aiObSave" data-testid="gemini-onboarding-save-btn">💾 Guardar</button>
+    </div>
+    <div class="small" style="color:#8a93a6;line-height:1.5">🔒 La clave se guarda solo en tu ordenador. Sin clave, el Asesor IA seguirá funcionando pero con un límite de consultas compartido.</div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" id="aiObSkip" data-testid="gemini-onboarding-skip-btn">Ahora no</button>
+    </div></div>`;
+  document.body.appendChild(back);
+  const proceed=()=>{back.remove();setTimeout(()=>$('#btnAiAsk').click(),100)};
+  back.querySelector('#aiObOpen').onclick=()=>{try{const w=window.open('https://aistudio.google.com/apikey','_blank');if(!w)openExternalUrl('https://aistudio.google.com/apikey')}catch(e){openExternalUrl('https://aistudio.google.com/apikey')}};
+  back.querySelector('#aiObSave').onclick=()=>{if(saveGeminiKey(back.querySelector('#aiObKey').value))proceed()};
+  back.querySelector('#aiObSkip').onclick=()=>{localStorage.setItem('caja.aiOnboardSeen','1');proceed()};
+}
 $('#btnAiAsk').onclick=()=>{
   const savedKey=localStorage.getItem('caja.geminiKey')||'';
+  if(!savedKey && !localStorage.getItem('caja.aiOnboardSeen')){showGeminiOnboarding();return}
   const back=document.createElement('div');back.className='modal-back';
   back.innerHTML=`<div class="modal" style="max-width:680px">
     <h3 style="color:#a855f7">🤖 Asesor IA · Buscar descuadre</h3>
     <p>Empresa activa: <b>${currentCompany==='cempla'?((window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2'):((window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1')}</b> · Datos: ${Object.keys(state.byDate).length} días</p>
     <details style="margin-bottom:12px;background:#141821;padding:10px;border-radius:8px;border:1px solid #2a3040">
-      <summary style="cursor:pointer;color:${savedKey?'#3ddc97':'#ffd58a'};font-weight:600">⚙️ Clau Google Gemini ${savedKey?'(activa — GRATIS 🎉)':'(recomanat — usa la teva pròpia clau GRATIS)'}</summary>
+      <summary style="cursor:pointer;color:${savedKey?'#3ddc97':'#ffd58a'};font-weight:600">⚙️ Clave Google Gemini ${savedKey?'(activa — GRATIS 🎉)':'(recomendado — usa tu propia clave GRATIS)'}</summary>
       <div style="padding:10px 0">
         <div class="small" style="margin-bottom:6px;line-height:1.5">
-          🎁 Google et regala <b>1.500 consultes/dia gratis</b>. Passos:<br>
-          1. Ves a <a href="https://aistudio.google.com/apikey" target="_blank" style="color:#5aa9ff">aistudio.google.com/apikey</a><br>
-          2. Inicia sessió amb Google<br>
-          3. Pulsa <b>Create API Key</b> i copia la clau (comença per <code>AIza...</code>)<br>
-          4. Enganxa-la aquí baix i pulsa Desar
+          🎁 Google te regala <b>1.500 consultas/día gratis</b>. Pasos:<br>
+          1. Ve a <span onclick="try{var w=window.open('https://aistudio.google.com/apikey','_blank');if(!w)openExternalUrl('https://aistudio.google.com/apikey')}catch(e){openExternalUrl('https://aistudio.google.com/apikey')}" style="color:#5aa9ff;cursor:pointer;text-decoration:underline">aistudio.google.com/apikey</span><br>
+          2. Inicia sesión con Google<br>
+          3. Pulsa <b>Create API Key</b> y copia la clave (empieza por <code>AIza...</code>)<br>
+          4. Pégala aquí abajo y pulsa Guardar
         </div>
         <div style="display:flex;gap:6px">
           <input type="text" id="aiKey" placeholder="AIzaSy..." value="${savedKey}" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;flex:1;font-family:monospace;font-size:12px" />
-          <button class="btn btn-success" id="aiSaveKey">💾 Desar</button>
+          <button class="btn btn-success" id="aiSaveKey">💾 Guardar</button>
           ${savedKey?'<button class="btn btn-danger" id="aiClearKey">🗑️</button>':''}
         </div>
       </div>
     </details>
     <div style="display:grid;grid-template-columns:1fr 140px;gap:8px;margin-bottom:10px">
       <div><label>Tu pregunta (o descripción del problema)</label>
-        <textarea id="aiQ" rows="3" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;width:100%;font-family:inherit;font-size:13px" placeholder="Ej: Em falten 47€ aquesta setmana, busca duplicats i devolucions"></textarea></div>
+        <textarea id="aiQ" rows="3" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;width:100%;font-family:inherit;font-size:13px" placeholder="Ej: Me faltan 47€ esta semana, busca duplicados y devoluciones"></textarea></div>
       <div><label>Descuadre (€)</label><input type="number" step="0.01" id="aiDiff" placeholder="0" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;width:100%" /></div>
     </div>
     <div class="small" style="margin-bottom:12px">💡 Positivo = te sobra dinero · Negativo = te falta. Deja 0 si solo quieres preguntar.</div>
@@ -3424,13 +3458,13 @@ $('#btnAiAsk').onclick=()=>{
   back.querySelector('[data-no]').onclick=()=>back.remove();
   back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
   const saveBtn=back.querySelector('#aiSaveKey');
-  saveBtn.onclick=()=>{let k=back.querySelector('#aiKey').value.trim().replace(/^["'`]+|["'`]+$/g,'').replace(/\s+/g,'');if(k.length<20){toast('❌ La clau sembla massa curta ('+k.length+' car.). Ha de tenir ~39 caràcters.');return}localStorage.setItem('caja.geminiKey',k);toast('✅ Clau desada ('+k.length+' car.) — provant ara...');back.remove();setTimeout(()=>$('#btnAiAsk').click(),100)};
+  saveBtn.onclick=()=>{if(saveGeminiKey(back.querySelector('#aiKey').value)){back.remove();setTimeout(()=>$('#btnAiAsk').click(),100)}};
   const clearBtn=back.querySelector('#aiClearKey');
-  if(clearBtn)clearBtn.onclick=()=>{localStorage.removeItem('caja.geminiKey');toast('Clau esborrada');back.remove();setTimeout(()=>$('#btnAiAsk').click(),100)};
+  if(clearBtn)clearBtn.onclick=()=>{localStorage.removeItem('caja.geminiKey');toast('Clave borrada');back.remove();setTimeout(()=>$('#btnAiAsk').click(),100)};
   const btn=back.querySelector('#aiSend');
   btn.onclick=async()=>{
     const q=back.querySelector('#aiQ').value.trim();
-    if(!q){toast('Escriu una pregunta');return}
+    if(!q){toast('Escribe una pregunta');return}
     const diff=parseFloat(back.querySelector('#aiDiff').value)||0;
     const userKey=localStorage.getItem('caja.geminiKey')||'';
     btn.disabled=true;btn.textContent='⏳ Pensando...';
@@ -3447,7 +3481,7 @@ $('#btnAiAsk').onclick=()=>{
       currentCompany=prevCompany;state=savedState;
       const res=await fetch(getAiEndpoint(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,data:allData,company:currentCompany==='cempla'?'cempla':'cbTrafic',diff,userGeminiKey:userKey,auditSummary})});
       const j=await res.json();
-      ansEl.textContent=(j.source==='user-key'?'🎁 (Resposta gratuïta amb la teva clau Google)\n\n':'')+(j.answer||'(sense resposta)');
+      ansEl.textContent=(j.source==='user-key'?'🎁 (Respuesta gratuita con tu clave Google)\n\n':'')+(j.answer||'(sin respuesta)');
     }catch(e){ansEl.textContent='❌ Error de conexión: '+e.message}
     btn.disabled=false;btn.textContent='🚀 Preguntar';
   };
