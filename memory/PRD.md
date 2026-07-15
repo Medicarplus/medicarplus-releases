@@ -1,3 +1,24 @@
+# PRD — MediCar Plus (Estat 15/07/2026)
+
+## 🆕 CANVI 15/07/2026 · Dropdown "Estadísticas" + Comparativa años
+
+Nou menú desplegable independent "📊 Estadísticas" al header (gradient marró/or) amb 3 opcions, extret del menú Contabilidad:
+- **📅 Facturación mensual** → `openAnnualReport()` (informe anual amb repartiment mes a mes)
+- **🚗 Estadísticas autoescuelas** → `openStats()` (modal multi-secció: autos · tráfico · SMS · cites)
+- **📈 Comparativa años** → `openYearComparison()` (NOU · compara 2–6 anys en paral·lel)
+
+Nova funció `openYearComparison()` a `v2.html` (línies ~2773–2870):
+- KPI cards per any (facturació neta + entrades + barra proporcional)
+- Taula "Resumen comparativo" (Facturación neta, Entradas, Tasas DGT, Media mensual) amb % variació any inicial → any final (fletxes ▲▼)
+- Taula "Facturación mensual comparada" (12 mesos × N anys)
+- Selector "Años a comparar" 2/3/4/5/6, botó imprimir/PDF (utilitza `@media print` estàndard)
+- Data-testids: `btn-stats`, `btn-stat-fac-mensual`, `btn-stat-autoescolas`, `btn-stat-comparar-anys`, `yc-body`, `yc-print`, `yc-close`
+- Verificat visualment amb screenshot: comparativa 2024–2026 renderitza KPIs, %variació i taula mensual OK
+
+Botons eliminats del dropdown Contabilidad: `btnAnnualReport`, `btnStatsMenu` (ara viuen al nou dropdown). Contabilidad conserva: Llibreta, IRPF, Reserva de cambio, Libro de Registro, Novedades.
+
+---
+
 # PRD — MediCar Plus (Estat 14/07/2026)
 
 ## 🚨 REGLA D'OR · PRIORITAT MÀXIMA · LLEGIR ABANS DE QUALSEVOL CANVI

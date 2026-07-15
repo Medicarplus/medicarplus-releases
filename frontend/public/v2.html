@@ -204,11 +204,18 @@
       <div id="btnAccountingMenu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid #475569;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.5);z-index:1000;min-width:180px;padding:6px;flex-direction:column;gap:4px">
         <button class="btn" id="btnLedger" style="background:#2a1f3a;border-color:#5e2a5e;color:#e0bff0;font-weight:600;width:100%;text-align:left" data-i18n="ledger">📖 Llibreta</button>
         <button class="btn" id="btnIrpf" style="background:#3a2a1f;border-color:#8b5e2a;color:#f0d6bf;font-weight:600;width:100%;text-align:left">📋 IRPF</button>
-        <button class="btn" id="btnAnnualReport" style="background:#1e293b;border-color:#f5b301;color:#f5b301;font-weight:600;width:100%;text-align:left" data-i18n="annual_report">📊 Informe anual</button>
         <button class="btn" id="btnCambio" style="background:#1f3a2e;border-color:#22c55e;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-i18n="reserve" data-testid="btn-cambio">💰 Reserva de cambio</button>
-        <button class="btn" id="btnStatsMenu" style="background:#3a2a15;border-color:#f5b301;color:#f5b301;font-weight:600;width:100%;text-align:left">📊 Estadísticas</button>
         <button class="btn" id="btnLibroRegMenu" style="background:#152a3a;border-color:#7ec8ff;color:#7ec8ff;font-weight:600;width:100%;text-align:left">📖 Libro de Registro</button>
         <button class="btn" id="btnWhatsNewMenu" data-testid="btn-whats-new" style="background:#2a1f15;border-color:#f97316;color:#fed7aa;font-weight:600;width:100%;text-align:left">🎁 Novedades</button>
+      </div>
+    </div>
+    <!-- Estadísticas dropdown · Facturación mensual + Autoescuelas + Comparativa años -->
+    <div class="btn-dropdown" id="btnStatsBox" style="position:relative;display:inline-block">
+      <button class="btn" id="btnStatsToggle" style="background:linear-gradient(90deg,#8b5e2a 0%,#c2841c 100%);border-color:transparent;color:#fff;font-weight:700" data-testid="btn-stats">📊 <span data-i18n="stats_menu">Estadísticas</span> <span style="font-size:9px;margin-left:4px">▼</span></button>
+      <div id="btnStatsSubmenu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid #c2841c;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.5);z-index:1000;min-width:220px;padding:6px;flex-direction:column;gap:4px">
+        <button class="btn" id="btnStatFacMensual" data-testid="btn-stat-fac-mensual" style="background:#1e293b;border-color:#f5b301;color:#f5b301;font-weight:600;width:100%;text-align:left">📅 Facturación mensual</button>
+        <button class="btn" id="btnStatAutoescolas" data-testid="btn-stat-autoescolas" style="background:#3a2a15;border-color:#f5b301;color:#f5b301;font-weight:600;width:100%;text-align:left">🚗 Estadísticas autoescuelas</button>
+        <button class="btn" id="btnStatCompararAnys" data-testid="btn-stat-comparar-anys" style="background:#152a3a;border-color:#7ec8ff;color:#7ec8ff;font-weight:600;width:100%;text-align:left">📈 Comparativa años</button>
       </div>
     </div>
     <!-- Utilidades dropdown · Avisos + Cites + Auditoría + Asesor IA -->
@@ -1880,13 +1887,18 @@ function confirmModal(title,message,onYes,yesLabel='Sí, borrar',danger=true,ext
 $('#btnHistory').onclick=()=>openBackupHistory();
 $('#btnLedger').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLedger()};
 $('#btnIrpf').onclick=()=>{$('#btnAccountingMenu').style.display='none';openIRPF()};
-$('#btnAnnualReport').onclick=()=>{$('#btnAccountingMenu').style.display='none';openAnnualReport()};
 $('#btnCambio').onclick=()=>{$('#btnAccountingMenu').style.display='none';openCambio()};
-$('#btnStatsMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';openStats()};
 $('#btnLibroRegMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLibroRegistro()};
 $('#btnWhatsNewMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';showWhatsNew(true)};
 $('#btnAccountingToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnAccountingMenu');m.style.display=(m.style.display==='none'||!m.style.display)?'flex':'none'};
 document.addEventListener('click',(e)=>{const box=$('#btnAccounting');const menu=$('#btnAccountingMenu');if(menu&&box&&!box.contains(e.target))menu.style.display='none'});
+
+// Estadísticas dropdown toggle (Facturación mensual · Autoescuelas · Comparativa años)
+$('#btnStatFacMensual').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openAnnualReport()};
+$('#btnStatAutoescolas').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openStats()};
+$('#btnStatCompararAnys').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openYearComparison()};
+$('#btnStatsToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnStatsSubmenu');m.style.display=(m.style.display==='none'||!m.style.display)?'flex':'none'};
+document.addEventListener('click',(e)=>{const box=$('#btnStatsBox');const menu=$('#btnStatsSubmenu');if(menu&&box&&!box.contains(e.target))menu.style.display='none'});
 
 // Utilidades dropdown toggle (Avisos, Cites, Auditoria, Asesor IA)
 const utilToggle=document.getElementById('btnUtilitiesToggle');
@@ -2757,6 +2769,115 @@ function _buildAnnualReport(year){
   return html;
 }
 function _arCard(label,value,color,bg){return `<div style="background:${bg};border:1px solid ${color}55;border-left:4px solid ${color};padding:12px 14px;border-radius:6px"><div style="font-size:10px;color:#64748b;letter-spacing:1px;text-transform:uppercase">${label}</div><div style="font-size:20px;color:${color};font-weight:700;margin-top:4px;font-family:'Courier New',monospace">${value}</div></div>`}
+
+// ============================================================================
+// COMPARATIVA AÑOS · vista comparativa año a año (facturación, entradas, tasas)
+// ============================================================================
+function openYearComparison(){
+  const yearNow=new Date().getFullYear();
+  const back=document.createElement('div');back.className='modal-back';back.style.zIndex='500';
+  back.innerHTML=`<div class="modal print-report" style="max-width:1200px;width:97%;max-height:94vh;overflow:auto;padding:16px;background:#fff;color:#1a1a1a">
+    <div style="display:flex;align-items:center;gap:14px;margin:-16px -16px 12px -16px;padding:12px 18px;background:linear-gradient(90deg,#0f172a,#1e3a8a);color:#fff;border-radius:12px 12px 0 0" class="no-print">
+      <h3 style="margin:0;flex:1;font-family:Georgia,serif;color:#f5b301">📈 ${L('Comparativa anys','Comparativa años')}</h3>
+      <label class="small" style="margin:0;color:#cbd5e1">${L('Anys a comparar','Años a comparar')}:</label>
+      <select id="ycCount" style="background:#1e293b;color:#f5b301;border:1px solid #f5b301;border-radius:6px;padding:6px 10px;font-weight:700">
+        <option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option>
+      </select>
+      <button class="btn" id="ycPrint" style="background:#f5b301;color:#0f172a;border-color:#f5b301;font-weight:700" data-testid="yc-print">🖨️ ${L('Imprimir / PDF','Imprimir / PDF')}</button>
+      <button class="btn" id="ycClose" style="background:#7f1d1d;color:#fff;border-color:#7f1d1d" data-testid="yc-close">✖</button>
+    </div>
+    <div id="ycBody" data-testid="yc-body"></div>
+    <div style="text-align:center;margin-top:24px;color:#64748b;font-size:11px;font-style:italic" class="print-only">
+      MediCar Plus · ${L('Informe generat el','Informe generado el')} ${new Date().toLocaleDateString(currentLang==='es'?'es-ES':'ca-ES')}
+    </div>
+  </div>`;
+  document.body.appendChild(back);
+  back.addEventListener('click',e=>{if(e.target===back)back.remove()});
+  back.querySelector('#ycClose').onclick=()=>back.remove();
+  back.querySelector('#ycPrint').onclick=()=>{document.body.classList.add('printing-report');window.print();setTimeout(()=>document.body.classList.remove('printing-report'),1000)};
+  const sel=back.querySelector('#ycCount');
+  const bodyEl=back.querySelector('#ycBody');
+  const render=()=>{bodyEl.innerHTML=_buildYearComparison(yearNow,parseInt(sel.value))};
+  sel.onchange=render;render();
+}
+
+function _buildYearComparison(latestYear,count){
+  const years=[];for(let i=count-1;i>=0;i--)years.push(latestYear-i);
+  const comps=[{key:'trafic',name:(window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1'}];
+  if(window.CFG&&CFG.company2&&CFG.company2.name)comps.push({key:'cempla',name:CFG.company2.name});
+  const MESES=currentLang==='es'?['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']:['Gener','Febrer','Març','Abril','Maig','Juny','Juliol','Agost','Setembre','Octubre','Novembre','Desembre'];
+
+  // Agrega totales por año
+  const byYear={};
+  years.forEach(y=>{byYear[y]={bruto:0,tasas:0,neto:0,cnt:0,byMonth:Array(12).fill(0),byMonthCnt:Array(12).fill(0)}});
+  comps.forEach(comp=>{
+    let raw;try{raw=JSON.parse(localStorage.getItem(KEYS[comp.key]))||{byDate:{}}}catch(e){raw={byDate:{}}}
+    Object.keys(raw.byDate||{}).forEach(d=>{
+      const y=parseInt(d.split('-')[0]);if(!byYear[y])return;
+      const m=parseInt(d.split('-')[1])-1;
+      const t=computeTotals(raw.byDate[d]||[]);
+      byYear[y].bruto+=t.bruto;byYear[y].tasas+=t.tasas;byYear[y].neto+=t.neto;byYear[y].cnt+=t.cnt;
+      byYear[y].byMonth[m]+=t.neto;byYear[y].byMonthCnt[m]+=t.cnt;
+    });
+  });
+
+  let html='';
+  html+=`<div class="print-header" style="text-align:center;padding:14px 0;border-bottom:2px solid #0f172a;margin-bottom:20px">
+    <div style="font-size:22px;font-weight:700;font-family:Georgia,serif;color:#0f172a">${L('Comparativa anys','Comparativa años')} · ${years[0]} – ${years[years.length-1]}</div>
+    <div style="font-size:13px;color:#64748b;margin-top:4px">MediCar Plus · ${comps.map(c=>c.name).join(' + ')}</div>
+  </div>`;
+
+  // KPIs por año
+  html+=`<div style="display:grid;grid-template-columns:repeat(${years.length},1fr);gap:10px;margin-bottom:20px">`;
+  const maxNeto=Math.max(1,...years.map(y=>byYear[y].neto));
+  years.forEach(y=>{
+    const d=byYear[y];const pct=d.neto?((d.neto/maxNeto)*100).toFixed(0):0;
+    html+=`<div style="background:#f8fafc;border:1px solid #cbd5e1;border-left:4px solid #f5b301;padding:14px;border-radius:6px">
+      <div style="font-size:11px;color:#64748b;letter-spacing:1px;text-transform:uppercase">${y}</div>
+      <div style="font-size:22px;color:#0f172a;font-weight:700;margin-top:4px;font-family:'Courier New',monospace">${fmt(d.neto)}</div>
+      <div style="font-size:12px;color:#475569;margin-top:6px">${d.cnt} ${L('entrades','entradas')}</div>
+      <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-top:8px;overflow:hidden"><div style="height:100%;background:#f5b301;width:${pct}%"></div></div>
+    </div>`;
+  });
+  html+=`</div>`;
+
+  // Tabla comparativa totales
+  html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">📊 ${L('Resum comparatiu','Resumen comparativo')}</h4>
+    <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
+      <thead><tr style="background:#0f172a;color:#f5b301"><th style="padding:8px;text-align:left">${L('Concepte','Concepto')}</th>${years.map(y=>`<th style="padding:8px;text-align:right">${y}</th>`).join('')}<th style="padding:8px;text-align:right">${L('Variació','Variación')}</th></tr></thead>
+      <tbody>`;
+  const rowsDef=[
+    {label:L('Facturació neta','Facturación neta'),getter:y=>byYear[y].neto,fmt:v=>fmt(v),money:true},
+    {label:L('Entrades','Entradas'),getter:y=>byYear[y].cnt,fmt:v=>v,money:false},
+    {label:L('Taxes DGT','Tasas DGT'),getter:y=>byYear[y].tasas,fmt:v=>fmt(v),money:true},
+    {label:L('Mitjana mensual','Media mensual'),getter:y=>byYear[y].neto/12,fmt:v=>fmt(v),money:true}
+  ];
+  rowsDef.forEach(r=>{
+    const first=r.getter(years[0]);const last=r.getter(years[years.length-1]);
+    const diff=first?(((last-first)/Math.abs(first))*100):0;
+    const arrow=diff>0.5?'▲':(diff<-0.5?'▼':'—');
+    const col=diff>0.5?'#16a34a':(diff<-0.5?'#dc2626':'#64748b');
+    html+=`<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px;font-weight:600">${r.label}</td>${years.map(y=>`<td style="padding:8px;text-align:right;font-family:'Courier New',monospace">${r.fmt(r.getter(y))}</td>`).join('')}<td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:${col};font-weight:700">${arrow} ${diff.toFixed(1)}%</td></tr>`;
+  });
+  html+=`</tbody></table>`;
+
+  // Comparativa mensual
+  html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">📅 ${L('Facturació mensual comparada','Facturación mensual comparada')}</h4>
+    <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:12px;margin-bottom:18px">
+      <thead><tr style="background:#0f172a;color:#f5b301"><th style="padding:6px 8px;text-align:left">${L('Mes','Mes')}</th>${years.map(y=>`<th style="padding:6px 8px;text-align:right">${y}</th>`).join('')}</tr></thead>
+      <tbody>`;
+  for(let m=0;m<12;m++){
+    html+=`<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:6px 8px;font-weight:600">${MESES[m]}</td>${years.map(y=>{const v=byYear[y].byMonth[m];return `<td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:${v?'#0f172a':'#cbd5e1'}">${v?fmt(v):'—'}</td>`}).join('')}</tr>`;
+  }
+  // Fila totales
+  html+=`<tr style="background:#fef3c7;border-top:2px solid #0f172a"><td style="padding:8px;font-weight:700">${L('TOTAL','TOTAL')}</td>${years.map(y=>`<td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(byYear[y].neto)}</td>`).join('')}</tr>`;
+  html+=`</tbody></table>`;
+
+  const anyData=years.some(y=>byYear[y].cnt>0);
+  if(!anyData){html+=`<div style="text-align:center;padding:40px;color:#94a3b8;font-style:italic">${L('No hi ha dades per aquests anys','No hay datos para estos años')}.</div>`}
+  return html;
+}
+
 
 // ============================================================================
 // RESERVA DE CAMBIO · seguiment de monedes i bitllets guardats a l'oficina
