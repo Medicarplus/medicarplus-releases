@@ -59,6 +59,13 @@ async def _load_attachments(
     encara arribi amb documentació.
     """
     from services.pdf_builder import build_client_pdf
+    from services.doc_counter import next_doc_number
+
+    # Un únic Nº Documento per aquesta emissió (compartit entre guia i manual)
+    try:
+        doc_number = await next_doc_number()
+    except Exception:  # noqa: BLE001
+        doc_number = ""
 
     out: list[tuple[str, bytes]] = []
     for spec in GUIDE_ATTACHMENTS:
@@ -72,6 +79,7 @@ async def _load_attachments(
             plan=plan,
             expires_at=expires_at,
             license_key=license_key,
+            doc_number=doc_number,
         )
         if pdf_bytes:
             out.append((spec["pdf_name"], pdf_bytes))

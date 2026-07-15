@@ -318,3 +318,14 @@ Efecte immediat en tots els clients (main.js consulta abans d'auto-actualitzar).
 - `mailer.py` → `_load_attachments()` ara accepta les dades del client i genera dos PDFs personalitzats (guia + manual) amb la portada corresponent (títol i subtítol diferents).
 - Nova dependència: `pypdf==6.14.2` afegida a `requirements.txt`.
 - **Testejat**: correu real a marcbrugulat@hotmail.com. PDFs: guia 746 KB (2 pàgines: portada + cos), manual 391 KB. Portada verificada amb screenshot: logo, bandes daurades, targeta client i footer amb dades. `smtp_sent` OK.
+
+## 📝 Sessió 15/07/2026 (6a part) · Nº Documento correlatiu
+
+### 📇 Referència d'emissió atòmica per PDF
+- Nou `/app/backend/services/doc_counter.py`:
+  - `next_doc_number()` → `MCP-{year}-{seq:06d}`. Ex: `MCP-2026-000042`.
+  - Backend: `db.emission_counters` amb `find_one_and_update({_id:license_docs_2026},{$inc:{seq:1}},upsert=True)`. Atòmic, thread-safe. Reset anual automàtic.
+  - ⚠️ NO és factura fiscal (la real l'emet Stripe/Verifacti). Només ref. interna.
+- Portada actualitzada: cantonada superior dreta amb "Nº DOCUMENTO · MCP-YYYY-NNNNNN" en Courier daurat.
+- `mailer.py` genera el número una vegada per emissió i el comparteix entre guia i manual (mateixa ref. per a ambdós PDFs).
+- **Testejat**: counter incrementa correctament (000001 → 000002 → 000003). Screenshot portada verificat. Correu enviat OK a marcbrugulat@hotmail.com.

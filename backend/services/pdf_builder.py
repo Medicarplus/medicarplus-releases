@@ -89,6 +89,7 @@ def _cover_html(
     plan: str,
     expires_at: Optional[datetime],
     license_key: str,
+    doc_number: str = "",
 ) -> str:
     expiry_txt = expires_at.strftime("%d/%m/%Y") if expires_at else "Perpetua (sin caducidad)"
     today = datetime.now().strftime("%d/%m/%Y")
@@ -236,6 +237,10 @@ def _cover_html(
         <div class="brand-name">MEDICAR PLUS</div>
         <div class="brand-tag">Software · Marc Brugulat Lopez</div>
       </div>
+      <div style="margin-left:auto;text-align:right;font-family:'Segoe UI',Arial,sans-serif">
+        <div style="font-size:9px;color:#64748b;letter-spacing:2px;font-weight:700">Nº DOCUMENTO</div>
+        <div style="font-family:'Courier New',monospace;font-size:14px;color:#f5b301;font-weight:700;margin-top:3px;letter-spacing:0.5px">{doc_number or '—'}</div>
+      </div>
     </div>
 
     <div class="hero">
@@ -280,6 +285,7 @@ async def build_client_pdf(
     plan: str,
     expires_at: Optional[datetime],
     license_key: str,
+    doc_number: str = "",
 ) -> Optional[bytes]:
     """Genera un PDF personalitzat = portada (per client) + cos (cacheat).
 
@@ -298,6 +304,7 @@ async def build_client_pdf(
             plan=plan,
             expires_at=expires_at,
             license_key=license_key,
+            doc_number=doc_number,
         )
         cover_pdf = await _print_pdf_from_html_content(cover_html)
 
