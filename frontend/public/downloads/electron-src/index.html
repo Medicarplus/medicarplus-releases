@@ -211,13 +211,22 @@
         <button class="btn" id="btnWhatsNewMenu" data-testid="btn-whats-new" style="background:#2a1f15;border-color:#f97316;color:#fed7aa;font-weight:600;width:100%;text-align:left">🎁 Novedades</button>
       </div>
     </div>
-    <button class="btn" id="btnSms" style="background:linear-gradient(90deg,#059669 0%,#10b981 100%);color:#fff;border-color:transparent;font-weight:700" title="Avisos SMS / WhatsApp de renovació">📱 Avisos</button>
-    <button class="btn" id="btnCalendar" data-premium="1" style="display:none;background:linear-gradient(90deg,#0369a1 0%,#0ea5e9 100%);color:#fff;border-color:transparent;font-weight:700;position:relative" title="Cites del dia · Google Calendar · Doctoralia · Calendly...">📅 Cites<span id="calBadge" data-testid="calendar-badge" style="display:none;position:absolute;top:-6px;right:-6px;background:#dc2626;color:#fff;border:2px solid #0b1220;border-radius:999px;min-width:20px;height:20px;padding:0 5px;font-size:11px;font-weight:800;line-height:16px;text-align:center;box-shadow:0 2px 6px rgba(220,38,38,.6);animation:calPulse 2s infinite">0</span></button>
+    <!-- Utilidades dropdown · Avisos + Cites + Auditoría + Asesor IA -->
+    <div style="position:relative;display:inline-block">
+      <button class="btn" id="btnUtilitiesToggle" style="background:linear-gradient(90deg,#0891b2 0%,#0e7490 100%);border-color:transparent;color:#fff;font-weight:700" data-testid="btn-utilities">🧰 <span data-i18n="utilities">Utilidades</span> <span style="font-size:9px;margin-left:4px">▼</span> <span id="utilBadgeGlobal" style="display:none;position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border-radius:999px;min-width:16px;height:16px;font-size:9px;font-weight:800;line-height:14px;padding:0 4px;border:2px solid #0b1220">0</span></button>
+      <div id="utilitiesMenu" style="display:none;position:absolute;top:calc(100% + 4px);right:0;background:#0b1220;border:1px solid #0891b2;border-radius:8px;min-width:220px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:1000;padding:4px">
+        <button id="btnSms" class="util-item" style="display:flex;align-items:center;gap:10px;width:100%;background:transparent;color:#e2e8f0;border:none;padding:10px 14px;text-align:left;cursor:pointer;font-size:13px;border-radius:6px" title="Avisos SMS / WhatsApp de renovación">📱 <span>Avisos SMS</span></button>
+        <button id="btnCalendar" data-premium="1" class="util-item" style="display:flex;align-items:center;gap:10px;width:100%;background:transparent;color:#e2e8f0;border:none;padding:10px 14px;text-align:left;cursor:pointer;font-size:13px;border-radius:6px;position:relative" title="Citas del día · Google Calendar · Doctoralia · Calendly...">📅 <span>Citas del día</span><span id="calBadge" data-testid="calendar-badge" style="display:none;background:#dc2626;color:#fff;border-radius:999px;min-width:20px;height:20px;padding:0 5px;font-size:10px;font-weight:800;line-height:18px;text-align:center;margin-left:auto">0</span></button>
+        <button id="btnAudit" class="util-item traffic-only" style="display:flex;align-items:center;gap:10px;width:100%;background:transparent;color:#e2e8f0;border:none;padding:10px 14px;text-align:left;cursor:pointer;font-size:13px;border-radius:6px" data-i18n="audit" title="Auditoría del cierre diario">🔎 <span>Auditoría</span></button>
+        <button id="btnAiAsk" class="util-item" style="display:flex;align-items:center;gap:10px;width:100%;background:transparent;color:#e2e8f0;border:none;padding:10px 14px;text-align:left;cursor:pointer;font-size:13px;border-radius:6px" data-i18n="ai_advisor" title="Asistente inteligente para consultar tus datos">🤖 <span>Asesor IA</span></button>
+      </div>
+    </div>
+    <style>
+      #utilitiesMenu button.util-item:hover{background:#1e293b !important;color:#7ee3aa !important}
+    </style>
     <a id="btnWebsite" href="https://medicarplus.es" target="_blank" rel="noopener" title="Obrir medicarplus.es · Compte, ajuda, actualitzacions" style="background:linear-gradient(90deg,#0f172a 0%,#1e293b 100%);color:#f5b301;border:1px solid #f5b301;border-radius:6px;padding:8px 14px;font-weight:700;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:'Segoe UI',sans-serif" data-testid="btn-website">🌐 medicarplus.es</a>
     <div id="trialBadge" data-testid="trial-badge" style="display:none;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;font-family:'Segoe UI',sans-serif;font-size:12px;font-weight:700;border:1px solid;letter-spacing:.3px"></div>
     <span id="autosaveBadge" style="display:none;padding:5px 10px;border-radius:6px;background:#1f3a2e;color:#7ee3aa;font-size:11px;font-family:'Consolas',monospace;letter-spacing:.3px;border:1px solid #2a5e44"></span>
-    <button class="btn traffic-only" id="btnAudit" style="background:linear-gradient(90deg,#ea580c 0%,#f97316 100%);color:#fff;border-color:transparent;font-weight:700" data-i18n="audit">🔎 Auditoría</button>
-    <button class="btn" id="btnAiAsk" style="background:linear-gradient(90deg,#7c3aed 0%,#a855f7 100%);color:#fff;border-color:transparent;font-weight:700" data-i18n="ai_advisor">🤖 Asesor IA</button>
     <button class="btn" id="btnPrint" data-i18n="print">🖨️ Imprimir</button>
     <button class="btn" id="btnSettings" title="Configuració" style="background:linear-gradient(135deg,#334155,#1e293b);border-color:#475569;color:#e8ecf2;font-weight:700;padding:6px 12px" data-testid="btn-settings">⚙️ <span data-i18n="settings">Configuració</span></button>
     <button class="btn" id="btnLang" style="display:none" data-testid="lang-toggle"><span id="langLabel">ES</span></button>
@@ -1878,6 +1887,18 @@ $('#btnLibroRegMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';
 $('#btnWhatsNewMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';showWhatsNew(true)};
 $('#btnAccountingToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnAccountingMenu');m.style.display=(m.style.display==='none'||!m.style.display)?'flex':'none'};
 document.addEventListener('click',(e)=>{const box=$('#btnAccounting');const menu=$('#btnAccountingMenu');if(menu&&box&&!box.contains(e.target))menu.style.display='none'});
+
+// Utilidades dropdown toggle (Avisos, Cites, Auditoria, Asesor IA)
+const utilToggle=document.getElementById('btnUtilitiesToggle');
+const utilMenu=document.getElementById('utilitiesMenu');
+if(utilToggle && utilMenu){
+  utilToggle.onclick=(e)=>{e.stopPropagation();utilMenu.style.display=(utilMenu.style.display==='none'||!utilMenu.style.display)?'block':'none'};
+  document.addEventListener('click',(e)=>{if(!utilToggle.contains(e.target) && !utilMenu.contains(e.target)) utilMenu.style.display='none'});
+  // Close menu when a util item is clicked
+  utilMenu.querySelectorAll('.util-item').forEach(btn=>{
+    btn.addEventListener('click',()=>{ setTimeout(()=>{utilMenu.style.display='none'},50); });
+  });
+}
 
 // ============ LLIBRETA (LIBRO DIARIO CONTABLE) ============
 function generateLedgerEntries(dateFrom,dateTo,company){
@@ -4459,10 +4480,17 @@ function getUnread(){return parseInt(localStorage.getItem(CAL_UNREAD_KEY)||'0',1
 function setUnread(n){localStorage.setItem(CAL_UNREAD_KEY,String(n));updateCalBadge()}
 function updateCalBadge(){
   const badge=$('#calBadge');
-  if(!badge)return;
+  const global=$('#utilBadgeGlobal');
   const n=getUnread();
-  if(n>0){badge.style.display='inline-block';badge.textContent=n>99?'99+':String(n)}
-  else{badge.style.display='none'}
+  if(badge){
+    if(n>0){badge.style.display='inline-block';badge.textContent=n>99?'99+':String(n)}
+    else{badge.style.display='none'}
+  }
+  // Sync global badge on Utilidades button
+  if(global){
+    if(n>0){global.style.display='inline-block';global.textContent=n>99?'99+':String(n)}
+    else{global.style.display='none'}
+  }
 }
 
 async function pollCalendarInBackground(){
@@ -5184,7 +5212,7 @@ setTimeout(()=>{ try{ showWhatsNew(false) }catch(e){ console.warn('showWhatsNew'
 const API_BASE_HARDCODED='https://project-helper-47.preview.emergentagent.com';
 // App version (hardcoded — s'actualitza a cada release). Serveix per invalidar
 // caché de descoberta al detectar que l'usuari acaba d'actualitzar l'app.
-const APP_VERSION='2.2.1';
+const APP_VERSION='2.2.2';
 // Múltiples fonts de descoberta. La primera que respongui vàlidament guanya.
 // L'orden importa:
 // 1) raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json
