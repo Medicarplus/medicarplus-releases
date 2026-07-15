@@ -408,25 +408,27 @@ function LicenseKeyModal({ data, onClose }) {
               const client = data?.license?.client_name || data?.request?.company_name || "";
               const plan = (data?.license?.plan || "").toUpperCase();
               const expLbl = data?.license?.expires_at
-                ? new Date(data.license.expires_at).toLocaleDateString("ca-ES")
-                : "perpètua";
-              const subject = encodeURIComponent(`La teva llicència MediCar Plus (${plan})`);
+                ? new Date(data.license.expires_at).toLocaleDateString("es-ES")
+                : "perpetua";
+              const subject = encodeURIComponent(`Tu licencia MediCar Plus (${plan})`);
               const body = encodeURIComponent(
-                `Benvingut/da a MediCar Plus!\n\n` +
-                `Aquí tens la teva clau de llicència personal (${plan}, vàlida fins a ${expLbl}):\n\n` +
+                `¡Bienvenido/a a MediCar Plus!\n\n` +
+                `Aquí tienes tu clave de licencia personal (${plan}, válida hasta ${expLbl}):\n\n` +
                 `${jwt}\n\n` +
-                `📥 DESCARREGA L'APP:\n` +
-                `[Enganxa aquí el link de WeTransfer o Google Drive amb el fitxer .exe]\n\n` +
-                `📖 GUIA D'INSTAL·LACIÓ (per no perdre't):\n` +
-                `https://project-helper-47.preview.emergentagent.com/guia-client-installacio.html\n\n` +
-                `Passos ràpids:\n` +
-                `1. Descarrega el fitxer del link de dalt\n` +
-                `2. Feu doble clic per instal·lar (si Windows avisa, cliqui "Más información" → "Ejecutar de todos modos")\n` +
-                `3. Un cop instal·lada, obri l'app i enganxi la clau de dalt\n` +
-                `4. Segueixi el wizard per configurar els noms de les seves empreses\n` +
-                `5. Ja pot començar a treballar!\n\n` +
-                `Dubtes? Escrigui'm a info@medicarplus.es\n\n` +
-                `Salutacions,\nM. Brugulat Lopez\nMediCar Plus`,
+                `📥 DESCARGA LA APP (última versión):\n` +
+                `https://github.com/Medicarplus/medicarplus-releases/releases/latest\n\n` +
+                `📖 GUÍA DE INSTALACIÓN (para no perderte):\n` +
+                `https://medicarplus.es/guia-client-installacio.html\n\n` +
+                `📘 MANUAL DE USUARIO:\n` +
+                `https://medicarplus.es/manual-usuari.html\n\n` +
+                `Pasos rápidos:\n` +
+                `1. Descarga el instalador desde el enlace de GitHub\n` +
+                `2. Doble clic para instalar (si Windows avisa, clica "Más información" → "Ejecutar de todos modos")\n` +
+                `3. Abre la app y pega la clave de arriba\n` +
+                `4. Sigue el wizard para configurar los nombres de tus empresas\n` +
+                `5. ¡Ya puedes empezar a trabajar!\n\n` +
+                `¿Dudas? Escríbeme a info@medicarplus.es\n\n` +
+                `Saludos,\nM. Brugulat Lopez\nMediCar Plus`,
               );
               window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
             }}
