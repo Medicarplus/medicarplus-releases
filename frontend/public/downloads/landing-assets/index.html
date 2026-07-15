@@ -444,7 +444,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
           <li>Actualizaciones incluidas</li>
           <li>Soporte por email</li>
         </ul>
-        <a href="#contacto" class="btn btn-secondary">Contactar</a>
+        <a href="#" class="btn btn-secondary buy-plan-btn" data-plan-family="STD">💳 Suscribirme Standard</a>
       </div>
 
       <div class="plan featured" data-plan-prm>
@@ -464,7 +464,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
           <li><b>📅 Citas online</b> (Google Calendar, Doctoralia, Calendly...)</li>
           <li>Soporte prioritario</li>
         </ul>
-        <a href="#contacto" class="btn btn-primary">Contactar</a>
+        <a href="#" class="btn btn-primary buy-plan-btn" data-plan-family="PREMIUM">💳 Suscribirme Premium</a>
       </div>
 
     </div>
@@ -617,6 +617,78 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
     </div>
   </div>
 </footer>
+
+<script>
+// ============================================================================
+// Botons de compra Stripe · redirigeix a checkout amb el pla correcte
+// ============================================================================
+(function(){
+  const buyBtns = document.querySelectorAll('.buy-plan-btn');
+  if(!buyBtns.length) return;
+
+  async function _apiBase(){
+    try{
+      const r = await fetch('https://raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json?t=' + Date.now(), {cache:'no-store'});
+      if(r.ok){ const j = await r.json(); if(j && j.api) return j.api.replace(/\/$/,''); }
+    }catch(e){}
+    return 'https://project-helper-47.preview.emergentagent.com';
+  }
+
+  function getCurrentPeriod(){
+    const yearlyBtn = document.getElementById('billYearly');
+    // Comprovem si el botó "Anual" té el color d'actiu (verd)
+    if(yearlyBtn){
+      const bg = window.getComputedStyle(yearlyBtn).backgroundColor;
+      if(bg && bg.includes('61, 220, 151')) return 'ANY';
+    }
+    return 'MES';
+  }
+
+  async function startCheckout(planFamily, btn){
+    const email = prompt('Para procesar tu suscripción, indica el email donde quieres recibir la licencia y factura:');
+    if(!email || !email.includes('@')) { alert('Email no válido.'); return; }
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '⏳ Preparando pago...';
+    btn.style.pointerEvents='none';
+    try{
+      const apiBase = await _apiBase();
+      const period = getCurrentPeriod();
+      const packageId = planFamily + '_' + period;
+      const r = await fetch(apiBase + '/api/payments/create-subscription', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          package_id: packageId,
+          customer_email: email,
+          origin_url: window.location.origin
+        })
+      });
+      if(!r.ok){
+        const errTxt = await r.text();
+        throw new Error('HTTP ' + r.status + ' · ' + errTxt.slice(0,200));
+      }
+      const data = await r.json();
+      if(data && data.url){
+        window.location.href = data.url;
+      } else {
+        throw new Error('No se ha recibido URL de pago');
+      }
+    }catch(err){
+      alert('❌ No se ha podido iniciar el pago:\n\n' + err.message + '\n\nPor favor, escribe a info@medicarplus.es y lo procesaremos manualmente.');
+      btn.innerHTML = originalText;
+      btn.style.pointerEvents='';
+    }
+  }
+
+  buyBtns.forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      const fam = btn.getAttribute('data-plan-family');
+      startCheckout(fam, btn);
+    });
+  });
+})();
+</script>
 
 <script>
 // URL del backend (dinàmica via api-endpoint.json a GitHub raw · sempre estable)
