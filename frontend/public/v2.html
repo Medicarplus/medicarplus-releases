@@ -791,12 +791,18 @@ $('#btnPrevDay').onclick=()=>shiftDate(-1);$('#btnNextDay').onclick=()=>shiftDat
 // Per defecte: OCULT (privacitat activada). Clica l'ull per mostrar temporalment.
 (function initPrivacy(){
   const KEY='mb.privacy.on';
+  const RESET_FLAG='mb.privacy.default.v2'; // força un reset one-time perquè el default nou (ON) s'apliqui
   const btn=$('#btnPrivacyToggle');
   if(!btn) return;
   const apply=(on)=>{document.body.classList.toggle('privacy-on',on);btn.textContent=on?'🙈':'👁️';btn.title=on?'Mostrar importes':'Ocultar importes (privacidad)'};
-  // Default = ON (ocult). Només si l'usuari ha desactivat explícitament ("0") ho mostrem.
-  const stored=localStorage.getItem(KEY);
-  apply(stored===null?true:stored==='1');
+  // Reset one-time: si mai no s'ha aplicat el nou default (v2), l'apliquem ON i marquem el flag.
+  if(localStorage.getItem(RESET_FLAG)!=='1'){
+    localStorage.setItem(KEY,'1');
+    localStorage.setItem(RESET_FLAG,'1');
+    apply(true);
+  } else {
+    apply(localStorage.getItem(KEY)==='1');
+  }
   btn.onclick=()=>{const on=!document.body.classList.contains('privacy-on');localStorage.setItem(KEY,on?'1':'0');apply(on)};
 })();
 $('#cTrafic').onclick=()=>switchCompany('trafic');
@@ -5271,6 +5277,13 @@ const LAST_SEEN_VERSION_KEY = 'caja.last_seen_version';
 // IMPORTANT: L'ordre importa. La primera entrada ha de ser la MÉS RECENT.
 // Cada versió té: { version, date (dd/mm/aaaa), highlights (array de strings HTML curts) }
 const CHANGELOG = [
+  { version:'2.2.3', date:'15/07/2026', highlights:[
+    '🔒 <b>NOU · Modo privacidad por defecto</b>: los importes de CAJA FÍSICA, CUENTA BANCO y TOTAL CAJA arrancan <b>difuminados</b> automáticamente. Haz clic en el icono del ojo (👁️/🙈) del panel <i>Cierre del día</i> para mostrarlos u ocultarlos. Pasa el ratón por encima de una fila para revelar solo ese importe temporalmente.',
+    '📄 <b>NOU · Guía y Manual en PDF adjuntos al correo de licencia</b>: cada cliente ahora recibe automáticamente <code>guia-instalacion-medicar-plus.pdf</code> y <code>manual-usuario-medicar-plus.pdf</code> como adjuntos al correo de activación — no depende de que la web esté publicada.',
+    '🎨 <b>NOU · Portada branded en cada PDF</b>: cada guía/manual lleva una portada A4 profesional con logo MediCar Plus, tarjeta "EMITIDO PARA" con datos del cliente (Cliente, Plan, Caducidad, Install ID, Clave) y bandas doradas superior/inferior.',
+    '📇 <b>NOU · Nº Documento correlativo</b>: cada emisión lleva una referencia única tipo <code>MCP-2026-000042</code> en la portada, guardada de forma atómica en base de datos. Reset anual automático. <i>(Ojo: no es la factura fiscal, esa la emite Stripe.)</i>',
+    '📧 <b>Correo de licencia rediseñado</b>: nuevo cuerpo en castellano con referencias claras a los adjuntos PDF y el enlace de descarga de GitHub Releases.',
+  ]},
   { version:'2.1.3', date:'14/07/2026', highlights:[
     '🌐 <b>FIX · IRPF ara respecta l\'idioma seleccionat</b> · abans hi havia textos en català que no es traduïen al castellà (títol "Retencions trimestrals", placeholders, tooltips, confirmació d\'eliminar). Ara tot es tradueix correctament segons l\'idioma configurat.',
     '💰 Preu per certificat (€/CERT) per metge · BRUT auto-calculat',
