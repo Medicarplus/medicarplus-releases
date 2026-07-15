@@ -328,6 +328,22 @@ async def _sync_license_from_subscription(sub: dict, install_id: str | None,
                           "revoked_reason": "replaced_by_subscription"}},
             )
             await db.licenses.insert_one(doc)
+            # 🆕 Envia email automàtic al client amb la llicència + guia
+            if client_email:
+                try:
+                    from services import mailer as _mailer
+                    sent, info = await _mailer.send_license_email(
+                        to_email=client_email,
+                        client_name=company_name or client_email,
+                        install_id=install_id,
+                        license_key=jwt_key,
+                        plan=plan_family,
+                        expires_at=expires_at,
+                    )
+                    logger.info("Stripe subscription email → %s: sent=%s info=%s",
+                                client_email, sent, info)
+                except Exception as _em:
+                    logger.exception("Stripe subscription email failed: %s", _em)
         logger.info("License synced from subscription %s → install_id=%s exp=%s",
                     sub["id"], install_id, expires_at)
 
