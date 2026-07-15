@@ -3745,7 +3745,7 @@ function openSettingsModal(){
 
   // Millora de pla · obre modal amb els 4 plans i inicia Stripe
   const upgBtn=document.getElementById('setUpgrade');
-  if(upgBtn) upgBtn.onclick=()=>openUpgradeModal();
+  if(upgBtn) upgBtn.onclick=()=>{back.remove();openUpgradeModal()};
 
   // Gestionar subscripció · billing portal Stripe · només visible si té subscripció activa
   (async()=>{
@@ -3784,15 +3784,26 @@ function openSettingsModal(){
         if(!r.ok){const t=await r.text();throw new Error('HTTP '+r.status+' · '+t.slice(0,180))}
         const d=await r.json();
         if(d && d.url){
-          const a=document.createElement('a');
-          a.href=d.url; a.target='_blank'; a.rel='noopener'; a.click();
-          statusEl.innerHTML='<span style="color:#22c55e">✓ '+(isCAloc?'Portal obert. Gestiona la teva subscripció al navegador.':'Portal abierto. Gestiona tu suscripción en el navegador.')+'</span>';
+          openExternalUrl(d.url);
+          statusEl.innerHTML='<span style="color:#22c55e">✓ '+(isCAloc?'Portal obert al navegador':'Portal abierto en el navegador')+'</span>';
         } else throw new Error(isCAloc?'URL no rebuda':'URL no recibida');
       }catch(err){
         statusEl.innerHTML='<span style="color:#f97316">❌ '+err.message+'</span>';
       }
     };
   })();
+}
+
+// Helper universal per obrir URLs externes (Stripe checkout, portal, etc.)
+// - Electron: window.open → intercepted → shell.openExternal (nova finestra sistema)
+// - Navegador: window.location.href (redirect en la mateixa pestanya, evita bloqueig de popups)
+function openExternalUrl(url){
+  const isElec=!!(window.appInfo && window.appInfo.isDesktop);
+  if(isElec){
+    try{ window.open(url, '_blank'); return; }catch(e){}
+  }
+  // Navegador o fallback: redirect (segur perquè després Stripe torna a medicarplus.es)
+  window.location.href = url;
 }
 
 // ============================================================================
@@ -3874,9 +3885,8 @@ function openUpgradeModal(){
         const d=await r.json();
         if(d && d.url){
           status.innerHTML='<span style="color:#22c55e">✓ '+(isCA?'Obrint Stripe...':'Abriendo Stripe...')+'</span>';
-          // Obrir a nova pestanya (Electron: shell.openExternal via anchor target=_blank)
-          const a=document.createElement('a');
-          a.href=d.url; a.target='_blank'; a.rel='noopener'; a.click();
+          // Obrir la URL de Stripe (Electron → nova finestra sistema · Navegador → mateixa pestanya)
+          openExternalUrl(d.url);
         } else throw new Error(isCA?'URL de pagament no rebuda':'URL de pago no recibida');
       }catch(err){
         status.innerHTML='<span style="color:#f97316">❌ '+err.message+'<br>'+(isCA?'Prova a medicarplus.es o escriu a info@medicarplus.es':'Prueba en medicarplus.es o escribe a info@medicarplus.es')+'</span>';

@@ -144,7 +144,7 @@ async def ai_ask(request: Request, body: AiAskBody):
         try:
             import google.generativeai as genai
             genai.configure(api_key=body.userGeminiKey)
-            model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=system)
+            model = genai.GenerativeModel("gemini-2.0-flash", system_instruction=system)
             resp = model.generate_content(user_msg)
             return {"answer": resp.text, "source": "user-key"}
         except Exception as ex:
@@ -156,7 +156,7 @@ async def ai_ask(request: Request, body: AiAskBody):
             api_key=EMERGENT_LLM_KEY,
             session_id=f"caja-{uuid.uuid4().hex[:8]}",
             system_message=system,
-        ).with_model("gemini", "gemini-2.5-flash")
+        ).with_model("gemini", "gemini-3-flash-preview")
         reply = await chat.send_message(UserMessage(text=user_msg))
         return {"answer": reply, "source": "emergent-key"}
     except Exception as ex:
