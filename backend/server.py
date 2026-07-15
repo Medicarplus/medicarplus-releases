@@ -140,6 +140,7 @@ async def ai_ask(request: Request, body: AiAskBody):
             audit_txt = "\n".join(lines_au) + "\n"
     user_msg = f"{diff_txt}Pregunta: {body.question}\n{audit_txt}\nRegistre:\n{data_txt}"
     # Use user's own Google Gemini API key if provided (FREE tier)
+    user_key_error = None
     if body.userGeminiKey and len(body.userGeminiKey.strip()) >= 20:
         try:
             import google.generativeai as genai
@@ -149,8 +150,15 @@ async def ai_ask(request: Request, body: AiAskBody):
             return {"answer": resp.text, "source": "user-key"}
         except Exception as ex:
             logging.exception("User Gemini key error")
-            return {"answer": f"❌ Tu clave de Google Gemini ha dado error: {str(ex)[:200]}\n\nRevisa que la clave sea válida en https://aistudio.google.com/apikey", "error": True}
-    # Fallback to Emergent LLM Key
+            err_str = str(ex)
+            user_key_error = err_str
+            # Si l'error és quota excedida (429), fem fallback silenciós a Emergent Key
+            is_quota_error = "429" in err_str or "quota" in err_str.lower() or "rate limit" in err_str.lower()
+            if not is_quota_error:
+                # Altres errors (clau invàlida, etc.): mostra-ho a l'usuari, no facis fallback
+                short = err_str[:200]
+                return {"answer": f"❌ Tu clave de Google Gemini ha dado error: {short}\n\nRevisa que la clave sea válida en https://aistudio.google.com/apikey", "error": True}
+    # Fallback to Emergent LLM Key (també cau aquí si la user key ha esgotat quota)
     try:
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
@@ -158,7 +166,10 @@ async def ai_ask(request: Request, body: AiAskBody):
             system_message=system,
         ).with_model("gemini", "gemini-3-flash-preview")
         reply = await chat.send_message(UserMessage(text=user_msg))
-        return {"answer": reply, "source": "emergent-key"}
+        note = ""
+        if user_key_error:
+            note = "\n\n_ℹ️ Tu clave gratuita de Google Gemini ha superado la cuota diaria (se resetea a las 09:00 hora española). He usado la clave compartida de MediCar Plus mientras tanto._"
+        return {"answer": reply + note, "source": "emergent-key-fallback" if user_key_error else "emergent-key"}
     except Exception as ex:
         logging.exception("AI error")
         return {"answer": f"❌ Error del asesor IA: {str(ex)[:250]}\n\n💡 Consejo: introduce tu propia clave gratuita de Google Gemini en la app (botón ⚙️ del modal) para no depender de la clave compartida.", "error": True}
