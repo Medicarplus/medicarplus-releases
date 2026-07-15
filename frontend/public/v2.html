@@ -5204,7 +5204,7 @@ try{setInterval(function(){try{window.updateTrialBadge()}catch(e){}}, 60000)}cat
 // Mostra la versió del programa a la cantonada superior dreta (des d'Electron via preload)
 (function initVersion(){
   try{
-    var v = (window.appInfo && window.appInfo.version) ? window.appInfo.version : '2.0.0';
+    var v = (window.appInfo && window.appInfo.version) ? window.appInfo.version : '2.1.11';
     var isElectron = !!(window.appInfo && window.appInfo.isDesktop);
     var el = document.getElementById('appVersion');
     if(el){ el.textContent = 'v' + v + (isElectron ? '' : ' (web)'); }

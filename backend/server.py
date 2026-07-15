@@ -145,7 +145,7 @@ async def ai_ask(request: Request, body: AiAskBody):
         try:
             import google.generativeai as genai
             genai.configure(api_key=body.userGeminiKey)
-            model = genai.GenerativeModel("gemini-2.0-flash", system_instruction=system)
+            model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=system)
             resp = model.generate_content(user_msg)
             return {"answer": resp.text, "source": "user-key"}
         except Exception as ex:
