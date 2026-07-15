@@ -3636,8 +3636,10 @@ function openSettingsModal(){
         <!-- Millora de pla / Suscripció -->
         <div class="settings-section" style="background:linear-gradient(135deg,#4c1d95 0%,#1e1b4b 100%);border:1px solid #7c3aed;border-radius:10px;padding:14px">
           <div style="font-size:13px;font-weight:700;color:#c4b5fd;letter-spacing:.5px;margin-bottom:4px">${isCA?'💎 Millora el teu pla':'💎 Mejora tu plan'}</div>
-          <div style="font-size:12px;color:#ddd6fe;opacity:.85;margin-bottom:10px">${isCA?'Passa a Standard o Premium i paga directament des d\'aquí. La teva llicència s\'actualitza automàticament sense reinstal·lar res.':'Pásate a Standard o Premium y paga directamente desde aquí. Tu licencia se actualiza automáticamente sin reinstalar nada.'}</div>
+          <div style="font-size:12px;color:#ddd6fe;opacity:.85;margin-bottom:10px">${isCA?'Passa a Standard o Premium i paga directament des d\'aquí. Subscripció mensual/anual que es renova automàticament. La pots cancel·lar quan vulguis.':'Pásate a Standard o Premium y paga directamente desde aquí. Suscripción mensual/anual con renovación automática. La puedes cancelar cuando quieras.'}</div>
           <button id="setUpgrade" class="btn" style="width:100%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:1px solid #a855f7;font-weight:700;padding:10px" data-testid="btn-upgrade-plan">${isCA?'Veure planes i pagar':'Ver planes y pagar'}</button>
+          <button id="setManageSub" class="btn" style="display:none;width:100%;margin-top:8px;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e0e7ff;border:1px solid #6366f1;font-weight:700;padding:10px" data-testid="btn-manage-subscription">${isCA?'🧾 Gestionar subscripció / Cancel·lar':'🧾 Gestionar suscripción / Cancelar'}</button>
+          <div id="setSubStatus" style="margin-top:8px;font-size:11px;color:#c4b5fd;text-align:center;min-height:14px"></div>
         </div>
 
         <!-- Sortir -->
@@ -3744,6 +3746,53 @@ function openSettingsModal(){
   // Millora de pla · obre modal amb els 4 plans i inicia Stripe
   const upgBtn=document.getElementById('setUpgrade');
   if(upgBtn) upgBtn.onclick=()=>openUpgradeModal();
+
+  // Gestionar subscripció · billing portal Stripe · només visible si té subscripció activa
+  (async()=>{
+    const manageBtn=document.getElementById('setManageSub');
+    const statusEl=document.getElementById('setSubStatus');
+    if(!manageBtn) return;
+    const installId=localStorage.getItem('caja.install.id.v1')||'';
+    if(!installId) return;
+    try{
+      const apiBase=(typeof getApiBase==='function')?getApiBase():'';
+      const r=await fetch(apiBase+'/api/payments/subscription/by-install/'+encodeURIComponent(installId));
+      if(!r.ok) return;
+      const d=await r.json();
+      const sub=d && d.subscription;
+      if(sub && sub.stripe_customer_id){
+        manageBtn.style.display='block';
+        const isCAloc=currentLang==='ca';
+        const st=sub.status||'';
+        const cape=sub.cancel_at_period_end;
+        const pkg=sub.package_id||'';
+        const nice=st==='active'?(isCAloc?'activa':'activa'):st==='trialing'?(isCAloc?'en prova':'en prueba'):st==='canceled'?(isCAloc?'cancel·lada':'cancelada'):st==='past_due'?(isCAloc?'impagament':'impago'):st;
+        const cancelHint=cape?(isCAloc?' · es cancel·larà al final del període':' · se cancelará al final del período'):'';
+        statusEl.textContent=(isCAloc?'Subscripció ':'Suscripción ')+pkg+' · '+nice+cancelHint;
+      }
+    }catch(e){}
+    manageBtn.onclick=async()=>{
+      const isCAloc=currentLang==='ca';
+      statusEl.innerHTML='<span style="color:#a855f7">⏳ '+(isCAloc?'Obrint portal...':'Abriendo portal...')+'</span>';
+      try{
+        const apiBase=(typeof getApiBase==='function')?getApiBase():'';
+        const r=await fetch(apiBase+'/api/payments/billing-portal',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({install_id:installId,return_url:'https://medicarplus.es/gracies'})
+        });
+        if(!r.ok){const t=await r.text();throw new Error('HTTP '+r.status+' · '+t.slice(0,180))}
+        const d=await r.json();
+        if(d && d.url){
+          const a=document.createElement('a');
+          a.href=d.url; a.target='_blank'; a.rel='noopener'; a.click();
+          statusEl.innerHTML='<span style="color:#22c55e">✓ '+(isCAloc?'Portal obert. Gestiona la teva subscripció al navegador.':'Portal abierto. Gestiona tu suscripción en el navegador.')+'</span>';
+        } else throw new Error(isCAloc?'URL no rebuda':'URL no recibida');
+      }catch(err){
+        statusEl.innerHTML='<span style="color:#f97316">❌ '+err.message+'</span>';
+      }
+    };
+  })();
 }
 
 // ============================================================================

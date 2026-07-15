@@ -274,12 +274,30 @@ Els botons antics <code>Informe anual</code> i <code>Estadísticas</code> han so
 <h3>💳 Pagament online integrat dins l'app <span class="badge badge-new">v2.1.10 · NOU</span></h3>
 Nou botó <b>"⬆ Millora el plan"</b> dins <b>⚙️ Configuración</b> del client. Flux automatitzat:
 <ol>
-<li>Client clica el botó → l'app crida <code>POST /api/payments/create-checkout</code> amb el seu <code>installId</code></li>
-<li>Backend obre sessió <b>Stripe Checkout</b> i retorna la URL</li>
+<li>Client clica el botó → l'app crida <code>POST /api/payments/create-subscription</code> amb el seu <code>installId</code></li>
+<li>Backend obre sessió <b>Stripe Checkout en mode <code>subscription</code></b> (auto-renewal) i retorna la URL</li>
 <li>App obre la URL al navegador del client (targeta / Bizum / SEPA)</li>
-<li>Un cop pagat, Stripe callback genera clau JWT PREMIUM al backend i l'envia per email via IONOS SMTP</li>
-<li>Al proper arrencament, l'app veu el nou pla via <code>/api/licenses/verify</code> i s'actualitza sola</li>
+<li>Un cop pagat, Stripe envia webhook <code>checkout.session.completed</code> → backend crea clau JWT PREMIUM amb <code>expires_at = current_period_end</code></li>
+<li>A partir d'aquí, Stripe cobra <b>automàticament cada mes/any</b>. Cada <code>invoice.paid</code> renova la clau JWT extenent l'expiració</li>
+<li>Si el pagament falla (<code>invoice.payment_failed</code>) → licencia queda en estat <code>past_due</code></li>
+<li>Si el client cancel·la (<code>customer.subscription.deleted</code>) → licencia queda en estat <code>canceled</code> però funciona fins <code>current_period_end</code></li>
 </ol>
+
+<h3>🧾 Portal de Client Stripe (self-service) <span class="badge badge-new">v2.1.10 · NOU</span></h3>
+<b>Botó "🧾 Gestionar subscripció / Cancel·lar"</b> apareix automàticament dins <b>⚙️ Configuración</b> quan la subscripció està activa. Obre el <b>Stripe Billing Portal</b>, on el client pot autogestionar-se sense passar per suport:
+<ul>
+<li>Cancel·lar la subscripció (efectiu al final del període ja pagat)</li>
+<li>Canviar targeta de pagament</li>
+<li>Descarregar factures dels mesos anteriors (PDF)</li>
+<li>Actualitzar l'adreça de facturació</li>
+<li>Reactivar una subscripció cancel·lada</li>
+</ul>
+Endpoint backend: <code>POST /api/payments/billing-portal</code> amb <code>{install_id | customer_email, return_url}</code> → retorna URL de Stripe.
+<br><br>
+També accessible des de la <b>web pública</b> al peu de pàgina: <i>"Gestionar mi suscripción"</i> → prompt d'email → obre el mateix portal. Perfecte per clients que no tenen l'app instal·lada al PC en aquell moment.
+<br><br>
+<b>Configuració a Stripe Dashboard obligatòria:</b> cal activar el Billing Portal a Settings → Billing → Customer Portal i marcar quines accions es permeten (cancel·lació, canvi de pla, etc.).
+<br><br>
 <b>Mode ACTUAL:</b> Stripe TEST keys (targeta de proves <code>4242 4242 4242 4242</code> funciona). Cal switch a <b>Stripe LIVE keys</b> quan tinguis IBAN.
 <br><br>
 El landing públic <code>medicarplus.es</code> també ja té els botons de pagament connectats a la mateixa API — un usuari nou pot pagar directament sense passar per un email de prova.

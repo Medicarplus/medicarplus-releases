@@ -602,6 +602,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
           <li><a href="#features">Características</a></li>
           <li><a href="#plans">Precios</a></li>
           <li><a href="#faq">FAQ</a></li>
+          <li><a href="#" id="manageSubLink" data-testid="link-manage-subscription">Gestionar mi suscripción</a></li>
         </ul>
       </div>
       <div class="footer-col">
@@ -687,6 +688,40 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
       startCheckout(fam, btn);
     });
   });
+
+  // Gestionar suscripción — obre el Billing Portal de Stripe via email
+  const manageLink = document.getElementById('manageSubLink');
+  if(manageLink){
+    manageLink.addEventListener('click', async(e)=>{
+      e.preventDefault();
+      const email = prompt('Introduce el email con el que te suscribiste. Te abriremos el portal de Stripe donde puedes cancelar la suscripción, cambiar la tarjeta o ver las facturas:');
+      if(!email || !email.includes('@')) return;
+      manageLink.textContent = '⏳ Abriendo portal...';
+      try{
+        const apiBase = await _apiBase();
+        const r = await fetch(apiBase + '/api/payments/billing-portal', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({customer_email: email.trim().toLowerCase(), return_url: window.location.origin})
+        });
+        if(!r.ok){
+          const t = await r.text();
+          if(r.status===404){
+            alert('❌ No hemos encontrado ninguna suscripción activa con el email "' + email + '".\n\nSi crees que es un error, escríbenos a info@medicarplus.es y te ayudamos personalmente.');
+          } else {
+            throw new Error('HTTP ' + r.status + ' · ' + t.slice(0,180));
+          }
+          return;
+        }
+        const d = await r.json();
+        if(d && d.url){ window.location.href = d.url; }
+        else throw new Error('No se ha recibido URL del portal');
+      }catch(err){
+        alert('❌ ' + err.message + '\n\nEscríbenos a info@medicarplus.es y lo gestionaremos manualmente.');
+      }finally{
+        manageLink.textContent = 'Gestionar mi suscripción';
+      }
+    });
+  }
 })();
 </script>
 

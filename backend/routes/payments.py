@@ -309,3 +309,66 @@ async def list_subscriptions():
     from server import db
     docs = await db.subscriptions.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
     return {"total": len(docs), "items": docs}
+
+
+# ===========================================================================
+# BILLING PORTAL · self-service (cancel, update card, view invoices)
+# ===========================================================================
+class BillingPortalBody(BaseModel):
+    install_id: Optional[str] = None
+    customer_email: Optional[str] = None
+    return_url: str
+
+
+@router.post("/billing-portal")
+async def billing_portal(body: BillingPortalBody):
+    """
+    Genera una URL del Stripe Customer Portal per què el client
+    pugui gestionar la seva subscripció (cancel·lar, canviar targeta,
+    veure factures) sense passar per suport.
+
+    Cerca el `stripe_customer_id` a la col·lecció `subscriptions` per:
+    1. install_id (preferit — l'usa l'app Electron)
+    2. customer_email (fallback — l'usa la web pública)
+    """
+    if not body.install_id and not body.customer_email:
+        raise HTTPException(status_code=400, detail="Cal install_id o customer_email")
+
+    from server import db
+    query = {}
+    if body.install_id:
+        query["install_id"] = body.install_id
+    elif body.customer_email:
+        query["customer_email"] = body.customer_email.lower().strip()
+
+    sub_doc = await db.subscriptions.find_one(query, sort=[("updated_at", -1)])
+    if not sub_doc or not sub_doc.get("stripe_customer_id"):
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No hem trobat cap subscripció activa. "
+                "Si acabes de pagar, espera 1 minut i torna-ho a provar. "
+                "Si el problema persisteix, escriu a info@medicarplus.es."
+            ),
+        )
+
+    stripe_sdk.api_key = _stripe_api_key()
+    try:
+        portal = stripe_sdk.billing_portal.Session.create(
+            customer=sub_doc["stripe_customer_id"],
+            return_url=body.return_url,
+        )
+    except stripe_sdk.error.StripeError as e:
+        logger.error("Billing portal creation failed: %s", e)
+        raise HTTPException(status_code=502, detail=f"Stripe error: {str(e)}")
+
+    return {"url": portal.url}
+
+
+@router.get("/subscription/by-install/{install_id}")
+async def subscription_by_install(install_id: str):
+    """Retorna la subscripció d'un install_id (o null). Usat pel botó
+    'Gestionar subscripció' del client per saber si l'ha de mostrar."""
+    from server import db
+    sub = await db.subscriptions.find_one({"install_id": install_id}, {"_id": 0})
+    return {"subscription": sub}
