@@ -255,6 +255,37 @@ Amb 2 clients pagant STD anual (299,90€×2 = 599,80€) ja tens el fix cobert 
 <div class="tab-panel" data-panel="novetats">
 <h1 id="novetats">4. Últimes novetats (juliol 2026)</h1>
 
+<h3>📊 Nou menú desplegable "Estadísticas" + Comparativa años <span class="badge badge-new">v2.1.10 · NOU</span></h3>
+<b>Refactor del header</b>: Estadísticas ara viu al seu propi dropdown independent (gradient marró/or) separat de Contabilidad, amb 3 opcions:
+<ul>
+<li><b>📅 Facturación mensual</b> — obre l'Informe Anual sencer (abans "Contabilidad → Informe anual").</li>
+<li><b>🚗 Estadísticas autoescuelas</b> — modal multi-secció existent (Autoescolas · Tráfico · SMS · Cites).</li>
+<li><b>📈 Comparativa años</b> <span class="badge badge-new">NOU</span> — comparació any a any, 2 a 6 anys en paral·lel.</li>
+</ul>
+La nova vista <b>Comparativa años</b> mostra:
+<ul>
+<li>Targetes KPI per any (facturació neta + entrades + barra proporcional de mida)</li>
+<li>Taula "Resumen comparativo" amb Facturación neta, Entradas, Tasas DGT, Media mensual i <b>% de variació</b> (fletxes ▲ verdes o ▼ vermelles) entre l'any inicial i el final</li>
+<li>Taula "Facturación mensual comparada" — 12 mesos × N anys per detectar tendències i estacionalitat</li>
+<li>Selector "Años a comparar" 2/3/4/5/6, botó "Imprimir / PDF" amb <code>@media print</code></li>
+</ul>
+Els botons antics <code>Informe anual</code> i <code>Estadísticas</code> han sortit del dropdown Contabilidad (que ara conserva: Llibreta, IRPF, Reserva de cambio, Libro de Registro, Novedades).
+
+<h3>💳 Pagament online integrat dins l'app <span class="badge badge-new">v2.1.10 · NOU</span></h3>
+Nou botó <b>"⬆ Millora el plan"</b> dins <b>⚙️ Configuración</b> del client. Flux automatitzat:
+<ol>
+<li>Client clica el botó → l'app crida <code>POST /api/payments/create-checkout</code> amb el seu <code>installId</code></li>
+<li>Backend obre sessió <b>Stripe Checkout</b> i retorna la URL</li>
+<li>App obre la URL al navegador del client (targeta / Bizum / SEPA)</li>
+<li>Un cop pagat, Stripe callback genera clau JWT PREMIUM al backend i l'envia per email via IONOS SMTP</li>
+<li>Al proper arrencament, l'app veu el nou pla via <code>/api/licenses/verify</code> i s'actualitza sola</li>
+</ol>
+<b>Mode ACTUAL:</b> Stripe TEST keys (targeta de proves <code>4242 4242 4242 4242</code> funciona). Cal switch a <b>Stripe LIVE keys</b> quan tinguis IBAN.
+<br><br>
+El landing públic <code>medicarplus.es</code> també ja té els botons de pagament connectats a la mateixa API — un usuari nou pot pagar directament sense passar per un email de prova.
+
+<hr>
+
 <h3>🔒 HWID Lock anti-pirateig <span class="badge badge-new">NOU</span></h3>
 Cada llicència queda "casada" amb el maquinari del PC on s'activa per primera vegada. Si algú copia el JWT a un altre PC, l'app el bloqueja amb missatge en català/castellà.
 <ul>
