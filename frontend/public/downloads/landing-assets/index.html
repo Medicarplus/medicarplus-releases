@@ -619,7 +619,22 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
 </footer>
 
 <script>
-function sendContact(e){
+// URL del backend (dinàmica via api-endpoint.json a GitHub raw · sempre estable)
+const API_ENDPOINT_JSON = 'https://raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json';
+const API_HARDCODED = 'https://project-helper-47.preview.emergentagent.com';
+
+async function _getApiBase(){
+  try{
+    const r = await fetch(API_ENDPOINT_JSON + '?t=' + Date.now(), {cache:'no-store'});
+    if(r.ok){
+      const j = await r.json();
+      if(j && j.api && /^https?:\/\//.test(j.api)) return j.api.replace(/\/$/,'');
+    }
+  }catch(e){}
+  return API_HARDCODED;
+}
+
+async function sendContact(e){
   e.preventDefault();
   const name = document.getElementById('c-name').value.trim();
   const email = document.getElementById('c-email').value.trim();
@@ -628,17 +643,65 @@ function sendContact(e){
   const tipo = document.getElementById('c-tipo').value;
   const msg = document.getElementById('c-msg').value.trim();
 
-  const tipoLabels = {info:'Información general',demo:'Demo del software',trial:'Prueba 30 días',precio:'Consulta precios',soporte:'Soporte técnico'};
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+  if(submitBtn){ submitBtn.disabled = true; submitBtn.innerHTML = '⏳ Enviando...'; }
 
-  const subject = `[MediCar Plus · ${tipoLabels[tipo]}] Solicitud de ${name}`;
-  const body = `Hola,\n\n${msg}\n\n---\nDatos del contacto:\nNombre: ${name}\nEmail: ${email}\nCentro: ${empresa || '(no indicado)'}\nTeléfono: ${tel || '(no indicado)'}\nTipo de consulta: ${tipoLabels[tipo]}\n\n(Enviado desde medicarplus.es)`;
+  const isTrial = tipo === 'trial';
 
-  const mailto = `mailto:info@medicarplus.es?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.location.href = mailto;
+  try{
+    const apiBase = await _getApiBase();
 
-  setTimeout(() => {
-    alert('✅ Se ha abierto tu cliente de email con el mensaje preparado. Revisa que se envíe correctamente. Si no se abre nada, escríbenos directamente a info@medicarplus.es');
-  }, 500);
+    if(isTrial){
+      // Sol·licitud de prova gratuïta → endpoint específic que dispara email automàtic
+      const r = await fetch(apiBase + '/api/licenses/requests', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          email: email,
+          contact_name: name,
+          company_name: empresa || name,
+          phone: tel || null,
+          notes: msg,
+          plan_requested: 'TRIAL'
+        })
+      });
+      if(!r.ok){
+        const err = await r.text();
+        throw new Error('HTTP ' + r.status + ' · ' + err.slice(0,200));
+      }
+      alert('✅ ¡Solicitud enviada correctamente!\n\nRecibirás un email en marcbrugulat@medicarplus.es en las próximas horas con tu clave de licencia y las instrucciones de descarga.\n\n(Si no ves el email en 24h, revisa la carpeta de spam o escríbenos a info@medicarplus.es)'.replace('marcbrugulat@medicarplus.es', email));
+      e.target.reset();
+    } else {
+      // Info / Demo / Preus / Suport → notificació genèrica de contacte al teu email
+      const tipoLabels = {info:'Información general',demo:'Demo del software',precio:'Consulta precios',soporte:'Soporte técnico'};
+      const subjectTxt = `${tipoLabels[tipo]||tipo} · ${name}` + (empresa?` (${empresa})`:'');
+      const fullMsg = msg + (empresa?`\n\nCentro médico: ${empresa}`:'') + (tel?`\nTeléfono: ${tel}`:'');
+      const r = await fetch(apiBase + '/api/support/contact', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          name: name,
+          email: email,
+          subject: subjectTxt,
+          message: fullMsg,
+          category: tipo,
+          client_name: empresa || ''
+        })
+      });
+      if(!r.ok){
+        const errTxt = await r.text();
+        throw new Error('HTTP ' + r.status + ' · ' + errTxt.slice(0,200));
+      }
+      alert('✅ Mensaje enviado correctamente.\n\nTe responderemos a ' + email + ' lo antes posible.');
+      e.target.reset();
+    }
+  }catch(err){
+    console.error('Contact err:', err);
+    alert('❌ Hubo un problema al enviar la solicitud:\n\n' + err.message + '\n\nPor favor, escríbenos directamente a info@medicarplus.es y te atenderemos personalmente.');
+  }finally{
+    if(submitBtn){ submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+  }
 }
 // Menú mòbil: toggle del hamburguesa
 (function(){
