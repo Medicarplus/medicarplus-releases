@@ -3491,6 +3491,13 @@ function openSettingsModal(){
           <div id="setSupportStatus" style="margin-top:8px;font-size:12px;text-align:center;min-height:16px"></div>
         </div>
 
+        <!-- Millora de pla / Suscripció -->
+        <div class="settings-section" style="background:linear-gradient(135deg,#4c1d95 0%,#1e1b4b 100%);border:1px solid #7c3aed;border-radius:10px;padding:14px">
+          <div style="font-size:13px;font-weight:700;color:#c4b5fd;letter-spacing:.5px;margin-bottom:4px">${isCA?'💎 Millora el teu pla':'💎 Mejora tu plan'}</div>
+          <div style="font-size:12px;color:#ddd6fe;opacity:.85;margin-bottom:10px">${isCA?'Passa a Standard o Premium i paga directament des d\'aquí. La teva llicència s\'actualitza automàticament sense reinstal·lar res.':'Pásate a Standard o Premium y paga directamente desde aquí. Tu licencia se actualiza automáticamente sin reinstalar nada.'}</div>
+          <button id="setUpgrade" class="btn" style="width:100%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:1px solid #a855f7;font-weight:700;padding:10px" data-testid="btn-upgrade-plan">${isCA?'Veure planes i pagar':'Ver planes y pagar'}</button>
+        </div>
+
         <!-- Sortir -->
         <div class="settings-section" style="background:linear-gradient(135deg,#450a0a 0%,#1f0505 100%);border:1px solid #7f1d1d;border-radius:10px;padding:14px">
           <div style="font-size:13px;font-weight:700;color:#fca5a5;letter-spacing:.5px;margin-bottom:4px">${T.logoutSec}</div>
@@ -3591,6 +3598,101 @@ function openSettingsModal(){
       location.reload();
     }
   };
+
+  // Millora de pla · obre modal amb els 4 plans i inicia Stripe
+  const upgBtn=document.getElementById('setUpgrade');
+  if(upgBtn) upgBtn.onclick=()=>openUpgradeModal();
+}
+
+// ============================================================================
+// Modal Upgrade Plan · pagament directe des de l'app (Stripe checkout)
+// ============================================================================
+function openUpgradeModal(){
+  const isCA=currentLang==='ca';
+  const lic=loadLicense()||{};
+  const installId=lic.install_id||localStorage.getItem('caja.install.id.v1')||'';
+  const clientEmail=lic.client_email||'';
+  const currentPlan=(lic.plan||'TRIAL').toUpperCase();
+
+  const plans=[
+    {id:'STD_MES', name:'Standard', period:'mes', price:'29,90 €', full:'29,90 €/mes', color:'#22c55e', desc:isCA?'1 empresa · Comptabilitat completa':'1 empresa · Contabilidad completa'},
+    {id:'STD_ANY', name:'Standard', period:'año', price:'299,90 €', full:'299,90 €/año',save:'-58,80 €', color:'#22c55e', desc:isCA?'1 empresa · Estalvia 58,80 €':'1 empresa · Ahorra 58,80 €'},
+    {id:'PREMIUM_MES', name:'Premium', period:'mes', price:'39,90 €', full:'39,90 €/mes', color:'#a855f7', desc:isCA?'2 empreses · SMS · Cites · IA':'2 empresas · SMS · Citas · IA', featured:true},
+    {id:'PREMIUM_ANY', name:'Premium', period:'año', price:'399,90 €', full:'399,90 €/año',save:'-78,90 €', color:'#a855f7', desc:isCA?'2 empreses · Estalvia 78,90 €':'2 empresas · Ahorra 78,90 €', featured:true},
+  ];
+
+  const back=document.createElement('div');
+  back.className='modal-back';
+  back.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto';
+  back.innerHTML=`
+    <div class="modal" style="background:linear-gradient(160deg,#0f172a,#020617);color:#e2e8f0;max-width:900px;width:100%;border-radius:16px;padding:28px;border:1px solid #334155;box-shadow:0 25px 60px rgba(0,0,0,.6)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
+        <div>
+          <h2 style="margin:0;color:#a855f7;font-family:Georgia,serif;font-size:24px">${isCA?'💎 Millora el teu pla':'💎 Mejora tu plan'}</h2>
+          <div style="color:#94a3b8;font-size:12px;margin-top:4px">${isCA?'Pla actual':'Plan actual'}: <b style="color:#f5b301">${currentPlan}</b></div>
+        </div>
+        <button data-no class="btn" style="background:#334155;color:#e2e8f0;border:1px solid #475569">✕ ${isCA?'Tancar':'Cerrar'}</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px">
+        ${plans.map(p=>`
+          <div style="background:${p.featured?'linear-gradient(160deg,#3b0764,#1e1b4b)':'#1e293b'};border:2px solid ${p.color};border-radius:12px;padding:16px;position:relative">
+            ${p.featured?`<div style="position:absolute;top:-10px;right:12px;background:${p.color};color:#0f172a;padding:2px 10px;border-radius:12px;font-size:10px;font-weight:800;letter-spacing:.5px">⭐ ${isCA?'RECOMANAT':'RECOMENDADO'}</div>`:''}
+            ${p.save?`<div style="position:absolute;top:-10px;left:12px;background:#fbbf24;color:#0f172a;padding:2px 10px;border-radius:12px;font-size:10px;font-weight:800">${p.save}</div>`:''}
+            <div style="font-size:11px;color:${p.color};letter-spacing:1px;font-weight:700">${p.name.toUpperCase()}</div>
+            <div style="font-size:26px;font-weight:700;color:#fff;margin:4px 0;font-family:Georgia,serif">${p.price}<span style="font-size:12px;color:#94a3b8;font-weight:400">/${p.period}</span></div>
+            <div style="font-size:11px;color:#cbd5e1;margin-bottom:12px;min-height:32px">${p.desc}</div>
+            <button data-buy-plan="${p.id}" class="btn" style="width:100%;background:${p.color};color:#0f172a;border:none;font-weight:700;padding:10px;font-size:13px" data-testid="btn-buy-${p.id}">${isCA?'Subscriure':'Suscribirme'}</button>
+          </div>
+        `).join('')}
+      </div>
+      <div id="upgStatus" style="margin-top:16px;font-size:12px;text-align:center;color:#94a3b8;min-height:20px"></div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid #334155;font-size:11px;color:#64748b;line-height:1.6;text-align:center">
+        ${isCA?'Pagament segur via Stripe · Reps l\'email amb la nova clau al moment · La teva llicència s\'actualitza sola':'Pago seguro vía Stripe · Recibes el email con la nueva clave al momento · Tu licencia se actualiza sola'}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(back);
+  back.querySelector('[data-no]').onclick=()=>back.remove();
+  back.addEventListener('click', ev => { if(ev.target===back) back.remove(); });
+
+  back.querySelectorAll('[data-buy-plan]').forEach(btn=>{
+    btn.onclick=async()=>{
+      const pkgId=btn.getAttribute('data-buy-plan');
+      const status=back.querySelector('#upgStatus');
+      // Confirma o demana email
+      let email=clientEmail;
+      if(!email){
+        email=prompt(isCA?'Confirma\'ns el teu email per la factura i llicència:':'Confírmanos tu email para la factura y licencia:');
+        if(!email || !email.includes('@')){ status.innerHTML='<span style="color:#f97316">'+(isCA?'Email invàlid':'Email inválido')+'</span>';return }
+      }
+      status.innerHTML='<span style="color:#a855f7">⏳ '+(isCA?'Preparant pagament...':'Preparando pago...')+'</span>';
+      btn.disabled=true;
+      try{
+        const apiBase=(typeof getApiBase==='function')?getApiBase():'https://project-helper-47.preview.emergentagent.com';
+        const r=await fetch(apiBase+'/api/payments/create-subscription',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            package_id:pkgId,
+            customer_email:email,
+            install_id:installId,
+            origin_url:'https://medicarplus.es'
+          })
+        });
+        if(!r.ok){const t=await r.text();throw new Error('HTTP '+r.status+' · '+t.slice(0,180))}
+        const d=await r.json();
+        if(d && d.url){
+          status.innerHTML='<span style="color:#22c55e">✓ '+(isCA?'Obrint Stripe...':'Abriendo Stripe...')+'</span>';
+          // Obrir a nova pestanya (Electron: shell.openExternal via anchor target=_blank)
+          const a=document.createElement('a');
+          a.href=d.url; a.target='_blank'; a.rel='noopener'; a.click();
+        } else throw new Error(isCA?'URL de pagament no rebuda':'URL de pago no recibida');
+      }catch(err){
+        status.innerHTML='<span style="color:#f97316">❌ '+err.message+'<br>'+(isCA?'Prova a medicarplus.es o escriu a info@medicarplus.es':'Prueba en medicarplus.es o escribe a info@medicarplus.es')+'</span>';
+        btn.disabled=false;
+      }
+    };
+  });
 }
 if($('#btnSettings')){$('#btnSettings').onclick=openSettingsModal}
 
@@ -5082,7 +5184,7 @@ setTimeout(()=>{ try{ showWhatsNew(false) }catch(e){ console.warn('showWhatsNew'
 const API_BASE_HARDCODED='https://project-helper-47.preview.emergentagent.com';
 // App version (hardcoded — s'actualitza a cada release). Serveix per invalidar
 // caché de descoberta al detectar que l'usuari acaba d'actualitzar l'app.
-const APP_VERSION='2.2.0';
+const APP_VERSION='2.2.1';
 // Múltiples fonts de descoberta. La primera que respongui vàlidament guanya.
 // L'orden importa:
 // 1) raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json
