@@ -1,0 +1,127 @@
+<!--
+  link-healer.html · Include comú per a totes les pàgines-guia + admin.
+  ────────────────────────────────────────────────────────────────────────
+  Problema: les guies i el panell admin poden ser accedits des de:
+    • https://medicarplus.es/...  (GitHub Pages · només té la landing)
+    • https://<backend>.preview.emergentagent.com/...  (backend real)
+    • URLs futures (deploy final)
+
+  Aquest script:
+    1. Detecta on ÉS servida la pàgina actual.
+    2. Consulta api-endpoint.json (font canònica auto-publicada pel backend) i
+       determina quin és el backend actiu.
+    3. Si l'usuari ha aterrat en un domini que NO és el backend actiu (ex.
+       medicarplus.es/admin → 404), el redirigeix immediatament al backend.
+    4. Reescriu qualsevol <a> amb href absolut a un domini "vell" perquè apunti
+       al backend actual, garantint que els enllaços interns SEMPRE funcionin.
+-->
+<script>
+(function linkHealer(){
+  'use strict';
+  var DISCOVERY = 'https://raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json';
+  var CACHE_KEY = 'mc.linkhealer.api.v1';
+  var CACHE_TS  = 'mc.linkhealer.ts.v1';
+  var MAX_AGE   = 24*60*60*1000; // 24h
+  var LANDING_HOSTS = ['medicarplus.es','www.medicarplus.es'];
+
+  function loc() { return window.location; }
+  function currentHost() { return loc().hostname.toLowerCase(); }
+  function isOnLanding() { return LANDING_HOSTS.indexOf(currentHost()) !== -1; }
+  function stripTrail(u){ return u.replace(/\/+$/,''); }
+
+  function getCached(){
+    try{
+      var url = localStorage.getItem(CACHE_KEY);
+      var ts  = parseInt(localStorage.getItem(CACHE_TS)||'0');
+      if(url && (Date.now()-ts) < MAX_AGE) return url;
+    }catch(e){}
+    return null;
+  }
+  function setCache(url){
+    try{
+      localStorage.setItem(CACHE_KEY, url);
+      localStorage.setItem(CACHE_TS, String(Date.now()));
+    }catch(e){}
+  }
+
+  async function fetchDiscovery(){
+    var ctrl = new AbortController();
+    var t = setTimeout(function(){ ctrl.abort(); }, 4000);
+    try{
+      var r = await fetch(DISCOVERY + '?t=' + Date.now(), { cache:'no-store', signal: ctrl.signal });
+      clearTimeout(t);
+      if(!r.ok) return null;
+      var j = await r.json();
+      if(j && j.api && /^https?:\/\//.test(j.api)) return stripTrail(j.api);
+    }catch(e){ clearTimeout(t); }
+    return null;
+  }
+
+  function rewriteLinks(base){
+    if(!base) return;
+    var baseHost = new URL(base).hostname.toLowerCase();
+    // Reescriu qualsevol enllaç absolut que apunti a un preview-URL "vell" o a
+    // medicarplus.es amb rutes que només existeixen al backend.
+    var funcPaths = ['/admin','/request-license','/panel-admin.html','/guia-','/manual-usuari','/index-guies.html','/downloads/'];
+    var links = document.querySelectorAll('a[href]');
+    for(var i=0;i<links.length;i++){
+      var a = links[i];
+      var href = a.getAttribute('href') || '';
+      if(!href) continue;
+      // href relatiu (comença per /)
+      if(href.charAt(0) === '/' && funcPaths.some(function(p){ return href.indexOf(p)===0; })){
+        // Si estem al landing, prepend backend base
+        if(isOnLanding()){
+          a.href = base + href;
+        }
+        continue;
+      }
+      // href absolut a un host "conegut" (medicarplus.es o preview.emergentagent.com)
+      var m = href.match(/^https?:\/\/([^\/]+)(\/.*)?$/i);
+      if(!m) continue;
+      var host = m[1].toLowerCase();
+      var path = m[2] || '/';
+      // Només reescrivim rutes funcionals (no la home marketing)
+      if(!funcPaths.some(function(p){ return path.indexOf(p)===0; })) continue;
+      // Si el host actual no és el backend actiu, redirigim al backend
+      if(host !== baseHost){
+        a.href = base + path;
+      }
+    }
+  }
+
+  async function maybeRedirectSelf(base){
+    // Si estem servint una ruta funcional al domini landing, redirect al backend
+    if(!base || !isOnLanding()) return false;
+    var path = loc().pathname;
+    var funcPaths = ['/admin','/request-license','/panel-admin.html'];
+    var pageFunc = ['/guia-','/manual-usuari','/index-guies.html','/downloads/'];
+    if(funcPaths.some(function(p){ return path.indexOf(p)===0; })){
+      loc().replace(base + path + loc().search + loc().hash);
+      return true;
+    }
+    // Guies: si estem a medicarplus.es i la pàgina retorna 404, redirigim (però ja hi som
+    // servint, així que probablement són pàgines pujades manualment). No forcem redirect
+    // per no crear loops. Només reescrivim links interns.
+    return false;
+  }
+
+  async function run(){
+    var base = getCached();
+    if(!base){
+      base = await fetchDiscovery();
+      if(base) setCache(base);
+    }
+    if(!base) return;  // fallback silenciós: no fem res
+    var redirected = await maybeRedirectSelf(base);
+    if(redirected) return; // el navegador ja està canviant de pàgina
+    if(document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', function(){ rewriteLinks(base); });
+    } else {
+      rewriteLinks(base);
+    }
+  }
+  // Executa immediatament (asíncron)
+  run();
+})();
+</script>

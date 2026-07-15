@@ -226,12 +226,15 @@
         <button class="btn" id="btnWhatsNewMenu" data-testid="btn-whats-new" style="background:#2a1f15;border-color:#f97316;color:#fed7aa;font-weight:600;width:100%;text-align:left">🎁 Novedades</button>
       </div>
     </div>
-    <!-- Estadísticas dropdown · Facturación mensual + Autoescuelas + Comparativa años -->
+    <!-- Estadísticas dropdown · Facturación + Autoescuelas + Tráfico + SMS + Citas + Comparativa años -->
     <div class="btn-dropdown" id="btnStatsBox" style="position:relative;display:inline-block">
       <button class="btn" id="btnStatsToggle" style="background:linear-gradient(90deg,#8b5e2a 0%,#c2841c 100%);border-color:transparent;color:#fff;font-weight:700" data-testid="btn-stats">📊 <span data-i18n="stats_menu">Estadísticas</span> <span style="font-size:9px;margin-left:4px">▼</span></button>
-      <div id="btnStatsSubmenu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid #c2841c;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.5);z-index:1000;min-width:220px;padding:6px;flex-direction:column;gap:4px">
-        <button class="btn" id="btnStatFacMensual" data-testid="btn-stat-fac-mensual" style="background:#1e293b;border-color:#f5b301;color:#f5b301;font-weight:600;width:100%;text-align:left">📅 Facturación mensual</button>
-        <button class="btn" id="btnStatAutoescolas" data-testid="btn-stat-autoescolas" style="background:#3a2a15;border-color:#f5b301;color:#f5b301;font-weight:600;width:100%;text-align:left">🚗 Estadísticas autoescuelas</button>
+      <div id="btnStatsSubmenu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid #c2841c;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.5);z-index:1000;min-width:230px;padding:6px;flex-direction:column;gap:4px">
+        <button class="btn" id="btnStatFacMensual" data-testid="btn-stat-fac-mensual" style="background:#1e293b;border-color:#f5b301;color:#f5b301;font-weight:600;width:100%;text-align:left">📅 Facturación (mensual/anual)</button>
+        <button class="btn" id="btnStatAutoescolas" data-testid="btn-stat-autoescolas" style="background:#3a2a15;border-color:#f5b301;color:#f5b301;font-weight:600;width:100%;text-align:left">🚗 Estadísticas Autoescuelas</button>
+        <button class="btn" id="btnStatTrafico" data-testid="btn-stat-trafico" style="background:#152a3a;border-color:#7ec8ff;color:#7ec8ff;font-weight:600;width:100%;text-align:left">🚦 Estadísticas Tráfico</button>
+        <button class="btn" id="btnStatSms" data-testid="btn-stat-sms" style="background:#0f3a20;border-color:#22c55e;color:#22c55e;font-weight:600;width:100%;text-align:left">📱 Estadísticas SMS</button>
+        <button class="btn" id="btnStatCites" data-testid="btn-stat-cites" style="background:#0c2a3e;border-color:#0ea5e9;color:#0ea5e9;font-weight:600;width:100%;text-align:left">📅 Estadísticas Citas</button>
         <button class="btn" id="btnStatCompararAnys" data-testid="btn-stat-comparar-anys" style="background:#152a3a;border-color:#7ec8ff;color:#7ec8ff;font-weight:600;width:100%;text-align:left">📈 Comparativa años</button>
       </div>
     </div>
@@ -981,9 +984,13 @@ function openLibroRegistro(){
     });
   };
 }
-function openStats(){
+function openStats(initialSection){
   const s=loadStats();
   const back=document.createElement('div');back.className='modal-back stats-modal';back.style.zIndex='500';
+  // Títol dinàmic segons secció d'obertura
+  const titleMap = { autos:'🚗 Autoescolas', traffic:'🚦 Tráfico', sms:'📱 SMS', cites:'📅 Citas' };
+  const initSec = initialSection && titleMap[initialSection] ? initialSection : 'autos';
+  const dynTitle = titleMap[initSec] || 'Estadísticas';
   back.innerHTML=`<div class="modal" style="max-width:1400px;width:97%;max-height:95vh;display:flex;flex-direction:column;padding:16px">
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
       <h3 style="margin:0;color:#f5b301">📊 Estadístiques · ${(window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1'}</h3>
@@ -1016,7 +1023,7 @@ function openStats(){
   back.querySelector('[data-no]').onclick=()=>back.remove();
   back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
   // Section state (persist across renders)
-  let currentSection = 'autos';
+  let currentSection = initSec;
   const setSection = (sec) => {
     currentSection = sec;
     back.querySelectorAll('#stSectionSwitch button').forEach(b => {
@@ -1167,20 +1174,58 @@ function openStats(){
   // ============================================================================
   // Secció TRÁFICO · Agrega les entrades del CSV DGT del panell principal
   // ============================================================================
-  // Categories base de "tipo" (extreu part abans de la coma per gestionar "Renovación, Profesional")
-  const TRAF_CATS = ['Renovación','Expedición','Duplicado','Canje','Recuperación','Otro'];
-  const TRAF_COLORS = { 'Renovación':'#3ddc97', 'Expedición':'#7ec8ff', 'Duplicado':'#f5b301', 'Canje':'#c084fc', 'Recuperación':'#f472b6', 'Otro':'#94a3b8' };
-  function _trafBaseCat(tipo){
-    const t = String(tipo||'').split(',')[0].trim();
+  // Estadístiques Tráfico · categories DETECTADES AUTOMÀTICAMENT del CSV DGT.
+  // No hi ha llista tancada: mostrem TOTES les que aparèixin al document importat
+  // (Renovación, Expedición, Duplicado, Canje, Recuperación, Conducción, Marina,
+  // Grúas, Animales peligrosos, Ciclomotor, etc.).
+  // ============================================================================
+  const TRAF_COLOR_PALETTE = ['#3ddc97','#7ec8ff','#f5b301','#c084fc','#f472b6','#22d3ee','#fb923c','#a3e635','#e879f9','#fca5a5','#60a5fa','#facc15','#4ade80','#f87171','#818cf8','#94a3b8'];
+  function _trafNormalizeCat(raw){
+    // Retorna la categoria "canònica" (només normalitza majúscules i sinònims coneguts).
+    // Preserva tota la resta de valors del CSV.
+    const t = String(raw||'').split(',')[0].trim();
     if(!t) return 'Otro';
     const lc = t.toLowerCase();
     if(lc.startsWith('renov')) return 'Renovación';
-    if(lc.startsWith('exped') || lc.startsWith('obten')) return 'Expedición';
-    if(lc.startsWith('dupl')) return 'Duplicado';
-    if(lc.startsWith('canj')) return 'Canje';
+    if(lc.startsWith('exped')) return 'Expedición';
+    if(lc.startsWith('obten')) return 'Obtención';
+    if(lc.startsWith('dupl'))  return 'Duplicado';
+    if(lc.startsWith('canj'))  return 'Canje';
     if(lc.startsWith('recup')) return 'Recuperación';
-    return 'Otro';
+    if(lc.startsWith('conduc')) return 'Conducción';
+    if(lc.startsWith('marin')) return 'Marina';
+    if(lc.startsWith('grúa') || lc.startsWith('grua')) return 'Grúas';
+    if(lc.startsWith('animal')) return 'Animales peligrosos';
+    if(lc.startsWith('ciclom')) return 'Ciclomotor';
+    if(lc.startsWith('arma')) return 'Armas';
+    // Retorna el valor original amb la primera lletra en majúscules
+    return t.charAt(0).toUpperCase() + t.slice(1);
   }
+  function _trafBaseCat(tipo){ return _trafNormalizeCat(tipo); }
+  // Retorna l'array complet de categories detectades al CSV (ordenat alfabèticament).
+  // S'utilitza per generar dinàmicament les columnes de la taula.
+  function _trafDetectedCats(){
+    let src = {};
+    try{ src = (JSON.parse(localStorage.getItem(KEYS['trafic']))||{}).byDate || {} }catch(e){ src = {} }
+    const set = new Set();
+    for(const iso of Object.keys(src)){
+      const list = src[iso] || [];
+      for(const e of list){
+        if(e.kind !== 'TRAF' || !e._csv) continue;
+        set.add(_trafBaseCat(e.tipo));
+      }
+    }
+    if(set.size === 0) ['Renovación','Expedición','Duplicado','Canje','Otro'].forEach(c => set.add(c));
+    return Array.from(set).sort();
+  }
+  // Colors dinàmics: mateixa paleta per index, mateix ordre alfabètic → estable entre renders
+  function _trafColorFor(cat, cats){
+    const idx = (cats || _trafDetectedCats()).indexOf(cat);
+    return TRAF_COLOR_PALETTE[Math.max(0, idx) % TRAF_COLOR_PALETTE.length];
+  }
+  // Compatibilitat amb codi existent
+  const TRAF_CATS = _trafDetectedCats();
+  const TRAF_COLORS = TRAF_CATS.reduce((o,c) => { o[c] = _trafColorFor(c, TRAF_CATS); return o; }, {});
   // Agrega totes les entrades CSV DGT (kind:'TRAF' && _csv:true) del state.byDate
   // Filtre opcional per any i mes. Retorna { count, byCat:{Renovación:n,...}, importe, tasas, dailyMap? }
   function _trafAggregate(filterYear, filterMonth){
@@ -1243,6 +1288,9 @@ function openStats(){
     const monthSel = +$('#stMonth').value;
     $('#stMonth').style.display = mode === 'month' ? '' : 'none';
     const body = $('#stBody');
+    // 📊 Detecta categories dinàmicament del CSV actual (Renovación, Expedición, Marina, Grúas, Animales peligrosos, etc.)
+    const CATS = _trafDetectedCats();
+    const COLORS = CATS.reduce((o,c) => { o[c] = _trafColorFor(c, CATS); return o; }, {});
     if(mode === 'year'){
       const agg = _trafAggregate(year);
       // Chart: monthly counts
@@ -1253,17 +1301,17 @@ function openStats(){
       const monthLabels = MESOS.map(m => m.slice(0,3));
       const chart = _barChartHtml(monthLabels, monthCounts, monthLabels.map(()=>'#7ec8ff'), 180);
       // Category summary chart
-      const catValues = TRAF_CATS.map(c => agg.byCat[c] || 0);
-      const catColors = TRAF_CATS.map(c => TRAF_COLORS[c]);
-      const catChart = _barChartHtml(TRAF_CATS, catValues, catColors, 140);
+      const catValues = CATS.map(c => agg.byCat[c] || 0);
+      const catColors = CATS.map(c => COLORS[c]);
+      const catChart = _barChartHtml(CATS, catValues, catColors, 140);
       // Table: monthly breakdown by category
       const rows = MESOS.map((mName, mi) => {
         const k = `${year}-${String(mi+1).padStart(2,'0')}`;
         const md = agg.monthly[k] || { count:0, byCat:{}, importe:0, tasas:0 };
-        const catCells = TRAF_CATS.map(c => `<td style="padding:6px 8px;border:1px solid #2a3040;text-align:center;font-family:'Consolas',monospace;color:${TRAF_COLORS[c]}">${md.byCat[c] || ''}</td>`).join('');
+        const catCells = CATS.map(c => `<td style="padding:6px 8px;border:1px solid #2a3040;text-align:center;font-family:'Consolas',monospace;color:${COLORS[c]}">${md.byCat[c] || ''}</td>`).join('');
         return `<tr><td style="padding:6px 10px;border:1px solid #2a3040;font-weight:600;background:#141821;text-transform:capitalize">${mName}</td><td style="padding:6px 10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff">${md.count || ''}</td>${catCells}<td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;font-family:'Consolas',monospace;color:#3ddc97">${md.importe ? _fmtEur(md.importe) : ''}</td><td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;font-family:'Consolas',monospace;color:#f5b301">${md.tasas ? _fmtEur(md.tasas) : ''}</td></tr>`;
       }).join('');
-      const catTotCells = TRAF_CATS.map(c => `<td style="padding:8px;border:1px solid #2a3040;background:#1f2530;text-align:center;font-weight:700;color:${TRAF_COLORS[c]}">${agg.byCat[c] || ''}</td>`).join('');
+      const catTotCells = CATS.map(c => `<td style="padding:8px;border:1px solid #2a3040;background:#1f2530;text-align:center;font-weight:700;color:${COLORS[c]}">${agg.byCat[c] || ''}</td>`).join('');
       body.innerHTML = `
         <div data-testid="traffic-stats-year" style="display:flex;flex-direction:column;gap:14px">
           <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
@@ -1298,7 +1346,7 @@ function openStats(){
             <thead><tr style="background:#1a1e26">
               <th style="padding:10px;border:1px solid #2a3040;background:#1a1e26;text-align:left;min-width:100px">MES ${year}</th>
               <th style="padding:10px;border:1px solid #2a3040;color:#7ec8ff">TOTAL</th>
-              ${TRAF_CATS.map(c => `<th style="padding:10px;border:1px solid #2a3040;color:${TRAF_COLORS[c]};text-transform:uppercase">${c}</th>`).join('')}
+              ${CATS.map(c => `<th style="padding:10px;border:1px solid #2a3040;color:${COLORS[c]};text-transform:uppercase">${c}</th>`).join('')}
               <th style="padding:10px;border:1px solid #2a3040;color:#3ddc97">IMPORTE</th>
               <th style="padding:10px;border:1px solid #2a3040;color:#f5b301">TASAS DGT</th>
             </tr></thead>
@@ -1325,18 +1373,18 @@ function openStats(){
         dailyLabels.push(String(d));
       }
       const chart = _barChartHtml(dailyLabels, dailyCounts, dailyLabels.map(()=>'#7ec8ff'), 160);
-      const catValues = TRAF_CATS.map(c => agg.byCat[c] || 0);
-      const catChart = _barChartHtml(TRAF_CATS, catValues, TRAF_CATS.map(c => TRAF_COLORS[c]), 140);
+      const catValues = CATS.map(c => agg.byCat[c] || 0);
+      const catChart = _barChartHtml(CATS, catValues, CATS.map(c => COLORS[c]), 140);
       // Daily table (only days with data)
       const dailyRows = [];
       for(let d = 1; d <= daysInMonth; d++){
         const iso = `${year}-${String(monthSel).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const dd = agg.daily[iso];
         if(!dd) continue;
-        const catCells = TRAF_CATS.map(c => `<td style="padding:5px 8px;border:1px solid #2a3040;text-align:center;color:${TRAF_COLORS[c]}">${dd.byCat[c] || ''}</td>`).join('');
+        const catCells = CATS.map(c => `<td style="padding:5px 8px;border:1px solid #2a3040;text-align:center;color:${COLORS[c]}">${dd.byCat[c] || ''}</td>`).join('');
         dailyRows.push(`<tr><td style="padding:5px 10px;border:1px solid #2a3040;font-weight:600;background:#141821">Día ${d}</td><td style="padding:5px 10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff">${dd.count}</td>${catCells}<td style="padding:5px 10px;border:1px solid #2a3040;text-align:right;color:#3ddc97">${dd.importe ? _fmtEur(dd.importe) : ''}</td><td style="padding:5px 10px;border:1px solid #2a3040;text-align:right;color:#f5b301">${dd.tasas ? _fmtEur(dd.tasas) : ''}</td></tr>`);
       }
-      const dailyTableRows = dailyRows.length ? dailyRows.join('') : `<tr><td colspan="${3 + TRAF_CATS.length}" style="padding:20px;text-align:center;color:#94a3b8;font-style:italic">No hay entradas de Tráfico en ${MESOS[monthSel-1]} ${year}</td></tr>`;
+      const dailyTableRows = dailyRows.length ? dailyRows.join('') : `<tr><td colspan="${3 + CATS.length}" style="padding:20px;text-align:center;color:#94a3b8;font-style:italic">No hay entradas de Tráfico en ${MESOS[monthSel-1]} ${year}</td></tr>`;
       body.innerHTML = `
         <div data-testid="traffic-stats-month" style="display:flex;flex-direction:column;gap:14px">
           <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
@@ -1371,7 +1419,7 @@ function openStats(){
             <thead><tr style="background:#1a1e26">
               <th style="padding:8px;border:1px solid #2a3040;background:#1a1e26;text-align:left;min-width:90px">DÍA</th>
               <th style="padding:8px;border:1px solid #2a3040;color:#7ec8ff">TOTAL</th>
-              ${TRAF_CATS.map(c => `<th style="padding:8px;border:1px solid #2a3040;color:${TRAF_COLORS[c]};text-transform:uppercase">${c}</th>`).join('')}
+              ${CATS.map(c => `<th style="padding:8px;border:1px solid #2a3040;color:${COLORS[c]};text-transform:uppercase">${c}</th>`).join('')}
               <th style="padding:8px;border:1px solid #2a3040;color:#3ddc97">IMPORTE</th>
               <th style="padding:8px;border:1px solid #2a3040;color:#f5b301">TASAS</th>
             </tr></thead>
@@ -1645,6 +1693,8 @@ function openStats(){
     renderResults('');
   }
 
+  // Aplica la secció inicial (visualment + funcionalment)
+  setSection(initSec);
   renderTable();
 }
 $$('#chips-priv-cempla .chip').forEach(c=>c.onclick=()=>{$$('#chips-priv-cempla .chip').forEach(x=>x.classList.remove('active'));c.classList.add('active');privConcept=c.dataset.c||'';currentPreu=c.dataset.preu||'';currentSplit=c.dataset.split||'45-45-10';$('#p-tipo-custom').value=privConcept;$('#p-preu-custom').value=currentPreu;const[b,cc,m]=currentSplit.split('-');$('#p-pct-b').value=b;$('#p-pct-c').value=cc;$('#p-pct-m').value=m;setTimeout(()=>$('#p-nombre-cempla').focus(),50)});
@@ -1929,9 +1979,12 @@ $('#btnWhatsNewMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';
 $('#btnAccountingToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnAccountingMenu');m.style.display=(m.style.display==='none'||!m.style.display)?'flex':'none'};
 document.addEventListener('click',(e)=>{const box=$('#btnAccounting');const menu=$('#btnAccountingMenu');if(menu&&box&&!box.contains(e.target))menu.style.display='none'});
 
-// Estadísticas dropdown toggle (Facturación mensual · Autoescuelas · Comparativa años)
+// Estadísticas dropdown toggle (Facturación · Autoescuelas · Tráfico · SMS · Cites · Comparativa)
 $('#btnStatFacMensual').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openAnnualReport()};
-$('#btnStatAutoescolas').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openStats()};
+$('#btnStatAutoescolas').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openStats('autos')};
+$('#btnStatTrafico').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openStats('traffic')};
+$('#btnStatSms').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openStats('sms')};
+$('#btnStatCites').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openStats('cites')};
 $('#btnStatCompararAnys').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openYearComparison()};
 $('#btnStatsToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnStatsSubmenu');m.style.display=(m.style.display==='none'||!m.style.display)?'flex':'none'};
 document.addEventListener('click',(e)=>{const box=$('#btnStatsBox');const menu=$('#btnStatsSubmenu');if(menu&&box&&!box.contains(e.target))menu.style.display='none'});
@@ -2704,8 +2757,13 @@ function openAnnualReport(){
 }
 
 function _buildAnnualReport(year){
-  const comps=[{key:'trafic',name:(window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1',color:'#166534'}];
-  if(window.CFG&&CFG.company2&&CFG.company2.name)comps.push({key:'cempla',name:CFG.company2.name,color:'#1e5aa8'});
+  // 🔒 Isolat per empresa activa · només mostra les dades de l'empresa seleccionada al top
+  const activeKey = currentCompany || 'trafic';
+  const c1Name = (window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1';
+  const c2Name = (window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2';
+  const comps = activeKey === 'trafic'
+    ? [{key:'trafic',name:c1Name,color:'#166534'}]
+    : [{key:'cempla',name:c2Name,color:'#1e5aa8'}];
   const partners=(window.CFG&&Array.isArray(CFG.partners))?CFG.partners:[];
   const MESES=currentLang==='es'?['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']:['Gener','Febrer','Març','Abril','Maig','Juny','Juliol','Agost','Setembre','Octubre','Novembre','Desembre'];
   const TRIM=[[0,1,2],[3,4,5],[6,7,8],[9,10,11]];
@@ -2839,8 +2897,13 @@ function openYearComparison(){
 
 function _buildYearComparison(latestYear,count){
   const years=[];for(let i=count-1;i>=0;i--)years.push(latestYear-i);
-  const comps=[{key:'trafic',name:(window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1'}];
-  if(window.CFG&&CFG.company2&&CFG.company2.name)comps.push({key:'cempla',name:CFG.company2.name});
+  // 🔒 Isolat per empresa activa · només mostra les dades de l'empresa seleccionada al top
+  const activeKey = currentCompany || 'trafic';
+  const c1Name = (window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1';
+  const c2Name = (window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2';
+  const comps = activeKey === 'trafic'
+    ? [{key:'trafic',name:c1Name}]
+    : [{key:'cempla',name:c2Name}];
   const MESES=currentLang==='es'?['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']:['Gener','Febrer','Març','Abril','Maig','Juny','Juliol','Agost','Setembre','Octubre','Novembre','Desembre'];
 
   // Agrega totales por año
@@ -5274,16 +5337,17 @@ const LAST_SEEN_VERSION_KEY = 'caja.last_seen_version';
 // IMPORTANT: L'ordre importa. La primera entrada ha de ser la MÉS RECENT.
 // Cada versió té: { version, date (dd/mm/aaaa), highlights (array de strings HTML curts) }
 const CHANGELOG = [
-  { version:'2.0.64', date:'15/07/2026', highlights:[
-    '🔒 <b>FIX · Privacidad SIEMPRE por defecto</b>: cada vez que abras el programa, los importes de CAJA FÍSICA, CUENTA BANCO, TOTAL y SALDO ANTERIOR arrancan <b>difuminados</b> (comportamiento tipo app de banca). El botón ojo (👁️/🙈) los muestra solo durante la sesión — al cerrar y reabrir vuelven a estar ocultos.',
-    '🏷️ <b>Renombrado · TOTAL CAJA (facturación) → TOTAL</b>: el total del panel de cierre ahora se llama simplemente "TOTAL" porque representa la suma real (facturación + saldo anterior − salidas). La cifra de facturación pura va en <i>Estadísticas</i>.',
-    '📄 <b>NOU · Guía y Manual en PDF adjuntos al correo de licencia</b>: cada cliente ahora recibe automáticamente <code>guia-instalacion-medicar-plus.pdf</code> y <code>manual-usuario-medicar-plus.pdf</code> como adjuntos al correo de activación — no depende de que la web esté publicada.',
-    '🎨 <b>NOU · Portada branded en cada PDF</b>: cada guía/manual lleva una portada A4 profesional con logo MediCar Plus, tarjeta "EMITIDO PARA" con datos del cliente (Cliente, Plan, Caducidad, Install ID, Clave) y bandas doradas superior/inferior.',
-    '📇 <b>NOU · Nº Documento correlativo</b>: cada emisión lleva una referencia única tipo <code>MCP-2026-000042</code> en la portada, guardada de forma atómica en base de datos. Reset anual automático. <i>(Ojo: no es la factura fiscal, esa la emite Stripe.)</i>',
-    '📧 <b>Correo de licencia rediseñado</b>: nuevo cuerpo en castellano con referencias claras a los adjuntos PDF y el enlace de descarga de GitHub Releases.',
+  { version:'2.0.65', date:'15/07/2026', highlights:[
+    '🚨 <b>FIX CRÍTICO · Enlaces resistentes a rotación de URL</b>: los enlaces internos (Admin, Solicitud, Guías) ahora derivan dinámicamente del backend actual vía <code>api-endpoint.json</code> (auto-publicado por el backend en cada arranque). Además, cada guía HTML lleva un script <i>link-healer</i> que reescribe automáticamente enlaces si detecta URLs obsoletas o si el usuario aterriza en medicarplus.es por error. <b>Se acabaron los 404 aleatorios.</b>',
+    '📊 <b>Dropdown Estadísticas reorganizado</b>: cada tipo de estadística tiene ahora su propia entrada en el menú (Autoescuelas / Tráfico / SMS / Citas), sin sub-tabs anidados. Más fácil de encontrar lo que buscas.',
+    '🏢 <b>Estadísticas aisladas por empresa</b>: Facturación e Informe anual y Comparativa años ahora muestran <b>solo los datos de la empresa activa</b> (Tráfic o Cempla según la que tengas seleccionada). Se acabó la mezcla que no tenía sentido.',
+    '🚦 <b>Estadísticas Tráfico ampliadas</b>: ahora detecta automáticamente <b>todas las categorías del CSV DGT</b> (Renovación, Expedición, Duplicado, Canje, Conducción, Marina, Grúas, Animales peligrosos, Ciclomotor, Armas, etc.), no solo las 5 hardcoded. Desglose por categoría + totales mensuales/anuales + comparativa.',
+    '🔒 <b>Privacidad SIEMPRE por defecto</b>: cada vez que abras el programa, los importes de CAJA FÍSICA, CUENTA BANCO, TOTAL y SALDO ANTERIOR arrancan <b>difuminados</b> (comportamiento tipo app de banca). El botón ojo (👁️/🙈) los muestra solo durante la sesión.',
+    '🏷️ <b>Renombrado · TOTAL CAJA (facturación) → TOTAL</b>: el total del panel de cierre ahora se llama simplemente "TOTAL" porque representa la suma real (facturación + saldo anterior − salidas).',
+    '📄 <b>Guía y Manual en PDF adjuntos al correo de licencia</b> con portada branded MediCar Plus y Nº Documento correlativo (<code>MCP-2026-000042</code>).',
   ]},
-  { version:'2.0.63', date:'15/07/2026', highlights:[
-    '🔒 Primer intento del modo privacidad por defecto (superado por v2.0.64).',
+  { version:'2.0.64', date:'15/07/2026', highlights:[
+    '🔒 Privacidad por defecto (superado por v2.0.65).',
   ]},
   { version:'2.1.3', date:'14/07/2026', highlights:[
     '🌐 <b>FIX · IRPF ara respecta l\'idioma seleccionat</b> · abans hi havia textos en català que no es traduïen al castellà (títol "Retencions trimestrals", placeholders, tooltips, confirmació d\'eliminar). Ara tot es tradueix correctament segons l\'idioma configurat.',
@@ -5468,7 +5532,7 @@ setTimeout(()=>{ try{ showWhatsNew(false) }catch(e){ console.warn('showWhatsNew'
 const API_BASE_HARDCODED='https://project-helper-47.preview.emergentagent.com';
 // App version (hardcoded — s'actualitza a cada release). Serveix per invalidar
 // caché de descoberta al detectar que l'usuari acaba d'actualitzar l'app.
-const APP_VERSION='2.2.2';
+const APP_VERSION='2.0.64';
 // Múltiples fonts de descoberta. La primera que respongui vàlidament guanya.
 // L'orden importa:
 // 1) raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json
@@ -5565,6 +5629,53 @@ async function discoverApiBaseWithFallback(){
 // On startup: fire-and-forget discovery to keep cache fresh
 setTimeout(()=>{ discoverApiBase().catch(()=>{}) }, 500);
 
+// Auto-heal: si un fetch a getApiBase() retorna 404/error de xarxa, dispara re-discovery
+// i reintenta un cop. Encara que Emergent roti la URL, els botons segueixen funcionant.
+async function fetchWithApiBaseHeal(path, init){
+  const doFetch = async (base) => {
+    const url = (base.endsWith('/') ? base.slice(0,-1) : base) + (path.startsWith('/') ? path : '/'+path);
+    return fetch(url, init);
+  };
+  try{
+    const r = await doFetch(getApiBase());
+    if(r.status !== 404 && r.status < 500) return r;
+    // 404 o 5xx → intenta re-descobrir
+    throw new Error('base_stale_'+r.status);
+  }catch(e){
+    _clearCachedApiBase();
+    const fresh = await discoverApiBaseWithFallback();
+    return doFetch(fresh);
+  }
+}
+// Obre una URL derivada del backend actual amb re-discovery si cal.
+// Ús: openBackendUrl('/admin'), openBackendUrl('/request-license'), etc.
+async function openBackendUrl(path){
+  let base = getApiBase();
+  try{
+    // Verifica ràpidament que la base actual funciona (HEAD a /api/health si existeix, si no /)
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), 3000);
+    const test = await fetch(base + '/', {signal: ctrl.signal, cache:'no-store', method:'HEAD'}).catch(()=>null);
+    clearTimeout(timer);
+    if(!test || !test.ok){
+      _clearCachedApiBase();
+      base = await discoverApiBaseWithFallback();
+    }
+  }catch(e){
+    base = await discoverApiBaseWithFallback();
+  }
+  const url = (base.endsWith('/') ? base.slice(0,-1) : base) + (path.startsWith('/') ? path : '/'+path);
+  try{
+    if(typeof window!=='undefined' && typeof window.openExternalUrl==='function'){
+      window.openExternalUrl(url);
+    } else {
+      window.open(url, '_blank', 'noopener');
+    }
+  }catch(e){
+    window.location.href = url;
+  }
+}
+
 // SISTEMA DE LLICÈNCIES · v2 COMERCIAL · MediCar Plus
 // ============================================================================
 const LIC={
@@ -5574,9 +5685,14 @@ const LIC={
   LAST_CHECK:'caja.license.lastcheck.v1',
   CHECK_INTERVAL_DAYS:15,
   MAX_OFFLINE_DAYS:30,
+  // TOTS els URLs funcionals de l'app deriven de getApiBase() → resistent a rotacions d'Emergent.
+  // El domini medicarplus.es només s'usa per la landing pública (marketing).
   get VERIFY_URL(){ return getApiBase()+'/api/licenses/verify'; },
-  REQUEST_URL:'https://medicarplus.es/request-license',
-  WEBSITE_URL:'https://medicarplus.es',
+  get REQUEST_URL(){ return getApiBase()+'/request-license'; },
+  get ADMIN_URL(){ return getApiBase()+'/admin'; },
+  get GUIDE_INSTALL_URL(){ return getApiBase()+'/guia-client-installacio.html'; },
+  get MANUAL_URL(){ return getApiBase()+'/manual-usuari.html'; },
+  WEBSITE_URL:'https://medicarplus.es',  // Landing marketing · queda al domini públic
   SUPPORT_EMAIL:'info@medicarplus.es',
   MASTER_KEY:'MB-MASTER-BRUGULAT-2026-OWNER',
 };

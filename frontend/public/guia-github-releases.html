@@ -60,6 +60,29 @@
     font-size: 12px; text-align: center;
   }
 </style>
+<!-- link-healer · auto-repair links if URL rotates or user hits wrong domain -->
+<script>
+(function linkHealer(){
+  'use strict';
+  var DISCOVERY = 'https://raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json';
+  var CACHE_KEY = 'mc.linkhealer.api.v1';
+  var CACHE_TS  = 'mc.linkhealer.ts.v1';
+  var MAX_AGE   = 24*60*60*1000;
+  var LANDING_HOSTS = ['medicarplus.es','www.medicarplus.es'];
+  var FUNC_PATHS = ['/admin','/request-license','/panel-admin.html','/guia-','/manual-usuari','/index-guies.html','/downloads/'];
+  function currentHost(){ return location.hostname.toLowerCase(); }
+  function isOnLanding(){ return LANDING_HOSTS.indexOf(currentHost()) !== -1; }
+  function stripTrail(u){ return u.replace(/\/+$/,''); }
+  function getCached(){ try{ var u=localStorage.getItem(CACHE_KEY); var t=parseInt(localStorage.getItem(CACHE_TS)||'0'); if(u && (Date.now()-t)<MAX_AGE) return u; }catch(e){} return null; }
+  function setCache(u){ try{ localStorage.setItem(CACHE_KEY,u); localStorage.setItem(CACHE_TS,String(Date.now())); }catch(e){} }
+  function funcMatch(p){ for(var i=0;i<FUNC_PATHS.length;i++) if(p.indexOf(FUNC_PATHS[i])===0) return true; return false; }
+  async function fetchDiscovery(){ var c=new AbortController(); var t=setTimeout(function(){c.abort()},4000); try{ var r=await fetch(DISCOVERY+'?t='+Date.now(),{cache:'no-store',signal:c.signal}); clearTimeout(t); if(!r.ok) return null; var j=await r.json(); if(j&&j.api&&/^https?:\/\//.test(j.api)) return stripTrail(j.api); }catch(e){clearTimeout(t)} return null; }
+  function rewriteLinks(base){ if(!base) return; var bh=new URL(base).hostname.toLowerCase(); var links=document.querySelectorAll('a[href]'); for(var i=0;i<links.length;i++){ var a=links[i]; var h=a.getAttribute('href')||''; if(!h) continue; if(h.charAt(0)==='/' && funcMatch(h)){ if(isOnLanding()) a.href=base+h; continue; } var m=h.match(/^https?:\/\/([^\/]+)(\/.*)?$/i); if(!m) continue; var host=m[1].toLowerCase(); var path=m[2]||'/'; if(!funcMatch(path)) continue; if(host!==bh) a.href=base+path; } }
+  async function maybeRedirectSelf(base){ if(!base||!isOnLanding()) return false; var p=location.pathname; if(funcMatch(p) && p!=='/'){ location.replace(base+p+location.search+location.hash); return true; } return false; }
+  async function run(){ var base=getCached(); if(!base){ base=await fetchDiscovery(); if(base) setCache(base); } if(!base) return; if(await maybeRedirectSelf(base)) return; if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){rewriteLinks(base)}); else rewriteLinks(base); }
+  run();
+})();
+</script>
 </head>
 <body>
 <div class="container">

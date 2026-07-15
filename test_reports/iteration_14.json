@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 14 · URL-rotation fix + Estadísticas dropdown restructure + dynamic Tráfico categories + company-scoped annual/comparison reports. 10/10 backend pytest PASS, 6/6 frontend dropdown flows PASS with ZERO JS console errors.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter14_url_rotation_stats_dropdown.py",
+    "/app/test_reports/pytest/pytest_iter14.xml"
+  ],
+  "action_items": [
+    "None blocking. Optional cleanup: previous iterations (test_calendar_sync/test_prelaunch_v217/test_v2_print_backend) still have outdated version assertions from earlier bumps — not touched here as they are unrelated to this review scope."
+  ],
+  "critical_code_review_comments": [
+    "FIX #4 (URL rotation) — VERIFIED: /app/backend/services/auto_publish_endpoint.py::_current_preview_url() now reads /app/frontend/.env → REACT_APP_BACKEND_URL first, with env-var fallback chain (preview_endpoint, PREVIEW_ENDPOINT, APP_URL). The GitHub file https://raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json currently returns exactly https://project-helper-47.preview.emergentagent.com — matches REACT_APP_BACKEND_URL exactly. In-field Electron clients will auto-heal within 24 h.",
+    "FIX #4 (link-healer) — VERIFIED: all 3 guides (guia-medicar-plus.html, guia-client-installacio.html, manual-usuari.html) contain the <script>function linkHealer(){...}</script> block AND the '<!-- link-healer -->' HTML comment marker. All 3 return 200 via ingress.",
+    "FIX #4 (dynamic LIC URLs) — VERIFIED at runtime: LIC.REQUEST_URL, LIC.ADMIN_URL, LIC.VERIFY_URL, LIC.GUIDE_INSTALL_URL, LIC.MANUAL_URL are getters returning getApiBase()+path — all evaluated to https://project-helper-47.preview.emergentagent.com/... in the live browser session.",
+    "FIX #2 (dropdown restructure) — VERIFIED: 6 buttons present with exact IDs btnStatFacMensual/btnStatAutoescolas/btnStatTrafico/btnStatSms/btnStatCites/btnStatCompararAnys. All 6 have data-testid attributes. Each click closes the submenu and opens the correct modal (openAnnualReport / openStats('autos'|'traffic'|'sms'|'cites') / openYearComparison) with zero JS errors.",
+    "FIX #3 (dynamic Tráfico categories) — VERIFIED source-side: _trafNormalizeCat() recognises Renov/Exped/Obten/Dupl/Canj/Recup/Conducción/Marina/Grúas/Animales peligrosos/Ciclomotor/Armas AND preserves any other CSV value with capitalised first letter. _trafDetectedCats() aggregates all TRAF+_csv entries into a Set, falling back to the default 5 only when localStorage is empty. TRAF_COLOR_PALETTE has 16 colours cycling for any category count. Not testable via global scope (fn is inside an IIFE) but present in packaged index.html per download endpoint.",
+    "FIX #1 (company scoping in reports) — VERIFIED: _buildAnnualReport (v2.html:2759) uses activeKey=currentCompany||'trafic'; _buildYearComparison (v2.html:2898) same pattern. openAnnualReport/openYearComparison both call the correct helper with no cross-company mixing. Cannot regression-test cross-company mixing without seed data, but code path is correct.",
+    "PACKAGING: /app/frontend/public/downloads/electron-src/index.html is a byte-for-byte copy of /app/frontend/public/v2.html (both 6047 lines, same size). The /api/electron/manifest correctly hashes it and /api/electron/download/index.html serves it with no-store cache headers. The v2.0.65 changelog marker is present in the packaged copy (verified by test_download_index_html_200).",
+    "MINOR (not a bug): the app's on-screen version pill shows v2.1.11 (from appVersion.textContent set elsewhere), while the review request mentioned v2.0.65. The v2.0.65 string is in the *changelog list*, not in the version pill — this is expected: changelog entries are historical, version pill is current."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter14_url_rotation_stats_dropdown.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (10/10 tests passed — manifest, download index.html with v2.0.65 + all 6 dropdown IDs + _trafDetectedCats, admin+request-license+v2.html reachability, 3 guides with linkHealer, GitHub api-endpoint.json = REACT_APP_BACKEND_URL exact match)",
+    "frontend": "100% (6/6 dropdown entries clickable and open correct modal, LIC URLs dynamic and pointing at project-helper-47, body.privacy-on active by default, zero JS console errors, zero page errors)"
+  },
+  "test_credentials": "Master license MB-MASTER-BRUGULAT-2026-OWNER (offline, seeded via localStorage.caja.license.v1). Admin token MB-ADMIN-BRUGULAT-2026-4F8E2A1C (not required for this iteration since /admin is served publicly).",
+  "seed_data_creation": "Playwright pre-seeded localStorage: caja.install.id.v1='CD-TEST-VERIFY-1601', caja.license.v1=MASTER, caja.aiOnboardSeen='1', caja.config.v1 with company1/company2 names, caja.setupDone='1'. Removed on session close (Playwright discards context).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "URL auto-publish now uses /app/frontend/.env as source of truth — if you rotate the preview URL, restart backend to trigger auto_publish_endpoint_url() and re-verify api-endpoint.json on GitHub. The Stats submenu is hidden by default (display:none) and requires clicking #btnStatsToggle first; use force=True on the subsequent entry click (the submenu is absolutely positioned). Empty backend seed → openStats modal opens correctly but shows 'sin datos' placeholders — this is expected behaviour, not a bug. The Electron packaged index.html at /app/frontend/public/downloads/electron-src/index.html is a mirror of v2.html — the two are kept in sync by publish-safe.ps1 (manual step by owner before .exe rebuild).",
+  "rca of the issue": "N/A — verification pass. All 4 review-request fixes (URL rotation resilience, dropdown restructure, dynamic Tráfico categories, company-scoped annual/comparison reports) verified working end-to-end on the preview URL. The Electron .exe running on user's field machine has NOT been recompiled yet (user needs to run publish-safe.ps1); once recompiled, existing clients on obsolete URLs will auto-heal within 24h via api-endpoint.json polling."
+}
