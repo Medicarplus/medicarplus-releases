@@ -1,21 +1,29 @@
-# PRD — MediCar Plus (Estat 15/07/2026)
+# PRD — MediCar Plus (Estat 15/07/2026 — v2.1.11)
 
-## 🆕 CANVI 15/07/2026 · Dropdown "Estadísticas" + Comparativa años
+## 🆕 CANVIS 15/07/2026 · Sessió acumulada
 
-Nou menú desplegable independent "📊 Estadísticas" al header (gradient marró/or) amb 3 opcions, extret del menú Contabilidad:
-- **📅 Facturación mensual** → `openAnnualReport()` (informe anual amb repartiment mes a mes)
-- **🚗 Estadísticas autoescuelas** → `openStats()` (modal multi-secció: autos · tráfico · SMS · cites)
-- **📈 Comparativa años** → `openYearComparison()` (NOU · compara 2–6 anys en paral·lel)
+### v2.1.11 · Estat més recent
+- **🛡️ Nou dropdown "Copias de seguridad"** al header (verd fosc), agrupa: Guardar copia · Restaurar copia · Historial de copias. Testids: `btn-backup`, `btn-save-backup`, `btn-restore-backup`, `btn-history`.
+- **🤖 Fix crític AI Gemini**: model actualitzat a `gemini-3-flash-preview` (Emergent LLM Key) i `gemini-2.0-flash` (Google API key usuari). Prompt del sistema traduït al castellà (resposta per defecte en castellà, català només si l'usuari ho demana explícitament).
+- **🌍 Missatges d'error AI traduïts al castellà**: "Tu clave de Google Gemini ha dado error", "💡 Consejo: introduce tu propia clave..." (abans en català).
+- **💳 Fix pagament UX**:
+  - `openExternalUrl()` universal: Electron → `window.open` intercepted per `setWindowOpenHandler` → `shell.openExternal`. Navegador → `window.location.href` (evita bloqueig popups).
+  - "Ver planes y pagar" ara TANCA el modal Config abans d'obrir el modal Upgrade (arregla z-index bug on Config 10000 > Upgrade 9999).
+- **🧾 Portal Client Stripe**:
+  - Backend: `POST /api/payments/billing-portal` (params: install_id o customer_email) + `GET /api/payments/subscription/by-install/{id}`
+  - Frontend: botó **"🧾 Gestionar subscripció / Cancel·lar"** dins ⚙️ Configuración, només visible si té subscripció activa. Mostra estat (activa/cancelada/past_due) i si es cancel·larà al final del període.
+  - Landing: link "Gestionar mi suscripción" al peu de pàgina → prompt d'email → obre portal.
+- **📊 Dropdown Estadísticas** (Facturación mensual · Estadísticas autoescuelas · **Comparativa años** [NOU])
+  - `openYearComparison()` amb KPIs, taula comparativa % variació, taula mensual 12×N anys, selector 2-6 anys, impressió.
 
-Nova funció `openYearComparison()` a `v2.html` (línies ~2773–2870):
-- KPI cards per any (facturació neta + entrades + barra proporcional)
-- Taula "Resumen comparativo" (Facturación neta, Entradas, Tasas DGT, Media mensual) amb % variació any inicial → any final (fletxes ▲▼)
-- Taula "Facturación mensual comparada" (12 mesos × N anys)
-- Selector "Años a comparar" 2/3/4/5/6, botó imprimir/PDF (utilitza `@media print` estàndard)
-- Data-testids: `btn-stats`, `btn-stat-fac-mensual`, `btn-stat-autoescolas`, `btn-stat-comparar-anys`, `yc-body`, `yc-print`, `yc-close`
-- Verificat visualment amb screenshot: comparativa 2024–2026 renderitza KPIs, %variació i taula mensual OK
+### Documentació actualitzada
+- `guia-client-installacio.html`: nou dropdown, comparativa anys, subscripció auto-renovable, cancel·lació pas a pas
+- `guia-medicar-plus.html`: novetats v2.1.10-11 al top, portal Stripe tècnic, webhook flow
+- `guia-stripe-setup.html`: pas obligatori d'activar Billing Portal a Stripe Dashboard, flux complet de cancel·lació 10 passos
 
-Botons eliminats del dropdown Contabilidad: `btnAnnualReport`, `btnStatsMenu` (ara viuen al nou dropdown). Contabilidad conserva: Llibreta, IRPF, Reserva de cambio, Libro de Registro, Novedades.
+### Cal fer després per anar LIVE
+- Activar Customer Portal a Stripe Dashboard (Settings → Billing → Customer Portal): Cancel subscriptions "at end of billing period", Invoice history, Payment methods, Business info amb Privacy/Terms URLs
+- Substituir Stripe TEST keys per LIVE keys al backend `.env` quan tinguis IBAN
 
 ---
 

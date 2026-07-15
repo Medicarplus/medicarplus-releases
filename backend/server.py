@@ -118,10 +118,10 @@ async def ai_ask(request: Request, body: AiAskBody):
                 lines.append(f"{d} {e.get('tipo','')} {e.get('nombre','')[:30]} imp={e.get('importe',0)} tasa={e.get('tasa',0)} {e.get('fp','')}")
     data_txt = "\n".join(lines[-400:])
     system = (
-        "Ets un assessor comptable expert en gestories de trànsit i medicina esportiva a Catalunya. "
-        "Analitza el registre de caixa i respon en català o castellà segons l'usuari, breu i pràctic amb vinyetes. "
-        "Si hi ha descuadre (diff), busca causes: devolucions de taxa DGT no apuntades, duplicats, imports atípics. "
-        "Cita dates concretes dd/mm/yyyy."
+        "Eres un asesor contable experto en gestorías de tráfico y medicina deportiva en España. "
+        "Analiza el registro de caja y responde en castellano (o catalán solo si el usuario lo pide), breve y práctico con viñetas. "
+        "Si hay descuadre (diff), busca causas: devoluciones de tasa DGT no apuntadas, duplicados, importes atípicos. "
+        "Cita fechas concretas dd/mm/yyyy."
     )
     diff_txt = f"DESCUADRE: {body.diff:.2f}€ (positiu=sobra, negatiu=falta)\n" if body.diff else ""
     audit_txt = ""
@@ -149,7 +149,7 @@ async def ai_ask(request: Request, body: AiAskBody):
             return {"answer": resp.text, "source": "user-key"}
         except Exception as ex:
             logging.exception("User Gemini key error")
-            return {"answer": f"❌ La teva clau Google Gemini ha donat error: {str(ex)[:200]}\n\nRevisa que la clau sigui vàlida a https://aistudio.google.com/apikey", "error": True}
+            return {"answer": f"❌ Tu clave de Google Gemini ha dado error: {str(ex)[:200]}\n\nRevisa que la clave sea válida en https://aistudio.google.com/apikey", "error": True}
     # Fallback to Emergent LLM Key
     try:
         chat = LlmChat(
@@ -161,7 +161,7 @@ async def ai_ask(request: Request, body: AiAskBody):
         return {"answer": reply, "source": "emergent-key"}
     except Exception as ex:
         logging.exception("AI error")
-        return {"answer": f"❌ Error del asesor IA: {str(ex)[:250]}\n\n💡 Consell: introdueix la teva pròpia clau gratuïta de Google Gemini a la app (botó ⚙️ del modal) per no dependre de la clau compartida.", "error": True}
+        return {"answer": f"❌ Error del asesor IA: {str(ex)[:250]}\n\n💡 Consejo: introduce tu propia clave gratuita de Google Gemini en la app (botón ⚙️ del modal) para no depender de la clave compartida.", "error": True}
 
 @api_router.post("/status", response_model=StatusCheck)
 async def create_status_check(input: StatusCheckCreate):
