@@ -150,15 +150,9 @@ async def ai_ask(request: Request, body: AiAskBody):
             return {"answer": resp.text, "source": "user-key"}
         except Exception as ex:
             logging.exception("User Gemini key error")
-            err_str = str(ex)
-            user_key_error = err_str
-            # Si l'error és quota excedida (429), fem fallback silenciós a Emergent Key
-            is_quota_error = "429" in err_str or "quota" in err_str.lower() or "rate limit" in err_str.lower()
-            if not is_quota_error:
-                # Altres errors (clau invàlida, etc.): mostra-ho a l'usuari, no facis fallback
-                short = err_str[:200]
-                return {"answer": f"❌ Tu clave de Google Gemini ha dado error: {short}\n\nRevisa que la clave sea válida en https://aistudio.google.com/apikey", "error": True}
-    # Fallback to Emergent LLM Key (també cau aquí si la user key ha esgotat quota)
+            user_key_error = str(ex)
+            # SEMPRE fem fallback silenciós — millor UX: l'usuari sempre rep resposta
+    # Fallback to Emergent LLM Key (també cau aquí si la user key ha fallat per qualsevol motiu)
     try:
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
@@ -168,7 +162,12 @@ async def ai_ask(request: Request, body: AiAskBody):
         reply = await chat.send_message(UserMessage(text=user_msg))
         note = ""
         if user_key_error:
-            note = "\n\n_ℹ️ Tu clave gratuita de Google Gemini ha superado la cuota diaria (se resetea a las 09:00 hora española). He usado la clave compartida de MediCar Plus mientras tanto._"
+            # Detecta si és quota per donar-li un missatge útil
+            err_lower = user_key_error.lower()
+            if "429" in user_key_error or "quota" in err_lower or "rate" in err_lower or "exhausted" in err_lower:
+                note = "\n\n_ℹ️ Tu clave gratuita de Google Gemini ha alcanzado el límite diario (10 preguntas/min, 250/día). Se resetea automáticamente. He usado la clave compartida de MediCar Plus mientras tanto._"
+            else:
+                note = "\n\n_ℹ️ Tu clave de Google Gemini ha dado error temporal. He usado la clave compartida de MediCar Plus. Si el problema persiste, revisa que la clave sea válida en aistudio.google.com/apikey._"
         return {"answer": reply + note, "source": "emergent-key-fallback" if user_key_error else "emergent-key"}
     except Exception as ex:
         logging.exception("AI error")

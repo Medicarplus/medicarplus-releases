@@ -3888,12 +3888,8 @@ function openUpgradeModal(){
     btn.onclick=async()=>{
       const pkgId=btn.getAttribute('data-buy-plan');
       const status=back.querySelector('#upgStatus');
-      // Confirma o demana email
-      let email=clientEmail;
-      if(!email){
-        email=prompt(isCA?'Confirma\'ns el teu email per la factura i llicència:':'Confírmanos tu email para la factura y licencia:');
-        if(!email || !email.includes('@')){ status.innerHTML='<span style="color:#f97316">'+(isCA?'Email invàlid':'Email inválido')+'</span>';return }
-      }
+      // Email: si el tenim de la llicència l'usem; si no, deixem que Stripe el demani al Checkout
+      const email=clientEmail && clientEmail.includes('@') ? clientEmail : ('client-'+installId.slice(-8)+'@medicarplus.es');
       status.innerHTML='<span style="color:#a855f7">⏳ '+(isCA?'Preparant pagament...':'Preparando pago...')+'</span>';
       btn.disabled=true;
       try{
@@ -3911,8 +3907,7 @@ function openUpgradeModal(){
         if(!r.ok){const t=await r.text();throw new Error('HTTP '+r.status+' · '+t.slice(0,180))}
         const d=await r.json();
         if(d && d.url){
-          status.innerHTML='<span style="color:#22c55e">✓ '+(isCA?'Obrint Stripe...':'Abriendo Stripe...')+'</span>';
-          // Obrir la URL de Stripe (Electron → nova finestra sistema · Navegador → mateixa pestanya)
+          status.innerHTML='<span style="color:#22c55e">✓ '+(isCA?'Obrint Stripe al navegador...':'Abriendo Stripe en el navegador...')+'</span>';
           openExternalUrl(d.url);
         } else throw new Error(isCA?'URL de pagament no rebuda':'URL de pago no recibida');
       }catch(err){
