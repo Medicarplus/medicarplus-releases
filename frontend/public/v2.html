@@ -102,10 +102,13 @@
   body.cempla{--accent:#5aa9ff;--accent-2:#86b6ff}
   body.cempla .chip.active{color:#0a1d2e}
   body.cempla .summary .row.total{color:#5aa9ff}
-  /* 🔒 Privacy mode · amaga imports sensibles amb blur */
+  /* 🔒 Privacy mode · només difumina els IMPORTS (num), no les etiquetes. Així saps QUÈ està ocult. */
+  body.privacy-on .summary .row.wide .num,
   body.privacy-on .summary .row.wide .num.big,
-  body.privacy-on .summary .row.total .num,
-  body.privacy-on .summary .row.wide{filter:blur(9px);transition:filter .2s;user-select:none;pointer-events:none}
+  body.privacy-on .summary .row.total .num{filter:blur(8px);transition:filter .2s;user-select:none;pointer-events:none;cursor:pointer}
+  body.privacy-on .summary .row.wide:hover .num,
+  body.privacy-on .summary .row.wide:hover .num.big,
+  body.privacy-on .summary .row.total:hover .num{filter:blur(0);cursor:default}
   body.privacy-on #btnPrivacyToggle{color:#f59e0b !important;border-color:#f59e0b !important;background:rgba(245,158,11,.1) !important}
   #btnPrivacyToggle:hover{color:#e2e8f0;border-color:#5aa9ff}
   @media print {body{background:#fff;color:#000}header,.no-print,.panel h2 button,.actions,.toolbar,form,.tabs,details{display:none !important}.grid{display:block}.panel{border:none;background:#fff}thead th{background:#eee;color:#000;border-color:#999}tbody td{border-color:#ccc;color:#000}.summary{color:#000}.tag{border:1px solid #999;color:#000;background:#fff}}
@@ -785,12 +788,15 @@ function setDate(d){currentDate=d;$('#fecha').value=d;render()}
 function shiftDate(delta){const d=new Date(currentDate);d.setDate(d.getDate()+delta);setDate(d.toISOString().slice(0,10))}
 $('#btnPrevDay').onclick=()=>shiftDate(-1);$('#btnNextDay').onclick=()=>shiftDate(1);$('#btnToday').onclick=()=>setDate(isoToday());$('#fecha').onchange=e=>setDate(e.target.value);
 // 🔒 Privacy toggle · amaga imports sensibles (CAJA FÍSICA, COMPTE BANC, TOTAL) amb blur
+// Per defecte: OCULT (privacitat activada). Clica l'ull per mostrar temporalment.
 (function initPrivacy(){
   const KEY='mb.privacy.on';
   const btn=$('#btnPrivacyToggle');
   if(!btn) return;
   const apply=(on)=>{document.body.classList.toggle('privacy-on',on);btn.textContent=on?'🙈':'👁️';btn.title=on?'Mostrar importes':'Ocultar importes (privacidad)'};
-  apply(localStorage.getItem(KEY)==='1');
+  // Default = ON (ocult). Només si l'usuari ha desactivat explícitament ("0") ho mostrem.
+  const stored=localStorage.getItem(KEY);
+  apply(stored===null?true:stored==='1');
   btn.onclick=()=>{const on=!document.body.classList.contains('privacy-on');localStorage.setItem(KEY,on?'1':'0');apply(on)};
 })();
 $('#cTrafic').onclick=()=>switchCompany('trafic');
