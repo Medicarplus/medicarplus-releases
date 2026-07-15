@@ -28,32 +28,61 @@ def is_configured() -> bool:
 
 
 GUIDE_ATTACHMENTS = [
-    ("guia-instalacion-medicar-plus.pdf", "/app/frontend/public/guia-client-installacio.html"),
-    ("manual-usuario-medicar-plus.pdf", "/app/frontend/public/manual-usuari.html"),
+    {
+        "pdf_name": "guia-instalacion-medicar-plus.pdf",
+        "html_path": "/app/frontend/public/guia-client-installacio.html",
+        "doc_kind": "guia",
+        "doc_title": "Guía de Instalación",
+        "doc_subtitle": "Cómo activar tu licencia MediCar Plus en 5 minutos · Windows",
+    },
+    {
+        "pdf_name": "manual-usuario-medicar-plus.pdf",
+        "html_path": "/app/frontend/public/manual-usuari.html",
+        "doc_kind": "manual",
+        "doc_title": "Manual de Usuario",
+        "doc_subtitle": "Referencia completa del software · Registro, estadísticas, campañas SMS y más",
+    },
 ]
 
 
-async def _load_attachments() -> list[tuple[str, bytes]]:
-    """Genera PDFs a partir dels HTML de guia/manual i els retorna com a adjunts.
+async def _load_attachments(
+    *,
+    client_name: str,
+    install_id: str,
+    license_key: str,
+    plan: str,
+    expires_at: Optional[datetime],
+) -> list[tuple[str, bytes]]:
+    """Genera PDFs personalitzats (portada + cos) per client i els retorna com a adjunts.
 
-    Si la conversió a PDF falla, fa fallback al HTML original perquè el correu
+    Si la conversió falla, fa fallback al HTML original perquè el correu
     encara arribi amb documentació.
     """
-    from services.pdf_builder import html_to_pdf
+    from services.pdf_builder import build_client_pdf
 
     out: list[tuple[str, bytes]] = []
-    for pdf_name, html_path in GUIDE_ATTACHMENTS:
-        pdf_bytes = await html_to_pdf(html_path)
+    for spec in GUIDE_ATTACHMENTS:
+        pdf_bytes = await build_client_pdf(
+            doc_kind=spec["doc_kind"],
+            body_html_path=spec["html_path"],
+            doc_title=spec["doc_title"],
+            doc_subtitle=spec["doc_subtitle"],
+            client_name=client_name,
+            install_id=install_id,
+            plan=plan,
+            expires_at=expires_at,
+            license_key=license_key,
+        )
         if pdf_bytes:
-            out.append((pdf_name, pdf_bytes))
+            out.append((spec["pdf_name"], pdf_bytes))
             continue
         # Fallback: adjunta l'HTML si el PDF no es pot generar
         try:
-            with open(html_path, "rb") as fh:
-                fallback_name = os.path.basename(html_path)
+            with open(spec["html_path"], "rb") as fh:
+                fallback_name = os.path.basename(spec["html_path"])
                 out.append((fallback_name, fh.read()))
         except Exception as ex:  # noqa: BLE001
-            logger.warning("attachment missing: %s (%s)", html_path, ex)
+            logger.warning("attachment missing: %s (%s)", spec["html_path"], ex)
     return out
 
 
@@ -203,7 +232,13 @@ async def send_license_email(
         plan=plan,
         expires_at=expires_at,
     )
-    attachments = await _load_attachments()
+    attachments = await _load_attachments(
+        client_name=client_name,
+        install_id=install_id,
+        license_key=license_key,
+        plan=plan,
+        expires_at=expires_at,
+    )
 
     # 1) Prova Resend
     if is_configured():

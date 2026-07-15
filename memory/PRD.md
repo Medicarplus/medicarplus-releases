@@ -308,3 +308,13 @@ Efecte immediat en tots els clients (main.js consulta abans d'auto-actualitzar).
 - Cos del correu i botons actualitzats amb noms nous: `guia-instalacion-medicar-plus.pdf` i `manual-usuario-medicar-plus.pdf`.
 - SMTP diferencia `application/pdf` vs `octet-stream` segons extensió.
 - **Testejat**: correu real a marcbrugulat@hotmail.com amb 2 PDF adjunts (667 KB guia + 313 KB manual). Magic `%PDF-` verificat. `smtp_sent` OK.
+
+## 📝 Sessió 15/07/2026 (5a part) · Portada branded per PDF
+
+### 🎨 Portada personalitzada per client
+- `pdf_builder.py` refactoritzat:
+  - `_cover_html(...)` genera una portada A4 amb branding MediCar Plus (logo M+ daurat, bandes superior/inferior en gradient, targeta "EMITIDO PARA" amb Cliente/Plan/Caducidad/Install ID/Clave).
+  - `build_client_pdf(doc_kind, ...)` renderitza portada + cos i els uneix amb `pypdf`. El cos es cacheja per mtime (guia/manual només es regeneren si canvien els HTML). Només la portada es genera per client (~1s).
+- `mailer.py` → `_load_attachments()` ara accepta les dades del client i genera dos PDFs personalitzats (guia + manual) amb la portada corresponent (títol i subtítol diferents).
+- Nova dependència: `pypdf==6.14.2` afegida a `requirements.txt`.
+- **Testejat**: correu real a marcbrugulat@hotmail.com. PDFs: guia 746 KB (2 pàgines: portada + cos), manual 391 KB. Portada verificada amb screenshot: logo, bandes daurades, targeta client i footer amb dades. `smtp_sent` OK.
