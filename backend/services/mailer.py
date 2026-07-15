@@ -28,20 +28,32 @@ def is_configured() -> bool:
 
 
 GUIDE_ATTACHMENTS = [
-    ("guia-client-installacio.html", "/app/frontend/public/guia-client-installacio.html"),
-    ("manual-usuari.html", "/app/frontend/public/manual-usuari.html"),
+    ("guia-instalacion-medicar-plus.pdf", "/app/frontend/public/guia-client-installacio.html"),
+    ("manual-usuario-medicar-plus.pdf", "/app/frontend/public/manual-usuari.html"),
 ]
 
 
-def _load_attachments() -> list[tuple[str, bytes]]:
-    """Llegeix els fitxers de guia/manual per adjuntar-los al correu."""
+async def _load_attachments() -> list[tuple[str, bytes]]:
+    """Genera PDFs a partir dels HTML de guia/manual i els retorna com a adjunts.
+
+    Si la conversió a PDF falla, fa fallback al HTML original perquè el correu
+    encara arribi amb documentació.
+    """
+    from services.pdf_builder import html_to_pdf
+
     out: list[tuple[str, bytes]] = []
-    for name, path in GUIDE_ATTACHMENTS:
+    for pdf_name, html_path in GUIDE_ATTACHMENTS:
+        pdf_bytes = await html_to_pdf(html_path)
+        if pdf_bytes:
+            out.append((pdf_name, pdf_bytes))
+            continue
+        # Fallback: adjunta l'HTML si el PDF no es pot generar
         try:
-            with open(path, "rb") as fh:
-                out.append((name, fh.read()))
+            with open(html_path, "rb") as fh:
+                fallback_name = os.path.basename(html_path)
+                out.append((fallback_name, fh.read()))
         except Exception as ex:  # noqa: BLE001
-            logger.warning("attachment missing: %s (%s)", path, ex)
+            logger.warning("attachment missing: %s (%s)", html_path, ex)
     return out
 
 
@@ -79,9 +91,9 @@ def _render_html(
         <p style="color:#cbd5e1;font-size:14px;margin-top:22px;line-height:1.55">
           <b style="color:#f5b301">Cómo activarla:</b><br>
           1. Descarga la aplicación MediCar Plus desde <a href="https://github.com/Medicarplus/medicarplus-releases/releases/latest" style="color:#f5b301;text-decoration:underline">este enlace</a>.<br>
-          2. Instala el ejecutable (sigue la <b style="color:#22c55e">guía de instalación</b> adjunta a este correo — abre el archivo <code style="color:#22c55e">guia-client-installacio.html</code>).<br>
+          2. Instala el ejecutable (sigue la <b style="color:#22c55e">guía de instalación</b> adjunta en PDF — <code style="color:#22c55e">guia-instalacion-medicar-plus.pdf</code>).<br>
           3. En la pantalla "Activación de licencia", pega la clave completa y pulsa <b>Activar</b>.<br>
-          4. Consulta el <b style="color:#7ec8ff">manual de usuario completo</b> adjunto (<code style="color:#7ec8ff">manual-usuari.html</code>) cuando tengas cualquier duda.
+          4. Consulta el <b style="color:#7ec8ff">manual de usuario completo</b> adjunto en PDF (<code style="color:#7ec8ff">manual-usuario-medicar-plus.pdf</code>) cuando tengas cualquier duda.
         </p>
 
         <table width="100%" cellpadding="12" cellspacing="0" style="margin-top:20px">
@@ -94,13 +106,13 @@ def _render_html(
             <td style="width:2%"></td>
             <td style="background:#0f172a;border:1px solid #22c55e;border-radius:8px;padding:14px;text-align:center;width:33%">
               <span style="color:#22c55e;font-size:13px;font-weight:700">
-                📎 Guía<br>de instalación<br><span style="font-size:10px;color:#94a3b8;font-weight:400">(adjunta)</span>
+                📄 Guía<br>de instalación<br><span style="font-size:10px;color:#94a3b8;font-weight:400">(PDF adjunto)</span>
               </span>
             </td>
             <td style="width:2%"></td>
             <td style="background:#0f172a;border:1px solid #7ec8ff;border-radius:8px;padding:14px;text-align:center;width:33%">
               <span style="color:#7ec8ff;font-size:13px;font-weight:700">
-                📎 Manual<br>de usuario<br><span style="font-size:10px;color:#94a3b8;font-weight:400">(adjunto)</span>
+                📄 Manual<br>de usuario<br><span style="font-size:10px;color:#94a3b8;font-weight:400">(PDF adjunto)</span>
               </span>
             </td>
           </tr>
@@ -146,7 +158,8 @@ def _send_smtp(to_email: str, subject: str, html: str, attachments: list[tuple[s
             body.attach(MIMEText(html, "html", "utf-8"))
             msg.attach(body)
             for fname, data in attachments:
-                part = MIMEApplication(data, _subtype="octet-stream")
+                subtype = "pdf" if fname.lower().endswith(".pdf") else "octet-stream"
+                part = MIMEApplication(data, _subtype=subtype)
                 part.add_header("Content-Disposition", "attachment", filename=fname)
                 msg.attach(part)
         else:
@@ -190,7 +203,7 @@ async def send_license_email(
         plan=plan,
         expires_at=expires_at,
     )
-    attachments = _load_attachments()
+    attachments = await _load_attachments()
 
     # 1) Prova Resend
     if is_configured():

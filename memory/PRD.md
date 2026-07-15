@@ -299,3 +299,12 @@ Efecte immediat en tots els clients (main.js consulta abans d'auto-actualitzar).
   - Resend inclou `attachments` amb el contingut en base64.
   - Cos del correu actualitzat: enllaços trencats reemplaçats per referències als adjunts (`guia-client-installacio.html`, `manual-usuari.html`).
 - **Testejat**: correu real enviat a marcbrugulat@hotmail.com amb els 2 adjunts (14 KB + 28 KB). Result: `smtp_sent`.
+
+## 📝 Sessió 15/07/2026 (4a part) · Adjunts en PDF
+
+### 📄 Guia i manual ara s'adjunten com a PDF (no HTML)
+- Nou mòdul `/app/backend/services/pdf_builder.py`: `html_to_pdf(path)` amb Playwright Chromium (A4, marges 16/12mm, fons imprès). Cache a `/tmp/medicar_pdfs/` per mtime.
+- `mailer.py` → `_load_attachments()` és async i genera PDFs a partir dels HTML. Fallback a HTML si Playwright falla.
+- Cos del correu i botons actualitzats amb noms nous: `guia-instalacion-medicar-plus.pdf` i `manual-usuario-medicar-plus.pdf`.
+- SMTP diferencia `application/pdf` vs `octet-stream` segons extensió.
+- **Testejat**: correu real a marcbrugulat@hotmail.com amb 2 PDF adjunts (667 KB guia + 313 KB manual). Magic `%PDF-` verificat. `smtp_sent` OK.
