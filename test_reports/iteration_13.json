@@ -1,0 +1,48 @@
+{
+  "summary": "Pre-launch iteration 13 — Stripe subscriptions end-to-end + Gemini AI onboarding + billing portal + webhook security. All 10 focused backend pytest tests PASS. All 5 critical frontend flows PASS with ZERO console errors. Ready for launch.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Asesor IA modal (post-save)", "issues": ["Line 3430 shows the header 'Asesor IA · Buscar descuadre' correctly in Spanish, and the collapsed 'Clave Google Gemini' section correctly updates to 'activa — GRATIS 🎉' after key save. Verified visually."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_prelaunch_gemini_stripe.py",
+    "/app/test_reports/pytest/pytest_iter13.xml",
+    "/app/test_reports/pytest/pytest_iter13_all.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: 6 pre-existing regression tests in older test files fail due to product version bumps (electron 2.1.x → 2.2.2), stripe price refactor, printHtml relocation, and SMTP error format change from Resend to IONOS. These are outdated test expectations, NOT product bugs. Consider updating: test_calendar_sync.py::test_electron_package_json_version (2.1.x → 2.2.x), test_license_requests.py::test_approve_creates_license_and_graceful_email_fallback (SMTP error is now the fallback, not resend_not_configured), test_prelaunch_v217.py (version + Guardar PDF assertion location), test_v2_print_backend.py (electron download endpoint changed).",
+    "OPTIONAL (very minor): the onboarding modal skip button text 'Ahora no' currently uses default btn styling — could be muted (btn-secondary) to make 'Guardar' stand out more. Not blocking."
+  ],
+  "critical_code_review_comments": [
+    "SECURITY: /api/webhook/stripe correctly rejects unsigned/invalid-signature payloads (verified: 200 with received=false, no side-effect in DB). The signature verification via _stripe_sdk.Webhook.construct_event is safe.",
+    "SECURITY: payments router uses HTTPException(400) for invalid package_id and HTTPException(503) for unconfigured Price IDs — good UX + no info leak.",
+    "AI ROBUSTNESS: /api/ai-ask has 3-tier fallback (user key → emergent key → error message). Verified with invalid 39-char key that emergent fallback kicks in silently (200 response). No 500 ever returned.",
+    "STRIPE CHECKOUT: create-subscription writes to payment_transactions with status='initiated', mode='subscription', install_id, company_name, request_id — all needed for webhook reconciliation. Verified session_id starts with cs_test_ and URL starts with https://checkout.stripe.com/.",
+    "BILLING PORTAL: correctly returns 400 (missing both ids) and 404 (unknown install_id) with Catalan/Spanish friendly messages. Behavior matches spec.",
+    "FRONTEND: saveGeminiKey() at v2.html:3389 correctly (a) trims quotes/whitespace, (b) rejects <20 chars with a Spanish toast, (c) stores in localStorage caja.geminiKey. Verified end-to-end.",
+    "FRONTEND: showGeminiOnboarding() at v2.html:3396 renders all 5 required testids (modal, open-link, key-input, save-btn, skip-btn). Content is 100% Spanish. Skip correctly sets caja.aiOnboardSeen=1.",
+    "FRONTEND: btnAiAsk onclick gate at v2.html:3422 is correctly wired: no key + no seen → onboarding; otherwise → normal Asesor IA modal.",
+    "MINOR (non-blocking): v2.html is now 5912 lines — up from 5468 last iter. Still a deliberate single-file architecture for Electron packaging. Post-launch refactor recommendation stands.",
+    "MINOR (non-blocking): the upgrade modal's Suscribirme click resolves the backend URL via the URL auto-discovery mechanism, so the create-subscription POST goes to the discovered URL (c3cff9be-...preview.emergentagent.com), not to the REACT_APP_BACKEND_URL in frontend/.env. Both URLs point to the same backend cluster — verified by matching Stripe cs_test_ sessions."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_prelaunch_gemini_stripe.py"
+  ],
+  "success_rate": {
+    "backend": "100% (10/10 focused pre-launch tests passed). Overall suite: 85/91 passed — 6 outdated regression assertions unrelated to this review scope.",
+    "frontend": "100% (5/5 critical flows: onboarding modal render, skip → Spanish Asesor IA, short-key toast, valid-key persist + GRATIS label, upgrade modal → create-subscription API call). Zero JS console errors."
+  },
+  "test_credentials": "Master license: MB-MASTER-BRUGULAT-2026-OWNER (offline, activated via localStorage.caja.license.v1). Admin token: MB-ADMIN-BRUGULAT-2026-4F8E2A1C. Stripe TEST MODE keys configured in backend/.env.",
+  "seed_data_creation": "Backend: create-subscription created 1 test payment_transaction (session cs_test_..., install_id='CD-TEST-PRELAUNCH-13', customer_email='TEST_prelaunch@medicarplus.es') — safe test data prefixed TEST_. Frontend: localStorage seeded pre-navigation (caja.install.id.v1, caja.license.v1 MASTER, caja.config.v1 with company1='Empresa Test SL'). Cleaned after test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend URL uses auto-discovery — the create-subscription in the app POSTs to the discovered URL (c3cff9be-...preview.emergentagent.com), which may differ from REACT_APP_BACKEND_URL in frontend/.env. Both resolve to the same backend. When testing subscription flows via UI, don't assume the network call goes to REACT_APP_BACKEND_URL — verify via api_calls capture. The Gemini onboarding modal (data-testid='gemini-onboarding-modal') is a gate at btnAiAsk that only appears when BOTH caja.geminiKey is empty AND caja.aiOnboardSeen is unset. To re-test, always clear both. Master license MB-MASTER-BRUGULAT-2026-OWNER is OFFLINE — v2.html activates it locally; backend /api/licenses/verify does NOT accept it and returns ok=false with a JWT decode error, which is the correct behavior. install_id format validated by pydantic must match CD-XXXX-XXXX-XXXX-XXXX (majuscules and digits).",
+  "rca of the issue": "N/A — no bugs found. All review-request items (Stripe subscriptions creation + status + billing portal 400/404, webhook signature rejection, /api/ai-ask fallback with no key + invalid key, Gemini onboarding modal + testids + Spanish text + skip flag + short key rejection + valid key persistence + Asesor IA label update, upgrade modal → create-subscription integration) verified working end-to-end. Zero JS console errors. Zero backend 500s. The 6 failing tests in the wider suite are outdated regression assertions from previous iterations that need version-bump updates — not product bugs."
+}

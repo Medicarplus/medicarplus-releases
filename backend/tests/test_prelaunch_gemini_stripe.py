@@ -195,7 +195,7 @@ class TestLicenseMasterOffline:
         - It gracefully rejects the master string (ok=false)
         """
         payload = {
-            "install_id": "CD-TEST-OFFLINE-13",
+            "install_id": "CD-TEST-OFFL-INE1-3XYZ",
             "key": "MB-MASTER-BRUGULAT-2026-OWNER",
         }
         r = s.post(f"{API}/licenses/verify", json=payload, timeout=15)
