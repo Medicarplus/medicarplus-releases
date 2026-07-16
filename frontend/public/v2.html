@@ -2975,7 +2975,6 @@ function _buildAnnualReport(year){
     const totalHaberCnt = haberEntries.reduce((s,[,v]) => s + v.count, 0);
     const totalHaber = grandTotals.haberTotal || 0;
     html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">💰 ${L('Ingresos manuales (HABER)','Ingresos manuales (HABER)')}</h4>
-      <p style="color:#64748b;font-size:11px;margin:-4px 0 8px 0;font-style:italic">${L('Ingresos añadidos manualmente vía Debe/Haber (honorarios, fotos, extras). Sumen en el total facturado.','Ingresos añadidos manualmente vía Debe/Haber (honorarios, fotos, extras). Suman en el total facturado.')}</p>
       <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
         <thead><tr style="background:#0f4d2a;color:#a7f3d0"><th style="padding:8px;text-align:left">${L('Concepto','Concepto')}</th><th style="padding:8px;text-align:right">${L('Uds.','Uds.')}</th><th style="padding:8px;text-align:right">${L('Total','Total')}</th></tr></thead>
         <tbody>${haberEntries.map(([k,v]) => `<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:6px 8px">${escapeHtml(k)}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:#0891b2;font-weight:600">${v.count}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#166534">+${fmt(v.total)}</td></tr>`).join('')}
@@ -2984,41 +2983,36 @@ function _buildAnnualReport(year){
       </table>`;
   }
 
-  // 🎯 RESULTAT COMPTABLE FINAL · resum comptable segons regles reals
-  const totalServicios = Object.values(grandTotals.byConcept||{}).reduce((s,n)=>s+n,0);
-  const totalHaberSum = grandTotals.haberTotal || 0;
-  const totalTasasVendidas = grandTotals.tasasVendidas || 0;
-  const totalGastosSum = Object.values(grandTotals.gastos||{}).reduce((s,g)=>s+g.total,0);
-  const ingresosBrutos = totalServicios + totalHaberSum;
-  const beneficioNeto = ingresosBrutos - totalGastosSum;
-  html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">🎯 ${L('Resultado contable','Resultado contable')}</h4>
-    <p style="color:#64748b;font-size:11px;margin:-4px 0 8px 0;font-style:italic">${L('Modelo del negocio: tasas DGT compradas por anticipado en bloque (stock). Al vender al cliente = ingreso propio. Compras en bloque = COGS (gasto DEBE).','Modelo del negocio: tasas DGT compradas por anticipado en bloque (stock). Al vender al cliente = ingreso propio. Compras en bloque = COGS (gasto DEBE).')}</p>
-    <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
-      <tbody>
-        <tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px">${L('Facturación total (servicios + tasas cobradas)','Facturación total (servicios + tasas cobradas)')}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#166534">+${fmt(totalServicios)}</td></tr>
-        <tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px">${L('Ingresos manuales (HABER)','Ingresos manuales (HABER)')}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#166534">+${fmt(totalHaberSum)}</td></tr>
-        <tr style="border-bottom:2px solid #0f172a;background:#f0fdf4"><td style="padding:8px;font-weight:700">= ${L('INGRESOS BRUTOS','INGRESOS BRUTOS')}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#166534">${fmt(ingresosBrutos)}</td></tr>
-        <tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px">− ${L('Gastos totales (DEBE · incluye compra tasas en bloque)','Gastos totales (DEBE · incluye compra tasas en bloque)')}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#dc2626">-${fmt(totalGastosSum)}</td></tr>
-        <tr style="border-top:2px solid #0f172a;background:#fef3c7"><td style="padding:12px;font-weight:800;font-size:14px">= ${L('BENEFICIO NETO','BENEFICIO NETO')} <span style="font-size:10px;color:#64748b;font-weight:400">${L('(antes IRPF)','(antes IRPF)')}</span></td><td style="padding:12px;text-align:right;font-family:'Courier New',monospace;font-weight:800;font-size:16px;color:${beneficioNeto>=0?'#166534':'#dc2626'}">${beneficioNeto>=0?'+':''}${fmt(beneficioNeto)}</td></tr>
-        <tr style="border-top:1px dashed #cbd5e1"><td style="padding:6px 8px;color:#64748b;font-size:11px;font-style:italic">${L('De las cuales · Tasas DGT vendidas (informativo)','De las cuales · Tasas DGT vendidas (informativo)')}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:#64748b;font-size:11px">${fmt(totalTasasVendidas)}</td></tr>
-      </tbody>
-    </table>`;
-
-  // 📚 GASTOS (DEBE) · separats de la facturació per correcció comptable
+  // 📚 GASTOS (DEBE) · abans del Resultat comptable
   const gastosData = grandTotals.gastos || {};
   const gastosEntries = Object.entries(gastosData).sort((a,b) => b[1].total - a[1].total);
   if(gastosEntries.length){
     const totalGastos = gastosEntries.reduce((s,[,v]) => s + v.total, 0);
     const totalGastosCnt = gastosEntries.reduce((s,[,v]) => s + v.count, 0);
-    html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">💸 ${L('Gastos (DEBE) · No suman en facturación','Gastos (DEBE) · No suman en facturación')}</h4>
-      <p style="color:#64748b;font-size:11px;margin:-4px 0 8px 0;font-style:italic">${L('Aquests conceptes es resten de caixa però NO són facturació segons regles comptables. Es mostren per referència i control de despeses.','Estos conceptos se restan de caja pero NO son facturación según reglas contables. Se muestran para referencia y control de gastos.')}</p>
+    html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">💸 ${L('Gastos (DEBE)','Gastos (DEBE)')}</h4>
       <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
-        <thead><tr style="background:#7f1d1d;color:#fecaca"><th style="padding:8px;text-align:left">${L('Concepte gasto','Concepto gasto')}</th><th style="padding:8px;text-align:right">${L('Uds.','Uds.')}</th><th style="padding:8px;text-align:right">${L('Total','Total')}</th></tr></thead>
+        <thead><tr style="background:#7f1d1d;color:#fecaca"><th style="padding:8px;text-align:left">${L('Concepto','Concepto')}</th><th style="padding:8px;text-align:right">${L('Uds.','Uds.')}</th><th style="padding:8px;text-align:right">${L('Total','Total')}</th></tr></thead>
         <tbody>${gastosEntries.map(([k,v]) => `<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:6px 8px">${escapeHtml(k)}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:#0891b2;font-weight:600">${v.count}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#dc2626">-${fmt(v.total)}</td></tr>`).join('')}
         <tr style="border-top:2px solid #7f1d1d;background:#fef2f2;font-weight:700"><td style="padding:8px">${L('TOTAL GASTOS','TOTAL GASTOS')}</td><td style="padding:8px;text-align:right;color:#0891b2">${totalGastosCnt}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#dc2626">-${fmt(totalGastos)}</td></tr>
         </tbody>
       </table>`;
   }
+
+  // 🎯 RESULTAT COMPTABLE FINAL · Ingresos − Gastos = Beneficio
+  const totalServicios = Object.values(grandTotals.byConcept||{}).reduce((s,n)=>s+n,0);
+  const totalHaberSum = grandTotals.haberTotal || 0;
+  const totalGastosSum = Object.values(grandTotals.gastos||{}).reduce((s,g)=>s+g.total,0);
+  const ingresosBrutos = totalServicios + totalHaberSum;
+  const beneficioNeto = ingresosBrutos - totalGastosSum;
+  html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">🎯 ${L('Resultado','Resultado')}</h4>
+    <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
+      <tbody>
+        <tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px">${L('Facturación','Facturación')}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#166534">+${fmt(totalServicios)}</td></tr>
+        <tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px">${L('HABER','HABER')}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#166534">+${fmt(totalHaberSum)}</td></tr>
+        <tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px">${L('DEBE','DEBE')}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#dc2626">-${fmt(totalGastosSum)}</td></tr>
+        <tr style="border-top:2px solid #0f172a;background:#fef3c7"><td style="padding:12px;font-weight:800;font-size:14px">${L('BENEFICIO','BENEFICIO')}</td><td style="padding:12px;text-align:right;font-family:'Courier New',monospace;font-weight:800;font-size:16px;color:${beneficioNeto>=0?'#166534':'#dc2626'}">${beneficioNeto>=0?'+':''}${fmt(beneficioNeto)}</td></tr>
+      </tbody>
+    </table>`;
 
   // Formes de pagament
   html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">💳 ${L('Per forma de pagament','Por forma de pago')}</h4>
