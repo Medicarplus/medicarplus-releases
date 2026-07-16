@@ -2826,21 +2826,21 @@ function _buildAnnualReport(year){
       cTotal.byMonth[m]=(cTotal.byMonth[m]||0)+t.neto;
       grandTotals.bruto+=t.bruto;grandTotals.tasas+=t.tasas;grandTotals.neto+=t.neto;grandTotals.cnt+=t.cnt;
       grandTotals.byMonth[m]+=t.neto;grandTotals.byMonthCnt[m]+=t.cnt;
-      // 💳 Per forma de pago · si l'usuari ha entrat el datáfono manual del dia,
-      //     TOT el que va a targeta = valor manual (override). L'efectiu = TOTAL COBRAT − targeta manual − bizum − transferencia.
-      //     Si NO hi ha datáfono manual, usem el càlcul automàtic (servei per fp + tases per fpTasa).
+      // 💳 Per forma de pago · replica la lògica exacta del panell diari:
+      //   Tarjeta = df manual si existeix, si no: sum auto (servei + tasa via T)
+      //   Efectiu = efectiu auto − delta (reclassificació entre caixa/banc)
       const dfManual = parseFloat(dfMap[d] || 0);
-      const totalCobrado = t.bruto + t.tasas + t.haber;
+      const autoT = (t.byFp.T||0) + (t.tasasByFp.T||0);
+      const efAuto = (t.byFp.E||0) + (t.tasasByFp.E||0);
+      const trDay = dfManual > 0 ? dfManual : autoT;
+      const deltaT = dfManual > 0 ? (dfManual - autoT) : 0;
+      const efDay = efAuto - deltaT;
       const bizumDay = (t.byFp.B||0) + (t.tasasByFp.B||0);
       const transDay = (t.byFp.X||0) + (t.tasasByFp.X||0);
-      if(dfManual > 0){
-        grandTotals.byFp.T += dfManual;
-        grandTotals.byFp.B += bizumDay;
-        grandTotals.byFp.X += transDay;
-        grandTotals.byFp.E += Math.max(0, totalCobrado - dfManual - bizumDay - transDay - t.debe);
-      } else {
-        ['E','T','B','X'].forEach(fp=>{grandTotals.byFp[fp]+=(t.byFp[fp]||0) + (t.tasasByFp[fp]||0)});
-      }
+      grandTotals.byFp.T += trDay;
+      grandTotals.byFp.E += efDay;
+      grandTotals.byFp.B += bizumDay;
+      grandTotals.byFp.X += transDay;
       list.forEach(e=>{
         if(e.retorno)return;
         // 📚 REGLES COMPTABLES (autoescola/gestoria autònom · Espanya)
