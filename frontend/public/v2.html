@@ -2808,10 +2808,14 @@ function _buildAnnualReport(year){
     <div style="font-size:13px;color:#64748b;margin-top:4px">MediCar Plus · ${comps.map(c=>c.name).join(' + ')}</div>
   </div>`;
 
-  // Agregació any complet
+  // Agregació any complet · llegeix també el datáfono manual per company (override de tarjeta)
+  const dfMapByComp = {};
+  try{ dfMapByComp['trafic'] = JSON.parse(localStorage.getItem('caja.datafono')||'{}') }catch(e){ dfMapByComp['trafic'] = {} }
+  try{ dfMapByComp['cempla'] = JSON.parse(localStorage.getItem('caja.cempla.datafono')||'{}') }catch(e){ dfMapByComp['cempla'] = {} }
   const grandTotals={bruto:0,tasas:0,neto:0,cnt:0,byMonth:Array(12).fill(0),byMonthCnt:Array(12).fill(0),byFp:{E:0,T:0,B:0,X:0},byConcept:{},byCompany:{}};
   comps.forEach(comp=>{
     let compRaw;try{compRaw=JSON.parse(localStorage.getItem(KEYS[comp.key]))||{byDate:{}}}catch(e){compRaw={byDate:{}}}
+    const dfMap = dfMapByComp[comp.key] || {};
     let cTotal={bruto:0,tasas:0,neto:0,cnt:0,byMonth:Array(12).fill(0)};
     Object.keys(compRaw.byDate||{}).forEach(d=>{
       if(!d.startsWith(String(year)+'-'))return;
@@ -2822,7 +2826,21 @@ function _buildAnnualReport(year){
       cTotal.byMonth[m]=(cTotal.byMonth[m]||0)+t.neto;
       grandTotals.bruto+=t.bruto;grandTotals.tasas+=t.tasas;grandTotals.neto+=t.neto;grandTotals.cnt+=t.cnt;
       grandTotals.byMonth[m]+=t.neto;grandTotals.byMonthCnt[m]+=t.cnt;
-      ['E','T','B','X'].forEach(fp=>{grandTotals.byFp[fp]+=(t.byFp[fp]||0) + (t.tasasByFp[fp]||0)});
+      // 💳 Per forma de pago · si l'usuari ha entrat el datáfono manual del dia,
+      //     TOT el que va a targeta = valor manual (override). L'efectiu = TOTAL COBRAT − targeta manual − bizum − transferencia.
+      //     Si NO hi ha datáfono manual, usem el càlcul automàtic (servei per fp + tases per fpTasa).
+      const dfManual = parseFloat(dfMap[d] || 0);
+      const totalCobrado = t.bruto + t.tasas + t.haber;
+      const bizumDay = (t.byFp.B||0) + (t.tasasByFp.B||0);
+      const transDay = (t.byFp.X||0) + (t.tasasByFp.X||0);
+      if(dfManual > 0){
+        grandTotals.byFp.T += dfManual;
+        grandTotals.byFp.B += bizumDay;
+        grandTotals.byFp.X += transDay;
+        grandTotals.byFp.E += Math.max(0, totalCobrado - dfManual - bizumDay - transDay - t.debe);
+      } else {
+        ['E','T','B','X'].forEach(fp=>{grandTotals.byFp[fp]+=(t.byFp[fp]||0) + (t.tasasByFp[fp]||0)});
+      }
       list.forEach(e=>{
         if(e.retorno)return;
         // 📚 REGLES COMPTABLES (autoescola/gestoria autònom · Espanya)
@@ -5827,7 +5845,7 @@ setTimeout(()=>{ try{ showWhatsNew(false) }catch(e){ console.warn('showWhatsNew'
 const API_BASE_HARDCODED='https://project-helper-47.preview.emergentagent.com';
 // App version (hardcoded — s'actualitza a cada release). Serveix per invalidar
 // caché de descoberta al detectar que l'usuari acaba d'actualitzar l'app.
-const APP_VERSION='2.0.69';
+const APP_VERSION='2.0.70';
 // Múltiples fonts de descoberta. La primera que respongui vàlidament guanya.
 // L'orden importa:
 // 1) raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json
