@@ -2825,11 +2825,22 @@ function _buildAnnualReport(year){
       ['E','T','B','X'].forEach(fp=>{grandTotals.byFp[fp]+=(t.byFp[fp]||0)});
       list.forEach(e=>{
         if(e.retorno)return;
+        // 📚 Regla comptable · DEBE (gasto) NO suma en facturación · es tracta a part
+        if(e.kind==='DH' && e.tipo==='DEBE'){
+          grandTotals.gastos = grandTotals.gastos || {};
+          const gCat = _normalizeReportCat(e.nombre || 'Gasto');
+          const gc = grandTotals.gastos[gCat] = grandTotals.gastos[gCat] || {count:0, total:0};
+          gc.count += 1;
+          gc.total += (e.importe || 0);
+          return;
+        }
         const rawTipo = (e.tipo || 'Otro');
         const rawGrupo = (e.grupo || '').trim();
         const cat = _normalizeReportCat(rawTipo);
-        const grupoLabel = rawGrupo ? _normalizeReportCat(rawGrupo) : (currentLang==='es'?'General':'General');
-        const amt = (e.importe||0) - (e.descuento||0) + (e.tasa||0);
+        const grupoLabel = rawGrupo && rawGrupo !== '-' ? _normalizeReportCat(rawGrupo) : (currentLang==='es'?'General':'General');
+        const amt = e.kind==='DH'
+          ? (e.importe||0)  // HABER: només l'importe (no té descompte ni tassa)
+          : (e.importe||0) - (e.descuento||0) + (e.tasa||0);
         // Sum per concepte
         grandTotals.byConcept[cat] = (grandTotals.byConcept[cat]||0) + amt;
         grandTotals.byConceptCnt = grandTotals.byConceptCnt || {};
@@ -2930,6 +2941,22 @@ function _buildAnnualReport(year){
     const grandSum = Object.values(grandTotals.byConcept||{}).reduce((s,n)=>s+n,0);
     html += `<tr style="border-top:2px solid #0f172a;background:#fef3c7;font-weight:700"><td style="padding:8px">${L('TOTAL','TOTAL')}</td>${totalRow}<td style="padding:8px;text-align:right;color:#0891b2">${grandCnt}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace">${fmt(grandSum)}</td></tr>`;
     html += `</tbody></table>`;
+  }
+
+  // 📚 GASTOS (DEBE) · separats de la facturació per correcció comptable
+  const gastosData = grandTotals.gastos || {};
+  const gastosEntries = Object.entries(gastosData).sort((a,b) => b[1].total - a[1].total);
+  if(gastosEntries.length){
+    const totalGastos = gastosEntries.reduce((s,[,v]) => s + v.total, 0);
+    const totalGastosCnt = gastosEntries.reduce((s,[,v]) => s + v.count, 0);
+    html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">💸 ${L('Gastos (DEBE) · No suman en facturación','Gastos (DEBE) · No suman en facturación')}</h4>
+      <p style="color:#64748b;font-size:11px;margin:-4px 0 8px 0;font-style:italic">${L('Aquests conceptes es resten de caixa però NO són facturació segons regles comptables. Es mostren per referència i control de despeses.','Estos conceptos se restan de caja pero NO son facturación según reglas contables. Se muestran para referencia y control de gastos.')}</p>
+      <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
+        <thead><tr style="background:#7f1d1d;color:#fecaca"><th style="padding:8px;text-align:left">${L('Concepte gasto','Concepto gasto')}</th><th style="padding:8px;text-align:right">${L('Uds.','Uds.')}</th><th style="padding:8px;text-align:right">${L('Total','Total')}</th></tr></thead>
+        <tbody>${gastosEntries.map(([k,v]) => `<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:6px 8px">${escapeHtml(k)}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:#0891b2;font-weight:600">${v.count}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#dc2626">-${fmt(v.total)}</td></tr>`).join('')}
+        <tr style="border-top:2px solid #7f1d1d;background:#fef2f2;font-weight:700"><td style="padding:8px">${L('TOTAL GASTOS','TOTAL GASTOS')}</td><td style="padding:8px;text-align:right;color:#0891b2">${totalGastosCnt}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#dc2626">-${fmt(totalGastos)}</td></tr>
+        </tbody>
+      </table>`;
   }
 
   // Formes de pagament
@@ -5535,10 +5562,16 @@ const LAST_SEEN_VERSION_KEY = 'caja.last_seen_version';
 // IMPORTANT: L'ordre importa. La primera entrada ha de ser la MÉS RECENT.
 // Cada versió té: { version, date (dd/mm/aaaa), highlights (array de strings HTML curts) }
 const CHANGELOG = [
+  { version:'2.0.68', date:'16/07/2026', highlights:[
+    '📚 <b>FIX CONTABLE · DEBE ya NO suma en facturación</b>: las entradas DEBE (gastos como IRPF, Mercadona, devoluciones DGT) ya no aparecen mezcladas con la facturación real. Ahora tienen su propia sección <b>"Gastos (DEBE) · No suman en facturación"</b> en el informe anual, cumpliendo las reglas contables correctas.',
+    '💸 <b>Nueva sección "Gastos"</b> en el informe anual: muestra todos los DEBE agrupados por concepto con contador de veces + total. En rojo para distinguirlos claramente de los ingresos.',
+    '🎯 <b>Facturación anual · Desglose completo por grupo y tipo</b>: nueva tabla que muestra <b>cuántos</b> se han hecho de cada combinación grupo × concepto (ej: Conducción → 45 Renovaciones, 22 Expediciones). Con totales por fila y columna.',
+    '📝 <b>Facturación por concepto</b> ahora incluye columna Uds. (número de veces).',
+    '🔗 <b>Categorías fusionadas</b>: Obtención = Expedición · Prórroga = Renovación.',
+  ]},
   { version:'2.0.67', date:'16/07/2026', highlights:[
-    '🎯 <b>Facturación anual · Desglose completo por grupo y tipo</b>: nueva tabla con matriz que muestra <b>cuántos</b> se han hecho de cada combinación grupo × concepto. Ejemplo: Conducción → 45 Renovaciones, 22 Expediciones, etc. También muestras totales por fila y columna.',
-    '📝 <b>Facturación por concepto · Ahora con contador de unidades</b>: nueva columna "Uds." al lado del Total.',
-    '🔗 <b>Categorías fusionadas · más limpias</b>: <code>Obtención = Expedición</code> · <code>Prórroga = Renovación</code>. Se acabó tenerlas separadas cuando son lo mismo.',
+    '🎯 Desglose por grupo y tipo (superado por v2.0.68).',
+  ]},
     '🛡️ <b>sync.js resistente 100%</b>: 4 niveles de descubrimiento de URL (GitHub raw → jsdelivr → GitHub API → cache local). Si todos fallan, para el build. <b>Nunca más URLs viejas</b>.',
     '🤖 <b>Auto-marca asistencia de citas al importar CSV DGT</b>: al importar el CSV del programa GIC al final del día, se cruzan automáticamente los nombres con las citas del calendario. Nombre coincide → marca "Vino" (🤖). No coincide → marca "No vino" (🤖). Las manuales (👤) no se tocan.',
     '🚨 <b>FIX · Enlaces resistentes a rotación de URL</b>: los enlaces internos (Admin, Solicitud, Guías) derivan dinámicamente del backend actual.',
@@ -5739,7 +5772,7 @@ setTimeout(()=>{ try{ showWhatsNew(false) }catch(e){ console.warn('showWhatsNew'
 const API_BASE_HARDCODED='https://project-helper-47.preview.emergentagent.com';
 // App version (hardcoded — s'actualitza a cada release). Serveix per invalidar
 // caché de descoberta al detectar que l'usuari acaba d'actualitzar l'app.
-const APP_VERSION='2.0.67';
+const APP_VERSION='2.0.68';
 // Múltiples fonts de descoberta. La primera que respongui vàlidament guanya.
 // L'orden importa:
 // 1) raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json
