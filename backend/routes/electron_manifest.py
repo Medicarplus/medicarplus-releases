@@ -26,7 +26,7 @@ CONTENT_SIGNATURES = {
     "index.html":   ["MediCar Plus"],
     "main.js":      ["require('electron')", "BrowserWindow"],
     "preload.js":   ["contextBridge"],
-    "sync.js":      ["SERVER", "signatures"],
+    "sync.js":      ["DISCOVERY_SOURCES", "SIGNATURES"],
     "package.json": ['"name"', '"version"'],
 }
 

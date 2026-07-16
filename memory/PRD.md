@@ -373,3 +373,19 @@ Efecte immediat en tots els clients (main.js consulta abans d'auto-actualitzar).
 - **10/10 tests unitaris passats** (matching flexible CA/ES, cognoms verificats, edge cases)
 
 ### Versió v2.0.66 amb entrada al changelog
+
+## 📝 Sessió 15/07/2026 (9a part) · sync.js resistent per sempre
+
+### 🛡️ MAI MÉS URLs velles
+- Reescrit `sync.js` amb 4 nivells de discovery:
+  1. `raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json`
+  2. `cdn.jsdelivr.net/gh/Medicarplus/medicarplus-releases@main/api-endpoint.json` (mirror sense CDN cache llarg)
+  3. `api.github.com/repos/Medicarplus/medicarplus-releases/contents/api-endpoint.json` (API oficial, decode base64)
+  4. `.last-known-server.json` (cache local escrit després de cada discovery exitós)
+- CADA font es valida cridant `/api/electron/download/package.json` abans de fer-se servir → mai s'usa una URL descoberta però trencada.
+- SENSE cap fallback hardcoded → si totes 4 fonts fallen, `process.exit(3)` para el build.
+- Signatura del manifest actualitzada a `["DISCOVERY_SOURCES", "SIGNATURES"]` per detectar la nova versió.
+- Testejat end-to-end: sync fresc des de zero baixa 4 arxius sense errors.
+
+### 📎 Passa manual UNA VEGADA
+- L'usuari ha de baixar el sync.js nou manualment via Invoke-WebRequest. Un cop actualitzat, el sistema es manté sol per sempre.
