@@ -2825,32 +2825,57 @@ function _buildAnnualReport(year){
       ['E','T','B','X'].forEach(fp=>{grandTotals.byFp[fp]+=(t.byFp[fp]||0)});
       list.forEach(e=>{
         if(e.retorno)return;
-        // 📚 Regla comptable · DEBE (gasto) NO suma en facturación · es tracta a part
+        // 📚 REGLES COMPTABLES (autoescola/gestoria autònom · Espanya)
+        // ─────────────────────────────────────────────────────────
+        //  • Servei propi (importe - descuento) = base imponible IRPF = FACTURACIÓN
+        //  • Tasa DGT = SUPLIDO (paid en nom del client, NO és facturació base)
+        //  • HABER = ingrés manual (honoraris, foto...) = compta com ingrés
+        //  • DEBE  = gasto (IRPF, material, devolució tasa...) = compta com gasto
+        //  • Retorno = anul·lat (ja filtrat abans)
+        // ─────────────────────────────────────────────────────────
+        // DEBE (gasto) → NO suma en facturación · secció separada
         if(e.kind==='DH' && e.tipo==='DEBE'){
           grandTotals.gastos = grandTotals.gastos || {};
-          const gCat = _normalizeReportCat(e.nombre || 'Gasto');
+          const gCat = (e.nombre || 'Gasto').trim();
           const gc = grandTotals.gastos[gCat] = grandTotals.gastos[gCat] || {count:0, total:0};
           gc.count += 1;
           gc.total += (e.importe || 0);
           return;
         }
+        // HABER (ingrés manual) → suma en facturación com a "Ingresos manuales (HABER)"
+        if(e.kind==='DH' && e.tipo==='HABER'){
+          grandTotals.haberByConcept = grandTotals.haberByConcept || {};
+          const hCat = (e.nombre || 'Ingreso').trim();
+          const hc = grandTotals.haberByConcept[hCat] = grandTotals.haberByConcept[hCat] || {count:0, total:0};
+          hc.count += 1;
+          hc.total += (e.importe || 0);
+          // També suma al total facturació general (com que l'usuari les cobra)
+          grandTotals.haberTotal = (grandTotals.haberTotal || 0) + (e.importe || 0);
+          return;
+        }
+        // Entrada normal (TRAF, servei, etc.)
+        // 📚 MODEL DEL NEGOCI: les tases DGT es compren PER ANTICIPAT en bloc (4k€ cada cop)
+        // com a stock. Quan es venen al client, SÓN INGRÉS del negoci (no són suplidos).
+        // Les compres en bloc s'anoten com a DEBE amb concepte "Compra tasas DGT" (COGS).
         const rawTipo = (e.tipo || 'Otro');
         const rawGrupo = (e.grupo || '').trim();
         const cat = _normalizeReportCat(rawTipo);
         const grupoLabel = rawGrupo && rawGrupo !== '-' ? _normalizeReportCat(rawGrupo) : (currentLang==='es'?'General':'General');
-        const amt = e.kind==='DH'
-          ? (e.importe||0)  // HABER: només l'importe (no té descompte ni tassa)
-          : (e.importe||0) - (e.descuento||0) + (e.tasa||0);
-        // Sum per concepte
-        grandTotals.byConcept[cat] = (grandTotals.byConcept[cat]||0) + amt;
+        // Facturació = servei + tasa (les 2 són ingrés propi en aquest model de negoci)
+        const amtServicio = (e.importe||0) - (e.descuento||0);
+        const amtTasa = (e.tasa || 0);
+        const amtTotal = amtServicio + amtTasa;
+        grandTotals.byConcept[cat] = (grandTotals.byConcept[cat]||0) + amtTotal;
         grandTotals.byConceptCnt = grandTotals.byConceptCnt || {};
         grandTotals.byConceptCnt[cat] = (grandTotals.byConceptCnt[cat]||0) + 1;
-        // Desglossament per grup × concepte
+        // Tasas cobradas (separades per referència: quant se n'ha venut de stock)
+        grandTotals.tasasVendidas = (grandTotals.tasasVendidas || 0) + amtTasa;
+        // Desglossament per grup × concepte (total facturat = servei + tasa)
         grandTotals.byGroupConcept = grandTotals.byGroupConcept || {};
         grandTotals.byGroupConcept[grupoLabel] = grandTotals.byGroupConcept[grupoLabel] || {};
         const gc = grandTotals.byGroupConcept[grupoLabel][cat] = grandTotals.byGroupConcept[grupoLabel][cat] || {count:0, total:0};
         gc.count += 1;
-        gc.total += amt;
+        gc.total += amtTotal;
       });
     });
     grandTotals.byCompany[comp.name]=cTotal;
@@ -2942,6 +2967,42 @@ function _buildAnnualReport(year){
     html += `<tr style="border-top:2px solid #0f172a;background:#fef3c7;font-weight:700"><td style="padding:8px">${L('TOTAL','TOTAL')}</td>${totalRow}<td style="padding:8px;text-align:right;color:#0891b2">${grandCnt}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace">${fmt(grandSum)}</td></tr>`;
     html += `</tbody></table>`;
   }
+
+  // 💰 HABER (ingressos manuals · honoraris, foto, ciclista, etc.)
+  const haberData = grandTotals.haberByConcept || {};
+  const haberEntries = Object.entries(haberData).sort((a,b) => b[1].total - a[1].total);
+  if(haberEntries.length){
+    const totalHaberCnt = haberEntries.reduce((s,[,v]) => s + v.count, 0);
+    const totalHaber = grandTotals.haberTotal || 0;
+    html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">💰 ${L('Ingresos manuales (HABER)','Ingresos manuales (HABER)')}</h4>
+      <p style="color:#64748b;font-size:11px;margin:-4px 0 8px 0;font-style:italic">${L('Ingresos añadidos manualmente vía Debe/Haber (honorarios, fotos, extras). Sumen en el total facturado.','Ingresos añadidos manualmente vía Debe/Haber (honorarios, fotos, extras). Suman en el total facturado.')}</p>
+      <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
+        <thead><tr style="background:#0f4d2a;color:#a7f3d0"><th style="padding:8px;text-align:left">${L('Concepto','Concepto')}</th><th style="padding:8px;text-align:right">${L('Uds.','Uds.')}</th><th style="padding:8px;text-align:right">${L('Total','Total')}</th></tr></thead>
+        <tbody>${haberEntries.map(([k,v]) => `<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:6px 8px">${escapeHtml(k)}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:#0891b2;font-weight:600">${v.count}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#166534">+${fmt(v.total)}</td></tr>`).join('')}
+        <tr style="border-top:2px solid #0f4d2a;background:#f0fdf4;font-weight:700"><td style="padding:8px">${L('TOTAL HABER','TOTAL HABER')}</td><td style="padding:8px;text-align:right;color:#0891b2">${totalHaberCnt}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#166534">+${fmt(totalHaber)}</td></tr>
+        </tbody>
+      </table>`;
+  }
+
+  // 🎯 RESULTAT COMPTABLE FINAL · resum comptable segons regles reals
+  const totalServicios = Object.values(grandTotals.byConcept||{}).reduce((s,n)=>s+n,0);
+  const totalHaberSum = grandTotals.haberTotal || 0;
+  const totalTasasVendidas = grandTotals.tasasVendidas || 0;
+  const totalGastosSum = Object.values(grandTotals.gastos||{}).reduce((s,g)=>s+g.total,0);
+  const ingresosBrutos = totalServicios + totalHaberSum;
+  const beneficioNeto = ingresosBrutos - totalGastosSum;
+  html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">🎯 ${L('Resultado contable','Resultado contable')}</h4>
+    <p style="color:#64748b;font-size:11px;margin:-4px 0 8px 0;font-style:italic">${L('Modelo del negocio: tasas DGT compradas por anticipado en bloque (stock). Al vender al cliente = ingreso propio. Compras en bloque = COGS (gasto DEBE).','Modelo del negocio: tasas DGT compradas por anticipado en bloque (stock). Al vender al cliente = ingreso propio. Compras en bloque = COGS (gasto DEBE).')}</p>
+    <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
+      <tbody>
+        <tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px">${L('Facturación total (servicios + tasas cobradas)','Facturación total (servicios + tasas cobradas)')}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#166534">+${fmt(totalServicios)}</td></tr>
+        <tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px">${L('Ingresos manuales (HABER)','Ingresos manuales (HABER)')}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#166534">+${fmt(totalHaberSum)}</td></tr>
+        <tr style="border-bottom:2px solid #0f172a;background:#f0fdf4"><td style="padding:8px;font-weight:700">= ${L('INGRESOS BRUTOS','INGRESOS BRUTOS')}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#166534">${fmt(ingresosBrutos)}</td></tr>
+        <tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px">− ${L('Gastos totales (DEBE · incluye compra tasas en bloque)','Gastos totales (DEBE · incluye compra tasas en bloque)')}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#dc2626">-${fmt(totalGastosSum)}</td></tr>
+        <tr style="border-top:2px solid #0f172a;background:#fef3c7"><td style="padding:12px;font-weight:800;font-size:14px">= ${L('BENEFICIO NETO','BENEFICIO NETO')} <span style="font-size:10px;color:#64748b;font-weight:400">${L('(antes IRPF)','(antes IRPF)')}</span></td><td style="padding:12px;text-align:right;font-family:'Courier New',monospace;font-weight:800;font-size:16px;color:${beneficioNeto>=0?'#166534':'#dc2626'}">${beneficioNeto>=0?'+':''}${fmt(beneficioNeto)}</td></tr>
+        <tr style="border-top:1px dashed #cbd5e1"><td style="padding:6px 8px;color:#64748b;font-size:11px;font-style:italic">${L('De las cuales · Tasas DGT vendidas (informativo)','De las cuales · Tasas DGT vendidas (informativo)')}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:#64748b;font-size:11px">${fmt(totalTasasVendidas)}</td></tr>
+      </tbody>
+    </table>`;
 
   // 📚 GASTOS (DEBE) · separats de la facturació per correcció comptable
   const gastosData = grandTotals.gastos || {};
@@ -5562,23 +5623,23 @@ const LAST_SEEN_VERSION_KEY = 'caja.last_seen_version';
 // IMPORTANT: L'ordre importa. La primera entrada ha de ser la MÉS RECENT.
 // Cada versió té: { version, date (dd/mm/aaaa), highlights (array de strings HTML curts) }
 const CHANGELOG = [
-  { version:'2.0.68', date:'16/07/2026', highlights:[
-    '📚 <b>FIX CONTABLE · DEBE ya NO suma en facturación</b>: las entradas DEBE (gastos como IRPF, Mercadona, devoluciones DGT) ya no aparecen mezcladas con la facturación real. Ahora tienen su propia sección <b>"Gastos (DEBE) · No suman en facturación"</b> en el informe anual, cumpliendo las reglas contables correctas.',
-    '💸 <b>Nueva sección "Gastos"</b> en el informe anual: muestra todos los DEBE agrupados por concepto con contador de veces + total. En rojo para distinguirlos claramente de los ingresos.',
-    '🎯 <b>Facturación anual · Desglose completo por grupo y tipo</b>: nueva tabla que muestra <b>cuántos</b> se han hecho de cada combinación grupo × concepto (ej: Conducción → 45 Renovaciones, 22 Expediciones). Con totales por fila y columna.',
-    '📝 <b>Facturación por concepto</b> ahora incluye columna Uds. (número de veces).',
+  { version:'2.0.69', date:'16/07/2026', highlights:[
+    '📚 <b>Informe anual · Modelo contable REAL del negocio</b>: tras revisar cómo compras las tasas DGT (en bloques de 4.000€ como stock por adelantado), el informe ahora refleja correctamente que:<br>&nbsp;&nbsp;&nbsp;&nbsp;• <b>Tasas cobradas al cliente = ingreso propio</b> (suman en Facturación)<br>&nbsp;&nbsp;&nbsp;&nbsp;• <b>Compras en bloque = gasto DEBE (COGS)</b> · anota como DEBE con concepto "Compra tasas DGT"<br>&nbsp;&nbsp;&nbsp;&nbsp;• <b>HABER manual</b> (honorarios, fotos, ciclistas) → suma en ingresos<br>&nbsp;&nbsp;&nbsp;&nbsp;• <b>DEBE</b> (IRPF, material, compras tasas) → gastos deducibles',
+    '🎯 <b>Nueva sección · Resultado Contable</b>: al final del informe anual verás un resumen tipo cuenta de resultados: <b>Ingresos brutos − Gastos = Beneficio neto</b> (antes de IRPF). Es la cifra real que ganas.',
+    '💰 <b>Nueva sección · Ingresos manuales (HABER)</b>: tabla verde con todos los HABER agrupados por concepto y contador.',
+    '💸 <b>Nueva sección · Gastos (DEBE)</b>: tabla roja separada de la facturación, con todos los DEBE (IRPF, material, compras tasas, devoluciones DGT) agrupados por concepto.',
+    '🎯 <b>Desglose grupo × tipo</b>: matriz que muestra cuántos servicios se han hecho de cada combinación (Conducción/Marina/Armas × Renovación/Expedición/etc.).',
+    '📝 <b>Facturación por concepto con Uds.</b>: nueva columna con el número de veces.',
     '🔗 <b>Categorías fusionadas</b>: Obtención = Expedición · Prórroga = Renovación.',
+    '🛡️ <b>sync.js resistente 100%</b>: 4 niveles de discovery para nunca más usar URLs viejas.',
+    '🤖 <b>Auto-marca asistencia cites al importar CSV DGT</b>.',
+    '🔒 <b>Privacidad SIEMPRE por defecto</b>.',
+  ]},
+  { version:'2.0.68', date:'16/07/2026', highlights:[
+    '📚 DEBE ya no suma en facturación (superado por v2.0.69).',
   ]},
   { version:'2.0.67', date:'16/07/2026', highlights:[
     '🎯 Desglose por grupo y tipo (superado por v2.0.68).',
-  ]},
-    '🛡️ <b>sync.js resistente 100%</b>: 4 niveles de descubrimiento de URL (GitHub raw → jsdelivr → GitHub API → cache local). Si todos fallan, para el build. <b>Nunca más URLs viejas</b>.',
-    '🤖 <b>Auto-marca asistencia de citas al importar CSV DGT</b>: al importar el CSV del programa GIC al final del día, se cruzan automáticamente los nombres con las citas del calendario. Nombre coincide → marca "Vino" (🤖). No coincide → marca "No vino" (🤖). Las manuales (👤) no se tocan.',
-    '🚨 <b>FIX · Enlaces resistentes a rotación de URL</b>: los enlaces internos (Admin, Solicitud, Guías) derivan dinámicamente del backend actual.',
-    '📊 <b>Dropdown Estadísticas</b>: 6 entradas independientes (Facturación · Autoescuelas · Tráfico · SMS · Citas · Comparativa años).',
-    '🏢 <b>Estadísticas aisladas por empresa activa</b>.',
-    '🚦 <b>Estadísticas Tráfico ampliadas</b>: todas las categorías del CSV DGT.',
-    '🔒 <b>Privacidad SIEMPRE por defecto</b>.',
   ]},
   { version:'2.0.66', date:'15/07/2026', highlights:[
     '🤖 Auto-marca asistencia y sync robusto (superado por v2.0.67).',
@@ -5772,7 +5833,7 @@ setTimeout(()=>{ try{ showWhatsNew(false) }catch(e){ console.warn('showWhatsNew'
 const API_BASE_HARDCODED='https://project-helper-47.preview.emergentagent.com';
 // App version (hardcoded — s'actualitza a cada release). Serveix per invalidar
 // caché de descoberta al detectar que l'usuari acaba d'actualitzar l'app.
-const APP_VERSION='2.0.68';
+const APP_VERSION='2.0.69';
 // Múltiples fonts de descoberta. La primera que respongui vàlidament guanya.
 // L'orden importa:
 // 1) raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json
