@@ -1186,9 +1186,8 @@ function openStats(initialSection){
     const t = String(raw||'').split(',')[0].trim();
     if(!t) return 'Otro';
     const lc = t.toLowerCase();
-    if(lc.startsWith('renov')) return 'Renovación';
-    if(lc.startsWith('exped')) return 'Expedición';
-    if(lc.startsWith('obten')) return 'Obtención';
+    if(lc.startsWith('renov') || lc.startsWith('prorrog') || lc.startsWith('próroga') || lc.startsWith('proroga')) return 'Renovación';
+    if(lc.startsWith('exped') || lc.startsWith('obten')) return 'Expedición';
     if(lc.startsWith('dupl'))  return 'Duplicado';
     if(lc.startsWith('canj'))  return 'Canje';
     if(lc.startsWith('recup')) return 'Recuperación';
@@ -2771,6 +2770,26 @@ function openAnnualReport(){
 }
 
 function _buildAnnualReport(year){
+  // Normalitzador de categories a nivell d'informe · fusiona sinònims:
+  //   Obtención → Expedición (mateixa cosa a nivell de negoci)
+  //   Prórroga  → Renovación (mateixa cosa)
+  function _normalizeReportCat(raw){
+    const t = String(raw||'').split(',')[0].trim();
+    if(!t) return 'Otro';
+    const lc = t.toLowerCase();
+    if(lc.startsWith('renov') || lc.startsWith('prorrog') || lc.startsWith('prórrog')) return 'Renovación';
+    if(lc.startsWith('exped') || lc.startsWith('obten')) return 'Expedición';
+    if(lc.startsWith('dupl'))  return 'Duplicado';
+    if(lc.startsWith('canj'))  return 'Canje';
+    if(lc.startsWith('recup')) return 'Recuperación';
+    if(lc.startsWith('conduc')) return 'Conducción';
+    if(lc.startsWith('marin')) return 'Marina';
+    if(lc.startsWith('grúa') || lc.startsWith('grua')) return 'Grúas';
+    if(lc.startsWith('animal')) return 'Animales peligrosos';
+    if(lc.startsWith('ciclom')) return 'Ciclomotor';
+    if(lc.startsWith('arma')) return 'Armas';
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
   // 🔒 Isolat per empresa activa · només mostra les dades de l'empresa seleccionada al top
   const activeKey = currentCompany || 'trafic';
   const c1Name = (window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1';
@@ -2804,7 +2823,24 @@ function _buildAnnualReport(year){
       grandTotals.bruto+=t.bruto;grandTotals.tasas+=t.tasas;grandTotals.neto+=t.neto;grandTotals.cnt+=t.cnt;
       grandTotals.byMonth[m]+=t.neto;grandTotals.byMonthCnt[m]+=t.cnt;
       ['E','T','B','X'].forEach(fp=>{grandTotals.byFp[fp]+=(t.byFp[fp]||0)});
-      list.forEach(e=>{if(e.retorno)return;const cat=(e.tipo||e.grupo||'Otro');grandTotals.byConcept[cat]=(grandTotals.byConcept[cat]||0)+((e.importe||0)-(e.descuento||0)+(e.tasa||0))});
+      list.forEach(e=>{
+        if(e.retorno)return;
+        const rawTipo = (e.tipo || 'Otro');
+        const rawGrupo = (e.grupo || '').trim();
+        const cat = _normalizeReportCat(rawTipo);
+        const grupoLabel = rawGrupo ? _normalizeReportCat(rawGrupo) : (currentLang==='es'?'General':'General');
+        const amt = (e.importe||0) - (e.descuento||0) + (e.tasa||0);
+        // Sum per concepte
+        grandTotals.byConcept[cat] = (grandTotals.byConcept[cat]||0) + amt;
+        grandTotals.byConceptCnt = grandTotals.byConceptCnt || {};
+        grandTotals.byConceptCnt[cat] = (grandTotals.byConceptCnt[cat]||0) + 1;
+        // Desglossament per grup × concepte
+        grandTotals.byGroupConcept = grandTotals.byGroupConcept || {};
+        grandTotals.byGroupConcept[grupoLabel] = grandTotals.byGroupConcept[grupoLabel] || {};
+        const gc = grandTotals.byGroupConcept[grupoLabel][cat] = grandTotals.byGroupConcept[grupoLabel][cat] || {count:0, total:0};
+        gc.count += 1;
+        gc.total += amt;
+      });
     });
     grandTotals.byCompany[comp.name]=cTotal;
   });
@@ -2844,14 +2880,56 @@ function _buildAnnualReport(year){
       <tbody>${MESES.map((m,i)=>`<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:6px 8px">${m}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:600">${fmt(grandTotals.byMonth[i])}</td><td style="padding:6px 8px;text-align:right">${grandTotals.byMonthCnt[i]}</td></tr>`).join('')}</tbody>
     </table>`;
 
-  // Concepte
+  // Concepte (amb comptes)
   const conceptEntries=Object.entries(grandTotals.byConcept).sort((a,b)=>b[1]-a[1]);
   if(conceptEntries.length){
+    const conceptCnt = grandTotals.byConceptCnt || {};
     html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">📝 ${L('Facturació per concepte','Facturación por concepto')}</h4>
       <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
-        <thead><tr style="background:#0f172a;color:#f5b301"><th style="padding:8px;text-align:left">${L('Concepte','Concepto')}</th><th style="padding:8px;text-align:right">${L('Total','Total')}</th><th style="padding:8px;text-align:right">%</th></tr></thead>
-        <tbody>${conceptEntries.map(([k,v])=>`<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:6px 8px">${escapeHtml(k)}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:600">${fmt(v)}</td><td style="padding:6px 8px;text-align:right;color:#64748b">${grandTotals.neto?((v/grandTotals.neto)*100).toFixed(1):'0'}%</td></tr>`).join('')}</tbody>
+        <thead><tr style="background:#0f172a;color:#f5b301"><th style="padding:8px;text-align:left">${L('Concepte','Concepto')}</th><th style="padding:8px;text-align:right">${L('Uds.','Uds.')}</th><th style="padding:8px;text-align:right">${L('Total','Total')}</th><th style="padding:8px;text-align:right">%</th></tr></thead>
+        <tbody>${conceptEntries.map(([k,v])=>`<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:6px 8px">${escapeHtml(k)}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:#0891b2;font-weight:600">${conceptCnt[k]||0}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:600">${fmt(v)}</td><td style="padding:6px 8px;text-align:right;color:#64748b">${grandTotals.neto?((v/grandTotals.neto)*100).toFixed(1):'0'}%</td></tr>`).join('')}</tbody>
       </table>`;
+  }
+
+  // 📊 Desglossament per GRUP × CONCEPTE amb comptes
+  // (Marina, Armas, Conducción, Ciclomotor, ... × Renovación, Expedición, ...)
+  const groupConceptData = grandTotals.byGroupConcept || {};
+  const grupos = Object.keys(groupConceptData).sort();
+  if(grupos.length){
+    // Recull tots els conceptes que apareixen (per fer les columnes)
+    const allConcepts = new Set();
+    grupos.forEach(g => Object.keys(groupConceptData[g]).forEach(c => allConcepts.add(c)));
+    const conceptCols = Array.from(allConcepts).sort();
+    html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">🎯 ${L('Desglossament per grup i tipus','Desglose por grupo y tipo')}</h4>
+      <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:12px;margin-bottom:18px">
+        <thead><tr style="background:#0f172a;color:#f5b301">
+          <th style="padding:8px;text-align:left">${L('Grup','Grupo')}</th>
+          ${conceptCols.map(c => `<th style="padding:8px;text-align:center">${escapeHtml(c)}</th>`).join('')}
+          <th style="padding:8px;text-align:right;background:#1e293b">${L('Total uds.','Total uds.')}</th>
+          <th style="padding:8px;text-align:right;background:#1e293b">${L('Total €','Total €')}</th>
+        </tr></thead>
+        <tbody>`;
+    // Fila per cada grup
+    grupos.forEach(g => {
+      let rowCnt = 0, rowTotal = 0;
+      const cells = conceptCols.map(c => {
+        const d = groupConceptData[g][c];
+        if(!d){ return `<td style="padding:6px 8px;text-align:center;color:#cbd5e1">·</td>`; }
+        rowCnt += d.count; rowTotal += d.total;
+        return `<td style="padding:6px 8px;text-align:center"><b style="color:#0f172a">${d.count}</b><br><span style="font-size:10px;color:#64748b;font-family:'Courier New',monospace">${fmt(d.total)}</span></td>`;
+      }).join('');
+      html += `<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:6px 8px;font-weight:600;color:#0f172a">${escapeHtml(g)}</td>${cells}<td style="padding:6px 8px;text-align:right;font-weight:700;color:#0891b2;background:#f1f5f9">${rowCnt}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:700;background:#f1f5f9">${fmt(rowTotal)}</td></tr>`;
+    });
+    // Fila de totals per concepte
+    const totalRow = conceptCols.map(c => {
+      let cnt = 0, tot = 0;
+      grupos.forEach(g => { const d = groupConceptData[g][c]; if(d){ cnt += d.count; tot += d.total; }});
+      return `<td style="padding:8px;text-align:center;background:#fef3c7"><b>${cnt}</b><br><span style="font-size:10px;font-family:'Courier New',monospace">${fmt(tot)}</span></td>`;
+    }).join('');
+    const grandCnt = Object.values(grandTotals.byConceptCnt||{}).reduce((s,n)=>s+n,0);
+    const grandSum = Object.values(grandTotals.byConcept||{}).reduce((s,n)=>s+n,0);
+    html += `<tr style="border-top:2px solid #0f172a;background:#fef3c7;font-weight:700"><td style="padding:8px">${L('TOTAL','TOTAL')}</td>${totalRow}<td style="padding:8px;text-align:right;color:#0891b2">${grandCnt}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace">${fmt(grandSum)}</td></tr>`;
+    html += `</tbody></table>`;
   }
 
   // Formes de pagament
@@ -5457,16 +5535,20 @@ const LAST_SEEN_VERSION_KEY = 'caja.last_seen_version';
 // IMPORTANT: L'ordre importa. La primera entrada ha de ser la MÉS RECENT.
 // Cada versió té: { version, date (dd/mm/aaaa), highlights (array de strings HTML curts) }
 const CHANGELOG = [
+  { version:'2.0.67', date:'16/07/2026', highlights:[
+    '🎯 <b>Facturación anual · Desglose completo por grupo y tipo</b>: nueva tabla con matriz que muestra <b>cuántos</b> se han hecho de cada combinación grupo × concepto. Ejemplo: Conducción → 45 Renovaciones, 22 Expediciones, etc. También muestras totales por fila y columna.',
+    '📝 <b>Facturación por concepto · Ahora con contador de unidades</b>: nueva columna "Uds." al lado del Total.',
+    '🔗 <b>Categorías fusionadas · más limpias</b>: <code>Obtención = Expedición</code> · <code>Prórroga = Renovación</code>. Se acabó tenerlas separadas cuando son lo mismo.',
+    '🛡️ <b>sync.js resistente 100%</b>: 4 niveles de descubrimiento de URL (GitHub raw → jsdelivr → GitHub API → cache local). Si todos fallan, para el build. <b>Nunca más URLs viejas</b>.',
+    '🤖 <b>Auto-marca asistencia de citas al importar CSV DGT</b>: al importar el CSV del programa GIC al final del día, se cruzan automáticamente los nombres con las citas del calendario. Nombre coincide → marca "Vino" (🤖). No coincide → marca "No vino" (🤖). Las manuales (👤) no se tocan.',
+    '🚨 <b>FIX · Enlaces resistentes a rotación de URL</b>: los enlaces internos (Admin, Solicitud, Guías) derivan dinámicamente del backend actual.',
+    '📊 <b>Dropdown Estadísticas</b>: 6 entradas independientes (Facturación · Autoescuelas · Tráfico · SMS · Citas · Comparativa años).',
+    '🏢 <b>Estadísticas aisladas por empresa activa</b>.',
+    '🚦 <b>Estadísticas Tráfico ampliadas</b>: todas las categorías del CSV DGT.',
+    '🔒 <b>Privacidad SIEMPRE por defecto</b>.',
+  ]},
   { version:'2.0.66', date:'15/07/2026', highlights:[
-    '🤖 <b>NOU · Auto-marca asistencia de citas al importar CSV DGT</b>: al importar el CSV del programa GIC al final del día, se cruzan automáticamente los nombres del CSV con las citas del calendario:<br>&nbsp;&nbsp;&nbsp;&nbsp;• Si el nombre <b>aparece</b> en el CSV → 🤖 marca la cita como "Vino"<br>&nbsp;&nbsp;&nbsp;&nbsp;• Si el nombre <b>no aparece</b> → 🤖 marca "No vino"<br>&nbsp;&nbsp;&nbsp;&nbsp;• Las que ya has marcado manualmente (👤) <b>no se tocan nunca</b><br>Matching flexible: reconoce nombres en catalán/castellano (Jordi→Jorge, Marc→Marcos) siempre que los apellidos coincidan. Sin acentos, sin importar orden.',
-    '🔍 <b>Icono de origen en cada estado de cita</b>: 👤 = confirmado por ti manualmente · 🤖 = detectado automáticamente por el sistema. Así ves de un vistazo cuáles has revisado tú.',
-    '🚨 <b>FIX CRÍTICO · Enlaces resistentes a rotación de URL</b>: los enlaces internos (Admin, Solicitud, Guías) ahora derivan dinámicamente del backend actual vía <code>api-endpoint.json</code>. Se acabaron los 404 aleatorios.',
-    '📊 <b>Dropdown Estadísticas reorganizado</b>: 6 entradas independientes (Facturación · Autoescuelas · Tráfico · SMS · Citas · Comparativa años).',
-    '🏢 <b>Estadísticas aisladas por empresa</b>: Facturación anual y Comparativa años muestran <b>solo los datos de la empresa activa</b>. Se acabó la mezcla.',
-    '🚦 <b>Estadísticas Tráfico ampliadas</b>: detecta automáticamente todas las categorías del CSV DGT (Renovación, Expedición, Marina, Grúas, Animales peligrosos, Conducción, Ciclomotor, Armas, etc.).',
-    '🔒 <b>Privacidad SIEMPRE por defecto</b>: importes CAJA FÍSICA / CUENTA BANCO / TOTAL / SALDO ANTERIOR arrancan difuminados en cada apertura. Botón 👁️/🙈 revela durante la sesión.',
-    '🏷️ TOTAL CAJA (facturación) → simplemente <b>TOTAL</b>.',
-    '📄 Guía + Manual como PDF adjuntos al correo de licencia con portada branded MediCar Plus y Nº Documento correlativo.',
+    '🤖 Auto-marca asistencia y sync robusto (superado por v2.0.67).',
   ]},
   { version:'2.0.65', date:'15/07/2026', highlights:[
     '🚨 URLs resistentes + Dropdown Estadísticas + Aislamiento empresa + Tráfico dinámico (superado por v2.0.66).',
@@ -5657,7 +5739,7 @@ setTimeout(()=>{ try{ showWhatsNew(false) }catch(e){ console.warn('showWhatsNew'
 const API_BASE_HARDCODED='https://project-helper-47.preview.emergentagent.com';
 // App version (hardcoded — s'actualitza a cada release). Serveix per invalidar
 // caché de descoberta al detectar que l'usuari acaba d'actualitzar l'app.
-const APP_VERSION='2.0.66';
+const APP_VERSION='2.0.67';
 // Múltiples fonts de descoberta. La primera que respongui vàlidament guanya.
 // L'orden importa:
 // 1) raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json
