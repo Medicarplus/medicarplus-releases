@@ -2822,7 +2822,7 @@ function _buildAnnualReport(year){
       cTotal.byMonth[m]=(cTotal.byMonth[m]||0)+t.neto;
       grandTotals.bruto+=t.bruto;grandTotals.tasas+=t.tasas;grandTotals.neto+=t.neto;grandTotals.cnt+=t.cnt;
       grandTotals.byMonth[m]+=t.neto;grandTotals.byMonthCnt[m]+=t.cnt;
-      ['E','T','B','X'].forEach(fp=>{grandTotals.byFp[fp]+=(t.byFp[fp]||0)});
+      ['E','T','B','X'].forEach(fp=>{grandTotals.byFp[fp]+=(t.byFp[fp]||0) + (t.tasasByFp[fp]||0)});
       list.forEach(e=>{
         if(e.retorno)return;
         // 📚 REGLES COMPTABLES (autoescola/gestoria autònom · Espanya)
