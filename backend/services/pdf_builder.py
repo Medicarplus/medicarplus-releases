@@ -8,8 +8,12 @@ Usa Playwright Chromium per la conversió i pypdf per l'unió.
 """
 from __future__ import annotations
 
+import asyncio
 import io
 import logging
+import os
+import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -22,12 +26,79 @@ logger = logging.getLogger(__name__)
 CACHE_DIR = Path("/tmp/medicar_pdfs")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
+# Bandera per no reintentar la instal·lació 20 vegades si falla per raons permanents.
+_CHROMIUM_INSTALL_TRIED = False
+_CHROMIUM_INSTALL_LOCK = asyncio.Lock()
+
+
+async def _ensure_chromium_installed() -> bool:
+    """Si Chromium no està disponible per Playwright, l'instal·la en calent.
+
+    Necessari a deployments on l'imatge base no inclou `playwright install`.
+    Retorna True si (ara) està disponible, False si ha fallat.
+    """
+    global _CHROMIUM_INSTALL_TRIED
+    async with _CHROMIUM_INSTALL_LOCK:
+        if _CHROMIUM_INSTALL_TRIED:
+            return False
+        _CHROMIUM_INSTALL_TRIED = True
+
+        # Alguns deployments defineixen PLAYWRIGHT_BROWSERS_PATH però ~/.cache/ms-playwright
+        # és on Playwright busca per defecte quan la variable no s'hereta. Fem un symlink
+        # perquè totes dues rutes apuntin al mateix contingut.
+        try:
+            pw_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "")
+            if pw_path and Path(pw_path).exists():
+                default_cache = Path.home() / ".cache" / "ms-playwright"
+                default_cache.parent.mkdir(parents=True, exist_ok=True)
+                if not default_cache.exists():
+                    try:
+                        default_cache.symlink_to(pw_path)
+                    except Exception:  # noqa: BLE001
+                        pass
+        except Exception:  # noqa: BLE001
+            pass
+
+        logger.info("Chromium missing — running `playwright install chromium`…")
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "-m", "playwright", "install", "chromium",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            try:
+                _out, err = await asyncio.wait_for(proc.communicate(), timeout=180)
+            except asyncio.TimeoutError:
+                proc.kill()
+                logger.error("playwright install chromium timed out")
+                return False
+            if proc.returncode != 0:
+                logger.error("playwright install failed: %s", err.decode(errors="ignore")[:800])
+                return False
+            logger.info("Chromium installed successfully at runtime.")
+            return True
+        except Exception as ex:  # noqa: BLE001
+            logger.exception("Auto-install of chromium failed: %s", ex)
+            return False
+
+
+async def _launch_chromium(p):
+    """Llança Chromium. Si falta l'executable, l'instal·la i reintenta un cop."""
+    try:
+        return await p.chromium.launch()
+    except Exception as ex:  # noqa: BLE001
+        msg = str(ex)
+        if "Executable doesn't exist" in msg or "playwright install" in msg.lower():
+            if await _ensure_chromium_installed():
+                return await p.chromium.launch()
+        raise
+
 
 # ── Utilitats bàsiques ──────────────────────────────────────────────────────
 async def _print_pdf_from_html_content(html: str) -> bytes:
     """Renderitza un string HTML i retorna els bytes del PDF (A4)."""
     async with async_playwright() as p:
-        browser = await p.chromium.launch()
+        browser = await _launch_chromium(p)
         page = await browser.new_page()
         await page.set_content(html, wait_until="load")
         pdf_bytes = await page.pdf(
@@ -53,7 +124,7 @@ async def render_html_to_pdf_bytes(
     - Si el HTML no té @page, cau en el defalut A4 (portrait/landscape segons paràmetre).
     """
     async with async_playwright() as p:
-        browser = await p.chromium.launch()
+        browser = await _launch_chromium(p)
         try:
             page = await browser.new_page()
             await page.set_content(html, wait_until="load")
@@ -75,7 +146,7 @@ async def render_html_to_pdf_bytes(
 
 async def _print_pdf_from_file(html_path: Path) -> bytes:
     async with async_playwright() as p:
-        browser = await p.chromium.launch()
+        browser = await _launch_chromium(p)
         page = await browser.new_page()
         await page.goto(html_path.resolve().as_uri(), wait_until="load", timeout=15000)
         pdf_bytes = await page.pdf(
