@@ -83,14 +83,36 @@ async def _ensure_chromium_installed() -> bool:
 
 
 async def _launch_chromium(p):
-    """Llança Chromium. Si falta l'executable, l'instal·la i reintenta un cop."""
+    """Llança Chromium priorizant els binaris del sistema (més fiable a Emergent).
+
+    Ordre de prioritat:
+      1. /usr/bin/google-chrome (present a la majoria de containers Emergent)
+      2. /root/bin/chromium (alternatiu)
+      3. Playwright bundled chromium (defecte)
+      4. Auto-install de Playwright chromium si res funciona
+    """
+    # Args recomanats per contextos headless en Docker/Kubernetes
+    LAUNCH_ARGS = [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+    ]
+    # Provem binaris del sistema (no depenen de Playwright cache)
+    for candidate in ("/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser", "/root/bin/chromium"):
+        if os.path.exists(candidate):
+            try:
+                return await p.chromium.launch(executable_path=candidate, args=LAUNCH_ARGS)
+            except Exception as ex:  # noqa: BLE001
+                logger.warning("Chromium at %s failed: %s", candidate, ex)
+    # Fallback al chromium bundled amb Playwright
     try:
-        return await p.chromium.launch()
+        return await p.chromium.launch(args=LAUNCH_ARGS)
     except Exception as ex:  # noqa: BLE001
         msg = str(ex)
         if "Executable doesn't exist" in msg or "playwright install" in msg.lower():
             if await _ensure_chromium_installed():
-                return await p.chromium.launch()
+                return await p.chromium.launch(args=LAUNCH_ARGS)
         raise
 
 

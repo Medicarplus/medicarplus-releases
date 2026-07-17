@@ -5852,7 +5852,7 @@ setTimeout(()=>{ try{ showWhatsNew(false) }catch(e){ console.warn('showWhatsNew'
 // Emergent canvia el preview URL, només cal editar aquest JSON per solucionar-ho
 // a tots els Electron instal·lats sense recompilar res.
 // ============================================================================
-const API_BASE_HARDCODED='https://project-helper-47.preview.emergentagent.com';
+const API_BASE_HARDCODED='https://project-helper-47.emergent.host';
 // App version (hardcoded — s'actualitza a cada release). Serveix per invalidar
 // caché de descoberta al detectar que l'usuari acaba d'actualitzar l'app.
 const APP_VERSION='2.0.70';
@@ -5919,7 +5919,12 @@ function setApiBaseManualOverride(url){
   }catch(e){}
 }
 function getApiBase(){
-  // Prioritat: override manual > caché descoberta > hardcoded
+  // Prioritat: window.API_BASE (injectat pel bootstrap del .exe) > override manual > caché descoberta > hardcoded
+  try{
+    if (typeof window !== 'undefined' && window.API_BASE && /^https?:\/\//.test(window.API_BASE)){
+      return window.API_BASE.replace(/\/$/,'');
+    }
+  }catch(e){}
   return _getManualOverride() || _getCachedApiBase() || API_BASE_HARDCODED;
 }
 async function discoverApiBase(){
