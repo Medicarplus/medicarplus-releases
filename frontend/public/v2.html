@@ -185,6 +185,7 @@
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 <header>
@@ -636,18 +637,21 @@ function entriesOf(d){return state.byDate[d]||=[]}
 function toast(msg,ms=2200){const t=document.createElement('div');t.className='toast';t.textContent=msg;$('#toast').appendChild(t);setTimeout(()=>t.remove(),ms)}
 
 // ============================================================================
-// printHtml(html) — DESCARGAR PDF · UNIVERSAL (Electron + navegador)
+// printHtml(html, opts) — DESCARGAR PDF · 100% CLIENT-SIDE (offline OK)
 // ============================================================================
-// Enviem l'HTML sencer (amb el seu @page / estils) al backend Playwright.
-// El backend retorna un PDF A4 fidel al que veu l'usuari a la pàgina.
-// L'usuari el rep com a descàrrega — pot obrir-lo, imprimir-lo o guardar-lo.
-//
-// Motiu: el `window.print()` d'Electron trencava marges/pagination i obligava
-// a mantenir estils específics d'impressió. Ara enviem exactament el mateix
-// HTML que es veia, i Playwright honora `@page{size:A4 ...;margin:...}` del CSS.
-function printHtml(html, opts={}){
+// Genera el PDF DINS del navegador amb html2pdf.js (html2canvas + jsPDF).
+// No depèn de cap servidor, no hi ha timeouts, funciona sense internet.
+// WYSIWYG: el que veus a la pantalla és exactament el que baixaràs.
+function printHtml(html, opts){
+  opts = opts || {};
   try{
     if(!html || typeof html!=='string'){toast('❌ No hi ha res per descarregar');return}
+    if(typeof html2pdf === 'undefined'){
+      console.error('[printHtml] html2pdf.js no carregat');
+      toast('❌ Llibreria PDF no carregada. Comprova la connexió i torna a obrir l\'app.', 4000);
+      return;
+    }
+
     // 1) Extreu títol per fer-lo servir com a nom de fitxer
     let title='MediCar Plus';
     try{
@@ -657,50 +661,80 @@ function printHtml(html, opts={}){
     const safe=(title||'documento').replace(/[\\/\r\n\t·]+/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,140);
     const filename=(safe||'documento')+'.pdf';
 
-    // 2) Toast informatiu (la conversió pot trigar 1-2s)
+    // 2) Toast informatiu (la generació sol trigar 1-3s)
     const isCA=(typeof currentLang!=='undefined' && currentLang==='ca');
     toast(isCA?'📄 Generant PDF…':'📄 Generando PDF…', 2500);
 
-    // 3) POST al backend. Estratègia:
-    //    - Si servim v2.html des d'un origin http(s) (preview/producció) → usa MATEIXA origin
-    //      (garanteix que el backend que serveix la UI serveix també l'endpoint).
-    //    - A Electron (protocol `file://`), cau a `getApiBase()` (URL descoberta via sync.js).
-    let base='';
+    // 3) Parseja el HTML rebut i extreu head+body separats
+    const parser=new DOMParser();
+    const parsed=parser.parseFromString(html,'text/html');
+    // Fusiona estils del <head> del contingut a un contenidor propi
+    const styleTags=parsed.head?parsed.head.querySelectorAll('style, link[rel="stylesheet"]'):[];
+    const bodyClone=parsed.body?parsed.body.cloneNode(true):null;
+    if(!bodyClone){toast('❌ Contingut invàlid'); return}
+
+    // 4) Crea un contenidor OFF-SCREEN però amb dimensions reals A4 (perquè
+    //    html2canvas capturi tot correctament, no només l'àrea visible)
+    const isLandscape = !!opts.landscape;
+    const A4_W_MM = isLandscape ? 297 : 210;
+    const A4_H_MM = isLandscape ? 210 : 297;
+    // 1mm ≈ 3.78px a 96dpi, però amb scale:2 usarem el doble → millor render
+    const wrapper=document.createElement('div');
+    wrapper.setAttribute('data-html2pdf-wrapper','1');
+    wrapper.style.cssText='position:fixed;left:-99999px;top:0;background:#fff;color:#000;'+
+                          'width:'+A4_W_MM+'mm;padding:0;margin:0;box-sizing:border-box;';
+    // Injecta els estils originals
+    styleTags.forEach(s=>wrapper.appendChild(s.cloneNode(true)));
+    // Injecta el body original
+    Array.from(bodyClone.childNodes).forEach(n=>wrapper.appendChild(n));
+    document.body.appendChild(wrapper);
+
+    // 5) Marges (extreu de @page del HTML si hi és, sinó defaults per orientació)
+    let margin=isLandscape?[8,8,8,8]:[15,12,15,12]; // T,R,B,L en mm
     try{
-      if(typeof location!=='undefined' && /^https?:$/.test(location.protocol)){
-        base=location.origin;
-      }else if(typeof getApiBase==='function'){
-        base=getApiBase()||'';
+      const pageMatch=html.match(/@page\s*\{[^}]*margin\s*:\s*([^;}]+)/i);
+      if(pageMatch){
+        const parts=pageMatch[1].trim().replace(/mm/g,'').split(/\s+/).map(Number).filter(n=>!isNaN(n));
+        if(parts.length===1) margin=[parts[0],parts[0],parts[0],parts[0]];
+        else if(parts.length===2) margin=[parts[0],parts[1],parts[0],parts[1]];
+        else if(parts.length===4) margin=parts;
       }
     }catch(e){}
-    const url=(base||'').replace(/\/$/,'')+'/api/pdf/render';
-    const landscape = !!(opts && opts.landscape);
 
-    fetch(url, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({html, filename, landscape})
-    }).then(async r=>{
-      if(!r.ok){
-        const txt=await r.text().catch(()=>'');
-        throw new Error('HTTP '+r.status+' '+txt);
-      }
-      return r.blob();
-    }).then(blob=>{
-      const link=document.createElement('a');
-      link.href=URL.createObjectURL(blob);
-      link.download=filename;
-      document.body.appendChild(link);
-      link.click();
-      setTimeout(()=>{try{URL.revokeObjectURL(link.href);link.remove()}catch(e){}}, 1500);
+    // 6) Genera PDF client-side
+    const options={
+      margin: margin,
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        letterRendering: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        windowWidth: wrapper.scrollWidth || undefined,
+      },
+      jsPDF: {
+        unit: 'mm',
+        format: 'a4',
+        orientation: isLandscape ? 'landscape' : 'portrait',
+        compress: true,
+      },
+      pagebreak: { mode: ['css', 'legacy'] },
+    };
+
+    html2pdf().set(options).from(wrapper).save().then(function(){
       toast(isCA?'✅ PDF descarregat':'✅ PDF descargado');
-    }).catch(err=>{
-      console.error('[printHtml→PDF] failed:',err);
+    }).catch(function(err){
+      console.error('[printHtml] html2pdf FAIL:', err);
       toast(isCA?'❌ Error generant el PDF':'❌ Error generando el PDF', 3500);
+    }).finally(function(){
+      try{ wrapper.remove(); }catch(e){}
     });
   }catch(err){
     console.error('[printHtml] Fatal:',err);
     toast(currentLang==='ca'?'❌ No s\'ha pogut descarregar':'❌ No se ha podido descargar');
+    try{ document.querySelectorAll('[data-html2pdf-wrapper]').forEach(w=>w.remove()); }catch(e){}
   }
 }
 

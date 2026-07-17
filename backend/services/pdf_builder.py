@@ -144,26 +144,67 @@ async def render_html_to_pdf_bytes(
       El HTML generat per `printVisibleElement` a v2.html ja inclou `@page{size:A4 X;margin:Ymm}`,
       així cada informe manté la seva pròpia mida/marges sense hardcoding al backend.
     - Si el HTML no té @page, cau en el defalut A4 (portrait/landscape segons paràmetre).
+
+    Usa un context de navegador PERSISTENT compartit (singleton) per evitar 20-60s de
+    latència de llançament de Chromium a cada request en entorns amb recursos limitats.
     """
-    async with async_playwright() as p:
-        browser = await _launch_chromium(p)
+    browser = await _get_browser()
+    # Cada request rep el seu context aïllat (no comparteix cookies/state amb altres)
+    context = await browser.new_context()
+    try:
+        page = await context.new_page()
+        await page.set_content(html, wait_until="load")
         try:
-            page = await browser.new_page()
-            await page.set_content(html, wait_until="load")
-            # Espera fonts i imatges (millor fidelitat WYSIWYG)
-            try:
-                await page.evaluate("document.fonts && document.fonts.ready")
-            except Exception:  # noqa: BLE001
-                pass
-            pdf_bytes = await page.pdf(
-                format="A4",
-                landscape=landscape,
-                print_background=True,
-                prefer_css_page_size=prefer_css_page_size,
-            )
-        finally:
-            await browser.close()
-    return pdf_bytes
+            await page.evaluate("document.fonts && document.fonts.ready")
+        except Exception:  # noqa: BLE001
+            pass
+        pdf_bytes = await page.pdf(
+            format="A4",
+            landscape=landscape,
+            print_background=True,
+            prefer_css_page_size=prefer_css_page_size,
+        )
+        return pdf_bytes
+    finally:
+        try:
+            await context.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+# ── Singleton del browser Chromium ───────────────────────────────────────────
+# Mantenim una única instància de Playwright + Browser, reutilitzada per tots els
+# renders. El primer request encara triga (llançament inicial), però tots els
+# posteriors són ~1s. Si el browser mor per alguna raó, es recrea a la següent crida.
+_browser_lock = asyncio.Lock()
+_playwright_ctx = None  # instància async_playwright()
+_browser = None
+
+
+async def _get_browser():
+    global _playwright_ctx, _browser
+    # Fast path: browser viu i connectat
+    if _browser is not None and _browser.is_connected():
+        return _browser
+    async with _browser_lock:
+        if _browser is not None and _browser.is_connected():
+            return _browser
+        # Neteja instància anterior morta
+        try:
+            if _browser is not None:
+                await _browser.close()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            if _playwright_ctx is not None:
+                await _playwright_ctx.__aexit__(None, None, None)
+        except Exception:  # noqa: BLE001
+            pass
+        _playwright_ctx = async_playwright()
+        p = await _playwright_ctx.__aenter__()
+        _browser = await _launch_chromium(p)
+        logger.info("Chromium singleton browser started.")
+        return _browser
 
 
 async def _print_pdf_from_file(html_path: Path) -> bytes:
