@@ -254,7 +254,7 @@
     <a id="btnWebsite" href="https://medicarplus.es" target="_blank" rel="noopener" title="Obrir medicarplus.es · Compte, ajuda, actualitzacions" style="background:linear-gradient(90deg,#0f172a 0%,#1e293b 100%);color:#f5b301;border:1px solid #f5b301;border-radius:6px;padding:8px 14px;font-weight:700;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:'Segoe UI',sans-serif" data-testid="btn-website">🌐 medicarplus.es</a>
     <div id="trialBadge" data-testid="trial-badge" style="display:none;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;font-family:'Segoe UI',sans-serif;font-size:12px;font-weight:700;border:1px solid;letter-spacing:.3px"></div>
     <span id="autosaveBadge" style="display:none;padding:5px 10px;border-radius:6px;background:#1f3a2e;color:#7ee3aa;font-size:11px;font-family:'Consolas',monospace;letter-spacing:.3px;border:1px solid #2a5e44"></span>
-    <button class="btn" id="btnPrint" data-i18n="print">🖨️ Imprimir</button>
+    <button class="btn" id="btnPrint" data-i18n="print">📥 Descargar PDF</button>
     <button class="btn" id="btnSettings" title="Configuración" style="background:linear-gradient(135deg,#334155,#1e293b);border-color:#475569;color:#e8ecf2;font-weight:700;padding:6px 12px" data-testid="btn-settings">⚙️ <span data-i18n="settings">Configuración</span></button>
     <button class="btn" id="btnLang" style="display:none" data-testid="lang-toggle"><span id="langLabel">ES</span></button>
   </div>
@@ -388,8 +388,8 @@
 const STORE_KEY='caja.v1';const $=s=>document.querySelector(s);const $$=s=>document.querySelectorAll(s);
 // ============ i18n ============
 const I18N={
-  es:{app_title:'MediCar Plus',app_sub:'Cierre diario · Importación CSV/Excel · Debe / Haber',stats:'📊 ESTADÍSTICAS',date:'FECHA',today:'Hoy',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar copia',restore_copy:'📂 Restaurar copia',history:'🛡️ Historial',ledger:'📖 Libreta',accounting:'Contabilidad',annual_report:'📊 Informe anual',reserve:'💰 Reserva de cambio',audit:'🔎 Auditoría',ai_advisor:'🤖 Asesor IA',print:'🖨️ Imprimir',settings:'Configuración',tab_traffic:'Tráfico (Renov/Exped)',tab_reviews:'Revisiones / Certificados / Otros',tab_dh:'Debe / Haber',concept:'Concepto',group:'Grupo',name:'Nombre',amount:'Importe (€)',dgt_fee:'Tasa DGT (€)',payment:'F. Pago',cash:'Efectivo',card:'Tarjeta',transfer:'Transferencia',renewal:'Renovación',issue:'Expedición',duplicate:'Duplicado',exchange:'Canje',other:'Otro',driving:'Conducir',moped:'Ciclomotor',ph_name:'Apellidos, Nombre',add_entry:'+ Añadir entrada',entries_of_day:'Entradas del día',clear_day:'🗑️ Vaciar día',type:'Tipo',name_concept:'Nombre / Concepto',amount_short:'Importe',disc:'Dto',fee_short:'Tasa',fp_fee:'FP Tasa',actions:'Acciones',empty_entries:'No hay entradas. Importa CSV/Excel o añade manualmente arriba.',day_close:'Cierre del día',month_split:'Reparto mes actual',by_concept:'Resumen por concepto',history_title:'Histórico'},
-  ca:{app_title:'MediCar Plus',app_sub:'Tancament diari · Importació CSV/Excel · Deure / Haver',stats:'📊 ESTADÍSTIQUES',date:'DATA',today:'Avui',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar còpia',restore_copy:'📂 Restaurar còpia',history:'🛡️ Historial',ledger:'📖 Llibreta',accounting:'Comptabilitat',annual_report:'📊 Informe anual',audit:'🔎 Auditoria',ai_advisor:'🤖 Assessor IA',print:'🖨️ Imprimir',settings:'Configuració',tab_traffic:'Trànsit (Renov/Exped)',tab_reviews:'Revisions / Certificats / Altres',tab_dh:'Deure / Haver',concept:'Concepte',group:'Grup',name:'Nom',amount:'Import (€)',dgt_fee:'Taxa DGT (€)',payment:'F. Pagament',cash:'Efectiu',card:'Targeta',transfer:'Transferència',renewal:'Renovació',issue:'Expedició',duplicate:'Duplicat',exchange:'Canvi',other:'Altres',driving:'Conduir',moped:'Ciclomotor',ph_name:'Cognoms, Nom',add_entry:'+ Afegir entrada',entries_of_day:'Entrades del dia',clear_day:'🗑️ Buidar dia',type:'Tipus',name_concept:'Nom / Concepte',amount_short:'Import',disc:'Dte',fee_short:'Taxa',fp_fee:'FP Taxa',actions:'Accions',empty_entries:"No hi ha entrades. Importa CSV/Excel o afegeix manualment a dalt.",day_close:'Tancament del dia',month_split:'Repartiment mes actual',by_concept:'Resum per concepte',history_title:'Històric'}
+  es:{app_title:'MediCar Plus',app_sub:'Cierre diario · Importación CSV/Excel · Debe / Haber',stats:'📊 ESTADÍSTICAS',date:'FECHA',today:'Hoy',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar copia',restore_copy:'📂 Restaurar copia',history:'🛡️ Historial',ledger:'📖 Libreta',accounting:'Contabilidad',annual_report:'📊 Informe anual',reserve:'💰 Reserva de cambio',audit:'🔎 Auditoría',ai_advisor:'🤖 Asesor IA',print:'📥 Descargar PDF',settings:'Configuración',tab_traffic:'Tráfico (Renov/Exped)',tab_reviews:'Revisiones / Certificados / Otros',tab_dh:'Debe / Haber',concept:'Concepto',group:'Grupo',name:'Nombre',amount:'Importe (€)',dgt_fee:'Tasa DGT (€)',payment:'F. Pago',cash:'Efectivo',card:'Tarjeta',transfer:'Transferencia',renewal:'Renovación',issue:'Expedición',duplicate:'Duplicado',exchange:'Canje',other:'Otro',driving:'Conducir',moped:'Ciclomotor',ph_name:'Apellidos, Nombre',add_entry:'+ Añadir entrada',entries_of_day:'Entradas del día',clear_day:'🗑️ Vaciar día',type:'Tipo',name_concept:'Nombre / Concepto',amount_short:'Importe',disc:'Dto',fee_short:'Tasa',fp_fee:'FP Tasa',actions:'Acciones',empty_entries:'No hay entradas. Importa CSV/Excel o añade manualmente arriba.',day_close:'Cierre del día',month_split:'Reparto mes actual',by_concept:'Resumen por concepto',history_title:'Histórico'},
+  ca:{app_title:'MediCar Plus',app_sub:'Tancament diari · Importació CSV/Excel · Deure / Haver',stats:'📊 ESTADÍSTIQUES',date:'DATA',today:'Avui',prev_balance:'Saldo anterior',import_csv:'📥 Importar CSV / Excel',save_copy:'💾 Guardar còpia',restore_copy:'📂 Restaurar còpia',history:'🛡️ Historial',ledger:'📖 Llibreta',accounting:'Comptabilitat',annual_report:'📊 Informe anual',audit:'🔎 Auditoria',ai_advisor:'🤖 Assessor IA',print:'📥 Descarregar PDF',settings:'Configuració',tab_traffic:'Trànsit (Renov/Exped)',tab_reviews:'Revisions / Certificats / Altres',tab_dh:'Deure / Haver',concept:'Concepte',group:'Grup',name:'Nom',amount:'Import (€)',dgt_fee:'Taxa DGT (€)',payment:'F. Pagament',cash:'Efectiu',card:'Targeta',transfer:'Transferència',renewal:'Renovació',issue:'Expedició',duplicate:'Duplicat',exchange:'Canvi',other:'Altres',driving:'Conduir',moped:'Ciclomotor',ph_name:'Cognoms, Nom',add_entry:'+ Afegir entrada',entries_of_day:'Entrades del dia',clear_day:'🗑️ Buidar dia',type:'Tipus',name_concept:'Nom / Concepte',amount_short:'Import',disc:'Dte',fee_short:'Taxa',fp_fee:'FP Taxa',actions:'Accions',empty_entries:"No hi ha entrades. Importa CSV/Excel o afegeix manualment a dalt.",day_close:'Tancament del dia',month_split:'Repartiment mes actual',by_concept:'Resum per concepte',history_title:'Històric'}
 };
 let currentLang=localStorage.getItem('caja.lang')||'es';
 function t(key){return (I18N[currentLang]||I18N.ca)[key]||key}
@@ -636,77 +636,71 @@ function entriesOf(d){return state.byDate[d]||=[]}
 function toast(msg,ms=2200){const t=document.createElement('div');t.className='toast';t.textContent=msg;$('#toast').appendChild(t);setTimeout(()=>t.remove(),ms)}
 
 // ============================================================================
-// printHtml(html) — Impressió UNIVERSAL compatible amb Electron + navegador
+// printHtml(html) — DESCARGAR PDF · UNIVERSAL (Electron + navegador)
 // ============================================================================
-// Motiu: window.open('','_blank') no és fiable a Electron (popup blocker,
-// context isolation, etc). Usem un iframe amagat que carrega l'HTML via
-// srcdoc, i disparem contentWindow.print() després del load. Funciona 100%.
+// Enviem l'HTML sencer (amb el seu @page / estils) al backend Playwright.
+// El backend retorna un PDF A4 fidel al que veu l'usuari a la pàgina.
+// L'usuari el rep com a descàrrega — pot obrir-lo, imprimir-lo o guardar-lo.
+//
+// Motiu: el `window.print()` d'Electron trencava marges/pagination i obligava
+// a mantenir estils específics d'impressió. Ara enviem exactament el mateix
+// HTML que es veia, i Playwright honora `@page{size:A4 ...;margin:...}` del CSS.
 function printHtml(html, opts={}){
   try{
-    // Estratègia definitiva: injectar el HTML al DOM principal com un div ocult,
-    // aplicar CSS @media print que amaga tota la resta i mostra només aquest div,
-    // cridar window.print() del document principal. Així el diàleg de Windows
-    // pot fer una VISTA PRÈVIA correcta (perquè imprimeix el document actual,
-    // no un iframe extern).
-    //
-    // Un cop imprès (o cancel·lat), restaura el DOM.
+    if(!html || typeof html!=='string'){toast('❌ No hi ha res per descarregar');return}
+    // 1) Extreu títol per fer-lo servir com a nom de fitxer
+    let title='MediCar Plus';
+    try{
+      const m=html.match(/<title[^>]*>([^<]{1,180})<\/title>/i);
+      if(m && m[1]) title=m[1].trim();
+    }catch(e){}
+    const safe=(title||'documento').replace(/[\\/\r\n\t·]+/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,140);
+    const filename=(safe||'documento')+'.pdf';
 
-    // Extreu només el body content del html rebut
-    const parser=new DOMParser();
-    const parsed=parser.parseFromString(html,'text/html');
-    const bodyHtml=parsed.body?parsed.body.innerHTML:html;
-    // Extreu <style> tags del head del contingut generat
-    const styleBlocks=Array.from(parsed.head?parsed.head.querySelectorAll('style'):[]).map(s=>s.outerHTML).join('\n');
-    const docTitle=parsed.title||'MediCar Plus';
+    // 2) Toast informatiu (la conversió pot trigar 1-2s)
+    const isCA=(typeof currentLang!=='undefined' && currentLang==='ca');
+    toast(isCA?'📄 Generant PDF…':'📄 Generando PDF…', 2500);
 
-    // 1) Crear contenidor del print
-    const printRoot=document.createElement('div');
-    printRoot.id='_print_root';
-    printRoot.innerHTML=bodyHtml;
-
-    // 2) Crear/injectar estil de print (amaga tot menys #_print_root, activa @page)
-    const style=document.createElement('style');
-    style.id='_print_style';
-    style.textContent=`
-      @media print {
-        body > *:not(#_print_root) { display:none !important; visibility:hidden !important; }
-        #_print_root { display:block !important; visibility:visible !important; position:static !important; }
-        #_print_root, #_print_root * { visibility:visible !important; }
+    // 3) POST al backend. Estratègia:
+    //    - Si servim v2.html des d'un origin http(s) (preview/producció) → usa MATEIXA origin
+    //      (garanteix que el backend que serveix la UI serveix també l'endpoint).
+    //    - A Electron (protocol `file://`), cau a `getApiBase()` (URL descoberta via sync.js).
+    let base='';
+    try{
+      if(typeof location!=='undefined' && /^https?:$/.test(location.protocol)){
+        base=location.origin;
+      }else if(typeof getApiBase==='function'){
+        base=getApiBase()||'';
       }
-      @media screen {
-        #_print_root { display:none !important; }
+    }catch(e){}
+    const url=(base||'').replace(/\/$/,'')+'/api/pdf/render';
+    const landscape = !!(opts && opts.landscape);
+
+    fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({html, filename, landscape})
+    }).then(async r=>{
+      if(!r.ok){
+        const txt=await r.text().catch(()=>'');
+        throw new Error('HTTP '+r.status+' '+txt);
       }
-      ${styleBlocks.replace(/<style[^>]*>|<\/style>/g,'')}
-    `;
-
-    // 3) Título temporal (esdevé nom del fitxer per defecte al "Guardar com PDF")
-    const originalTitle=document.title;
-    document.title=docTitle;
-
-    document.head.appendChild(style);
-    document.body.appendChild(printRoot);
-
-    const cleanup=()=>{
-      try{style.remove()}catch(e){}
-      try{printRoot.remove()}catch(e){}
-      document.title=originalTitle;
-      window.removeEventListener('afterprint',cleanup);
-    };
-    window.addEventListener('afterprint',cleanup);
-    // Fallback: si afterprint no dispara, netegem als 60s
-    setTimeout(()=>{if(document.getElementById('_print_root'))cleanup()},60000);
-
-    // 4) Petit delay perquè el navegador renderitzi abans de disparar print
-    setTimeout(()=>{
-      try{window.print()}catch(e){
-        console.error('[printHtml] window.print() failed:',e);
-        toast(currentLang==='ca'?'❌ Error imprimint':'❌ Error imprimiendo');
-        cleanup();
-      }
-    },100);
+      return r.blob();
+    }).then(blob=>{
+      const link=document.createElement('a');
+      link.href=URL.createObjectURL(blob);
+      link.download=filename;
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(()=>{try{URL.revokeObjectURL(link.href);link.remove()}catch(e){}}, 1500);
+      toast(isCA?'✅ PDF descarregat':'✅ PDF descargado');
+    }).catch(err=>{
+      console.error('[printHtml→PDF] failed:',err);
+      toast(isCA?'❌ Error generant el PDF':'❌ Error generando el PDF', 3500);
+    });
   }catch(err){
     console.error('[printHtml] Fatal:',err);
-    toast(currentLang==='ca'?'❌ No s\'ha pogut imprimir':'❌ No se ha podido imprimir');
+    toast(currentLang==='ca'?'❌ No s\'ha pogut descarregar':'❌ No se ha podido descargar');
   }
 }
 
@@ -877,7 +871,7 @@ function openLibroRegistro(){
         <button class="btn" data-lr-preset="all" style="padding:6px 10px;font-size:11px">Todo</button>
       </div>
       <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;cursor:pointer;padding:4px 10px;background:#0e1117;border:1px solid #2a3040;border-radius:8px"><input type="checkbox" id="lrCountZero" style="cursor:pointer;accent-color:#3ddc97" /> Contar 0€ <span class="tt" data-tt="Desactivado (por defecto): las entradas con importe 0€ NO se cuentan. Activado: SÍ se cuentan (útil si quieres contabilizar visitas gratuitas). Sincronizado con el panel principal de Tráfico.">?</span></label>
-      <button class="btn btn-primary" id="lrPrint">🖨️ Imprimir</button>
+      <button class="btn btn-primary" id="lrPrint">📥 Descargar PDF</button>
       <button class="btn" data-no>✕ Cerrar</button>
     </div>
     <div id="lrBody" style="flex:1;overflow:auto"></div>
@@ -1013,7 +1007,7 @@ function openStats(initialSection){
       <input type="file" id="stFile" accept=".csv,.txt" style="display:none" />
       <button class="btn st-autos-only" id="stAdd">+ Autoescola</button>
       <button class="btn st-autos-only" id="stClearAll" style="background:#7f1d1d;color:#fecaca;border-color:#b91c1c" title="Elimina totes les autoescoles i les seves dades">🗑 Buidar tot</button>
-      <button class="btn btn-primary" id="stPrint">🖨️ Imprimir</button>
+      <button class="btn btn-primary" id="stPrint">📥 Descargar PDF</button>
       <button class="btn" data-no>✕ Tancar</button>
     </div>
     <div id="stBody" style="flex:1;overflow:auto" data-testid="st-body"></div>
@@ -2172,7 +2166,7 @@ function openLedger(){
         <button class="btn" data-p="all" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">Tot</button>
       </div>
       <div style="flex:1"></div>
-      <button class="btn btn-primary" id="ldPrint" style="background:#5a3a1a;color:#fff;border-color:#5a3a1a">🖨️ Imprimir</button>
+      <button class="btn btn-primary" id="ldPrint" style="background:#5a3a1a;color:#fff;border-color:#5a3a1a">📥 Descargar PDF</button>
       <button class="btn" data-no style="background:#8b6f47;color:#fff;border-color:#5a3a1a">✕ Tancar</button>
     </div>
     <div id="ldBody" style="flex:1;overflow:auto;font-family:Georgia,'Times New Roman',serif;background:#faf6e8"></div>
@@ -2391,7 +2385,7 @@ function openIRPF(){
         </div>
       </div>
       <div style="flex:1"></div>
-      <button class="btn btn-primary" id="irpfPrint" data-testid="irpf-print" style="background:#78350f;color:#fff;border-color:#78350f">🖨️ Imprimir mes</button>
+      <button class="btn btn-primary" id="irpfPrint" data-testid="irpf-print" style="background:#78350f;color:#fff;border-color:#78350f">📥 Descargar PDF</button>
     </div>
     <div id="irpfBody" style="flex:1;overflow:auto"></div>
   </div>`;
@@ -2751,7 +2745,7 @@ function openAnnualReport(){
       <select id="arYear" style="background:#1e293b;color:#f5b301;border:1px solid #f5b301;border-radius:6px;padding:6px 10px;font-weight:700">
         ${[yearNow,yearNow-1,yearNow-2,yearNow-3,yearNow-4].map(y=>`<option value="${y}" ${y===yearNow?'selected':''}>${y}</option>`).join('')}
       </select>
-      <button class="btn" id="arPrint" style="background:#f5b301;color:#0f172a;border-color:#f5b301;font-weight:700">🖨️ ${L('Imprimir / PDF','Imprimir / PDF')}</button>
+      <button class="btn" id="arPrint" style="background:#f5b301;color:#0f172a;border-color:#f5b301;font-weight:700">📥 ${L('Descarregar PDF','Descargar PDF')}</button>
       <button class="btn" id="arClose" style="background:#7f1d1d;color:#fff;border-color:#7f1d1d">✖</button>
     </div>
     <div id="arBody"></div>
@@ -2762,7 +2756,15 @@ function openAnnualReport(){
   document.body.appendChild(back);
   back.addEventListener('click',e=>{if(e.target===back)back.remove()});
   back.querySelector('#arClose').onclick=()=>back.remove();
-  back.querySelector('#arPrint').onclick=()=>{document.body.classList.add('printing-report');window.print();setTimeout(()=>document.body.classList.remove('printing-report'),1000)};
+  back.querySelector('#arPrint').onclick=()=>{
+    const modal=back.querySelector('.modal')||back.firstElementChild||back;
+    printVisibleElement(modal, {
+      title:'Facturación anual',
+      landscape:true,
+      margins:'8mm',
+      extraCss:'button, select, input, [data-no], .icon-btn { display:none !important }'
+    });
+  };
   const yearSel=back.querySelector('#arYear');
   const bodyEl=back.querySelector('#arBody');
   const render=()=>{bodyEl.innerHTML=_buildAnnualReport(parseInt(yearSel.value))};
@@ -3069,7 +3071,7 @@ function openYearComparison(){
       <select id="ycCount" style="background:#1e293b;color:#f5b301;border:1px solid #f5b301;border-radius:6px;padding:6px 10px;font-weight:700">
         <option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option>
       </select>
-      <button class="btn" id="ycPrint" style="background:#f5b301;color:#0f172a;border-color:#f5b301;font-weight:700" data-testid="yc-print">🖨️ ${L('Imprimir / PDF','Imprimir / PDF')}</button>
+      <button class="btn" id="ycPrint" style="background:#f5b301;color:#0f172a;border-color:#f5b301;font-weight:700" data-testid="yc-print">📥 ${L('Descarregar PDF','Descargar PDF')}</button>
       <button class="btn" id="ycClose" style="background:#7f1d1d;color:#fff;border-color:#7f1d1d" data-testid="yc-close">✖</button>
     </div>
     <div id="ycBody" data-testid="yc-body"></div>
@@ -3080,7 +3082,15 @@ function openYearComparison(){
   document.body.appendChild(back);
   back.addEventListener('click',e=>{if(e.target===back)back.remove()});
   back.querySelector('#ycClose').onclick=()=>back.remove();
-  back.querySelector('#ycPrint').onclick=()=>{document.body.classList.add('printing-report');window.print();setTimeout(()=>document.body.classList.remove('printing-report'),1000)};
+  back.querySelector('#ycPrint').onclick=()=>{
+    const modal=back.querySelector('.modal')||back.firstElementChild||back;
+    printVisibleElement(modal, {
+      title:'Comparativa anual',
+      landscape:true,
+      margins:'8mm',
+      extraCss:'button, select, input, [data-no], .icon-btn { display:none !important }'
+    });
+  };
   const sel=back.querySelector('#ycCount');
   const bodyEl=back.querySelector('#ycBody');
   const render=()=>{bodyEl.innerHTML=_buildYearComparison(yearNow,parseInt(sel.value))};
@@ -4513,7 +4523,7 @@ function openSmsModal(){
         <div style="margin-bottom:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <button onclick="document.getElementById('smsBody').innerHTML='';document.getElementById('smsClose').click();openSmsModal();" style="background:#1e293b;color:#e2e8f0;border:1px solid #475569;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">← ${isCA?'Tornar al llistat':'Volver al listado'}</button>
           <div style="flex:1"></div>
-          <button data-testid="sms-print-campaign" id="btnPrintSmsCamp" style="background:linear-gradient(90deg,#059669,#10b981);color:#fff;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">🖨️ ${isCA?'Imprimir informe':'Imprimir informe'}</button>
+          <button data-testid="sms-print-campaign" id="btnPrintSmsCamp" style="background:linear-gradient(90deg,#059669,#10b981);color:#fff;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">📥 ${isCA?'Descarregar PDF':'Descargar PDF'}</button>
           <button data-testid="sms-delete-campaign" id="btnDelSmsCamp" style="background:linear-gradient(90deg,#b91c1c,#7f1d1d);color:#fecaca;border:1px solid #ef4444;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">🗑 ${isCA?'Eliminar campanya':'Eliminar campaña'}</button>
         </div>
         <div style="background:#0e1a2e;padding:18px;border-radius:12px;border:1px solid #1e293b;margin-bottom:16px">

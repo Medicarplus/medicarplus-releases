@@ -39,6 +39,40 @@ async def _print_pdf_from_html_content(html: str) -> bytes:
     return pdf_bytes
 
 
+async def render_html_to_pdf_bytes(
+    html: str,
+    *,
+    landscape: bool = False,
+    prefer_css_page_size: bool = True,
+) -> bytes:
+    """Renderitza qualsevol HTML sencer a PDF respectant el CSS @page del propi HTML.
+
+    - `prefer_css_page_size=True` fa que Playwright honori @page (size/margin) del CSS.
+      El HTML generat per `printVisibleElement` a v2.html ja inclou `@page{size:A4 X;margin:Ymm}`,
+      així cada informe manté la seva pròpia mida/marges sense hardcoding al backend.
+    - Si el HTML no té @page, cau en el defalut A4 (portrait/landscape segons paràmetre).
+    """
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        try:
+            page = await browser.new_page()
+            await page.set_content(html, wait_until="load")
+            # Espera fonts i imatges (millor fidelitat WYSIWYG)
+            try:
+                await page.evaluate("document.fonts && document.fonts.ready")
+            except Exception:  # noqa: BLE001
+                pass
+            pdf_bytes = await page.pdf(
+                format="A4",
+                landscape=landscape,
+                print_background=True,
+                prefer_css_page_size=prefer_css_page_size,
+            )
+        finally:
+            await browser.close()
+    return pdf_bytes
+
+
 async def _print_pdf_from_file(html_path: Path) -> bytes:
     async with async_playwright() as p:
         browser = await p.chromium.launch()
