@@ -1,1 +1,160 @@
-../../v2.html
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>MediCar Plus</title>
+<!-- MediCar Plus Bootstrap · Loader v1
+     Aquesta pàgina és un BOOTSTRAP mínim que sempre descarrega l'última versió
+     del v2.html real des del servidor descobert. Preserva l'origen file://
+     (i per tant la localStorage/indexedDB del client) entre versions del .exe.
+     Si estem offline, restaura l'última v2.html cachada localment.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob: file:">
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#0f172a;color:#e2e8f0;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden}
+  .load{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+  .logo{width:72px;height:72px;border-radius:16px;background:linear-gradient(135deg,#f5b301,#d97706);display:flex;align-items:center;justify-content:center;color:#0f172a;font-size:34px;font-weight:900;box-shadow:0 8px 30px rgba(245,179,1,.35)}
+  .title{font-size:22px;font-weight:800;letter-spacing:3px;color:#f5b301;margin:0}
+  .sub{font-size:12px;color:#94a3b8;letter-spacing:1px}
+  .spinner{width:36px;height:36px;border:3px solid #1e293b;border-top-color:#f5b301;border-radius:50%;animation:sp 1s linear infinite;margin-top:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .status{font-size:11px;color:#64748b;min-height:16px;margin-top:10px;letter-spacing:.5px}
+  .err{color:#fca5a5;max-width:520px;text-align:center;padding:0 20px;font-size:12px;line-height:1.6}
+</style>
+</head>
+<body>
+  <div class="load">
+    <div class="logo">M+</div>
+    <h1 class="title">MEDICAR PLUS</h1>
+    <div class="sub">Software · Marc Brugulat Lopez</div>
+    <div class="spinner"></div>
+    <div class="status" id="_boot_status">Iniciando…</div>
+  </div>
+<script>
+(async function bootstrap(){
+  var $ = function(id){ return document.getElementById(id); };
+  var setStatus = function(t){ try{ $('_boot_status').textContent = t; }catch(e){} };
+  var LS_CACHE_HTML = 'medicar.boot.v2html.cache.v1';
+  var LS_CACHE_API  = 'medicar.boot.api.base.v1';
+  var SIG_MIN_LEN = 50000; // v2.html real fa ~250KB, si baixem <50KB és una pàgina d'error
+
+  var SOURCES = [
+    'https://raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json',
+    'https://cdn.jsdelivr.net/gh/Medicarplus/medicarplus-releases@main/api-endpoint.json',
+    'https://api.github.com/repos/Medicarplus/medicarplus-releases/contents/api-endpoint.json'
+  ];
+
+  function fetchTimeout(url, ms){
+    ms = ms || 8000;
+    return new Promise(function(resolve, reject){
+      var ctrl = new AbortController();
+      var to = setTimeout(function(){ ctrl.abort(); }, ms);
+      // No custom headers → evita preflight CORS. `cache:'no-store'` ja és suficient.
+      fetch(url, {signal: ctrl.signal, cache: 'no-store'})
+        .then(function(r){ clearTimeout(to); resolve(r); })
+        .catch(function(e){ clearTimeout(to); reject(e); });
+    });
+  }
+
+  async function discoverApi(){
+    for(var i=0;i<SOURCES.length;i++){
+      var src = SOURCES[i];
+      try{
+        var url = src + (src.indexOf('?')>=0?'&':'?') + 't=' + Date.now();
+        var r = await fetchTimeout(url, 8000);
+        if(!r.ok) continue;
+        var j = await r.json();
+        var api = null;
+        if(j && j.api && /^https?:\/\//.test(j.api)) api = j.api.replace(/\/+$/, '');
+        else if(j && j.content && j.encoding === 'base64'){
+          try{
+            var decoded = atob(j.content.replace(/\s/g,''));
+            var inner = JSON.parse(decoded);
+            if(inner && inner.api && /^https?:\/\//.test(inner.api)) api = inner.api.replace(/\/+$/, '');
+          }catch(e){}
+        }
+        if(api){
+          try{ localStorage.setItem(LS_CACHE_API, api); }catch(e){}
+          return api;
+        }
+      }catch(e){ /* try next source */ }
+    }
+    // fallback al últim API descobert
+    try{ return localStorage.getItem(LS_CACHE_API) || null; }catch(e){ return null; }
+  }
+
+  async function fetchV2(api){
+    var url = api + '/v2.html?t=' + Date.now();
+    var r = await fetchTimeout(url, 20000);
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var html = await r.text();
+    if(!html || html.indexOf('MediCar Plus') < 0 || html.length < SIG_MIN_LEN){
+      throw new Error('validation (len=' + (html?html.length:0) + ')');
+    }
+    return html;
+  }
+
+  function injectApiBase(html, api){
+    // Insereix window.API_BASE al head perquè fetches i getApiBase() coneguin l'origen.
+    if(!api) return html;
+    var inject = '<script>window.API_BASE=' + JSON.stringify(api) + ';<\/script>';
+    var i = html.toLowerCase().indexOf('<head>');
+    if(i >= 0) return html.slice(0, i+6) + inject + html.slice(i+6);
+    return inject + html;
+  }
+
+  function renderHtml(html){
+    // document.open/write/close ré-parseja el document i executa els <script> inline.
+    // Mantenim el mateix URL (file://…/index.html) → mateix origin → localStorage intacte.
+    try{
+      document.open();
+      document.write(html);
+      document.close();
+    }catch(e){
+      // Fallback: reemplaça innerHTML (no executa scripts, però evita quedar-se penjat)
+      document.documentElement.innerHTML = html.replace(/<\/?html[^>]*>/gi,'');
+    }
+  }
+
+  async function main(){
+    setStatus('Buscant servidor…');
+    var api = null;
+    try{ api = await discoverApi(); }catch(e){}
+
+    var html = null;
+    if(api){
+      setStatus('Descarregant la darrera versió…');
+      try{ html = await fetchV2(api); }catch(e){ console.warn('[bootstrap] fetchV2 fail:', e && e.message); }
+    }
+
+    if(html){
+      // Guarda a la caché per si el proper cop no hi ha internet
+      try{ localStorage.setItem(LS_CACHE_HTML, html); }catch(e){/* pot fallar si és massa gran, no és crític */}
+    }else{
+      setStatus('Sense connexió — usant còpia local…');
+      try{ html = localStorage.getItem(LS_CACHE_HTML) || null; }catch(e){}
+    }
+
+    if(!html){
+      setStatus('');
+      document.querySelector('.load').innerHTML =
+        '<div class="logo">M+</div>' +
+        '<h1 class="title">MEDICAR PLUS</h1>' +
+        '<div class="err">❌ Sense connexió a internet i sense còpia local disponible.<br>' +
+        'Comprova la teva xarxa i torna a obrir el programa.<br><br>' +
+        'Si el problema persisteix, contacta amb <b>info@medicarplus.es</b>.</div>';
+      return;
+    }
+
+    var final = injectApiBase(html, api);
+    renderHtml(final);
+  }
+
+  main().catch(function(e){
+    console.error('[bootstrap] fatal', e);
+    setStatus('❌ Error: ' + (e && e.message ? e.message : e));
+  });
+})();
+</script>
+</body>
+</html>

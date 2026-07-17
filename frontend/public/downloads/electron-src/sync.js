@@ -38,7 +38,7 @@ let SERVER = null; // s'omple SEMPRE per discovery, mai hardcoded
 const FILES = ['index.html', 'main.js', 'preload.js', 'package.json'];
 
 const SIGNATURES = {
-  'index.html':   ['<!doctype html>', 'MediCar Plus', 'Entradas del día'],
+  'index.html':   ['<!doctype html>', 'MediCar Plus', 'MediCar Plus Bootstrap'],
   'main.js':      ["require('electron')", 'BrowserWindow', 'autoUpdater'],
   'preload.js':   ['contextBridge'],
   'package.json': ['medicar-plus', 'electron-updater'],

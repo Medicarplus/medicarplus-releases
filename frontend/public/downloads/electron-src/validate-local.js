@@ -17,14 +17,12 @@ const dir = __dirname;
 // Si en falta cap, la build s'atura per NO publicar una app trencada.
 const REQUIRED = {
   'index.html': [
-    '<!doctype html>',        // HTML vàlid
-    'MediCar Plus',           // Marca correcta
-    'Entradas del día',       // Secció principal
-    'id="appTitle"',          // Header renderitzat
-    'id="mainTabs"',          // Sistema de pestanyes
-    'id="btn-settings"',      // Botó Configuració
-    'id="btn-import-csv"',    // Botó Importar CSV
-    'id="btn-sms-new"',       // Botó SMS
+    '<!doctype html>',           // HTML vàlid
+    'MediCar Plus',              // Marca correcta
+    'MediCar Plus Bootstrap',    // Comment que identifica el loader
+    'discoverApi',               // Funció de descoberta d'API
+    'document.write',            // Injecta v2.html real via document.write
+    'medicar.boot.v2html.cache', // Clau de caché offline
   ],
   'main.js': [
     "require('electron')",

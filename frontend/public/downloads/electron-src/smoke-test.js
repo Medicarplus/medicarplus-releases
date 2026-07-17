@@ -41,7 +41,7 @@ try {
   const raw = fs.readFileSync(asar, 'utf8');
   const REQUIRED_STRINGS = [
     'MediCar Plus',
-    'Entradas del día',
+    'MediCar Plus Bootstrap',
     'require(\'electron\')',
   ];
   const missing = REQUIRED_STRINGS.filter(s => !raw.includes(s));
@@ -62,7 +62,7 @@ if (!fs.existsSync(idxPath)) {
 }
 const idx = fs.readFileSync(idxPath, 'utf8');
 
-const REQUIRED_IN_INDEX = ['MediCar Plus', 'Entradas del día'];
+const REQUIRED_IN_INDEX = ['MediCar Plus', 'MediCar Plus Bootstrap'];
 const missing = REQUIRED_IN_INDEX.filter(s => !idx.includes(s));
 
 // Neteja
