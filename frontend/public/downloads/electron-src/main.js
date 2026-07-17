@@ -2,8 +2,10 @@
 // MediCar Plus · v2 COMERCIAL · Electron Main Process
 // Marc Brugulat Lopez · 2026
 // ============================================================================
-const { app, BrowserWindow, Menu, shell, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, shell, dialog, ipcMain, net } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const https = require('https');
 
 // Auto-updater (Opció A: GitHub Releases). Fallar silenciosament si el repo
 // no està configurat, així el dev local no peta.
@@ -23,6 +25,98 @@ if (!gotTheLock) {
 
 let mainWindow;
 let updateAvailable = false;
+
+// ============================================================================
+// RUNTIME DISCOVERY · sempre carrega v2.html del SERVIDOR (mai el local del disc)
+// ----------------------------------------------------------------------------
+// Fluxe cada cop que s'obre el .exe:
+//   1) Descobreix la URL del backend via la mateixa cadena de 4 fonts que sync.js
+//      (raw.githubusercontent → jsdelivr → api.github → cache local).
+//   2) Carrega `SERVER/v2.html?t=Date.now()` (no-cache) — sempre l'últim UI.
+//   3) Si TOTS els discoveries fallen (sense internet, GitHub caigut...) llavors
+//      i només llavors → cau al `index.html` local com a xarxa de seguretat.
+//
+// Conseqüència: qualsevol canvi al v2.html del servidor arriba als clients la
+// propera vegada que obren l'app, sense recompilar mai més el .exe.
+// ============================================================================
+const DISCOVERY_SOURCES = [
+  'https://raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json',
+  'https://cdn.jsdelivr.net/gh/Medicarplus/medicarplus-releases@main/api-endpoint.json',
+  'https://api.github.com/repos/Medicarplus/medicarplus-releases/contents/api-endpoint.json',
+];
+const LAST_KNOWN_FILE = path.join(app.getPath('userData'), 'last-known-server.json');
+
+function _httpGetJson(url, timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    try {
+      const req = https.get(url, {
+        timeout: timeoutMs,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) MediCarPlus-Electron',
+          'Accept': 'application/json,*/*',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        },
+      }, (res) => {
+        if (res.statusCode !== 200) return reject(new Error('HTTP ' + res.statusCode));
+        const chunks = [];
+        res.on('data', c => chunks.push(c));
+        res.on('end', () => {
+          try {
+            const txt = Buffer.concat(chunks).toString('utf8');
+            resolve(JSON.parse(txt));
+          } catch (e) { reject(e); }
+        });
+        res.on('error', reject);
+      });
+      req.on('error', reject);
+      req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    } catch (e) { reject(e); }
+  });
+}
+
+function _parseApiField(j) {
+  if (j && j.api && /^https?:\/\//.test(j.api)) return j.api.replace(/\/+$/, '');
+  if (j && j.content && j.encoding === 'base64') {
+    try {
+      const decoded = Buffer.from(j.content, 'base64').toString('utf8');
+      const inner = JSON.parse(decoded);
+      if (inner && inner.api && /^https?:\/\//.test(inner.api)) return inner.api.replace(/\/+$/, '');
+    } catch (e) { /* ignore */ }
+  }
+  return null;
+}
+
+async function discoverServerUrl() {
+  // 1) Prova cada font online (2 intents amb backoff)
+  for (let i = 0; i < DISCOVERY_SOURCES.length; i++) {
+    const src = DISCOVERY_SOURCES[i];
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const url = src + (src.includes('?') ? '&' : '?') + 't=' + Date.now();
+        const j = await _httpGetJson(url, 8000);
+        const api = _parseApiField(j);
+        if (api) {
+          try {
+            fs.mkdirSync(path.dirname(LAST_KNOWN_FILE), { recursive: true });
+            fs.writeFileSync(LAST_KNOWN_FILE, JSON.stringify({ api, discoveredAt: new Date().toISOString(), source: src }, null, 2));
+          } catch (e) { /* ignore */ }
+          return api;
+        }
+      } catch (e) {
+        await new Promise(r => setTimeout(r, 400 * attempt));
+      }
+    }
+  }
+  // 2) Cache local
+  try {
+    if (fs.existsSync(LAST_KNOWN_FILE)) {
+      const cached = JSON.parse(fs.readFileSync(LAST_KNOWN_FILE, 'utf8'));
+      if (cached && cached.api) return cached.api.replace(/\/+$/, '');
+    }
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -46,8 +140,8 @@ function createWindow() {
     }
   });
 
-  // Carrega el fitxer HTML local
-  mainWindow.loadFile('index.html');
+  // ── Càrrega WYSIWYG · sempre del servidor (fallback a local si offline) ──
+  loadUiFromServerOrLocal();
 
   // Mostra la finestra quan estigui llesta
   mainWindow.once('ready-to-show', () => {
@@ -94,6 +188,77 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+}
+
+// Carrega v2.html: primer intenta baixar l'ÚLTIMA versió del servidor i sobreescriu
+// la còpia local. Després carrega el fitxer local (preservant l'origen file:// i,
+// per tant, totes les dades de l'usuari a localStorage/indexedDB).
+// Si no hi ha connexió, carrega directament el local antic (últim rebut).
+async function loadUiFromServerOrLocal() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const localHtmlPath = path.join(__dirname, 'index.html');
+  try {
+    const server = await discoverServerUrl();
+    if (server) {
+      try {
+        const remoteHtml = await _httpGetBuffer(server + '/v2.html?t=' + Date.now(), 12000);
+        // Validació mínima: ha de ser HTML de MediCar Plus (signatura de contingut)
+        const txt = remoteHtml.toString('utf8');
+        if (txt.includes('MediCar Plus') && txt.includes('Entradas del día') && txt.length > 50000) {
+          // Sobreescriu la còpia local només si ha canviat (evita I/O innecessària)
+          let needsWrite = true;
+          try {
+            const cur = fs.readFileSync(localHtmlPath);
+            if (cur.equals(remoteHtml)) needsWrite = false;
+          } catch (e) { /* ignore */ }
+          if (needsWrite) {
+            try {
+              fs.writeFileSync(localHtmlPath, remoteHtml);
+              console.log('[MediCar] v2.html actualitzat des del servidor (' + (remoteHtml.length / 1024).toFixed(1) + ' KB).');
+            } catch (writeErr) {
+              console.warn('[MediCar] No s\'ha pogut escriure v2.html local:', writeErr.message);
+            }
+          } else {
+            console.log('[MediCar] v2.html ja al dia amb el servidor.');
+          }
+        } else {
+          console.warn('[MediCar] v2.html descarregat NO passa la validació — es descarta.');
+        }
+      } catch (fetchErr) {
+        console.warn('[MediCar] Fetch v2.html FAIL, es fa servir la còpia local:', fetchErr.message);
+      }
+    } else {
+      console.warn('[MediCar] Cap servidor descobert · fem servir v2.html local existent.');
+    }
+  } catch (e) {
+    console.warn('[MediCar] Discovery error · fallback local:', e.message);
+  }
+  // Sempre carreguem el fitxer local (que ara pot haver estat actualitzat).
+  // Aquest és el pas clau que preserva localStorage/indexedDB del client.
+  try { await mainWindow.loadFile('index.html'); } catch (e) { console.error('[MediCar] Local UI FAIL:', e); }
+}
+
+function _httpGetBuffer(url, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    try {
+      const req = https.get(url, {
+        timeout: timeoutMs || 12000,
+        headers: {
+          'User-Agent': 'MediCarPlus-Electron/1.0',
+          'Accept': 'text/html,*/*',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        },
+      }, (res) => {
+        if (res.statusCode !== 200) return reject(new Error('HTTP ' + res.statusCode));
+        const chunks = [];
+        res.on('data', c => chunks.push(c));
+        res.on('end', () => resolve(Buffer.concat(chunks)));
+        res.on('error', reject);
+      });
+      req.on('error', reject);
+      req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    } catch (e) { reject(e); }
   });
 }
 
