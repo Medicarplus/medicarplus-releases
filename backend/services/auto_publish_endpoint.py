@@ -33,15 +33,21 @@ GITHUB_API = "https://api.github.com"
 
 
 def _current_preview_url() -> Optional[str]:
-    """Retorna la URL actual del backend segons env vars d'Emergent.
+    """Retorna la URL pública del backend segons env vars d'Emergent.
 
     Ordre de prioritat:
-    1) `REACT_APP_BACKEND_URL` de `/app/frontend/.env` — canònica, Emergent la manté al dia
-    2) `preview_endpoint` (nom oficial d'Emergent, minúscules)
-    3) `PREVIEW_ENDPOINT` (variant en majúscules)
-    4) `APP_URL` (UUID estable per contenidor, però pot quedar obsolet a supervisor)
+    1) `PRODUCTION_URL` / `PUBLIC_URL` — override explícit per producció (recomanat: `project-helper-47.emergent.host`)
+    2) `REACT_APP_BACKEND_URL` de `/app/frontend/.env` — canònica, Emergent la manté al dia
+    3) `preview_endpoint` (nom oficial d'Emergent, minúscules)
+    4) `PREVIEW_ENDPOINT` (variant en majúscules)
+    5) `APP_URL` (UUID estable per contenidor, pot quedar obsolet a supervisor)
     """
-    # 1) Font canònica: /app/frontend/.env → REACT_APP_BACKEND_URL
+    # 1) Override explícit per producció
+    for key in ("PRODUCTION_URL", "PUBLIC_URL"):
+        url = (os.environ.get(key) or "").strip()
+        if url and url.startswith("http"):
+            return url.rstrip("/")
+    # 2) Font canònica: /app/frontend/.env → REACT_APP_BACKEND_URL
     try:
         fenv = Path("/app/frontend/.env")
         if fenv.exists():
@@ -52,7 +58,7 @@ def _current_preview_url() -> Optional[str]:
                         return val.rstrip("/")
     except Exception:  # noqa: BLE001
         pass
-    # 2-4) Fallback a env vars
+    # 3-5) Fallback a env vars
     for key in ("preview_endpoint", "PREVIEW_ENDPOINT", "APP_URL"):
         url = (os.environ.get(key) or "").strip()
         if url and url.startswith("http"):
