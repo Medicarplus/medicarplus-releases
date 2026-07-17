@@ -35,13 +35,18 @@ const DISCOVERY_SOURCES = [
 ];
 const LAST_KNOWN_FILE = path.join(__dirname, '.last-known-server.json');
 let SERVER = null; // s'omple SEMPRE per discovery, mai hardcoded
-const FILES = ['index.html', 'main.js', 'preload.js', 'package.json'];
+// IMPORTANT: sync.js s'inclou a sí mateix perquè els futurs canvis de signatures/discovery
+// s'apliquin al proper build automàticament (evita la trampa de "sync.js local vell").
+const FILES = ['index.html', 'main.js', 'preload.js', 'package.json', 'sync.js', 'validate-local.js', 'smoke-test.js'];
 
 const SIGNATURES = {
-  'index.html':   ['<!doctype html>', 'MediCar Plus', 'MediCar Plus Bootstrap'],
-  'main.js':      ["require('electron')", 'BrowserWindow', 'autoUpdater'],
-  'preload.js':   ['contextBridge'],
-  'package.json': ['medicar-plus', 'electron-updater'],
+  'index.html':      ['<!doctype html>', 'MediCar Plus', 'MediCar Plus Bootstrap'],
+  'main.js':         ["require('electron')", 'BrowserWindow', 'autoUpdater'],
+  'preload.js':      ['contextBridge'],
+  'package.json':    ['medicar-plus', 'electron-updater'],
+  'sync.js':         ['DISCOVERY_SOURCES', 'SIGNATURES', 'FILES'],
+  'validate-local.js': ['MediCar Plus Bootstrap', 'REQUIRED'],
+  'smoke-test.js':   ['MediCar Plus Bootstrap', 'REQUIRED_STRINGS'],
 };
 
 function fetch(url, extraHeaders) {
