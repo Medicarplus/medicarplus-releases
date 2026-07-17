@@ -185,7 +185,7 @@
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 <header>
@@ -637,22 +637,21 @@ function entriesOf(d){return state.byDate[d]||=[]}
 function toast(msg,ms=2200){const t=document.createElement('div');t.className='toast';t.textContent=msg;$('#toast').appendChild(t);setTimeout(()=>t.remove(),ms)}
 
 // ============================================================================
-// printHtml(html, opts) — DESCARGAR PDF · 100% CLIENT-SIDE (offline OK)
+// printHtml(html, opts) — DESCARGAR PDF · 100% CLIENT-SIDE + FALLBACK AUTOMÀTIC
 // ============================================================================
-// Genera el PDF DINS del navegador amb html2pdf.js (html2canvas + jsPDF).
-// No depèn de cap servidor, no hi ha timeouts, funciona sense internet.
-// WYSIWYG: el que veus a la pantalla és exactament el que baixaràs.
-function printHtml(html, opts){
+// Estratègia:
+//   1r intent: html2pdf.js (client-side, WYSIWYG, sense servidor)
+//   2n intent (si 1r falla o triga >20s): iframe.print() (navegador nadiu)
+//   Loguem tots els passos a consola perquè el debug sigui immediat.
+async function printHtml(html, opts){
   opts = opts || {};
+  const LOG = (msg, extra) => { try{ console.log('[printHtml]', msg, extra||''); }catch(e){} };
+  const ERR = (msg, err) => { try{ console.error('[printHtml]', msg, err||''); }catch(e){} };
   try{
     if(!html || typeof html!=='string'){toast('❌ No hi ha res per descarregar');return}
-    if(typeof html2pdf === 'undefined'){
-      console.error('[printHtml] html2pdf.js no carregat');
-      toast('❌ Llibreria PDF no carregada. Comprova la connexió i torna a obrir l\'app.', 4000);
-      return;
-    }
+    LOG('start · length='+html.length+' landscape='+!!opts.landscape);
 
-    // 1) Extreu títol per fer-lo servir com a nom de fitxer
+    // 1) Nom del fitxer
     let title='MediCar Plus';
     try{
       const m=html.match(/<title[^>]*>([^<]{1,180})<\/title>/i);
@@ -660,82 +659,148 @@ function printHtml(html, opts){
     }catch(e){}
     const safe=(title||'documento').replace(/[\\/\r\n\t·]+/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,140);
     const filename=(safe||'documento')+'.pdf';
+    LOG('filename='+filename);
 
-    // 2) Toast informatiu (la generació sol trigar 1-3s)
     const isCA=(typeof currentLang!=='undefined' && currentLang==='ca');
-    toast(isCA?'📄 Generant PDF…':'📄 Generando PDF…', 2500);
+    toast(isCA?'📄 Generant PDF…':'📄 Generando PDF…', 3000);
 
-    // 3) Parseja el HTML rebut i extreu head+body separats
-    const parser=new DOMParser();
-    const parsed=parser.parseFromString(html,'text/html');
-    // Fusiona estils del <head> del contingut a un contenidor propi
-    const styleTags=parsed.head?parsed.head.querySelectorAll('style, link[rel="stylesheet"]'):[];
-    const bodyClone=parsed.body?parsed.body.cloneNode(true):null;
-    if(!bodyClone){toast('❌ Contingut invàlid'); return}
-
-    // 4) Crea un contenidor OFF-SCREEN però amb dimensions reals A4 (perquè
-    //    html2canvas capturi tot correctament, no només l'àrea visible)
-    const isLandscape = !!opts.landscape;
-    const A4_W_MM = isLandscape ? 297 : 210;
-    const A4_H_MM = isLandscape ? 210 : 297;
-    // 1mm ≈ 3.78px a 96dpi, però amb scale:2 usarem el doble → millor render
-    const wrapper=document.createElement('div');
-    wrapper.setAttribute('data-html2pdf-wrapper','1');
-    wrapper.style.cssText='position:fixed;left:-99999px;top:0;background:#fff;color:#000;'+
-                          'width:'+A4_W_MM+'mm;padding:0;margin:0;box-sizing:border-box;';
-    // Injecta els estils originals
-    styleTags.forEach(s=>wrapper.appendChild(s.cloneNode(true)));
-    // Injecta el body original
-    Array.from(bodyClone.childNodes).forEach(n=>wrapper.appendChild(n));
-    document.body.appendChild(wrapper);
-
-    // 5) Marges (extreu de @page del HTML si hi és, sinó defaults per orientació)
-    let margin=isLandscape?[8,8,8,8]:[15,12,15,12]; // T,R,B,L en mm
-    try{
-      const pageMatch=html.match(/@page\s*\{[^}]*margin\s*:\s*([^;}]+)/i);
-      if(pageMatch){
-        const parts=pageMatch[1].trim().replace(/mm/g,'').split(/\s+/).map(Number).filter(n=>!isNaN(n));
-        if(parts.length===1) margin=[parts[0],parts[0],parts[0],parts[0]];
-        else if(parts.length===2) margin=[parts[0],parts[1],parts[0],parts[1]];
-        else if(parts.length===4) margin=parts;
+    // 2) Espera que html2pdf estigui carregat (fins a 5s)
+    const waitLib = async () => {
+      for (let i=0; i<50; i++){
+        if(typeof html2pdf !== 'undefined') return true;
+        await new Promise(r=>setTimeout(r,100));
       }
-    }catch(e){}
-
-    // 6) Genera PDF client-side
-    const options={
-      margin: margin,
-      filename: filename,
-      image: { type: 'jpeg', quality: 0.95 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        letterRendering: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        windowWidth: wrapper.scrollWidth || undefined,
-      },
-      jsPDF: {
-        unit: 'mm',
-        format: 'a4',
-        orientation: isLandscape ? 'landscape' : 'portrait',
-        compress: true,
-      },
-      pagebreak: { mode: ['css', 'legacy'] },
+      return false;
     };
+    const libReady = await waitLib();
+    LOG('html2pdf ready='+libReady);
 
-    html2pdf().set(options).from(wrapper).save().then(function(){
-      toast(isCA?'✅ PDF descarregat':'✅ PDF descargado');
-    }).catch(function(err){
-      console.error('[printHtml] html2pdf FAIL:', err);
-      toast(isCA?'❌ Error generant el PDF':'❌ Error generando el PDF', 3500);
-    }).finally(function(){
-      try{ wrapper.remove(); }catch(e){}
-    });
+    // 3) Intent principal: html2pdf.js
+    if(libReady){
+      try{
+        await _pdfViaHtml2pdf(html, filename, opts, LOG);
+        LOG('success via html2pdf');
+        toast(isCA?'✅ PDF descarregat':'✅ PDF descargado');
+        return;
+      }catch(e){
+        ERR('html2pdf failed, trying fallback:', e && (e.message||e));
+      }
+    }else{
+      ERR('html2pdf library not loaded — going straight to native print fallback');
+    }
+
+    // 4) Fallback nadiu: obre HTML en iframe i dispara print() → Ctrl+P (usuari tria "Guardar com PDF")
+    LOG('fallback: iframe print');
+    _pdfViaIframePrint(html, filename, LOG);
+    toast(isCA?'ℹ️ Obrint diàleg d\'impressió — tria «Guardar com PDF»':'ℹ️ Abriendo diálogo — elige «Guardar como PDF»', 4500);
   }catch(err){
-    console.error('[printHtml] Fatal:',err);
+    ERR('Fatal:',err);
     toast(currentLang==='ca'?'❌ No s\'ha pogut descarregar':'❌ No se ha podido descargar');
     try{ document.querySelectorAll('[data-html2pdf-wrapper]').forEach(w=>w.remove()); }catch(e){}
   }
+}
+
+// Genera PDF client-side usant html2pdf.js (WYSIWYG, sense servidor).
+async function _pdfViaHtml2pdf(html, filename, opts, LOG){
+  const parser=new DOMParser();
+  const parsed=parser.parseFromString(html,'text/html');
+  const styleTags=parsed.head?parsed.head.querySelectorAll('style, link[rel="stylesheet"]'):[];
+  const bodyClone=parsed.body?parsed.body.cloneNode(true):null;
+  if(!bodyClone) throw new Error('cos HTML invàlid');
+
+  const isLandscape = !!opts.landscape;
+  const A4_W_MM = isLandscape ? 297 : 210;
+
+  const wrapper=document.createElement('div');
+  wrapper.setAttribute('data-html2pdf-wrapper','1');
+  wrapper.style.cssText='position:fixed;left:-99999px;top:0;background:#fff;color:#000;'+
+                        'width:'+A4_W_MM+'mm;padding:0;margin:0;box-sizing:border-box;';
+  styleTags.forEach(s=>wrapper.appendChild(s.cloneNode(true)));
+  Array.from(bodyClone.childNodes).forEach(n=>wrapper.appendChild(n));
+  document.body.appendChild(wrapper);
+  LOG('wrapper attached · size='+wrapper.scrollWidth+'x'+wrapper.scrollHeight);
+
+  let margin=isLandscape?[8,8,8,8]:[15,12,15,12];
+  try{
+    const pageMatch=html.match(/@page\s*\{[^}]*margin\s*:\s*([^;}]+)/i);
+    if(pageMatch){
+      const parts=pageMatch[1].trim().replace(/mm/g,'').split(/\s+/).map(Number).filter(n=>!isNaN(n));
+      if(parts.length===1) margin=[parts[0],parts[0],parts[0],parts[0]];
+      else if(parts.length===2) margin=[parts[0],parts[1],parts[0],parts[1]];
+      else if(parts.length===4) margin=parts;
+    }
+  }catch(e){}
+  LOG('margin=['+margin.join(',')+']mm');
+
+  const options={
+    margin: margin,
+    filename: filename,
+    image: { type: 'jpeg', quality: 0.95 },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      letterRendering: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+    },
+    jsPDF: {
+      unit: 'mm',
+      format: 'a4',
+      orientation: isLandscape ? 'landscape' : 'portrait',
+      compress: true,
+    },
+    pagebreak: { mode: ['css', 'legacy'] },
+  };
+
+  // Timeout de seguretat: si passa >20s, aborta i cau al fallback.
+  const gen = html2pdf().set(options).from(wrapper).save();
+  try{
+    await Promise.race([
+      gen,
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('html2pdf timeout 20s')), 20000))
+    ]);
+  } finally {
+    try{ wrapper.remove(); }catch(e){}
+  }
+}
+
+// Fallback nadiu: crea un iframe, hi carrega el HTML sencer, i dispara print().
+// L'usuari clicará "Guardar com PDF" al diàleg del sistema.
+function _pdfViaIframePrint(html, filename, LOG){
+  const oldTitle = document.title;
+  try{
+    // Prova titol perquè aparegui al diàleg
+    const m=html.match(/<title[^>]*>([^<]{1,180})<\/title>/i);
+    if(m && m[1]) document.title = m[1].trim();
+  }catch(e){}
+
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
+  iframe.setAttribute('data-print-iframe','1');
+  document.body.appendChild(iframe);
+
+  const cleanup = () => {
+    document.title = oldTitle;
+    try{ iframe.remove(); }catch(e){}
+  };
+
+  iframe.onload = () => {
+    try{
+      const w = iframe.contentWindow;
+      LOG('iframe loaded, printing…');
+      w.focus();
+      w.print();
+      setTimeout(cleanup, 60000);
+    }catch(e){
+      LOG('iframe print error', e.message);
+      cleanup();
+    }
+  };
+  // Escriu el HTML dins l'iframe
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
 }
 
 // ============================================================================
