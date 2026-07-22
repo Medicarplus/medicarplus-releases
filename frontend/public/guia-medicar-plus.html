@@ -542,6 +542,23 @@ M. Brugulat Lopez · MediCar Plus</pre>
 
 <hr>
 
+<h3 id="landing-github">🌐 Publicar canvis a la landing (medicarplus.es · GitHub Pages)</h3>
+<p>La landing pública (<code>medicarplus.es</code>) està allotjada a <b>GitHub Pages</b>, no a Emergent. Quan actualitzis el fitxer <code>landing-medicarplus.html</code> al preview d'Emergent, els canvis <b>NO arriben automàticament</b> al domini públic — cal fer una còpia manual al repositori de GitHub. Procés (7 minuts):</p>
+<ol>
+  <li><b>Descarrega el HTML actualitzat</b> — obre aquesta URL al navegador i guarda amb <b>Ctrl+S → "Página web, sólo HTML"</b> com a <code>index.html</code>:<br>
+  <code style="user-select:all">https://project-helper-47.preview.emergentagent.com/downloads/landing-medicarplus.html</code></li>
+  <li><b>Obre el repositori GitHub</b> que serveix <code>medicarplus.es</code> (típicament <code>Medicarplus/medicarplus.github.io</code> o el que tinguis configurat com a Pages source).</li>
+  <li>Clic al fitxer <code>index.html</code> → icona del <b>llapis ✏️</b> ("Edit this file") → <code>Ctrl+A</code> per seleccionar-ho tot → esborra → enganxa el contingut nou copiat del fitxer descarregat.</li>
+  <li>Al peu, escriu un commit message clar (ex: <code>Update landing: Stripe subscribe + trial badge</code>) i clica <b>"Commit changes"</b>.</li>
+  <li>Espera <b>1-2 minuts</b> a que GitHub Pages reconstrueixi.</li>
+  <li><b>Verifica en incògnit</b> a <code>https://medicarplus.es</code>: els nous botons "Suscribirse", el badge "🎁 Prueba gratuita 60 días · Sin tarjeta" i el prompt d'email al clicar han de sortir.</li>
+</ol>
+<div class="callout callout-blue">
+<b>💡 Millora futura:</b> pots migrar el domini a <b>Emergent Hosting</b> apuntant els DNS al servidor d'Emergent (veure <a href="/guia-deploy.html">guia-deploy.html</a>). A partir d'aquí, cada "Volver a publicar cambios" ja actualitzaria també la landing pública. Recomanat per estalviar-te aquest pas manual.
+</div>
+
+<hr>
+
 </div><!-- /distribucio -->
 
 <!-- ============ TAB: SMS ============ -->
@@ -604,10 +621,14 @@ Nova pestanya <b>📊 Estadístiques</b> al admin panel. Inclou:
 
 <table>
 <tr><th>Pla</th><th>Mensual</th><th>Anual</th><th>Estalvi</th><th>Inclou</th></tr>
-<tr><td><b>TRIAL</b></td><td colspan="3">Gratis 60 dies (accés complet PREMIUM)</td><td>Tot Premium</td></tr>
-<tr><td><b>STD</b></td><td><span class="price-card">29,90€/mes</span></td><td><span class="price-card">299,90€/any</span></td><td>16%</td><td>Caixa · IRPF · Llibreta · Informe Anual · Estadístiques · Cercador · Suport email</td></tr>
-<tr><td><b>PREMIUM</b> ⭐</td><td><span class="price-card">39,90€/mes</span></td><td><span class="price-card">399,90€/any</span></td><td>17%</td><td>Tot STD + <b>SMS/WhatsApp</b> + Suport prioritari</td></tr>
+<tr><td><b>TRIAL</b></td><td colspan="3">Gratis 60 dies · Sense targeta (accés complet PREMIUM)</td><td>Tot Premium · 1 ordinador</td></tr>
+<tr><td><b>STD</b></td><td><span class="price-card">29,90€/mes</span></td><td><span class="price-card">299,90€/any</span></td><td>16%</td><td>Caixa · IRPF · Llibreta · Informe Anual · Estadístiques · Cercador · 1 ordinador · Suport email 24h</td></tr>
+<tr><td><b>PREMIUM</b> ⭐</td><td><span class="price-card">39,90€/mes</span></td><td><span class="price-card">399,90€/any</span></td><td>17%</td><td>Tot STD + <b>SMS/WhatsApp</b> + <b>Cites (Google Calendar/Doctoralia)</b> + <b>Asesor IA</b> + <b>Auditoria avançada</b> + <b>2 ordinadors sincronitzats</b> + Suport prioritari 4h</td></tr>
 </table>
+
+<div class="callout callout-green" style="margin-top:14px">
+<b>💳 Flux automàtic Stripe → llicència → email:</b> quan un client paga (des de <code>medicarplus.es</code> o des del botó "Millora el plan" dins l'app), el webhook de Stripe genera la clau JWT, la vincula al seu install_id, l'envia per email (Resend o IONOS SMTP) amb la guia i el manual en PDF, i la subscripció es renova sola cada mes/any. <b>Zero intervenció manual.</b>
+</div>
 
 <hr>
 
