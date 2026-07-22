@@ -585,7 +585,7 @@ export default function AdminDashboard({ onLogout }) {
     const plan = (req.plan_requested || "").toUpperCase();
     let defaultDays = "365";
     let planLabel = plan;
-    if (plan === "TRIAL") { defaultDays = "30"; planLabel = "TRIAL 30 dies"; }
+    if (plan === "TRIAL") { defaultDays = "60"; planLabel = "TRIAL 60 dies (accés complet Premium)"; }
     else if (plan === "STD_MES" || plan === "PREMIUM_MES") { defaultDays = "30"; planLabel = plan + " (mensual)"; }
     else if (plan === "STD_ANY" || plan === "PREMIUM_ANY") { defaultDays = "365"; planLabel = plan + " (anual)"; }
     const installLbl = req.install_id || "(sense Install ID · s'usarà PENDING)";
