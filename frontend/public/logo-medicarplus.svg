@@ -1,15 +1,22 @@
-<!-- MediCar Plus · Logo Option 2 · Dark squircle + M+ dourat -->
+<!-- MediCar Plus · Logo Option 2 · Optimitzat per contrast a totes les mides -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
   <defs>
     <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#fbbf24"/>
       <stop offset="1" stop-color="#d97706"/>
     </linearGradient>
+    <linearGradient id="dark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e293b"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
   </defs>
-  <!-- Dark squircle base · cantonades arrodonides estil TeamViewer -->
-  <rect x="4" y="4" width="92" height="92" rx="28" fill="#0f172a" stroke="url(#gold)" stroke-width="4"/>
-  <!-- M (Playfair-style serif, gold) -->
-  <text x="46" y="72" font-family="'Playfair Display', 'DM Serif Display', Georgia, serif" font-weight="900" font-size="66" fill="#f5b301" text-anchor="middle">M</text>
-  <!-- + green (Manrope-style) offset to right -->
-  <text x="78" y="60" font-family="'Manrope', 'Segoe UI', system-ui, sans-serif" font-weight="900" font-size="44" fill="#22c55e" text-anchor="middle">+</text>
+  <!-- Base squircle amb gradient dourat gruixut (visible fins a 16px) -->
+  <rect x="2" y="2" width="96" height="96" rx="28" fill="url(#gold)"/>
+  <!-- Anell fosc intern per contrast (nova capa) -->
+  <rect x="8" y="8" width="84" height="84" rx="22" fill="url(#dark)"/>
+  <!-- M dourada centrada (mida gran) -->
+  <text x="42" y="72" font-family="'Playfair Display', 'DM Serif Display', Georgia, serif" font-weight="900" font-size="64" fill="#f5b301" text-anchor="middle">M</text>
+  <!-- + verd al canto superior dret, més gros i visible -->
+  <circle cx="76" cy="30" r="16" fill="#22c55e"/>
+  <text x="76" y="38" font-family="'Manrope', 'Segoe UI', system-ui, sans-serif" font-weight="900" font-size="24" fill="#fff" text-anchor="middle">+</text>
 </svg>
