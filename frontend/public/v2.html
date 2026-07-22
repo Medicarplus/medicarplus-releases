@@ -5019,10 +5019,34 @@ function isPremiumLicense(){
     if(!lic)return false;
     const t=(lic.type||'').toUpperCase();
     const p=(lic.plan||'').toUpperCase();
-    // MASTER (owner) sempre veu Premium. PRM/PREMIUM = Premium.
-    // TRIAL també inclou accés total a Premium (perquè el client pugui provar-ho durant 60 dies).
-    return t==='MASTER'||t==='PRM'||t==='PREMIUM'||p==='TRIAL'||t==='TRIAL';
+    // MASTER pot forçar una vista prèvia (TRIAL/STD/PRM) via `caja.plan.preview.v1`
+    // per veure com es veu l'app en cada pla sense perdre la llicència real.
+    if(t==='MASTER'){
+      const preview=(localStorage.getItem('caja.plan.preview.v1')||'').toUpperCase();
+      if(preview==='STD') return false;      // Simula Standard: Premium bloquejat
+      if(preview==='TRIAL') return true;     // Simula Trial: Premium desbloquejat
+      if(preview==='PRM'||preview==='PREMIUM') return true;
+      // Sense preview → Master = Premium real
+      return true;
+    }
+    // PRM/PREMIUM = Premium. TRIAL també inclou accés total a Premium.
+    return t==='PRM'||t==='PREMIUM'||p==='TRIAL'||t==='TRIAL';
   }catch(e){return false}
+}
+
+// Retorna el pla efectiu que s'ha de mostrar (respectant preview de MASTER)
+function getEffectivePlan(){
+  try{
+    const lic=JSON.parse(localStorage.getItem('caja.license.v1')||'null');
+    if(!lic) return 'NONE';
+    const t=(lic.type||'').toUpperCase();
+    if(t==='MASTER'){
+      const preview=(localStorage.getItem('caja.plan.preview.v1')||'').toUpperCase();
+      if(preview==='STD'||preview==='TRIAL'||preview==='PRM'||preview==='PREMIUM') return preview==='PREMIUM'?'PRM':preview;
+      return 'MASTER';
+    }
+    return t || (lic.plan||'').toUpperCase() || 'STD';
+  }catch(e){return 'NONE'}
 }
 
 // Obre el modal d'upgrade a Premium (usat pels candaus del menú Utilidades)
