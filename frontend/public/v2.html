@@ -188,6 +188,24 @@
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 </head>
 <body>
+<div id="planPreviewBanner" data-testid="plan-preview-banner" style="display:none;position:sticky;top:0;z-index:9999;background:linear-gradient(90deg,#a855f7,#7c3aed);color:#fff;padding:8px 16px;text-align:center;font-family:'Segoe UI',sans-serif;font-size:13px;font-weight:700;letter-spacing:.3px;box-shadow:0 2px 12px rgba(168,85,247,.4)">
+  <span id="planPreviewLabel"></span>
+  <button onclick="localStorage.removeItem('caja.plan.preview.v1');location.reload();" data-testid="exit-preview-btn" style="margin-left:12px;background:#fff;color:#7c3aed;border:none;padding:4px 12px;border-radius:6px;font-weight:800;font-size:12px;cursor:pointer">↩ Sortir de la vista prèvia</button>
+</div>
+<script>
+(function(){
+  try{
+    var p=(localStorage.getItem('caja.plan.preview.v1')||'').toUpperCase();
+    if(!p) return;
+    var lic=JSON.parse(localStorage.getItem('caja.license.v1')||'null');
+    if(!lic || (lic.type||'').toUpperCase()!=='MASTER') return;
+    var label={'TRIAL':'🎁 Vista prèvia: TRIAL (60 dies · Premium desbloquejat)','STD':'💼 Vista prèvia: STANDARD (Premium bloquejat)','PRM':'⭐ Vista prèvia: PREMIUM','PREMIUM':'⭐ Vista prèvia: PREMIUM'}[p]||('Vista prèvia: '+p);
+    var b=document.getElementById('planPreviewBanner');
+    document.getElementById('planPreviewLabel').textContent=label;
+    b.style.display='block';
+  }catch(e){}
+})();
+</script>
 <header>
   <h1 id="appTitle" data-testid="app-title"><span data-i18n="app_title">MediCar Plus</span> <small id="appSub" data-i18n="app_sub">Cierre diario · Importación CSV/Excel · Debe / Haber</small></h1>
   <div class="company-switch" data-testid="company-switch">
@@ -5903,7 +5921,12 @@ window.updateTrialBadge = function(){
     var el = document.getElementById('trialBadge');
     if(!el) return;
     // Només mostrem badge si és TRIAL amb data d'expiració vàlida
-    if(!lic || lic.plan !== 'TRIAL' || !lic.expTs){el.style.display='none';el.classList.remove('trial-critical');return}
+    if(!lic || !lic.expTs){el.style.display='none';el.classList.remove('trial-critical');return}
+    // Si master està simulant un pla que no és TRIAL, no mostrem el badge de trial
+    const isMaster=(lic.type||'').toUpperCase()==='MASTER';
+    const preview=(localStorage.getItem('caja.plan.preview.v1')||'').toUpperCase();
+    const showAsTrial = (lic.plan==='TRIAL') || (isMaster && preview==='TRIAL');
+    if(!showAsTrial){el.style.display='none';el.classList.remove('trial-critical');return}
     var msRemaining = Number(lic.expTs) - Date.now();
     var daysLeft = Math.ceil(msRemaining / 86400000);
     var hoursLeft = Math.max(0, Math.ceil(msRemaining / 3600000));
@@ -6501,8 +6524,22 @@ function showLicenseInfo(){
   const keyDisplay=lic&&lic.key?(lic.key.length>40?lic.key.slice(0,20)+'…'+lic.key.slice(-8):lic.key):'—';
   const lastCheck=parseInt(localStorage.getItem(LIC.LAST_CHECK)||'0');
   const lastCheckLabel=lastCheck?new Date(lastCheck).toLocaleDateString('ca-ES'):'mai';
+  const isMaster=lic&&(lic.type||'').toUpperCase()==='MASTER';
+  const currentPreview=(localStorage.getItem('caja.plan.preview.v1')||'').toUpperCase();
+  const previewBlock=isMaster?(
+    '<div style="background:#0b1121;border:1px dashed #a855f7;border-radius:8px;padding:14px;margin-bottom:12px">'
+    +'<div style="font-weight:800;color:#c4b5fd;font-size:12px;letter-spacing:.5px;margin-bottom:8px">👀 VISTA PRÈVIA DE PLA (només MASTER)</div>'
+    +'<div style="font-size:12px;color:#94a3b8;margin-bottom:10px">Visualitza l\'app com si fossis un client d\'un altre pla. Útil per validar el gating (què queda bloquejat/desbloquejat).</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap" data-testid="plan-preview-buttons">'
+    +'<button class="btn plan-prev-btn" data-preview="" data-testid="prev-off" style="'+(currentPreview===''?'background:#22c55e;color:#0b1121;border-color:#22c55e':'background:transparent;color:#22c55e;border-color:#22c55e')+'">Real (Master)</button>'
+    +'<button class="btn plan-prev-btn" data-preview="TRIAL" data-testid="prev-trial" style="'+(currentPreview==='TRIAL'?'background:#3ddc97;color:#0b1121;border-color:#3ddc97':'background:transparent;color:#3ddc97;border-color:#3ddc97')+'">🎁 Trial (60d)</button>'
+    +'<button class="btn plan-prev-btn" data-preview="STD" data-testid="prev-std" style="'+(currentPreview==='STD'?'background:#94a3b8;color:#0b1121;border-color:#94a3b8':'background:transparent;color:#94a3b8;border-color:#94a3b8')+'">Standard</button>'
+    +'<button class="btn plan-prev-btn" data-preview="PRM" data-testid="prev-prm" style="'+(currentPreview==='PRM'?'background:#a855f7;color:#fff;border-color:#a855f7':'background:transparent;color:#c4b5fd;border-color:#a855f7')+'">⭐ Premium</button>'
+    +'</div>'
+    +'</div>'
+  ):'';
   const back=document.createElement('div');back.className='modal-back';
-  back.innerHTML='<div class="modal" style="max-width:520px;padding:24px">'
+  back.innerHTML='<div class="modal" style="max-width:540px;padding:24px">'
     +'<h3 style="margin:0 0 14px 0;color:#f5b301;font-family:Georgia,serif">🔐 Informació de llicència</h3>'
     +'<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;margin-bottom:12px;font-family:\'Courier New\',monospace;font-size:12px;color:#cbd5e1;line-height:1.8">'
     +'<div><b style="color:#f5b301">ID Instal·lació:</b> '+installId+'</div>'
@@ -6513,6 +6550,7 @@ function showLicenseInfo(){
     +'<div><b style="color:#f5b301">Activada:</b> '+(lic&&lic.activated?new Date(lic.activated).toLocaleDateString('ca-ES'):'—')+'</div>'
     +'<div><b style="color:#f5b301">Última verif.:</b> '+lastCheckLabel+'</div>'
     +'</div>'
+    +previewBlock
     +'<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">'
     +((lic&&lic.type==='JWT'&&LIC.VERIFY_URL)?'<button class="btn" id="btnVerifyNow" style="background:#0891b2;color:#fff;border-color:#0891b2">↻ Verificar ara</button>':'')
     +'<button class="btn" id="btnDeactivate" style="background:#b91c1c;color:#fff;border-color:#b91c1c">↺ Desactivar</button>'
@@ -6523,6 +6561,15 @@ function showLicenseInfo(){
   back.querySelector('[data-no]').onclick=()=>back.remove();
   back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
   back.querySelector('#btnDeactivate').onclick=()=>{if(confirm('Desactivar la llicència? Hauràs de tornar-la a introduir.')){localStorage.removeItem('caja.license.v1');location.reload()}};
+  // Vista prèvia de pla (només MASTER) → setejar override i recarregar per aplicar
+  back.querySelectorAll('.plan-prev-btn').forEach(btn=>{
+    btn.onclick=()=>{
+      const p=btn.getAttribute('data-preview')||'';
+      if(p) localStorage.setItem('caja.plan.preview.v1', p);
+      else localStorage.removeItem('caja.plan.preview.v1');
+      location.reload();
+    };
+  });
   const verifyBtn=back.querySelector('#btnVerifyNow');
   if(verifyBtn){
     verifyBtn.onclick=async()=>{
