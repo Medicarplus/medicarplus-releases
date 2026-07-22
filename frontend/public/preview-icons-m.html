@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<title>Icones M+ · MediCar Plus</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@800;900&family=Playfair+Display:wght@900&family=Poppins:wght@800;900&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#0f172a;color:#e2e8f0;font-family:'Segoe UI',sans-serif;padding:32px}
+  h1{color:#f5b301;font-family:Georgia,serif;font-size:24px;margin:0 0 6px}
+  .lead{color:#94a3b8;font-size:13px;margin-bottom:32px}
+  .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}
+  .item{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:26px 22px;text-align:center;position:relative}
+  .item-num{position:absolute;top:10px;left:14px;font-size:11px;color:#f5b301;font-weight:900;background:rgba(245,179,1,.1);padding:2px 10px;border-radius:12px;border:1px solid rgba(245,179,1,.3)}
+  .canvas{margin:26px auto 14px;display:flex;align-items:center;justify-content:center;height:110px}
+  .item h3{color:#e2e8f0;font-size:14px;font-weight:800;margin:8px 0 4px}
+  .item p{color:#94a3b8;font-size:11px;margin:0;line-height:1.5}
+  .sizes-row{display:flex;gap:12px;justify-content:center;margin-top:12px;padding-top:12px;border-top:1px dashed #334155}
+  .sizes-row .mini-label{color:#64748b;font-size:9px;letter-spacing:1px;font-weight:700;margin-top:4px}
+
+  /* === Base cercle + M ============================================== */
+  .cir-base{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0}
+  .m-inside{font-family:'Manrope',sans-serif;font-weight:900;line-height:1;letter-spacing:-3px}
+
+  /* ================================================================
+     M1 · Cercle dourat + M fosca + "+" verd extern flotant
+  ================================================================ */
+  .m1-wrap{display:flex;align-items:center;gap:10px}
+  .m1{background:linear-gradient(135deg,#fbbf24,#d97706);box-shadow:0 6px 20px rgba(217,119,6,.4),inset 0 2px 0 rgba(255,255,255,.25)}
+  .m1 .m-inside{font-size:44px;color:#0f172a;text-shadow:0 1px 0 rgba(255,255,255,.2)}
+  .m1-plus{font-family:'Manrope',sans-serif;font-weight:900;font-size:44px;color:#22c55e;line-height:.9;filter:drop-shadow(0 4px 12px rgba(34,197,94,.4))}
+
+  /* ================================================================
+     M2 · Cercle dourat + M + "+" verd junts dins el cercle
+  ================================================================ */
+  .m2{background:linear-gradient(135deg,#fbbf24,#d97706);box-shadow:0 6px 20px rgba(217,119,6,.4),inset 0 2px 0 rgba(255,255,255,.25)}
+  .m2 .m-inside{font-size:38px;color:#0f172a;display:flex;align-items:baseline}
+  .m2 .m-inside .plus{color:#22c55e;font-size:26px;margin-left:2px;letter-spacing:0;text-shadow:0 1px 0 rgba(0,0,0,.15)}
+
+  /* ================================================================
+     M3 · Cercle fosc + M dourada + petit "+" verd badge damunt
+  ================================================================ */
+  .m3{background:#0f172a;border:3px solid #f5b301;box-shadow:0 6px 20px rgba(245,179,1,.35),inset 0 0 20px rgba(245,179,1,.08)}
+  .m3 .m-inside{font-size:44px;color:#f5b301}
+  .m3-plus{position:absolute;top:-6px;right:-6px;width:26px;height:26px;background:#22c55e;color:#0f172a;font-family:'Manrope',sans-serif;font-weight:900;font-size:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid #0f172a;box-shadow:0 4px 12px rgba(34,197,94,.5)}
+
+  /* ================================================================
+     M4 · Squircle dourat (estil iOS) + M dins + "+" verd corner
+  ================================================================ */
+  .m4-wrap{position:relative}
+  .m4{width:80px;height:80px;border-radius:22px;background:linear-gradient(135deg,#fbbf24,#d97706);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(217,119,6,.4),inset 0 2px 0 rgba(255,255,255,.3)}
+  .m4 .m-inside{font-size:46px;color:#0f172a;font-family:'Playfair Display',Georgia,serif;font-weight:900;text-shadow:0 1px 0 rgba(255,255,255,.2)}
+  .m4-plus{position:absolute;bottom:-8px;right:-8px;width:32px;height:32px;background:#22c55e;color:#fff;font-family:'Manrope',sans-serif;font-weight:900;font-size:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid #0f172a;box-shadow:0 4px 12px rgba(34,197,94,.5)}
+
+  /* ================================================================
+     M5 · Cercle dourat + M dins + "+" verd DIRECTAMENT al costat
+  ================================================================ */
+  .m5-wrap{display:flex;align-items:center;gap:0}
+  .m5{background:linear-gradient(135deg,#fbbf24,#d97706);box-shadow:0 6px 20px rgba(217,119,6,.4),inset 0 2px 0 rgba(255,255,255,.25)}
+  .m5 .m-inside{font-size:44px;color:#0f172a}
+  .m5-plus-wrap{margin-left:-8px;display:flex;align-items:center}
+  .m5-plus{width:36px;height:36px;background:#22c55e;color:#fff;font-family:'Manrope',sans-serif;font-weight:900;font-size:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:4px solid #0f172a;box-shadow:0 4px 12px rgba(34,197,94,.5)}
+
+  /* ================================================================
+     M6 · Cercle fosc amb ring dourat + M dourada + "+" verd al costat mateix
+  ================================================================ */
+  .m6-wrap{display:flex;align-items:center;gap:4px}
+  .m6{background:radial-gradient(circle at 30% 30%,#1e293b,#0f172a);border:3px solid #f5b301;box-shadow:0 6px 20px rgba(245,179,1,.35)}
+  .m6 .m-inside{font-size:44px;color:#f5b301;text-shadow:0 0 12px rgba(245,179,1,.5)}
+  .m6-plus{font-family:'Poppins',sans-serif;font-weight:900;font-size:56px;color:#22c55e;line-height:.85;letter-spacing:-4px;filter:drop-shadow(0 4px 16px rgba(34,197,94,.4))}
+
+  /* mini sizes preview */
+  .mini{position:relative;display:inline-flex;align-items:center;justify-content:center}
+  .mini-16{transform:scale(.2);transform-origin:center}
+  .mini-32{transform:scale(.4);transform-origin:center}
+  .mini-frame{width:32px;height:32px;background:#020617;border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .mini-frame-lg{width:48px;height:48px;background:#020617;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+</style>
+</head>
+<body>
+
+<h1>💠 Nou concepte: cercle amb "M" i "+"</h1>
+<p class="lead">Sis variants amb la "M" dins del cercle + el "+" com a element diferenciat. Cada una amb un tractament diferent del "+".</p>
+
+<div class="row">
+
+  <!-- M1 · CERCLE + M + "+" EXTERN GRAN -->
+  <div class="item">
+    <span class="item-num">M1</span>
+    <div class="canvas">
+      <div class="m1-wrap">
+        <div class="cir-base m1"><span class="m-inside">M</span></div>
+        <span class="m1-plus">+</span>
+      </div>
+    </div>
+    <h3>M + tipogràfic al costat</h3>
+    <p>La "M" dins del cercle dourat, i el "+" gran verd flotant al costat. Molt llegible i clar.</p>
+    <div class="sizes-row">
+      <div>
+        <div class="mini-frame"><div class="mini mini-16"><div class="m1-wrap"><div class="cir-base m1"><span class="m-inside">M</span></div><span class="m1-plus">+</span></div></div></div>
+        <div class="mini-label">16px</div>
+      </div>
+      <div>
+        <div class="mini-frame-lg"><div class="mini mini-32"><div class="m1-wrap"><div class="cir-base m1"><span class="m-inside">M</span></div><span class="m1-plus">+</span></div></div></div>
+        <div class="mini-label">32px</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- M2 · CERCLE amb M+"+" DINS -->
+  <div class="item">
+    <span class="item-num">M2</span>
+    <div class="canvas">
+      <div class="cir-base m2"><span class="m-inside">M<span class="plus">+</span></span></div>
+    </div>
+    <h3>M+ tot dins</h3>
+    <p>Cercle únic amb "M" + "+" verd junts a dins. Solucio més compacta, ideal per favicon petit.</p>
+    <div class="sizes-row">
+      <div>
+        <div class="mini-frame"><div class="mini mini-16"><div class="cir-base m2"><span class="m-inside">M<span class="plus">+</span></span></div></div></div>
+        <div class="mini-label">16px</div>
+      </div>
+      <div>
+        <div class="mini-frame-lg"><div class="mini mini-32"><div class="cir-base m2"><span class="m-inside">M<span class="plus">+</span></span></div></div></div>
+        <div class="mini-label">32px</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- M3 · CERCLE FOSC amb ring i "+" com a badge -->
+  <div class="item">
+    <span class="item-num">M3</span>
+    <div class="canvas">
+      <div class="cir-base m3">
+        <span class="m-inside">M</span>
+        <span class="m3-plus">+</span>
+      </div>
+    </div>
+    <h3>Dark + badge verd</h3>
+    <p>Cercle fosc amb ring dourat, "M" dourada dins, "+" verd com a badge circular a la cantonada.</p>
+    <div class="sizes-row">
+      <div>
+        <div class="mini-frame"><div class="mini mini-16"><div class="cir-base m3"><span class="m-inside">M</span><span class="m3-plus">+</span></div></div></div>
+        <div class="mini-label">16px</div>
+      </div>
+      <div>
+        <div class="mini-frame-lg"><div class="mini mini-32"><div class="cir-base m3"><span class="m-inside">M</span><span class="m3-plus">+</span></div></div></div>
+        <div class="mini-label">32px</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- M4 · SQUIRCLE (iOS) amb M + "+" badge inferior -->
+  <div class="item">
+    <span class="item-num">M4</span>
+    <div class="canvas">
+      <div class="m4-wrap">
+        <div class="m4"><span class="m-inside">M</span></div>
+        <span class="m4-plus">+</span>
+      </div>
+    </div>
+    <h3>Squircle iOS + badge</h3>
+    <p>Quadrat arrodonit estil app store. "M" en serif elegant. "+" verd com a app-badge modern.</p>
+    <div class="sizes-row">
+      <div>
+        <div class="mini-frame"><div class="mini mini-16"><div class="m4-wrap"><div class="m4"><span class="m-inside">M</span></div><span class="m4-plus">+</span></div></div></div>
+        <div class="mini-label">16px</div>
+      </div>
+      <div>
+        <div class="mini-frame-lg"><div class="mini mini-32"><div class="m4-wrap"><div class="m4"><span class="m-inside">M</span></div><span class="m4-plus">+</span></div></div></div>
+        <div class="mini-label">32px</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- M5 · CERCLE M + CERCLE "+" enllaçats -->
+  <div class="item">
+    <span class="item-num">M5</span>
+    <div class="canvas">
+      <div class="m5-wrap">
+        <div class="cir-base m5"><span class="m-inside">M</span></div>
+        <div class="m5-plus-wrap"><div class="m5-plus">+</div></div>
+      </div>
+    </div>
+    <h3>Dos cercles enllaçats</h3>
+    <p>Un cercle gran dourat amb "M" + un cercle petit verd amb "+" superposat. Look molt distintiu, com un "combo" de 2 pastilles.</p>
+    <div class="sizes-row">
+      <div>
+        <div class="mini-frame"><div class="mini mini-16"><div class="m5-wrap"><div class="cir-base m5"><span class="m-inside">M</span></div><div class="m5-plus-wrap"><div class="m5-plus">+</div></div></div></div></div>
+        <div class="mini-label">16px</div>
+      </div>
+      <div>
+        <div class="mini-frame-lg"><div class="mini mini-32"><div class="m5-wrap"><div class="cir-base m5"><span class="m-inside">M</span></div><div class="m5-plus-wrap"><div class="m5-plus">+</div></div></div></div></div>
+        <div class="mini-label">32px</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- M6 · CERCLE DARK + "+" GEGANT VERD AL COSTAT -->
+  <div class="item">
+    <span class="item-num">M6</span>
+    <div class="canvas">
+      <div class="m6-wrap">
+        <div class="cir-base m6"><span class="m-inside">M</span></div>
+        <span class="m6-plus">+</span>
+      </div>
+    </div>
+    <h3>Dark ring + "+" gegant</h3>
+    <p>Cercle fosc amb "M" dourada glow, "+" verd molt gran (mateixa altura que el cercle) al costat. Modern editorial.</p>
+    <div class="sizes-row">
+      <div>
+        <div class="mini-frame"><div class="mini mini-16"><div class="m6-wrap"><div class="cir-base m6"><span class="m-inside">M</span></div><span class="m6-plus">+</span></div></div></div>
+        <div class="mini-label">16px</div>
+      </div>
+      <div>
+        <div class="mini-frame-lg"><div class="mini mini-32"><div class="m6-wrap"><div class="cir-base m6"><span class="m-inside">M</span></div><span class="m6-plus">+</span></div></div></div>
+        <div class="mini-label">32px</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="text-align:center;color:#64748b;font-size:12px;margin-top:40px;padding:24px 0;border-top:1px solid #334155">
+  Digues quina (M1-M6) t'agrada més. També pots dir <b>"M2 però amb el "+" més gran"</b> o <b>"M1 però amb la M en serif com M4"</b> — combino el que vulguis.
+</div>
+
+</body>
+</html>
