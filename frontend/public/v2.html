@@ -259,7 +259,7 @@
     <button id="cTrafic" class="active">🚗 <span data-cfg-name="1">Empresa 1</span></button>
     <button id="cCempla" class="cempla">🩺 <span data-cfg-name="2">Empresa 2</span></button>
   </div>
-  <div style="position:fixed;top:6px;right:12px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:1.5px;font-style:italic;opacity:0.95;z-index:9999;text-align:right;line-height:1.3;user-select:none">
+  <div id="licSigBox" data-testid="lic-sig-box" style="position:fixed;top:6px;right:12px;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:1.5px;font-style:italic;opacity:0.95;z-index:9999;text-align:right;line-height:1.3;user-select:none;cursor:pointer" title="Clica per veure info de llicència">
     <div style="font-size:9px;font-weight:600;letter-spacing:1.5px;color:#94a3b8;text-transform:uppercase;opacity:.75;pointer-events:none">Powered by</div>
     <div style="font-size:11px;font-weight:600;letter-spacing:.5px;color:#cbd5e1;font-family:'Segoe UI',system-ui,sans-serif;opacity:.9;pointer-events:none">MediCar Plus</div>
     <div id="appVersion" data-testid="app-version" style="font-size:10px;font-weight:700;color:#f5b301;font-family:'Courier New',monospace;letter-spacing:1px;margin-top:2px;pointer-events:none">v—</div>
@@ -6778,8 +6778,7 @@ if(!isLicenseActive()){showActivationModal()}
 else if(!isConfigured()){setTimeout(()=>showConfigWizard(true),200)}
 // Botons ⚙️ Configuració + 🔓 Sortir/Canviar llicència al header
 setTimeout(()=>{
-  const sig=document.querySelector('[style*="Powered by"]');
-  const sigParent=sig?sig.parentElement:null;
+  const sigParent=document.getElementById('licSigBox');
   if(sigParent){sigParent.style.cursor='pointer';sigParent.style.pointerEvents='auto';sigParent.onclick=showLicenseInfo;sigParent.title='Clica per veure info de llicència'}
 },500);
 
