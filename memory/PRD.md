@@ -71,11 +71,21 @@ User's preferred language: **Catalan** (UI/code strings in **Spanish**).
 - 4-level URL discovery (raw.githubusercontent → jsdelivr → api.github → cached)
 - Cierre del día privacy blur, Auto-match Citas ↔ CSV DGT, Statistics per company, corrected DEBE/HABER as expense
 
-## Testing Status (iteration_16.json, Feb 2026)
-- **Backend**: 7/7 pytest PASS (heartbeat, push, pull, device limit, PDF render) — iteration_15
-- **Frontend**: 15+ Playwright checks PASS + i18n fix verificat 13/13 (Datàfon→Datáfono, Banc→Banco, Entesos→Entendido, popup castellà, syncIndicator top-right)
+## Testing Status (iteration_16.json + follow-up smoke, Feb 2026)
+- Backend: 7/7 pytest PASS (heartbeat, push, pull, device limit, PDF render)
+- Frontend: 15+ Playwright PASS + 13/13 i18n PASS + smoke visual gate global (btnStatSms/btnStatCites amb candau)
 - No critical bugs.
-- **Fixed post-testing** (iteration_16 minor findings): CAJA FÍSICA/CUENTA BANCO + branca 'cempla' Banco also wrapped with L() for future CA-cempla users.
+
+## Landing subscribe → Stripe
+- Botons "Contactar" reemplaçats per "💳 Suscribirse (mensual)" + "Suscribirse anual" a Standard i Premium (data-plan-subscribe=STD_MES/STD_ANY/PREMIUM_MES/PREMIUM_ANY)
+- Script client-side crida `POST https://project-helper-47.emergent.host/api/create-checkout` → redirigeix a Stripe Checkout de la sessió creada
+- Un cop pagat, webhook Stripe activa la llicència + envia mail automàtic amb .exe, guia i codi (ja existent al backend routes/payments.py)
+
+## Gate Premium GLOBAL (v2.html)
+- Handler capture-phase a document que intercepta clics a QUALSEVOL `[data-premium="1"]`
+- CSS opacity/🔒 automàtic per elements fora de #utilitiesMenu quan Standard
+- Aplicat a Estadísticas SMS (#btnStatSms) i Estadísticas Cites (#btnStatCites)
+- Ja aplicat a Utilidades menu (SMS, Cites, IA, Auditoría)
 
 ## Next Actions
 1. **User**: "Volver a publicar cambios" on Emergent panel → push all Feb 2026 changes to production

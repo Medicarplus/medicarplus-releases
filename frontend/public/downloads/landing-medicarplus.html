@@ -371,7 +371,8 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
         <div style="margin:14px 0 10px;padding:10px 12px;background:rgba(148,163,184,.08);border-radius:8px;border:1px dashed rgba(148,163,184,.2);font-size:12px;color:#94a3b8">
           🔒 <b>No incluye Utilidades:</b> SMS, Citas, IA, Auditoría
         </div>
-        <a href="#contacto" class="btn btn-secondary">Contactar</a>
+        <a href="#" class="btn btn-secondary" data-plan-subscribe="STD_MES" data-testid="landing-std-subscribe">💳 Suscribirse (mensual)</a>
+        <a href="#" class="btn btn-secondary" data-plan-subscribe="STD_ANY" data-testid="landing-std-subscribe-year" style="margin-top:8px;background:transparent;color:#94a3b8;border:1px solid #64748b;font-size:12px">Suscribirse anual · ahorra 58,90€</a>
       </div>
 
       <div class="plan featured" data-plan-prm>
@@ -399,7 +400,8 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
         <ul class="plan-features" style="margin-top:8px">
           <li>Soporte prioritario (4h)</li>
         </ul>
-        <a href="#contacto" class="btn btn-primary">Contactar</a>
+        <a href="#" class="btn btn-primary" data-plan-subscribe="PREMIUM_MES" data-testid="landing-prm-subscribe">🚀 Suscribirse (mensual)</a>
+        <a href="#" class="btn btn-primary" data-plan-subscribe="PREMIUM_ANY" data-testid="landing-prm-subscribe-year" style="margin-top:8px;background:transparent;color:#c4b5fd;border:2px solid #a855f7;font-size:12px;box-shadow:none">Suscribirse anual · ahorra 78,90€</a>
       </div>
 
     </div>
@@ -600,11 +602,47 @@ function sendContact(e){
   // Tanca en redimensionar a desktop
   window.addEventListener('resize', () => { if(window.innerWidth > 768) setOpen(false) });
 })();
-</script>
-
-</body>
-</html>
-
+// ── Suscripció Stripe ───────────────────────────────────────────────────
+// Els botons "Suscribirse" de la secció Planes envien un POST a /api/create-checkout
+// del backend d'Emergent (project-helper-47.emergent.host). El backend crea la sessió
+// Stripe i retorna la URL on hem de redirigir. Un cop pagat, Stripe redirigeix al
+// success_url configurat, i el webhook activa la llicència + envia email automàtic.
+const CHECKOUT_API = 'https://project-helper-47.emergent.host/api/create-checkout';
+document.addEventListener('click', async function(ev){
+  const btn = ev.target.closest && ev.target.closest('[data-plan-subscribe]');
+  if (!btn) return;
+  ev.preventDefault();
+  const pkg = btn.getAttribute('data-plan-subscribe');
+  const original = btn.textContent;
+  btn.textContent = '⏳ Redirigiendo…';
+  btn.style.pointerEvents = 'none';
+  try{
+    const originUrl = window.location.origin;
+    const r = await fetch(CHECKOUT_API, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        package_id: pkg,
+        origin_url: originUrl
+      })
+    });
+    if (!r.ok){
+      const txt = await r.text().catch(()=> '');
+      throw new Error('HTTP '+r.status+' '+txt);
+    }
+    const data = await r.json();
+    if (data.url){
+      window.location.href = data.url;
+    } else {
+      throw new Error('sin_url_retornada');
+    }
+  }catch(err){
+    console.error('[Stripe]', err);
+    alert('⚠️ Servicio de pago temporalmente no disponible. Contacta con info@medicarplus.es y te enviaremos las instrucciones de pago manualmente.\n\nDetalle: ' + (err.message||err));
+    btn.textContent = original;
+    btn.style.pointerEvents = '';
+  }
+});
 </script>
 
 </body>

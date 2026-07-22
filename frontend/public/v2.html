@@ -238,8 +238,8 @@
         <button class="btn" id="btnStatFacMensual" data-testid="btn-stat-fac-mensual" style="background:#1e293b;border-color:#f5b301;color:#f5b301;font-weight:600;width:100%;text-align:left">📅 Facturación (mensual/anual)</button>
         <button class="btn" id="btnStatAutoescolas" data-testid="btn-stat-autoescolas" style="background:#3a2a15;border-color:#f5b301;color:#f5b301;font-weight:600;width:100%;text-align:left">🚗 Estadísticas Autoescuelas</button>
         <button class="btn" id="btnStatTrafico" data-testid="btn-stat-trafico" style="background:#152a3a;border-color:#7ec8ff;color:#7ec8ff;font-weight:600;width:100%;text-align:left">🚦 Estadísticas Tráfico</button>
-        <button class="btn" id="btnStatSms" data-testid="btn-stat-sms" style="background:#0f3a20;border-color:#22c55e;color:#22c55e;font-weight:600;width:100%;text-align:left">📱 Estadísticas SMS</button>
-        <button class="btn" id="btnStatCites" data-testid="btn-stat-cites" style="background:#0c2a3e;border-color:#0ea5e9;color:#0ea5e9;font-weight:600;width:100%;text-align:left">📅 Estadísticas Citas</button>
+        <button class="btn util-item" id="btnStatSms" data-premium="1" data-testid="btn-stat-sms" style="background:#0f3a20;border-color:#22c55e;color:#22c55e;font-weight:600;width:100%;text-align:left">📱 Estadísticas SMS</button>
+        <button class="btn util-item" id="btnStatCites" data-premium="1" data-testid="btn-stat-cites" style="background:#0c2a3e;border-color:#0ea5e9;color:#0ea5e9;font-weight:600;width:100%;text-align:left">📅 Estadísticas Citas</button>
         <button class="btn" id="btnStatCompararAnys" data-testid="btn-stat-comparar-anys" style="background:#152a3a;border-color:#7ec8ff;color:#7ec8ff;font-weight:600;width:100%;text-align:left">📈 Comparativa años</button>
       </div>
     </div>
@@ -2211,6 +2211,29 @@ refreshUtilitiesPremiumUI();
 // Escolta canvis de llicència perquè el visual s'actualitzi sense recarregar
 window.addEventListener('storage', (e)=>{ if(e.key==='caja.license.v1') refreshUtilitiesPremiumUI(); });
 window.refreshUtilitiesPremiumUI = refreshUtilitiesPremiumUI;
+
+// Gate GLOBAL: intercepta clics a QUALSEVOL element amb data-premium="1", encara que estigui
+// fora del menú Utilidades (ex: #btnStatSms, #btnStatCites). En fase CAPTURE per bloquejar
+// abans que els handlers específics dels botons.
+document.addEventListener('click', function(ev){
+  const el = ev.target && ev.target.closest && ev.target.closest('[data-premium="1"]');
+  if (!el) return;
+  if (isPremiumLicense()) return;
+  ev.preventDefault();
+  ev.stopImmediatePropagation();
+  try{ openPremiumUpgradeModal(); }catch(e){ console.error(e); }
+  return false;
+}, true);
+// Aparença visual: candau als data-premium fora del menú Utilidades quan és Standard
+(function styleGlobalPremium(){
+  const s = document.createElement('style');
+  s.textContent = `
+    body[data-not-premium="1"] [data-premium="1"]:not(#utilitiesMenu [data-premium]){opacity:.55;position:relative}
+    body[data-not-premium="1"] [data-premium="1"]:not(#utilitiesMenu [data-premium])::after{content:'🔒';margin-left:8px;font-size:12px;display:inline-block}
+    body[data-not-premium="1"] [data-premium="1"]{cursor:not-allowed !important}
+  `;
+  document.head.appendChild(s);
+})();
 
 // ============ LLIBRETA (LIBRO DIARIO CONTABLE) ============
 function generateLedgerEntries(dateFrom,dateTo,company){
