@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 17 · Stripe subscriptions (4 packages) + sync device_not_authorized security + landing trust badges. All 13 backend pytest PASS. All 9 frontend Playwright checks PASS on landing-medicarplus.html.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter17_stripe_sync_security.py",
+    "/app/test_reports/pytest/pytest_iter17.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "STRIPE /api/payments/subscription/enabled — VERIFIED: returns enabled=true, stripe_api_key_present=true, and all 4 packages (STD_MES, STD_ANY, PREMIUM_MES, PREMIUM_ANY) configured=true.",
+    "STRIPE /api/payments/create-subscription — VERIFIED for all 4 packages: returns Stripe checkout URL matching 'checkout.stripe.com' + session_id starting with 'cs_'. 422 when customer_email missing (Pydantic required field). 400 when package_id unknown.",
+    "SYNC device_not_authorized security check — VERIFIED as NEW enforcement in /api/sync/push and /api/sync/pull: install_id 'UNAUTHORIZED-TEST-XYZ' correctly returns 403 device_not_authorized on both endpoints. Authorized install 'CD-PR8E-D4D8-A71A-2842' writes 1 entry (caja.testkey=X) and pull returns it back.",
+    "SYNC heartbeat — VERIFIED: already-registered install 'CD-PR8E-D4D8-A71A-2842' returns authorized=true, is_premium=true, plan_family=PRM, max_devices=2. A 3rd new install_id returns authorized=false, device_limit_reached=true (Premium license already has both slots taken: CD-PR8E... and CD-D299...).",
+    "LANDING PAGE — VERIFIED at /downloads/landing-medicarplus.html: both trust badges present with data-testid='landing-std-trial-badge' and 'landing-prm-trial-badge', both containing text '🎁 Prueba gratuita 60 días • Sin tarjeta'. Two 'Cancela cuando quieras · Sin permanencia' sublines present (1 per plan). CHECKOUT_API constant correctly points to https://project-helper-47.emergent.host/api/payments/create-subscription (production host per spec).",
+    "LANDING PAGE click flow — VERIFIED: clicking [data-testid='landing-std-subscribe'] triggers window.prompt for email (Playwright dialog accepted with 'test@medicarplus.es'). Client fires POST to CHECKOUT_API with correct JSON body {package_id:'STD_MES', customer_email:'test@medicarplus.es', origin_url:'https://project-helper-47.preview.emergentagent.com'}. On success (200 + {url}), page navigates to Stripe checkout URL via window.location.href.",
+    "SECURITY NOTE: _is_device_authorized() in sync.py correctly requires an entry in sync_devices collection before allowing push/pull — this closes the previous gap where push/pull would only check license plan family. Good defensive coding.",
+    "CODE QUALITY (payments.py): CreateSubscriptionBody uses `customer_email: str` (required, no Optional) — Pydantic returns 422 correctly on missing field. subscription_data.metadata is properly propagated to Stripe subscription so webhook can retrieve install_id/company_name later. Origin url stripping avoids double-slash issues. billing-portal endpoint uses proper $ne-safe query on install_id or email."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter17_stripe_sync_security.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13 pytest passed — subscription/enabled + 4 create-subscription URLs + missing-email 422 + unknown-pkg 400 + heartbeat authorized + heartbeat device_limit + push/pull unauthorized 403 + push/pull authorized OK)",
+    "frontend": "100% (9/9 checks passed on landing-medicarplus.html — 2 trust badges visible with correct text, 2 'Cancela cuando quieras' sublines, CHECKOUT_API URL correct, prompt shown + answered, fetch fired to correct endpoint with correct body, redirect to Stripe URL confirmed)"
+  },
+  "test_credentials": "PRM license (DB): 'eyJhbGci...WNbWc88' with install_ids CD-PR8E-D4D8-A71A-2842 and CD-D299-4E88-1F92-364A already authorized (both slots used). Stripe test API key configured in backend/.env with all 4 STRIPE_PRICE_* env vars present.",
+  "seed_data_creation": "Backend tests wrote 1 entry (caja.testkey=X) to sync_states for the PRM license, and any 3rd-install attempts were auto-cleaned in module teardown fixture. Payment_transactions records for TEST_* emails left in DB (small footprint, prefixed with TEST_ for future cleanup).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The PRM license in DB is at Premium device limit (2/2). Any test that heartbeats with a NEW install_id will always hit device_limit_reached=true — this is BY DESIGN. To test authorized=true for a new install, first free a slot (delete a sync_devices entry) or mint a fresh PRM license via /api/licenses/generate (needs X-Admin-Token). The push/pull now enforce device_not_authorized — always heartbeat first with a valid install to open a slot before testing push/pull. CHECKOUT_API in landing-medicarplus.html points to production emergent.host (NOT preview) — Playwright tests must intercept the fetch via page.route() to validate without hitting production. All 4 Stripe Price IDs are configured; if any test iteration removes them, subscription/enabled will drop to false.",
+  "rca of the issue": "N/A — verification pass. All items in this iteration request (Stripe endpoints for 4 packages, sync device_not_authorized security check, landing trust badges + click→prompt→Stripe flow) verified end-to-end. 13/13 pytest + 9/9 Playwright checks passing."
+}

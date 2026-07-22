@@ -84,6 +84,12 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
     async def _find_license(license_key: str) -> Optional[dict]:
         return await db.licenses.find_one({"license_key": license_key.strip()})
 
+    async def _is_device_authorized(license_key_hash: str, install_id: str) -> bool:
+        """Un dispositiu es considera autoritzat si ja té una entrada a sync_devices.
+        S'insereix a heartbeat quan encara hi ha slots lliures. Push/Pull no obren slots nous."""
+        d = await db[COLL_DEVICES].find_one({"license_key_hash": license_key_hash, "install_id": install_id})
+        return d is not None
+
     @router.post("/sync/heartbeat")
     async def heartbeat(body: HeartbeatBody):
         lic = await _find_license(body.license_key)
@@ -144,6 +150,8 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
             raise HTTPException(status_code=403, detail="sync_requires_premium")
 
         lkh = _key_hash(body.license_key)
+        if not await _is_device_authorized(lkh, body.install_id):
+            raise HTTPException(status_code=403, detail="device_not_authorized")
         now = _now()
         state = await db[COLL_STATE].find_one({"_id": lkh}) or {
             "_id": lkh,
@@ -187,6 +195,8 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
             raise HTTPException(status_code=403, detail="sync_requires_premium")
 
         lkh = _key_hash(license_key)
+        if not await _is_device_authorized(lkh, install_id):
+            raise HTTPException(status_code=403, detail="device_not_authorized")
         state = await db[COLL_STATE].find_one({"_id": lkh})
         if not state:
             return {"entries": {}, "cloud_updated_at": None}
