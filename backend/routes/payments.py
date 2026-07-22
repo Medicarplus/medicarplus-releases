@@ -218,8 +218,11 @@ async def create_subscription(body: CreateSubscriptionBody, request: Request):
 
     stripe_sdk.api_key = _stripe_api_key()
     origin = body.origin_url.rstrip("/")
-    success_url = f"{origin}/request-license?subscription_session_id={{CHECKOUT_SESSION_ID}}"
-    cancel_url = f"{origin}/request-license?cancelled=1"
+    # Redirigim SEMPRE al servidor d'Emergent (no a GitHub Pages) perquè la
+    # pàgina de gràcies estigui hostejada i pugui llegir el session_id.
+    PROD_HOST = os.environ.get("APP_PROD_URL", "https://project-helper-47.emergent.host").rstrip("/")
+    success_url = f"{PROD_HOST}/subscription-success.html?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{PROD_HOST}/subscription-success.html?cancelled=1"
 
     try:
         session = stripe_sdk.checkout.Session.create(
@@ -276,6 +279,7 @@ async def create_subscription(body: CreateSubscriptionBody, request: Request):
 async def subscription_status(session_id: str):
     """
     Polling: consulta l'estat d'una checkout session de subscripció.
+    Retorna també la llicència generada pel webhook (si ja hi és).
     """
     stripe_sdk.api_key = _stripe_api_key()
     try:
@@ -293,13 +297,39 @@ async def subscription_status(session_id: str):
     if isinstance(cust_id, dict):
         cust_id = cust_id.get("id")
 
+    customer_email = sess.get("customer_email") or sess.get("customer_details", {}).get("email")
+
+    # Cerca la llicència generada pel webhook (pot trigar uns segons)
+    from server import db
+    license_key = None
+    install_id = None
+    plan = None
+    expires_at = None
+    if sub_id:
+        lic = await db.licenses.find_one(
+            {"stripe_subscription_id": sub_id, "status": "active"},
+            sort=[("created_at", -1)],
+        )
+        if lic:
+            license_key = lic.get("license_key")
+            install_id = lic.get("install_id")
+            plan = lic.get("plan")
+            expires_at = lic.get("expires_at")
+
     return {
         "status": sess.get("status"),
         "payment_status": sess.get("payment_status"),
         "subscription_id": sub_id,
         "customer_id": cust_id,
-        "customer_email": sess.get("customer_email") or sess.get("customer_details", {}).get("email"),
+        "customer_email": customer_email,
         "metadata": sess.get("metadata", {}),
+        # Camps de llicència (poden ser null si el webhook encara no ha corregut)
+        "license_key": license_key,
+        "install_id": install_id,
+        "plan": plan,
+        "expires_at": expires_at,
+        "license_ready": bool(license_key),
+        "download_url": "https://github.com/Medicarplus/medicarplus-releases/releases/latest",
     }
 
 

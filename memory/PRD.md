@@ -87,7 +87,34 @@ User's preferred language: **Catalan** (UI/code strings in **Spanish**).
 - Aplicat a Estadísticas SMS (#btnStatSms) i Estadísticas Cites (#btnStatCites)
 - Ja aplicat a Utilidades menu (SMS, Cites, IA, Auditoría)
 
-## Iteration 17 (Feb 22, 2026) · Stripe verificat + Sync security + Trust badges
+## Iteration 18 (Feb 22, 2026) · Trial automàtic + Post-pago automàtic + Lightbox screenshots + Preus polits
+- **NOU endpoint `POST /api/trial/start`** (fitxer `backend/routes/trial.py`): genera llicència TRIAL de 60 dies + envia email amb clau + 2 PDFs (guia + manual). Anti-abús: 1 trial per email, honeypot, consent obligatori.
+- **Modal Trial a la landing**: reemplaça el `mailto:` anterior. Botó "🎁 Empezar prueba gratuita" (plan Trial) i badges "Prueba gratuita 60 días" (sota Standard i Premium) obren el modal. Al submit, mostren la clau a pantalla + confirmen l'enviament del mail.
+- **Endpoint `/api/payments/subscription/status/{id}` estès**: ara retorna també `license_key`, `install_id`, `expires_at`, `license_ready` (buscant a `db.licenses` via `stripe_subscription_id`) + `download_url` fix.
+- **NOVA pàgina `subscription-success.html`**: hostejada al backend Emergent. Rep `?session_id=...` de Stripe, fa poll cada 3s (20 intents = 60s màx), i mostra la clau + botó "📥 Descargar" + confirmació d'email en quan el webhook ha corregut. Redirecció Stripe canviada a aquesta pàgina (no a `/request-license`).
+- **API URLs auto-detectats** al landing (`API_BASE`): si el hostname és `medicarplus.es` → producció Emergent, sinó → mateix origin. Elimina el hardcoding que trencava en preview.
+- **Lightbox modal de captures** a les targetes "Características": 9 targetes mapejades a les captures de GitHub (`https://medicarplus.es/screenshots/*.jpg`). Afegides 3 targetes noves (Estadísticas, Citas, Auditoría) per aprofitar totes les captures. Etiqueta "🔍 Ver ejemplo" a cada targeta clicable.
+- **Botons plans polits**: "Suscribirse anual" ara mostra "🗓️ Pago anual · ahorra 58,90€/78,90€" en una sola línia amb padding uniforme (ja no es trenca lletjament).
+- **Sync device_not_authorized** verificat (iteració anterior mantinguda).
+- **Webhook Stripe** actualitzat via API a producció (URL definitiva `emergent.host/api/webhook/stripe`).
+
+### Cost temporal del `/api/trial/start`: ~5 segons (genera 2 PDFs via Playwright Chromium). Acceptable · el modal mostra spinner "Generando tu licencia…".
+
+## Next Actions (Feb 22, 2026)
+1. **User**: click "Volver a publicar cambios" al panel Emergent → puja a producció: endpoint `/api/trial/start`, `/subscription-success.html`, `payments.py` amb success_url nou, i `/api/payments/subscription/status` estès.
+2. **User**: puja el nou `landing-medicarplus.html` a GitHub Pages (segueix la guia del pas anterior o la nova secció "🌐 Publicar canvis a la landing" de la guia general).
+3. **Futur backlog**:
+   - Twilio SMS real (actualment mocked)
+   - Stripe live keys migration
+   - Verifactu compliance
+   - Domain mapping `medicarplus.es → Emergent Hosting` (elimina pas GitHub Pages manual)
+   - Panel de mètriques de subscripcions (MRR, churn, failed_payments) al Admin Dashboard
+   - Reminder emails al dia 45/55/59 del trial
+
+## Test Credentials
+- MASTER offline: `MB-MASTER-BRUGULAT-2026-OWNER`
+- Admin token: `MB-ADMIN-BRUGULAT-2026-4F8E2A1C`
+- PRM license (2/2 devices used): `CD-PR8E-D4D8-A71A-2842` + `CD-D299-4E88-1F92-364A`
 - **Stripe verificat**: totes 4 variables STRIPE_PRICE_* + STRIPE_API_KEY presents al backend. `/api/payments/subscription/enabled` retorna enabled=true. Els 4 packages (STD_MES, STD_ANY, PREMIUM_MES, PREMIUM_ANY) generen sessions Checkout vàlides (checkout.stripe.com).
 - **Landing CHECKOUT_API corregit**: abans apuntava a `/api/create-checkout` (endpoint one-off inexistent com a subscripció); ara apunta a `/api/payments/create-subscription` (correcte).
 - **Landing email prompt**: els botons "Suscribirse" ara demanen email via `window.prompt()` abans de crear la sessió Stripe (evita el 422 per customer_email missing).

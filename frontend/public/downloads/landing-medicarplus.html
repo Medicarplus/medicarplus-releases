@@ -130,9 +130,18 @@ h2{font-size:clamp(28px,4vw,42px);font-weight:800;line-height:1.15;margin-bottom
 .features{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
 .feature{
   background:var(--card);border:1px solid var(--border);border-radius:14px;
-  padding:28px 24px;transition:all .2s;
+  padding:28px 24px;transition:all .2s;position:relative;
 }
 .feature:hover{transform:translateY(-4px);border-color:var(--gold)}
+.feature[data-shot]{cursor:pointer}
+.feature[data-shot]::after{
+  content:'🔍 Ver ejemplo';
+  position:absolute;top:14px;right:14px;font-size:10px;color:var(--gold);
+  background:rgba(245,179,1,.12);border:1px solid rgba(245,179,1,.35);
+  padding:3px 8px;border-radius:999px;letter-spacing:.4px;font-weight:700;
+  opacity:.85;transition:opacity .2s;
+}
+.feature[data-shot]:hover::after{opacity:1;background:rgba(245,179,1,.22)}
 .feature-icon{
   width:48px;height:48px;border-radius:10px;
   background:linear-gradient(135deg,rgba(245,179,1,.15),rgba(245,179,1,.05));
@@ -140,6 +149,33 @@ h2{font-size:clamp(28px,4vw,42px);font-weight:800;line-height:1.15;margin-bottom
 }
 .feature h3{color:var(--gold);font-family:Georgia,serif;font-size:19px;margin-bottom:10px}
 .feature p{color:var(--muted);font-size:14px;line-height:1.6}
+.feature-pro{display:inline-block;background:rgba(168,85,247,.18);color:#c4b5fd;font-size:9px;padding:2px 7px;border-radius:4px;margin-left:6px;font-weight:800;letter-spacing:.5px;vertical-align:middle;border:1px solid rgba(168,85,247,.35)}
+
+/* LIGHTBOX MODAL */
+.lightbox{
+  position:fixed;inset:0;background:rgba(2,6,23,.92);backdrop-filter:blur(6px);
+  z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;
+  animation:lbFade .18s ease-out;
+}
+.lightbox.open{display:flex}
+@keyframes lbFade{from{opacity:0}to{opacity:1}}
+.lightbox-inner{
+  max-width:1200px;width:100%;max-height:92vh;position:relative;
+  display:flex;flex-direction:column;align-items:center;gap:12px;
+}
+.lightbox img{
+  max-width:100%;max-height:80vh;border-radius:12px;
+  box-shadow:0 24px 80px rgba(0,0,0,.7);border:1px solid rgba(245,179,1,.25);
+}
+.lightbox-caption{color:#e2e8f0;text-align:center;font-family:Georgia,serif;font-size:18px;letter-spacing:.3px}
+.lightbox-caption small{display:block;color:#94a3b8;font-size:13px;font-family:'Segoe UI',sans-serif;margin-top:4px;letter-spacing:0}
+.lightbox-close{
+  position:absolute;top:-12px;right:-12px;width:40px;height:40px;border-radius:50%;
+  background:var(--gold);color:#0b1121;border:none;font-size:22px;font-weight:900;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 6px 20px rgba(0,0,0,.5);transition:transform .15s;
+}
+.lightbox-close:hover{transform:scale(1.1)}
 
 /* PLANS */
 .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;max-width:1000px;margin:0 auto}
@@ -259,35 +295,55 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
       <p class="section-sub">Sistema completo diseñado desde la práctica diaria de los profesionales del sector de reconocimientos médicos.</p>
     </div>
     <div class="features">
-      <div class="feature">
-        <div class="feature-icon">📥</div>
-        <h3>Importación CSV DGT</h3>
-        <p>Sube el fichero de la DGT y el sistema clasifica automáticamente: renovaciones, expediciones, canjes, duplicados. Cada uno con su tasa correcta.</p>
-      </div>
-      <div class="feature">
+      <div class="feature" data-shot="main-cierre.jpg" data-shot-title="Cuadre de caja diario" data-shot-desc="Vista principal amb ingressos, tarjeta, Bizum, transferència, IRPF i saldo final del dia">
         <div class="feature-icon">💰</div>
         <h3>Cuadre de caja diario</h3>
         <p>Efectivo, tarjeta, Bizum, transferencia. Saldo anterior, ingresos del día, IRPF a descontar, caja física. Todo cuadrado al céntimo.</p>
       </div>
       <div class="feature">
+        <div class="feature-icon">📥</div>
+        <h3>Importación CSV DGT</h3>
+        <p>Sube el fichero de la DGT y el sistema clasifica automáticamente: renovaciones, expediciones, canjes, duplicados. Cada uno con su tasa correcta.</p>
+      </div>
+      <div class="feature" data-shot="irpf.jpg" data-shot-title="IRPF configurable" data-shot-desc="Configuració del % IRPF per empresa i càlcul automàtic trimestral">
         <div class="feature-icon">📋</div>
         <h3>IRPF configurable</h3>
         <p>Elige el % (7%, 15%, 19% o custom) por empresa. Se aplica automáticamente en cada asiento y suma anual disponible.</p>
       </div>
-      <div class="feature">
+      <div class="feature" data-shot="contabilidad.jpg" data-shot-title="Contabilidad completa" data-shot-desc="Llibreta anual, reparto de socios, informe trimestral i auditoria integrada">
         <div class="feature-icon">📊</div>
         <h3>Contabilidad completa</h3>
         <p>Libreta anual, reparto de socios por porcentajes, reserva de cambio, informe anual con gráficos, auditoría de tasas.</p>
       </div>
-      <div class="feature">
+      <div class="feature" data-shot="libro-registro.jpg" data-shot-title="Libro de registro" data-shot-desc="Registre acumulat de tots els serveis amb cercador intel·ligent per client">
+        <div class="feature-icon">📖</div>
+        <h3>Libro de registro</h3>
+        <p>Historial completo de todos los servicios: renovaciones, revisiones, certificados. Búsqueda instantánea por nombre en años de datos.</p>
+      </div>
+      <div class="feature" data-shot="estadisticas.jpg" data-shot-title="Estadísticas y comparativas" data-shot-desc="Informe anual, facturació per concepte, comparativa entre anys i estacionalitat">
+        <div class="feature-icon">📈</div>
+        <h3>Estadísticas anuales</h3>
+        <p>Informe anual con desglose trimestral IRPF, facturación por concepto, comparativa entre años y análisis de estacionalidad.</p>
+      </div>
+      <div class="feature" data-shot="sms-avisos.jpg" data-shot-title="Avisos SMS · WhatsApp" data-shot-desc="Enviament massiu de recordatoris de renovació de carnet integrat amb Twilio"><span class="feature-pro" style="position:absolute;top:14px;right:14px;background:rgba(168,85,247,.18);border:1px solid rgba(168,85,247,.35);color:#c4b5fd">PREMIUM</span>
         <div class="feature-icon">📱</div>
         <h3>Avisos SMS · WhatsApp</h3>
         <p>Envía recordatorios automáticos a los pacientes cuando toca renovar carnet, certificado o cualquier tipo de reconocimiento médico. Integrado con Twilio.</p>
       </div>
-      <div class="feature">
+      <div class="feature" data-shot="cites.jpg" data-shot-title="Citas online sincronizadas" data-shot-desc="Vincula Google Calendar, Doctoralia, Calendly, Doctolib i altres. Casament automàtic amb cliens al llibre de registre"><span class="feature-pro" style="position:absolute;top:14px;right:14px;background:rgba(168,85,247,.18);border:1px solid rgba(168,85,247,.35);color:#c4b5fd">PREMIUM</span>
+        <div class="feature-icon">📅</div>
+        <h3>Citas online</h3>
+        <p>Sincroniza Google Calendar, Doctoralia, Calendly, Doctolib, iCloud o cualquier calendario iCal. Casamiento automático con clientes del histórico.</p>
+      </div>
+      <div class="feature" data-shot="auditoria.jpg" data-shot-title="Auditoría avanzada" data-shot-desc="Detecta duplicats, fitxes 0€ i descuadres per rang de dates amb classificació automàtica"><span class="feature-pro" style="position:absolute;top:14px;right:14px;background:rgba(168,85,247,.18);border:1px solid rgba(168,85,247,.35);color:#c4b5fd">PREMIUM</span>
         <div class="feature-icon">🔎</div>
-        <h3>Búsqueda inteligente</h3>
-        <p>Encuentra cualquier paciente por nombre o apellidos en el histórico completo. Ve todas sus visitas, tipos de reconocimiento y pagos.</p>
+        <h3>Auditoría de tasas</h3>
+        <p>Detecta duplicados, fichas a 0€ y descuadres. Clasifica automáticamente en 3 niveles y ayuda a cuadrar la caja cuando algo no encaja.</p>
+      </div>
+      <div class="feature" data-shot="asesor-ia.jpg" data-shot-title="Asesor IA integrado" data-shot-desc="Consultes en llenguatge natural sobre facturació, clients i deutes"><span class="feature-pro" style="position:absolute;top:14px;right:14px;background:rgba(168,85,247,.18);border:1px solid rgba(168,85,247,.35);color:#c4b5fd">PREMIUM</span>
+        <div class="feature-icon">🤖</div>
+        <h3>Asesor IA integrado</h3>
+        <p>Pregunta en lenguaje natural: "¿cuánto he facturado este mes?" o "¿quién me debe dinero?". Respuesta en segundos.</p>
       </div>
       <div class="feature">
         <div class="feature-icon">🖨️</div>
@@ -297,12 +353,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
       <div class="feature">
         <div class="feature-icon">🔒</div>
         <h3>Licencia hardware-locked</h3>
-        <p>1 licencia = 1 ordenador. Impide piratería. Datos siempre locales en tu PC, cumple con LOPD/RGPD.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">🤖</div>
-        <h3>Asesor IA integrado</h3>
-        <p>Pregunta en lenguaje natural: "¿cuánto he facturado este mes?" o "¿quién me debe dinero?". Respuesta en segundos.</p>
+        <p>1 licencia = 1 ordenador (Standard) o 2 sincronizados (Premium). Datos siempre locales, cumple LOPD/RGPD.</p>
       </div>
       <div class="feature">
         <div class="feature-icon">🔄</div>
@@ -322,6 +373,69 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
     </div>
   </div>
 </section>
+
+<!-- LIGHTBOX MODAL per captures de features -->
+<div class="lightbox" id="featureLightbox" data-testid="feature-lightbox" onclick="if(event.target.id==='featureLightbox')closeLightbox()">
+  <div class="lightbox-inner">
+    <button class="lightbox-close" onclick="closeLightbox()" data-testid="lightbox-close" aria-label="Cerrar">×</button>
+    <img id="lightboxImg" src="" alt="">
+    <div class="lightbox-caption"><span id="lightboxTitle"></span><small id="lightboxDesc"></small></div>
+  </div>
+</div>
+
+<!-- TRIAL MODAL · sol·licitar prova gratuïta 60 dies automàticament -->
+<div class="lightbox" id="trialModal" data-testid="trial-modal" onclick="if(event.target.id==='trialModal')closeTrialModal()">
+  <div class="lightbox-inner" style="max-width:520px">
+    <button class="lightbox-close" onclick="closeTrialModal()" data-testid="trial-modal-close" aria-label="Cerrar">×</button>
+    <div style="background:#0f172a;border:2px solid #3ddc97;border-radius:14px;padding:32px;color:#e2e8f0;width:100%;font-family:'Segoe UI',sans-serif">
+      <div id="trialForm">
+        <h2 style="color:#3ddc97;font-family:Georgia,serif;font-size:22px;margin-bottom:6px">🎁 Prueba gratuita 60 días</h2>
+        <p style="color:#94a3b8;font-size:14px;margin-bottom:20px">Sin tarjeta · Acceso completo Premium · Cancela cuando quieras</p>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div>
+            <label style="display:block;font-size:12px;color:#cbd5e1;margin-bottom:4px;font-weight:700">Nombre completo *</label>
+            <input type="text" id="trial-name" data-testid="trial-name" required style="width:100%;padding:10px 12px;background:#020617;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:14px">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;color:#cbd5e1;margin-bottom:4px;font-weight:700">Email *</label>
+            <input type="email" id="trial-email" data-testid="trial-email" required style="width:100%;padding:10px 12px;background:#020617;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:14px">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;color:#cbd5e1;margin-bottom:4px;font-weight:700">Centro médico <span style="color:#64748b;font-weight:400">(opcional)</span></label>
+            <input type="text" id="trial-company" data-testid="trial-company" style="width:100%;padding:10px 12px;background:#020617;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:14px">
+          </div>
+          <!-- honeypot: ocult, si un bot l'omple, es bloqueja -->
+          <input type="text" id="trial-website" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" aria-hidden="true">
+          <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;margin-top:8px;cursor:pointer;padding:10px 12px;background:rgba(245,179,1,.06);border:1px dashed rgba(245,179,1,.3);border-radius:8px" for="trial-consent">
+            <input type="checkbox" id="trial-consent" data-testid="trial-consent" onchange="onConsentChange()" style="margin-top:3px;width:16px;height:16px;cursor:pointer;flex-shrink:0" required>
+            <span><b style="color:#e2e8f0">Acepto</b> recibir por email (a info@medicarplus.es) la clave de licencia, la guía de instalación y el manual de usuario. Cumplimos la LOPD/RGPD y no compartimos tu email. <b style="color:#f5b301">(obligatorio)</b></span>
+          </label>
+          <button type="button" id="trial-submit" data-testid="trial-submit" onclick="submitTrial()" disabled style="margin-top:8px;width:100%;background:linear-gradient(135deg,#3ddc97 0%,#22c55e 100%);color:#0b1121;border:none;padding:14px;border-radius:8px;font-weight:800;font-size:15px;cursor:pointer;letter-spacing:.3px;box-shadow:0 4px 16px rgba(61,220,151,.25);opacity:.45;pointer-events:none;transition:opacity .2s">🎁 Empezar prueba gratuita ahora</button>
+          <div id="trial-consent-hint" style="font-size:11px;color:#f59e0b;text-align:center;margin-top:-2px">👆 Marca la casilla de arriba para continuar</div>
+          <div id="trial-error" data-testid="trial-error" style="display:none;background:rgba(220,38,38,.1);border:1px solid #dc2626;color:#fecaca;padding:10px 12px;border-radius:8px;font-size:13px;margin-top:4px"></div>
+        </div>
+      </div>
+      <div id="trialSuccess" style="display:none" data-testid="trial-success">
+        <h2 style="color:#3ddc97;font-family:Georgia,serif;font-size:22px;margin-bottom:6px">✅ ¡Prueba activada!</h2>
+        <p style="color:#cbd5e1;font-size:14px;margin-bottom:16px">Tu licencia de <b>60 días</b> ya está lista. Te hemos enviado un email con la clave completa, la guía de instalación en PDF y el enlace de descarga.</p>
+        <div style="background:#020617;border:1px dashed #f5b301;border-radius:8px;padding:12px;margin-bottom:12px">
+          <div style="font-size:11px;color:#f5b301;font-weight:700;letter-spacing:1px;margin-bottom:6px">TU CLAVE DE LICENCIA</div>
+          <div id="trial-key-display" data-testid="trial-key-display" style="font-family:'Courier New',monospace;font-size:10px;color:#e2e8f0;word-break:break-all;line-height:1.5;max-height:100px;overflow:auto"></div>
+          <button type="button" onclick="copyTrialKey()" data-testid="trial-copy" style="margin-top:8px;background:#f5b301;color:#0b1121;border:none;padding:8px 14px;border-radius:6px;font-weight:800;font-size:12px;cursor:pointer">📋 Copiar clave</button>
+        </div>
+        <div style="background:rgba(2,132,199,.1);border:1px solid #0284c7;border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px;color:#bae6fd">
+          <b>Próximos pasos:</b><br>
+          1️⃣ Descarga la aplicación (Windows) → <a href="https://github.com/Medicarplus/medicarplus-releases/releases/latest" target="_blank" style="color:#f5b301;font-weight:700">github.com/Medicarplus/…</a><br>
+          2️⃣ Instálala (haz clic en "Más información" si Windows te avisa).<br>
+          3️⃣ Al abrirla, pega la clave y pulsa <b>ACTIVAR LICENCIA</b>.<br>
+          4️⃣ Todo se explica también en el email que acabamos de enviarte.
+        </div>
+        <div style="font-size:11px;color:#94a3b8;text-align:center;margin-top:10px" id="trial-email-note">¿No ves el email? Revisa tu carpeta de spam.</div>
+        <button type="button" onclick="closeTrialModal()" data-testid="trial-done" style="width:100%;margin-top:14px;background:transparent;color:#cbd5e1;border:1px solid #475569;padding:10px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- PLANS -->
 <section id="plans" style="background:linear-gradient(180deg,transparent,rgba(15,23,42,.5))">
@@ -349,7 +463,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
           <li>1 ordenador</li>
           <li>Soporte por email</li>
         </ul>
-        <a href="#contacto" class="btn btn-secondary">Solicitar prueba</a>
+        <a href="#" class="btn btn-secondary" onclick="event.preventDefault();openTrialModal()" data-testid="landing-trial-cta">🎁 Empezar prueba gratuita</a>
       </div>
 
       <div class="plan" data-plan-std>
@@ -611,12 +725,19 @@ function sendContact(e){
   window.addEventListener('resize', () => { if(window.innerWidth > 768) setOpen(false) });
 })();
 // ── Suscripció Stripe ───────────────────────────────────────────────────
-// Els botons "Suscribirse" de la secció Planes envien un POST a
-// /api/payments/create-subscription del backend d'Emergent. El backend crea
-// una Checkout Session (mode=subscription) i retorna la URL de Stripe on
-// redirigim l'usuari. Un cop pagat, Stripe redirigeix al success_url i el
-// webhook activa la llicència + envia email automàtic amb el codi.
-const CHECKOUT_API = 'https://project-helper-47.emergent.host/api/payments/create-subscription';
+// Detecta l'API base automàticament segons on està servida la pàgina:
+//   · medicarplus.es (GitHub Pages)  → producció Emergent
+//   · project-helper-47.preview.… → mateix origin (preview)
+//   · project-helper-47.emergent.host → producció (mateix origin)
+const API_BASE = (function(){
+  const h = (location.hostname||'').toLowerCase();
+  if(h === 'medicarplus.es' || h === 'www.medicarplus.es' || h === 'medicarplus.cat' || h === 'medicarplus.com'){
+    return 'https://project-helper-47.emergent.host';
+  }
+  return location.origin;
+})();
+const CHECKOUT_API = API_BASE + '/api/payments/create-subscription';
+const TRIAL_API_URL = API_BASE + '/api/trial/start';
 function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((e||'').trim()); }
 document.addEventListener('click', async function(ev){
   const btn = ev.target.closest && ev.target.closest('[data-plan-subscribe]');
@@ -661,6 +782,139 @@ document.addEventListener('click', async function(ev){
     btn.textContent = original;
     btn.style.pointerEvents = '';
   }
+});
+
+// ── Lightbox de captures de features ─────────────────────────────────────
+const SHOTS_BASE = 'https://medicarplus.es/screenshots/';
+function openLightbox(file, title, desc){
+  const box = document.getElementById('featureLightbox');
+  document.getElementById('lightboxImg').src = SHOTS_BASE + file;
+  document.getElementById('lightboxImg').alt = title || '';
+  document.getElementById('lightboxTitle').textContent = title || '';
+  document.getElementById('lightboxDesc').textContent = desc || '';
+  box.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox(){
+  document.getElementById('featureLightbox').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('click', function(ev){
+  const card = ev.target.closest && ev.target.closest('.feature[data-shot]');
+  if(!card) return;
+  ev.preventDefault();
+  openLightbox(
+    card.getAttribute('data-shot'),
+    card.getAttribute('data-shot-title'),
+    card.getAttribute('data-shot-desc')
+  );
+});
+document.addEventListener('keydown', function(ev){
+  if(ev.key === 'Escape'){
+    if(document.getElementById('featureLightbox').classList.contains('open')) closeLightbox();
+    if(document.getElementById('trialModal').classList.contains('open')) closeTrialModal();
+  }
+});
+
+// ── Prova gratuïta automàtica (60 dies) ──────────────────────────────────
+const TRIAL_API = TRIAL_API_URL;
+function openTrialModal(prefillEmail){
+  document.getElementById('trialForm').style.display = '';
+  document.getElementById('trialSuccess').style.display = 'none';
+  document.getElementById('trial-error').style.display = 'none';
+  document.getElementById('trial-consent').checked = false;
+  onConsentChange();
+  if(prefillEmail){ document.getElementById('trial-email').value = prefillEmail; }
+  document.getElementById('trialModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  setTimeout(()=>{ try{document.getElementById('trial-name').focus()}catch(e){} }, 100);
+}
+function onConsentChange(){
+  const consent = document.getElementById('trial-consent').checked;
+  const btn = document.getElementById('trial-submit');
+  const hint = document.getElementById('trial-consent-hint');
+  if(consent){
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.style.pointerEvents = '';
+    btn.textContent = '🎁 Empezar prueba gratuita ahora';
+    if(hint) hint.style.display = 'none';
+  } else {
+    btn.disabled = true;
+    btn.style.opacity = '0.45';
+    btn.style.pointerEvents = 'none';
+    btn.textContent = '🔒 Marca "Acepto" para activar';
+    if(hint) hint.style.display = 'block';
+  }
+}
+function closeTrialModal(){
+  document.getElementById('trialModal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+async function submitTrial(){
+  const errBox = document.getElementById('trial-error');
+  const btn = document.getElementById('trial-submit');
+  errBox.style.display = 'none';
+  const name = document.getElementById('trial-name').value.trim();
+  const email = document.getElementById('trial-email').value.trim();
+  const company = document.getElementById('trial-company').value.trim();
+  const website = document.getElementById('trial-website').value.trim();
+  const consent = document.getElementById('trial-consent').checked;
+  if(!name || name.length < 2){ errBox.textContent='⚠️ Introduce tu nombre.'; errBox.style.display='block'; return; }
+  if(!isValidEmail(email)){ errBox.textContent='⚠️ Introduce un email válido.'; errBox.style.display='block'; return; }
+  if(!consent){ errBox.textContent='⚠️ Debes aceptar la política de privacidad para continuar.'; errBox.style.display='block'; return; }
+  btn.disabled = true;
+  btn.textContent = '⏳ Generando tu licencia…';
+  try{
+    const r = await fetch(TRIAL_API, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, email, company: company||null, consent: true, website})
+    });
+    const data = await r.json().catch(()=>({}));
+    if(!r.ok){
+      const msg = (data && data.detail) ? data.detail : 'HTTP '+r.status;
+      throw new Error(msg);
+    }
+    document.getElementById('trial-key-display').textContent = data.license_key || '';
+    // Ajusta la nota d'email segons si s'ha enviat de veritat
+    const note = document.getElementById('trial-email-note');
+    if(data.email_sent){
+      note.textContent = '✉️ Email enviado a ' + email + '. Si no lo ves, revisa la carpeta de spam.';
+    } else {
+      note.innerHTML = '⚠️ El envío de email ha fallado, pero tu licencia está activa. <b>Copia la clave</b> de arriba antes de cerrar. Si necesitas soporte: <a href="mailto:info@medicarplus.es" style="color:#f5b301">info@medicarplus.es</a>';
+    }
+    document.getElementById('trialForm').style.display = 'none';
+    document.getElementById('trialSuccess').style.display = 'block';
+  }catch(err){
+    console.error('[Trial]', err);
+    errBox.textContent = '⚠️ ' + (err.message || 'No se ha podido generar la licencia. Contacta con info@medicarplus.es.');
+    errBox.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = '🎁 Empezar prueba gratuita ahora';
+  }
+}
+function copyTrialKey(){
+  const key = document.getElementById('trial-key-display').textContent;
+  if(!key) return;
+  try{
+    navigator.clipboard.writeText(key).then(()=>{
+      const btn = document.querySelector('[data-testid="trial-copy"]');
+      if(btn){ const orig=btn.textContent; btn.textContent='✅ Copiada!'; setTimeout(()=>btn.textContent=orig,1800); }
+    });
+  }catch(e){
+    // Fallback selecció manual
+    const range = document.createRange();
+    range.selectNodeContents(document.getElementById('trial-key-display'));
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  }
+}
+// Els badges "Prueba gratuita 60 días · Sin tarjeta" i qualsevol enllaç a #trial obren el modal
+document.addEventListener('click', function(ev){
+  const trg = ev.target.closest && ev.target.closest('[data-testid="landing-std-trial-badge"], [data-testid="landing-prm-trial-badge"], a[href="#trial"]');
+  if(!trg) return;
+  ev.preventDefault();
+  openTrialModal();
 });
 </script>
 

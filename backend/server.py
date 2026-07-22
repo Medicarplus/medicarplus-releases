@@ -239,6 +239,9 @@ app.include_router(pdf_render_router, prefix="/api")
 from routes.sync import build_sync_router
 app.include_router(build_sync_router(db), prefix="/api")
 
+from routes.trial import build_trial_router
+app.include_router(build_trial_router(db), prefix="/api")
+
 # Stripe webhook (obligatori per playbook: /api/webhook/stripe)
 # Gestiona tant one-off (via emergentintegrations) com subscriptions (via stripe SDK)
 from fastapi import Request as _FastReq
