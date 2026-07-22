@@ -6723,6 +6723,11 @@ setTimeout(()=>{
   async function runSyncCycle(){
     if(inflight) return; const lic=getLicense(); const iid=getInstallId();
     if(!lic || !lic.key || !iid){ setIndicator('Sin licencia', '#64748b'); return; }
+    // Skip heartbeat per MASTER offline key (no és a la DB, generaria soroll 404)
+    if((lic.type||'').toUpperCase()==='MASTER' || (lic.plan||'').toUpperCase()==='MASTER'){
+      setIndicator('👑 Owner · Sin sync', '#a855f7');
+      return;
+    }
     inflight=true;
     try{
       setIndicator('Sincronizando…', '#f5b301');
