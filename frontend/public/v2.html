@@ -6613,5 +6613,176 @@ setTimeout(()=>{
 },500);
 
 </script>
+
+<!-- ============================================================================
+     SYNC MULTI-DEVICE PREMIUM · auto-detecció upgrade + heartbeat cada 60s
+============================================================================ -->
+<script>
+(function(){
+  'use strict';
+  const SYNC_INTERVAL_MS = 60 * 1000;
+  const TS_KEY = 'caja.__sync_ts';
+  const LAST_PUSH_KEY = 'caja.__sync_last_push';
+  const LAST_PULL_KEY = 'caja.__sync_last_pull';
+  const NON_SYNCABLE = new Set([
+    'caja.license.v1','caja.install.id.v1','caja.__sync_ts',
+    'caja.__sync_last_push','caja.__sync_last_pull','caja.__sync_status',
+    'caja.license.lastcheck.v1',
+  ]);
+  const isSyncable = (k) => typeof k === 'string' && k.startsWith('caja.') && !NON_SYNCABLE.has(k);
+  const getApiUrl = (path) => {
+    let base = '';
+    try{
+      if (typeof location!=='undefined' && /^https?:$/.test(location.protocol)) base = location.origin;
+      else if (typeof getApiBase==='function') base = getApiBase() || '';
+      else if (window.API_BASE) base = window.API_BASE;
+    }catch(e){}
+    return (base||'').replace(/\/$/,'') + path;
+  };
+  const getLicense = () => { try{return JSON.parse(localStorage.getItem('caja.license.v1')||'null')}catch(e){return null} };
+  const getInstallId = () => localStorage.getItem('caja.install.id.v1')||'';
+  const loadTs = () => { try{return JSON.parse(localStorage.getItem(TS_KEY)||'{}')}catch(e){return {}} };
+  const saveTs = (ts) => { try{localStorage.setItem(TS_KEY, JSON.stringify(ts))}catch(e){} };
+  function markKeyChanged(key, when){
+    if (!isSyncable(key)) return;
+    const ts = loadTs(); ts[key] = when || new Date().toISOString(); saveTs(ts);
+  }
+  // Hook global setItem/removeItem per capturar timestamps
+  (function(){
+    const proto = Storage.prototype;
+    const origSet = proto.setItem, origRm = proto.removeItem;
+    proto.setItem = function(k,v){ const r=origSet.apply(this,arguments); try{if(this===localStorage)markKeyChanged(k)}catch(e){} return r; };
+    proto.removeItem = function(k){ const r=origRm.apply(this,arguments); try{if(this===localStorage)markKeyChanged(k)}catch(e){} return r; };
+  })();
+  function ensureIndicator(){
+    let el = document.getElementById('syncIndicator');
+    if (!el){
+      el = document.createElement('div'); el.id='syncIndicator'; el.setAttribute('data-testid','sync-indicator');
+      el.style.cssText='position:fixed;bottom:8px;right:10px;background:rgba(15,23,42,.9);color:#94a3b8;padding:6px 12px;border-radius:999px;font-size:11px;font-family:Consolas,monospace;letter-spacing:.3px;border:1px solid rgba(148,163,184,.2);z-index:9998;display:flex;align-items:center;gap:6px;pointer-events:none;transition:opacity .3s';
+      el.innerHTML='<span>☁️</span> <span id="syncIndTxt">Iniciando…</span>';
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+  function setIndicator(text, color){
+    try{ ensureIndicator(); const t=document.getElementById('syncIndTxt'); const el=document.getElementById('syncIndicator');
+      if(t) t.textContent=text; if(el && color) el.style.borderColor=color;
+    }catch(e){}
+  }
+  let inflight=false, lastSynced=null, prevIsPremium=null, prevPlan=null;
+  async function heartbeat(lic, iid){
+    const r = await fetch(getApiUrl('/api/sync/heartbeat'), {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({license_key:lic.key, install_id:iid})});
+    if(!r.ok) throw new Error('hb HTTP '+r.status); return await r.json();
+  }
+  async function pullChanges(lic, iid, since){
+    const u = getApiUrl('/api/sync/pull') + '?license_key='+encodeURIComponent(lic.key) + '&install_id='+encodeURIComponent(iid) + (since?'&since='+encodeURIComponent(since):'');
+    const r = await fetch(u); if(!r.ok) throw new Error('pull HTTP '+r.status); return await r.json();
+  }
+  async function pushChanges(lic, iid, entries){
+    const r = await fetch(getApiUrl('/api/sync/push'), {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({license_key:lic.key, install_id:iid, entries})});
+    if(!r.ok) throw new Error('push HTTP '+r.status); return await r.json();
+  }
+  function applyRemote(entries){
+    const localTs = loadTs(); let applied=0;
+    for(const key of Object.keys(entries||{})){
+      if(!isSyncable(key)) continue;
+      const rTs = entries[key].updated_at ? new Date(entries[key].updated_at).getTime() : 0;
+      const lTs = localTs[key] ? new Date(localTs[key]).getTime() : 0;
+      if(rTs > lTs){
+        try{
+          const v = entries[key].value;
+          if(v===null || v===undefined) localStorage.removeItem(key);
+          else localStorage.setItem(key, v);
+          localTs[key] = entries[key].updated_at; applied++;
+        }catch(e){}
+      }
+    }
+    saveTs(localTs); return applied;
+  }
+  function collectLocalChanges(lastPushIso){
+    const ts = loadTs(); const lastMs = lastPushIso ? new Date(lastPushIso).getTime() : 0;
+    const out = {};
+    for(const key of Object.keys(ts)){
+      if(!isSyncable(key)) continue;
+      if(new Date(ts[key]).getTime() > lastMs){
+        const v = localStorage.getItem(key);
+        if(v!==null) out[key] = {value:v, updated_at: ts[key]};
+      }
+    }
+    return out;
+  }
+  function notifyPlanChange(newPlan, isPrem){
+    try{
+      const lic = getLicense()||{}; lic.plan=newPlan; lic.type=newPlan;
+      localStorage.setItem('caja.license.v1', JSON.stringify(lic));
+      if(typeof refreshUtilitiesPremiumUI==='function') refreshUtilitiesPremiumUI();
+      if(typeof refreshCalendarButtonVisibility==='function') refreshCalendarButtonVisibility();
+      if(isPrem && typeof toast==='function') toast('✨ Plan Premium activado. Utilidades desbloqueadas!', 5000);
+    }catch(e){}
+  }
+  async function runSyncCycle(){
+    if(inflight) return; const lic=getLicense(); const iid=getInstallId();
+    if(!lic || !lic.key || !iid){ setIndicator('Sin licencia', '#64748b'); return; }
+    inflight=true;
+    try{
+      setIndicator('Sincronizando…', '#f5b301');
+      const hb = await heartbeat(lic, iid);
+      const isPrem = !!hb.is_premium;
+      if(prevIsPremium !== null && prevIsPremium !== isPrem) notifyPlanChange(hb.plan||'STD', isPrem);
+      prevIsPremium=isPrem; prevPlan=hb.plan;
+      if(!hb.authorized){ setIndicator('⚠️ Límite '+(hb.max_devices||1)+' dispositivos', '#dc2626'); return; }
+      if(!isPrem){ setIndicator('Standard · Sin sync', '#64748b'); return; }
+      const lastPull = localStorage.getItem(LAST_PULL_KEY) || '';
+      const pullRes = await pullChanges(lic, iid, lastPull);
+      const applied = applyRemote(pullRes.entries||{});
+      const lastPush = localStorage.getItem(LAST_PUSH_KEY) || '';
+      const changes = collectLocalChanges(lastPush);
+      let written=0; let cloudTs=pullRes.cloud_updated_at;
+      if(Object.keys(changes).length>0){
+        const pr = await pushChanges(lic, iid, changes);
+        written = pr.written||0; cloudTs = pr.cloud_updated_at || cloudTs;
+      }
+      if(cloudTs) localStorage.setItem(LAST_PULL_KEY, cloudTs);
+      localStorage.setItem(LAST_PUSH_KEY, new Date().toISOString());
+      lastSynced = new Date();
+      const suf = (applied||written) ? ` (${applied}↓ ${written}↑)` : '';
+      setIndicator('☁️ Sincronizado'+suf, '#22c55e');
+    }catch(err){
+      const msg = (err&&err.message)||'error';
+      if(msg.indexOf('Failed to fetch')>=0) setIndicator('📴 Offline', '#64748b');
+      else setIndicator('⚠️ '+msg.slice(0,25), '#f59e0b');
+    }finally{ inflight=false; }
+  }
+  function refreshRelative(){
+    if(!lastSynced) return;
+    const sec = Math.floor((Date.now()-lastSynced.getTime())/1000);
+    if(sec<10) return;
+    setIndicator(sec<60?`☁️ hace ${sec}s`:`☁️ hace ${Math.floor(sec/60)}m`, '#22c55e');
+  }
+  function boot(){
+    const lic = getLicense();
+    if(!lic || !lic.key){ setTimeout(boot, 3000); return; }
+    runSyncCycle();
+    setInterval(runSyncCycle, SYNC_INTERVAL_MS);
+    setInterval(refreshRelative, 5000);
+    window.addEventListener('focus', ()=>setTimeout(runSyncCycle, 500));
+    window.addEventListener('online', ()=>setTimeout(runSyncCycle, 500));
+    window.addEventListener('beforeunload', ()=>{
+      try{
+        const l=getLicense(); const iid=getInstallId();
+        if(!l||!l.key||!iid) return;
+        const changes = collectLocalChanges(localStorage.getItem(LAST_PUSH_KEY)||'');
+        if(Object.keys(changes).length===0) return;
+        const body = JSON.stringify({license_key:l.key, install_id:iid, entries:changes});
+        navigator.sendBeacon && navigator.sendBeacon(getApiUrl('/api/sync/push'), new Blob([body], {type:'application/json'}));
+      }catch(e){}
+    });
+  }
+  window.syncNow = runSyncCycle;
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+
 </body>
 </html>

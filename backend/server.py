@@ -235,6 +235,10 @@ app.include_router(calendar_sync_router, prefix="/api")
 from routes.pdf_render import router as pdf_render_router
 app.include_router(pdf_render_router, prefix="/api")
 
+# Sync multi-device Premium (heartbeat + push + pull + auto-upgrade STD→PRM)
+from routes.sync import build_sync_router
+app.include_router(build_sync_router(db), prefix="/api")
+
 # Stripe webhook (obligatori per playbook: /api/webhook/stripe)
 # Gestiona tant one-off (via emergentintegrations) com subscriptions (via stripe SDK)
 from fastapi import Request as _FastReq
