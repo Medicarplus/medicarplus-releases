@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 16 · Language/i18n verification bug fix (Marc's report). Verified that with default language='es', all hardcoded Catalan strings are correctly rendered in Castilian via the new L(ca,es) helper. Verified that switching to CA still shows Catalan strings. Also verified syncIndicator position (top-right, not bottom). All 12 language checks + 1 position check PASS. Frontend only.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Right panel (Cierre del día) - CAJA FÍSICA / CUENTA BANCO labels", "issues": ["Not part of this bug scope, but noticed: 'CAJA FÍSICA' and 'CUENTA BANCO' green/blue pill labels in the right-panel do not translate when switching to CA. Non-blocking; outside review scope. If desired, wrap these two labels with L('CAIXA FÍSICA','CAJA FÍSICA') and L('COMPTE BANC','CUENTA BANCO')."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_16.json"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "L(ca,es) helper (line 499) is a clean, minimal solution for the reported bug. Applied consistently at line 2076 (three '→ Banc/Banco' spans in the trafic branch), line 2089-2092 (four popup strings + Entendido/Entesos button), and line 2020 (fp-menu 'Cambiar método de pago' + four options). All produce correct output in both ES (default) and CA modes.",
+    "Note: In the isC==='cempla' branch (line 2076 first ternary branch), '→ Banco' is hardcoded (not wrapped in L()). If the cempla company is ever selected while lang=CA, it will show Castilian 'Banco'. Non-blocking because the reported bug and testing use trafic/default. Consider wrapping if CA-cempla is a real use case.",
+    "syncIndicator (line 202) is correctly positioned in the top-right header (top≈51px, right≈12px), showing '👑 Owner · Sin sync' when MASTER offline key is active. The dynamic fallback in ensureIndicator() (line 6665) that would create a bottom-right variant is not triggered because the element already exists in the static HTML.",
+    "toggleLang() at line 500 correctly rerenders when called; localStorage 'caja.lang' persists language."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (backend testing not requested)",
+    "frontend": "100% (13/13 checks passed: syncIndicator top-right position, 3× '→ Banco' spans in ES sumBox, 5 popup ES strings incl. Entendido button, 3× '→ Banc' spans in CA sumBox, 5 popup CA strings incl. Entesos button)"
+  },
+  "test_credentials": "MASTER offline key: MB-MASTER-BRUGULAT-2026-OWNER (pre-seeded via localStorage 'caja.license.v1' JSON blob, so the activation modal is bypassed).",
+  "seed_data_creation": "Playwright pre-seeded localStorage: caja.license.v1={key:MB-MASTER-BRUGULAT-2026-OWNER, type:MASTER, is_premium:true, authorized:true, source:offline}, caja.install.id.v1='CD-TEST-VERIFY-1601', caja.aiOnboardSeen='1', caja.config.v1={configured:true, company1:{name:'Test Auto'}, company2:{name:'Test Rev'}, partners:[]}, caja.lang='es'.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The bug fix uses a small L(ca,es) helper (v2.html line 499). Any future hardcoded string that needs both-language support should use this helper. Do NOT rely on the data-i18n MutationObserver system for strings inside innerHTML template literals — L() is the correct pattern. When testing language switch, use toggleLang() (line 500) directly via page.evaluate, then call render() to refresh sumBox. The isC (currentCompany==='cempla') branch of the sumBox innerHTML still has one hardcoded 'Banco' — see critical_code_review_comments if that becomes a scope item.",
+  "rca of the issue": "Root cause of Marc's bug: several strings inside JS innerHTML template literals (sumBox fp labels, datafono popup, fp-menu) were hardcoded in Catalan — they never went through the data-i18n dictionary because they are dynamically injected via innerHTML rather than static markup. The MutationObserver-based i18n system only rewrites text nodes matching known ca→es replacements, so any string not in the L() dictionary or applyLang() map stayed in Catalan even when currentLang==='es'. Fix: introduce L(ca,es) helper and wrap each affected string. Verified end-to-end via Playwright against the preview URL for both 'es' (default) and 'ca' modes. All expected strings render correctly in both languages."
+}
