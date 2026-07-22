@@ -7,6 +7,34 @@
 <meta http-equiv="Expires" content="0" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>MediCar Plus</title>
+<script>
+/* MediCar Plus · Asset URL Fix per Electron bootstrap
+   Quan el bootstrap fa document.write, la pàgina queda a file://.../index.html.
+   Les URLs relatives (logo, favicons) es resoldrien contra file:// i fallarien.
+   Aquest script detecta si estem sota Electron/file:// i reescriu les rutes
+   d'assets perquè apuntin al servidor via window.API_BASE. */
+(function(){
+  try{
+    var isFile = (location.protocol === 'file:');
+    var api = (typeof window.API_BASE === 'string' && window.API_BASE) ? window.API_BASE.replace(/\/+$/,'') : '';
+    if(!isFile && !api) return; // Servint des del navegador contra el servidor → URLs relatives ja funcionen
+    if(!api){
+      // Últim recurs: usa el domini de producció conegut
+      api = 'https://project-helper-47.preview.emergentagent.com';
+    }
+    var base = api + '/';
+    // 1) Reescriu els <link rel="icon"> i similars
+    document.querySelectorAll('link[rel*="icon"], link[rel*="apple-touch"]').forEach(function(l){
+      var h = l.getAttribute('href');
+      if(h && !/^(https?:|data:|\/)/.test(h)) l.setAttribute('href', base + h);
+    });
+    // 2) Injecta CSS que sobreescriu la URL del logo del header (background-image)
+    var css = document.createElement('style');
+    css.textContent = "header h1 .app-logo{background-image:url('" + base + "logo-medicarplus.svg') !important}";
+    document.head.appendChild(css);
+  }catch(e){ /* silenciós — no bloquegem la càrrega */ }
+})();
+</script>
 <link rel="icon" type="image/svg+xml" href="logo-medicarplus.svg">
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
