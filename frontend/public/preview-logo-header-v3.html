@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<title>Logo + Capçalera · propostes v3</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Serif+Display&family=Space+Grotesk:wght@500;700&family=Bebas+Neue&family=Anton&family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#020617;color:#e2e8f0;font-family:'Manrope','Segoe UI',sans-serif;padding:28px}
+  .grid{display:grid;grid-template-columns:1fr;gap:26px;max-width:1200px;margin:0 auto}
+  .card{background:#0b1121;border:1px solid #1e293b;border-radius:16px;padding:36px 32px;position:relative;overflow:hidden}
+  .card-label{position:absolute;top:14px;right:16px;font-size:11px;color:#f5b301;font-weight:800;letter-spacing:1px;background:rgba(245,179,1,.1);padding:5px 12px;border-radius:20px;border:1px solid rgba(245,179,1,.3);z-index:5}
+  .desc{font-size:12px;color:#64748b;margin-top:22px;padding-top:18px;border-top:1px dashed #1e293b;line-height:1.6}
+  h2.section{color:#94a3b8;font-size:12px;letter-spacing:3px;text-transform:uppercase;margin:24px 0 8px;font-weight:700}
+
+  /* ================================================================
+     A · CADUCEO — símbol mèdic clàssic reinterpretat
+  ================================================================ */
+  .a-wrap{display:flex;align-items:center;gap:20px}
+  .a-logo{width:64px;height:64px;position:relative;flex-shrink:0}
+  .a-logo svg{width:100%;height:100%;filter:drop-shadow(0 6px 16px rgba(245,179,1,.4))}
+  .a-text .name{font-family:'Playfair Display',serif;font-size:32px;font-weight:900;color:#f5b301;letter-spacing:-.5px;line-height:1}
+  .a-text .name .plus{color:#22c55e}
+  .a-text .tagline{margin-top:8px;font-size:10px;color:#94a3b8;letter-spacing:4px;text-transform:uppercase;font-weight:700}
+
+  /* ================================================================
+     B · MONOGRAMA MP — hexagonal · geometry premium
+  ================================================================ */
+  .b-wrap{display:flex;align-items:center;gap:22px}
+  .b-hex{width:70px;height:70px;position:relative;flex-shrink:0}
+  .b-hex-inner{width:100%;height:100%;background:linear-gradient(135deg,#f5b301,#d97706);clip-path:polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0% 50%);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-weight:900;font-size:28px;color:#0b1121;letter-spacing:-2px;box-shadow:0 8px 20px rgba(245,179,1,.35)}
+  .b-hex-inner span{color:#22c55e;font-size:20px}
+  .b-text .name{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:800;color:#e2e8f0;letter-spacing:-.8px;line-height:1}
+  .b-text .name em{font-style:normal;color:#f5b301;font-weight:800}
+  .b-text .name span{color:#22c55e;font-size:22px}
+  .b-text .sub{margin-top:8px;font-size:11px;color:#94a3b8;letter-spacing:2px;font-weight:600}
+  .b-text .sub b{color:#f5b301}
+
+  /* ================================================================
+     C · PULSE — línia d'electro amb creu al mig · dinamisme mèdic
+  ================================================================ */
+  .c-wrap{display:flex;align-items:center;gap:20px}
+  .c-logo{width:80px;height:60px;position:relative;flex-shrink:0}
+  .c-logo svg{width:100%;height:100%}
+  .c-text .name{font-family:'DM Serif Display',serif;font-size:34px;font-weight:400;color:#e2e8f0;line-height:1;letter-spacing:.3px}
+  .c-text .name .accent{color:#f5b301}
+  .c-text .name .plus{color:#22c55e;font-size:26px;vertical-align:top}
+  .c-text .sub{margin-top:6px;font-size:11px;color:#64748b;letter-spacing:1.5px;font-weight:600}
+
+  /* ================================================================
+     D · CIRCLE-CROSS — cercle amb creu dins · minimalisme suís
+  ================================================================ */
+  .d-wrap{display:flex;align-items:center;gap:24px}
+  .d-logo{width:60px;height:60px;border:3px solid #f5b301;border-radius:50%;position:relative;flex-shrink:0;background:radial-gradient(circle,rgba(245,179,1,.06),transparent 70%)}
+  .d-logo::before,.d-logo::after{content:'';position:absolute;background:#f5b301;top:50%;left:50%;transform:translate(-50%,-50%)}
+  .d-logo::before{width:24px;height:6px;border-radius:2px}
+  .d-logo::after{width:6px;height:24px;border-radius:2px}
+  .d-logo-dot{position:absolute;top:-2px;right:-2px;width:14px;height:14px;background:#22c55e;border-radius:50%;box-shadow:0 0 12px rgba(34,197,94,.6);border:2px solid #020617}
+  .d-text .name{font-family:'Manrope',sans-serif;font-size:32px;font-weight:800;color:#e2e8f0;line-height:1;letter-spacing:-1px}
+  .d-text .name .accent{color:#f5b301}
+  .d-text .sub{margin-top:8px;font-size:10px;color:#94a3b8;letter-spacing:5px;text-transform:uppercase;font-weight:700}
+
+  /* ================================================================
+     E · WORDMARK ROTAT — el "+" flotant fora · concepte editorial
+  ================================================================ */
+  .e-wrap{position:relative;padding:0 0 0 6px}
+  .e-name{font-family:'Anton',sans-serif;font-size:58px;font-weight:400;color:#e2e8f0;letter-spacing:.5px;line-height:.9}
+  .e-name .car{color:#f5b301}
+  .e-plus{position:absolute;top:-8px;right:-2px;font-family:'Playfair Display',serif;font-size:44px;color:#22c55e;font-weight:900;transform:rotate(15deg);filter:drop-shadow(0 4px 12px rgba(34,197,94,.4))}
+  .e-tag{margin-top:8px;display:inline-block;background:#f5b301;color:#0b1121;padding:4px 12px;border-radius:20px;font-size:9px;font-weight:900;letter-spacing:2px;text-transform:uppercase}
+
+  /* ================================================================
+     F · BADGE 3D · logo circular amb depth · producte físic
+  ================================================================ */
+  .f-wrap{display:flex;align-items:center;gap:24px}
+  .f-badge{width:74px;height:74px;flex-shrink:0;border-radius:50%;background:linear-gradient(145deg,#fbbf24 0%,#d97706 55%,#92400e 100%);position:relative;box-shadow:0 12px 32px rgba(217,119,6,.45),inset 0 2px 6px rgba(255,255,255,.3),inset 0 -3px 8px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center}
+  .f-badge::before{content:'';position:absolute;top:6px;left:6px;right:6px;bottom:6px;border-radius:50%;border:1px dashed rgba(11,17,33,.35)}
+  .f-badge-inner{font-family:'Playfair Display',serif;font-weight:900;font-size:32px;color:#0b1121;text-shadow:0 1px 0 rgba(255,255,255,.3);z-index:2;letter-spacing:-2px}
+  .f-badge-inner .plus{color:#22c55e;font-size:22px;-webkit-text-stroke:1px #0b1121}
+  .f-text .name{font-family:'Playfair Display',serif;font-size:30px;font-weight:900;color:#f5b301;line-height:1;letter-spacing:-.5px}
+  .f-text .sub{margin-top:6px;font-size:12px;color:#94a3b8;font-family:'Instrument Serif',serif;font-style:italic}
+  .f-text .cert{margin-top:8px;display:inline-flex;gap:5px;align-items:center;font-size:9px;color:#22c55e;letter-spacing:2px;font-weight:700}
+  .f-text .cert::before{content:'✓';display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:#22c55e;color:#0b1121;border-radius:50%;font-size:10px;font-weight:900}
+</style>
+</head>
+<body>
+<div class="grid">
+
+  <!-- OPCIÓ A · CADUCEO -->
+  <div class="card">
+    <div class="card-label">OPCIÓ A · Caduceo mèdic</div>
+    <div class="a-wrap">
+      <div class="a-logo">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#gradA)" />
+          <defs>
+            <linearGradient id="gradA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f5b301"/><stop offset="1" stop-color="#d97706"/></linearGradient>
+          </defs>
+          <rect x="28.5" y="14" width="7" height="36" fill="#0b1121" rx="2"/>
+          <rect x="14" y="28.5" width="36" height="7" fill="#0b1121" rx="2"/>
+          <circle cx="32" cy="10" r="6" fill="#22c55e" stroke="#0b1121" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <div class="a-text">
+        <div class="name">MediCar<span class="plus">+</span></div>
+        <div class="tagline">Software · Gestoría médica profesional</div>
+      </div>
+    </div>
+    <div class="desc">🏥 <b>Símbol mèdic clàssic</b> (creu + pastilla verda sobre placa dourada). Serifa Playfair elegant. Es reconeix el sector de cop d'ull. <b>Bon per SEO visual sanitari</b>.</div>
+  </div>
+
+  <!-- OPCIÓ B · MONOGRAMA HEXAGONAL -->
+  <div class="card">
+    <div class="card-label">OPCIÓ B · Hexàgon geomètric</div>
+    <div class="b-wrap">
+      <div class="b-hex">
+        <div class="b-hex-inner">M<span>+</span></div>
+      </div>
+      <div class="b-text">
+        <div class="name">Medi<em>Car</em><span>+</span></div>
+        <div class="sub">SOFTWARE <b>PROFESIONAL</b> · V.2</div>
+      </div>
+    </div>
+    <div class="desc">💠 <b>Monograma hexagonal</b> (química/enginyeria). Estil <b>tech-B2B modern</b>. La geometria diu "sistema robust". Molt escalable com a favicon.</div>
+  </div>
+
+  <!-- OPCIÓ C · PULSE ELECTROCARDIO -->
+  <div class="card">
+    <div class="card-label">OPCIÓ C · Pulse ECG</div>
+    <div class="c-wrap">
+      <div class="c-logo">
+        <svg viewBox="0 0 80 60" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 5 30 L 20 30 L 25 15 L 32 45 L 40 12 L 48 45 L 55 30 L 75 30" fill="none" stroke="#f5b301" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="40" cy="12" r="5" fill="#22c55e" stroke="#0b1121" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="c-text">
+        <div class="name">Medi<span class="accent">Car</span> <span class="plus">Plus</span></div>
+        <div class="sub">CIERRE · REGISTRO · ESTADÍSTICAS</div>
+      </div>
+    </div>
+    <div class="desc">💓 <b>Traçat d'electrocardiograma</b> dourat com a logo — molt reconeixible del món mèdic. Punt verd al pic superior = "sistema viu". Dinàmic i memorable.</div>
+  </div>
+
+  <!-- OPCIÓ D · CIRCLE-CROSS -->
+  <div class="card">
+    <div class="card-label">OPCIÓ D · Cercle-creu suís</div>
+    <div class="d-wrap">
+      <div class="d-logo">
+        <div class="d-logo-dot"></div>
+      </div>
+      <div class="d-text">
+        <div class="name">Medi<span class="accent">Car</span> Plus</div>
+        <div class="sub">CENTROS MÉDICOS · GESTIÓN INTEGRAL</div>
+      </div>
+    </div>
+    <div class="desc">🎯 <b>Minimalisme extrem estil suís</b> (Nordic/Muji). Cercle dourat + creu al centre + punt LED verd. Ultra net. Fàcil de reproduir a qualsevol mida (favicon fins a pòster).</div>
+  </div>
+
+  <!-- OPCIÓ E · WORDMARK ROTAT -->
+  <div class="card" style="padding:44px 32px 36px">
+    <div class="card-label">OPCIÓ E · Anton editorial</div>
+    <div class="e-wrap">
+      <div class="e-name">Medi<span class="car">CAR</span></div>
+      <div class="e-plus">+</div>
+    </div>
+    <div class="e-tag">Software PRO 2026</div>
+    <div class="desc">📰 <b>Tipografia Anton</b> condensada estil <b>editorial magazine / portada Vogue</b>. El "+" surt volant en rotació. Marca fortíssima, moderna, imposant. Ideal si voleu que "MediCar Plus" cridi l'atenció.</div>
+  </div>
+
+  <!-- OPCIÓ F · BADGE 3D CIRCULAR -->
+  <div class="card">
+    <div class="card-label">OPCIÓ F · Segell 3D premium</div>
+    <div class="f-wrap">
+      <div class="f-badge">
+        <div class="f-badge-inner">M<span class="plus">+</span></div>
+      </div>
+      <div class="f-text">
+        <div class="name">MediCar Plus</div>
+        <div class="sub">La gestión del centro, resuelta.</div>
+        <div class="cert">CERTIFICADO 2026 · VERIFACTU · LOPD</div>
+      </div>
+    </div>
+    <div class="desc">🥇 <b>Segell circular metàl·lic amb depth</b> (relleu i reflexos com una medalla). Certificació visible. Percepció de <b>producte tangible i de qualitat</b>. Ideal per invoices/PDFs també.</div>
+  </div>
+
+</div>
+
+<div style="text-align:center;color:#64748b;font-size:12px;margin-top:32px;padding:20px 0;border-top:1px solid #1e293b">
+  Digues quina lletra t'agrada més (A-F), o descriu què voldries diferent.<br>
+  <b>Recorda</b>: pots barrejar. Ex: "el logo de D amb la tipografia de B", "el logo de C però quadrat com el de A".
+</div>
+</body>
+</html>

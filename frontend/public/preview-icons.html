@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<title>Icones favicon + programa · MediCar Plus</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#0f172a;color:#e2e8f0;font-family:'Segoe UI',sans-serif;padding:32px}
+  h1{color:#f5b301;font-family:Georgia,serif;font-size:24px;margin:0 0 6px}
+  .lead{color:#94a3b8;font-size:13px;margin-bottom:32px}
+  section{margin-bottom:44px}
+  h2{color:#a5b4fc;font-size:14px;letter-spacing:3px;text-transform:uppercase;margin:0 0 6px;font-weight:800}
+  .section-lead{color:#64748b;font-size:12px;margin-bottom:20px;padding-bottom:14px;border-bottom:1px dashed #334155}
+  .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px}
+  .item{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:22px 18px;text-align:center;position:relative}
+  .item-num{position:absolute;top:8px;left:12px;font-size:11px;color:#f5b301;font-weight:900;background:rgba(245,179,1,.1);padding:2px 8px;border-radius:10px;border:1px solid rgba(245,179,1,.3)}
+  .icon-canvas{margin:14px auto 12px;display:flex;align-items:center;justify-content:center}
+  .item h3{color:#e2e8f0;font-size:13px;font-weight:700;margin:8px 0 4px;letter-spacing:.3px}
+  .item p{color:#64748b;font-size:11px;margin:0;line-height:1.5}
+  .tab-preview{display:inline-flex;align-items:center;gap:6px;background:#e2e8f0;color:#0f172a;padding:5px 10px 5px 6px;border-radius:8px 8px 0 0;font-size:11px;font-weight:700;margin-top:12px}
+  .desktop-preview{display:inline-flex;flex-direction:column;align-items:center;background:linear-gradient(180deg,#4c1d95,#1e1b4b);padding:14px 20px;border-radius:8px;margin-top:12px}
+  .desktop-preview span{color:#fff;font-size:10px;margin-top:6px;text-shadow:1px 1px 2px #000}
+
+  /* === Base: cercle-creu suís (opció D) === */
+  .cc-base{position:relative;background:radial-gradient(circle,rgba(245,179,1,.08),transparent 70%)}
+  .cc-base::before,.cc-base::after{content:'';position:absolute;background:#f5b301;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:2px}
+  .cc-dot{position:absolute;background:#22c55e;border-radius:50%;box-shadow:0 0 8px rgba(34,197,94,.7);border:2px solid #0f172a}
+
+  /* == Variant 1: circle bordered · sense fill == */
+  .v1{width:80px;height:80px;border:5px solid #f5b301;border-radius:50%}
+  .v1::before{width:30px;height:8px}.v1::after{width:8px;height:30px}
+  .v1 .cc-dot{top:-2px;right:-2px;width:14px;height:14px}
+
+  /* == Variant 2: filled dourat · creu blanca == */
+  .v2{width:80px;height:80px;background:linear-gradient(135deg,#fbbf24,#d97706);border-radius:50%;box-shadow:0 6px 20px rgba(217,119,6,.4),inset 0 2px 0 rgba(255,255,255,.25);position:relative}
+  .v2::before,.v2::after{content:'';position:absolute;background:#fff;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:2px}
+  .v2::before{width:34px;height:9px}.v2::after{width:9px;height:34px}
+  .v2 .cc-dot{top:-4px;right:-4px;width:20px;height:20px;background:#22c55e;box-shadow:0 0 12px rgba(34,197,94,.6);border-color:#0f172a}
+
+  /* == Variant 3: squircle · quadrat arrodonit tipus iOS == */
+  .v3{width:80px;height:80px;background:linear-gradient(135deg,#fbbf24,#d97706);border-radius:22px;box-shadow:0 6px 20px rgba(217,119,6,.4),inset 0 2px 0 rgba(255,255,255,.25);position:relative}
+  .v3::before,.v3::after{content:'';position:absolute;background:#0f172a;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:3px}
+  .v3::before{width:34px;height:9px}.v3::after{width:9px;height:34px}
+  .v3 .cc-dot{top:-4px;right:-4px;width:20px;height:20px;background:#22c55e;box-shadow:0 0 12px rgba(34,197,94,.6);border-color:#0f172a}
+
+  /* == Variant 4: hexagonal amb creu al mig == */
+  .v4-wrap{width:80px;height:80px;position:relative;display:flex;align-items:center;justify-content:center}
+  .v4{width:80px;height:80px;background:linear-gradient(135deg,#fbbf24,#d97706);clip-path:polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0% 50%);position:relative;box-shadow:0 6px 20px rgba(217,119,6,.35)}
+  .v4::before,.v4::after{content:'';position:absolute;background:#0f172a;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:3px}
+  .v4::before{width:30px;height:8px}.v4::after{width:8px;height:30px}
+  .v4-wrap .cc-dot{position:absolute;top:8px;right:8px;width:14px;height:14px}
+
+  /* == Variant 5: dark base · creu dourada · ring dourat == */
+  .v5{width:80px;height:80px;background:#0f172a;border:5px solid #f5b301;border-radius:50%;position:relative;box-shadow:0 6px 20px rgba(245,179,1,.35),inset 0 0 20px rgba(245,179,1,.1)}
+  .v5::before,.v5::after{content:'';position:absolute;background:#f5b301;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:2px}
+  .v5::before{width:28px;height:8px}.v5::after{width:8px;height:28px}
+  .v5 .cc-dot{top:-4px;right:-4px;width:18px;height:18px}
+
+  /* == Variant 6: white on dark · sobri corporate == */
+  .v6{width:80px;height:80px;background:linear-gradient(135deg,#1e293b,#0f172a);border:2px solid #f5b301;border-radius:22px;position:relative;box-shadow:0 6px 20px rgba(15,23,42,.6)}
+  .v6::before,.v6::after{content:'';position:absolute;background:#f5b301;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:2px}
+  .v6::before{width:32px;height:8px}.v6::after{width:8px;height:32px}
+  .v6-plus{position:absolute;top:6px;right:6px;background:#22c55e;color:#0f172a;font-weight:900;font-size:10px;padding:1px 6px;border-radius:8px;font-family:'Segoe UI',sans-serif;letter-spacing:.5px}
+
+  /* size comparisons */
+  .sizes{display:flex;gap:16px;align-items:center;justify-content:center;padding:14px 0}
+  .s-16{transform:scale(.2)}.s-32{transform:scale(.4)}.s-48{transform:scale(.6)}
+  .size-frame{background:#0b1121;border:1px dashed #334155;padding:8px;border-radius:8px}
+  .size-label{color:#64748b;font-size:9px;margin-top:6px;letter-spacing:1px;font-weight:700}
+</style>
+</head>
+<body>
+
+<h1>🎨 Icones per Favicon (web) + Icona programa (escriptori)</h1>
+<p class="lead">Totes basades en el disseny D (cercle-creu suís) que has triat. Cada una encaixa a un context: <b>favicon</b> per la pestanya del navegador (16-32px), <b>icona d'app</b> pel programa a l'escriptori (256px), i <b>logo web/PDF</b> pel branding gran.</p>
+
+<section>
+  <h2>▸ Grup A · Web · pestanya del navegador (favicon)</h2>
+  <div class="section-lead">Ideals per <code>favicon.ico</code> · petits · alt contrast · pocs detalls (fins 16×16px).</div>
+  <div class="row">
+    <div class="item">
+      <span class="item-num">A1</span>
+      <div class="icon-canvas"><div class="v1 cc-base"><span class="cc-dot"></span></div></div>
+      <h3>Outline gold</h3>
+      <p>Contorn dourat + punt verd. Elegant, minimalista, es distingeix a 16px.</p>
+      <div class="tab-preview">
+        <div style="width:16px;height:16px;border:2px solid #f5b301;border-radius:50%;position:relative">
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:8px;height:2px;background:#f5b301"></div>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:2px;height:8px;background:#f5b301"></div>
+        </div>
+        medicarplus.es
+      </div>
+    </div>
+
+    <div class="item">
+      <span class="item-num">A2</span>
+      <div class="icon-canvas"><div class="v2"><span class="cc-dot"></span></div></div>
+      <h3>Gold filled</h3>
+      <p>Cercle dourat massís + creu blanca. Molt visible en fons foscos i clars.</p>
+      <div class="tab-preview">
+        <div style="width:16px;height:16px;background:linear-gradient(135deg,#fbbf24,#d97706);border-radius:50%;position:relative">
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:9px;height:2.5px;background:#fff"></div>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:2.5px;height:9px;background:#fff"></div>
+        </div>
+        medicarplus.es
+      </div>
+    </div>
+
+    <div class="item">
+      <span class="item-num">A3</span>
+      <div class="icon-canvas"><div class="v5"><span class="cc-dot"></span></div></div>
+      <h3>Dark ring</h3>
+      <p>Anell dourat sobre fons fosc. Look premium, molt reconeixible.</p>
+      <div class="tab-preview">
+        <div style="width:16px;height:16px;background:#0f172a;border:2px solid #f5b301;border-radius:50%;position:relative">
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:7px;height:2px;background:#f5b301"></div>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:2px;height:7px;background:#f5b301"></div>
+        </div>
+        medicarplus.es
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>▸ Grup B · Programa · icona a l'escriptori (.exe)</h2>
+  <div class="section-lead">Ideals per <code>icon.ico</code> del Windows Explorer (typical size 256×256px). Amb depth, ombres i contrast alt per destacar entre les altres icones de l'usuari.</div>
+  <div class="row">
+    <div class="item">
+      <span class="item-num">B1</span>
+      <div class="icon-canvas"><div class="v3"><span class="cc-dot"></span></div></div>
+      <h3>Squircle gold</h3>
+      <p>Estil iOS/macOS. Reconeixible al taskbar de Windows. La creu fosca destaca.</p>
+      <div class="desktop-preview">
+        <div class="v3" style="width:56px;height:56px;transform:scale(.7);transform-origin:center"><span class="cc-dot"></span></div>
+        <span>MediCar Plus</span>
+      </div>
+    </div>
+
+    <div class="item">
+      <span class="item-num">B2</span>
+      <div class="icon-canvas"><div class="v4-wrap"><div class="v4"></div><span class="cc-dot"></span></div></div>
+      <h3>Hexàgon dourat</h3>
+      <p>Perfil distintiu (no és cap rodó típic). Look mèdic-tech.</p>
+      <div class="desktop-preview">
+        <div class="v4-wrap" style="width:56px;height:56px;transform:scale(.7);transform-origin:center"><div class="v4" style="width:56px;height:56px"></div><span class="cc-dot" style="top:5px;right:5px;width:10px;height:10px"></span></div>
+        <span>MediCar Plus</span>
+      </div>
+    </div>
+
+    <div class="item">
+      <span class="item-num">B3</span>
+      <div class="icon-canvas"><div class="v6"><span class="v6-plus">+</span></div></div>
+      <h3>Squircle dark + badge</h3>
+      <p>Corporate premium. Badge "+" verd suggereix "PLUS" sense embrutar.</p>
+      <div class="desktop-preview">
+        <div class="v6" style="width:56px;height:56px;transform:scale(.7);transform-origin:center"><span class="v6-plus" style="font-size:8px">+</span></div>
+        <span>MediCar Plus</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>▸ Comparació escalabilitat</h2>
+  <div class="section-lead">Com es veu la teva escollida a diferents mides (necessari per favicon.ico multi-resolució).</div>
+  <div style="display:flex;gap:22px;justify-content:center;flex-wrap:wrap">
+    <div style="text-align:center">
+      <div class="size-frame" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center">
+        <div style="width:16px;height:16px;background:linear-gradient(135deg,#fbbf24,#d97706);border-radius:50%;position:relative">
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:8px;height:2px;background:#fff"></div>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:2px;height:8px;background:#fff"></div>
+        </div>
+      </div>
+      <div class="size-label">16px · favicon</div>
+    </div>
+    <div style="text-align:center">
+      <div class="size-frame" style="width:48px;height:48px;display:flex;align-items:center;justify-content:center">
+        <div style="width:32px;height:32px;background:linear-gradient(135deg,#fbbf24,#d97706);border-radius:50%;position:relative;box-shadow:0 2px 6px rgba(217,119,6,.4)">
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:14px;height:4px;background:#fff"></div>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:4px;height:14px;background:#fff"></div>
+          <div style="position:absolute;top:-1px;right:-1px;width:9px;height:9px;background:#22c55e;border-radius:50%;border:1.5px solid #0f172a"></div>
+        </div>
+      </div>
+      <div class="size-label">32px · retina favicon</div>
+    </div>
+    <div style="text-align:center">
+      <div class="size-frame" style="width:72px;height:72px;display:flex;align-items:center;justify-content:center">
+        <div style="width:56px;height:56px;background:linear-gradient(135deg,#fbbf24,#d97706);border-radius:50%;position:relative;box-shadow:0 3px 10px rgba(217,119,6,.4),inset 0 2px 0 rgba(255,255,255,.25)">
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:22px;height:6px;background:#fff;border-radius:1px"></div>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:6px;height:22px;background:#fff;border-radius:1px"></div>
+          <div style="position:absolute;top:-2px;right:-2px;width:14px;height:14px;background:#22c55e;border-radius:50%;border:2px solid #0f172a;box-shadow:0 0 8px rgba(34,197,94,.6)"></div>
+        </div>
+      </div>
+      <div class="size-label">64px · macOS dock</div>
+    </div>
+    <div style="text-align:center">
+      <div class="size-frame" style="width:130px;height:130px;display:flex;align-items:center;justify-content:center">
+        <div style="width:110px;height:110px;background:linear-gradient(135deg,#fbbf24,#d97706);border-radius:50%;position:relative;box-shadow:0 8px 24px rgba(217,119,6,.5),inset 0 4px 0 rgba(255,255,255,.25)">
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:11px;background:#fff;border-radius:2px"></div>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:11px;height:44px;background:#fff;border-radius:2px"></div>
+          <div style="position:absolute;top:-4px;right:-4px;width:26px;height:26px;background:#22c55e;border-radius:50%;border:3px solid #0f172a;box-shadow:0 0 16px rgba(34,197,94,.6)"></div>
+        </div>
+      </div>
+      <div class="size-label">128px · icona .exe</div>
+    </div>
+  </div>
+</section>
+
+<div style="text-align:center;color:#64748b;font-size:12px;margin-top:44px;padding:24px 0;border-top:1px solid #334155">
+  Digues:<br>
+  • <b>Grup A (favicon web)</b>: A1, A2 o A3?<br>
+  • <b>Grup B (icona .exe)</b>: B1, B2 o B3?<br>
+  El meu preferit per coherència visual amb l'opció D del títol: <span style="color:#f5b301">A2 + B1</span> (mateixa base filled gold, favicon rodó a la web, squircle a l'escriptori). Però tu tries.
+</div>
+
+</body>
+</html>
