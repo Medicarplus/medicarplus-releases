@@ -71,10 +71,11 @@ User's preferred language: **Catalan** (UI/code strings in **Spanish**).
 - 4-level URL discovery (raw.githubusercontent → jsdelivr → api.github → cached)
 - Cierre del día privacy blur, Auto-match Citas ↔ CSV DGT, Statistics per company, corrected DEBE/HABER as expense
 
-## Testing Status (iteration_15.json, Feb 2026)
-- Backend: 7/7 pytest PASS (heartbeat, push, pull, device limit, PDF render)
-- Frontend: 15+ Playwright checks PASS incl. real 307KB PDF download, plan gating, badge, upgrade modal, sync indicator
-- No critical bugs. All features verified end-to-end on PREVIEW.
+## Testing Status (iteration_16.json, Feb 2026)
+- **Backend**: 7/7 pytest PASS (heartbeat, push, pull, device limit, PDF render) — iteration_15
+- **Frontend**: 15+ Playwright checks PASS + i18n fix verificat 13/13 (Datàfon→Datáfono, Banc→Banco, Entesos→Entendido, popup castellà, syncIndicator top-right)
+- No critical bugs.
+- **Fixed post-testing** (iteration_16 minor findings): CAJA FÍSICA/CUENTA BANCO + branca 'cempla' Banco also wrapped with L() for future CA-cempla users.
 
 ## Next Actions
 1. **User**: "Volver a publicar cambios" on Emergent panel → push all Feb 2026 changes to production
