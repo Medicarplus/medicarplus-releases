@@ -40,14 +40,12 @@ header{
 }
 .nav{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;max-width:1200px;margin:0 auto}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;color:var(--gold)}
-/* Circle-cross logo (opció D) reutilitzable a nav + footer */
-.brand-logo{width:40px;height:40px;border-radius:8px;overflow:visible;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0}
-.brand-logo img{width:100%;height:100%;object-fit:cover;display:block;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
-.brand-logo.svg-mark{width:36px;height:36px;border:2.5px solid #f5b301;border-radius:50%;background:radial-gradient(circle,rgba(245,179,1,.08),transparent 70%);box-shadow:none}
-.brand-logo.svg-mark::before,.brand-logo.svg-mark::after{content:'';position:absolute;background:#f5b301;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:2px}
-.brand-logo.svg-mark::before{width:16px;height:4px}
-.brand-logo.svg-mark::after{width:4px;height:16px}
-.brand-logo.svg-mark .dot{position:absolute;top:-2px;right:-2px;width:9px;height:9px;background:#22c55e;border-radius:50%;box-shadow:0 0 8px rgba(34,197,94,.7);border:2px solid #0b1121}
+/* Logo Option 2 · Dark squircle rounded amb M+ dourat */
+.brand-logo{width:44px;height:44px;overflow:visible;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.brand-logo img{width:100%;height:100%;object-fit:contain;display:block;background:transparent}
+.brand-logo.svg-mark{width:44px;height:44px;background:transparent;border:none;box-shadow:none;border-radius:0}
+.brand-logo.svg-mark::before,.brand-logo.svg-mark::after,.brand-logo.svg-mark .dot{display:none !important}
+.brand-logo.svg-mark{background-image:url('logo-medicarplus.svg');background-size:contain;background-repeat:no-repeat;background-position:center}
 .nav-links{display:flex;gap:28px}
 .nav-links a{color:var(--text);font-size:14px;font-weight:500;transition:color .2s}
 .nav-links a:hover{color:var(--gold)}

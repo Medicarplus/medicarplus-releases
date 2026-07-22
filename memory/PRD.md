@@ -87,7 +87,15 @@ User's preferred language: **Catalan** (UI/code strings in **Spanish**).
 - Aplicat a Estadísticas SMS (#btnStatSms) i Estadísticas Cites (#btnStatCites)
 - Ja aplicat a Utilidades menu (SMS, Cites, IA, Auditoría)
 
-## Iteration 18 (Feb 22, 2026) · Trial automàtic + Post-pago automàtic + Lightbox screenshots + Preus polits
+## Iteration 19 (Feb 22, 2026) · Nou logo + Vista prèvia de plans + Guies actualitzades
+- **Nou logotip Option 2** (dark squircle rounded amb "M" dourat + "+" verd): SVG font + PNG 16/32/48/180/256 + ICO multi-res per web i electron. Aplicat a `landing-medicarplus.html` (nav + footer), `v2.html` (header d'app) i `assets/icon.ico` per l'Electron .exe.
+- **Header renovat opció D→2**: font Manrope 800 en color dourat, subtítol "GESTIÓN DE CENTROS MÉDICOS" (letter-spacing 3.5px).
+- **Vista prèvia de plans (MASTER only)**: 4 botons a la modal "Info llicència" (Real / Trial / Standard / Premium). Banner lila permanent quan hi ha preview actiu. Trial-badge respecta l'override.
+- Files nous a `/app/frontend/public/` (i còpia a `/downloads/`): `logo-medicarplus.svg`, `favicon.ico`, `favicon-{16,32,48,180,256}.png`, `apple-touch-icon.png`, `android-chrome-{192,512}.png`, `electron-icon.ico`.
+- v2.html ara té meta favicon links (svg + ico + apple-touch).
+
+## Iteration 18 (Feb 22, 2026) · Trial automàtic + Post-pago automàtic + Lightbox screenshots
+
 - **NOU endpoint `POST /api/trial/start`** (fitxer `backend/routes/trial.py`): genera llicència TRIAL de 60 dies + envia email amb clau + 2 PDFs (guia + manual). Anti-abús: 1 trial per email, honeypot, consent obligatori.
 - **Modal Trial a la landing**: reemplaça el `mailto:` anterior. Botó "🎁 Empezar prueba gratuita" (plan Trial) i badges "Prueba gratuita 60 días" (sota Standard i Premium) obren el modal. Al submit, mostren la clau a pantalla + confirmen l'enviament del mail.
 - **Endpoint `/api/payments/subscription/status/{id}` estès**: ara retorna també `license_key`, `install_id`, `expires_at`, `license_ready` (buscant a `db.licenses` via `stripe_subscription_id`) + `download_url` fix.
