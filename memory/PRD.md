@@ -87,17 +87,26 @@ User's preferred language: **Catalan** (UI/code strings in **Spanish**).
 - Aplicat a Estadísticas SMS (#btnStatSms) i Estadísticas Cites (#btnStatCites)
 - Ja aplicat a Utilidades menu (SMS, Cites, IA, Auditoría)
 
-## Next Actions
-1. **User**: "Volver a publicar cambios" on Emergent panel → push all Feb 2026 changes to production
-2. **User (optional)**: Recompile .exe with `npm run release` to bake in new bootstrap (though existing .exe with bootstrap already pulls latest v2.html)
+## Iteration 17 (Feb 22, 2026) · Stripe verificat + Sync security + Trust badges
+- **Stripe verificat**: totes 4 variables STRIPE_PRICE_* + STRIPE_API_KEY presents al backend. `/api/payments/subscription/enabled` retorna enabled=true. Els 4 packages (STD_MES, STD_ANY, PREMIUM_MES, PREMIUM_ANY) generen sessions Checkout vàlides (checkout.stripe.com).
+- **Landing CHECKOUT_API corregit**: abans apuntava a `/api/create-checkout` (endpoint one-off inexistent com a subscripció); ara apunta a `/api/payments/create-subscription` (correcte).
+- **Landing email prompt**: els botons "Suscribirse" ara demanen email via `window.prompt()` abans de crear la sessió Stripe (evita el 422 per customer_email missing).
+- **Trust badges (conversion improvement)**: sota els botons Suscribirse de Standard i Premium ara hi ha un badge visible "🎁 Prueba gratuita 60 días • Sin tarjeta" + subline "Cancela cuando quieras · Sin permanencia". data-testid: `landing-std-trial-badge`, `landing-prm-trial-badge`.
+- **Sync security hardening**: `/api/sync/push` i `/api/sync/pull` ara requereixen que l'install_id ja tingui entrada a `sync_devices` (via heartbeat previ). Un dispositiu no autoritzat rep 403 `device_not_authorized`. Tanca gap on qualsevol amb la licence_key podia escriure/llegir el cloud state.
+- **Tests**: 13/13 backend pytest PASS + 9/9 frontend Playwright PASS. Zero action items.
+
+## Next Actions (Feb 2026)
+1. **User**: "Volver a publicar cambios" → push aquestes noves versions al domini de producció.
+2. **User**: Copiar el nou `landing-medicarplus.html` a GitHub Pages (`medicarplus.es`) perquè el badge i el CHECKOUT_API arribin al públic.
 3. **Future backlog**:
    - Real Twilio API (currently mocked)
-   - Stripe live keys (currently test)
-   - Verifacti / Verifactu compliance
+   - Stripe live keys migration (currently test mode)
+   - Verifactu compliance
    - Domain mapping `app.medicarplus.es` → production
    - Google Search Console for medicarplus.es
-   - Reparto socios % configuration UI (currently backend-only)
+   - Reparto socios % configuration UI
 
 ## Test Credentials
 - MASTER offline: `MB-MASTER-BRUGULAT-2026-OWNER`
 - Admin token: `MB-ADMIN-BRUGULAT-2026-4F8E2A1C`
+- PRM license (DB, 2/2 devices used): install_ids `CD-PR8E-D4D8-A71A-2842` + `CD-D299-4E88-1F92-364A`
