@@ -245,3 +245,41 @@ async def _record_reward(
         {"$push": {"referral_rewards": reward},
          "$inc": {"referral_reward_count": 1}},
     )
+    # 📧 Notifica al referrer per email (best-effort, no bloqueja el flow)
+    try:
+        referrer_email = doc.get("client_email")
+        if referrer_email:
+            referrer_name = (doc.get("client_name") or referrer_email.split("@")[0] or "cliente").split("@")[0][:60]
+            display_name = _referred_display_name(referred_email)
+            # Reobtenim el count actualitzat
+            fresh = await coll.find_one({"_id": doc["_id"]}, {"referral_reward_count": 1, "referral_rewards": 1})
+            total = int((fresh or {}).get("referral_reward_count") or 1)
+            months = 2 * total
+            from services.mailer import send_referral_notification_email
+            sent, mail_info = await send_referral_notification_email(
+                referrer_email=referrer_email,
+                referrer_name=referrer_name,
+                referred_display_name=display_name,
+                referred_plan=str(referred_plan or "STD").upper(),
+                total_referrals=total,
+                months_earned_total=months,
+            )
+            logger.info(
+                "Referral reward email → %s: sent=%s info=%s",
+                referrer_email, sent, mail_info,
+            )
+    except Exception as ex:  # noqa: BLE001
+        logger.exception("Referral notification email failed: %s", ex)
+
+
+def _referred_display_name(email: Optional[str]) -> str:
+    """Format amable de l'email del referit per mostrar al notification email.
+
+    "juan.perez@example.com" → "juan.p***@example.com"  (privacitat + reconeixibilitat).
+    """
+    if not email or "@" not in email:
+        return "Un nuevo cliente"
+    user, dom = email.split("@", 1)
+    if len(user) <= 3:
+        return f"{user[0]}***@{dom}"
+    return f"{user[:3]}***@{dom}"

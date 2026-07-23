@@ -282,3 +282,94 @@ async def send_license_email(
         return ok, info
 
     return False, "no_mail_provider_configured"
+
+
+async def send_referral_notification_email(
+    *,
+    referrer_email: str,
+    referrer_name: str,
+    referred_display_name: str,
+    referred_plan: str,
+    total_referrals: int,
+    months_earned_total: int,
+) -> tuple[bool, str]:
+    """
+    Envia un email al REFERRER quan un dels seus referits paga la 1a subscripció.
+
+    L'email confirma la recompensa (+2 mesos gratis) i mostra estadístiques del programa.
+    Funciona amb Resend + SMTP fallback (idèntic a send_license_email).
+    """
+    if not referrer_email or "@" not in referrer_email:
+        return False, "invalid_referrer_email"
+
+    subject = f"🎉 MediCar Plus · ¡Has ganado 2 meses gratis! · Ref: {referred_display_name}"
+    # Bloc HTML simple i clar
+    html = f"""<!doctype html><html><body style="font-family:Segoe UI,Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:24px">
+<div style="max-width:560px;margin:auto;background:#1e293b;border-radius:14px;padding:32px;border:1px solid #334155">
+  <div style="text-align:center;font-size:52px;line-height:1">🎁</div>
+  <h1 style="text-align:center;color:#fbbf24;font-size:24px;margin:12px 0 8px">¡Enhorabuena, {referrer_name or 'cliente'}!</h1>
+  <p style="text-align:center;color:#94a3b8;font-size:14px;margin:0 0 26px">Tu programa de referidos MediCar Plus da sus frutos.</p>
+
+  <div style="background:linear-gradient(135deg,rgba(34,197,94,.15),rgba(34,197,94,.05));border:2px solid #22c55e;border-radius:12px;padding:20px;margin:22px 0;text-align:center">
+    <div style="font-size:13px;color:#a7f3d0;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Recompensa aplicada</div>
+    <div style="font-size:28px;color:#4ade80;font-weight:900;margin:8px 0">+2 meses gratis</div>
+    <div style="font-size:13px;color:#bbf7d0">Aplicados automáticamente a tu suscripción MediCar Plus. Tu próximo cobro se retrasa 2 meses.</div>
+  </div>
+
+  <div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);border-radius:10px;padding:16px;margin:18px 0">
+    <div style="font-size:13px;color:#bfdbfe;font-weight:700;margin-bottom:6px">👥 Cliente referido</div>
+    <div style="color:#e2e8f0;font-size:14px;line-height:1.6">
+      <b>{referred_display_name}</b> ha activado su suscripción <b style="color:#f5b301">{referred_plan}</b>.<br>
+      <span style="color:#94a3b8;font-size:12px">Le hemos aplicado también <b>1 mes gratis</b> (nuestro incentivo por venir de tu recomendación).</span>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px;margin:22px 0">
+    <div style="flex:1;background:#0b1121;border-radius:10px;padding:14px;text-align:center;border:1px solid #334155">
+      <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px">Total referidos</div>
+      <div style="font-size:26px;color:#f5b301;font-weight:900;margin-top:4px">{total_referrals}</div>
+    </div>
+    <div style="flex:1;background:#0b1121;border-radius:10px;padding:14px;text-align:center;border:1px solid #334155">
+      <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px">Meses ganados</div>
+      <div style="font-size:26px;color:#4ade80;font-weight:900;margin-top:4px">+{months_earned_total}</div>
+    </div>
+  </div>
+
+  <p style="color:#cbd5e1;font-size:13px;line-height:1.6;margin:20px 0 4px">
+    Sigue compartiendo tu enlace para acumular más meses gratis. Cada nuevo cliente que pague te suma <b>2 meses adicionales</b>.
+  </p>
+  <p style="color:#94a3b8;font-size:12px;line-height:1.5;margin:8px 0 0">
+    Puedes ver tu código y estadísticas en cualquier momento desde la propia aplicación MediCar Plus, en el modal <b>Información de licencia</b> (esquina superior derecha).
+  </p>
+
+  <hr style="border:0;border-top:1px solid #334155;margin:26px 0 16px">
+  <div style="text-align:center;color:#64748b;font-size:11px;line-height:1.5">
+    ¿Preguntas? <a href="mailto:info@medicarplus.es" style="color:#f5b301">info@medicarplus.es</a><br>
+    Este email es una notificación transaccional relacionada con tu suscripción activa.
+  </div>
+</div>
+</body></html>"""
+
+    # Envia via el mateix pipeline (Resend + fallback SMTP), sense adjunts.
+    if is_configured():
+        try:
+            import base64 as _b64  # noqa: F401
+            import resend  # type: ignore
+            resend.api_key = _api_key()
+            params: dict = {
+                "from": _sender(),
+                "to": [referrer_email],
+                "subject": subject,
+                "html": html,
+            }
+            result = await asyncio.to_thread(resend.Emails.send, params)
+            email_id = result.get("id") if isinstance(result, dict) else None
+            return True, email_id or "resend_sent"
+        except Exception as ex:  # noqa: BLE001
+            logger.exception("Resend send (referral notif) failed, falling back to SMTP")
+
+    if _smtp_configured():
+        ok, info = await asyncio.to_thread(_send_smtp, referrer_email, subject, html, None)
+        return ok, info
+
+    return False, "no_mail_provider_configured"
