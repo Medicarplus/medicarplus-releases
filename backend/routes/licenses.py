@@ -110,11 +110,21 @@ def _doc_to_record(doc: dict, include_key: bool = False) -> LicenseRecord:
 
 def _mint_jwt(*, install_id: str, license_id: str, plan: str,
               expires_at: Optional[datetime]) -> str:
-    """Genera el JWT que serveix com a `license key`."""
+    """Genera el JWT que serveix com a `license key`.
+
+    Per PREMIUM el `sub` es fa portable (`CD-STRIPE-ADMIN-*`) perquè la mateixa clau
+    pugui activar-se al segon dispositiu que permet el pla. Per Standard/Trial el
+    `sub` queda lligat a l'install_id inicial (1 sol dispositiu).
+    """
     now = _now()
+    plan_upper = str(plan or "").upper()
+    sub_value = install_id
+    if plan_upper in ("PREMIUM", "PRM"):
+        # Portable sub → v2.html + verify_license accepten CD-STRIPE-* com a portables
+        sub_value = f"CD-STRIPE-ADMIN-{license_id[:12].upper()}"
     payload: dict[str, Any] = {
         "iss": _issuer(),
-        "sub": install_id,
+        "sub": sub_value,
         "jti": license_id,
         "plan": plan,
         "iat": int(now.timestamp()),

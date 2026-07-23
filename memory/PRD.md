@@ -145,3 +145,33 @@ User's preferred language: **Catalan** (UI/code strings in **Spanish**).
 - MASTER offline: `MB-MASTER-BRUGULAT-2026-OWNER`
 - Admin token: `MB-ADMIN-BRUGULAT-2026-4F8E2A1C`
 - PRM license (DB, 2/2 devices used): install_ids `CD-PR8E-D4D8-A71A-2842` + `CD-D299-4E88-1F92-364A`
+
+## Session Feb 23, 2026 · Auto-upgrade + Multi-device Premium + Editable email
+**Bugs fixats en aquesta sessió (tots verificats per testing agent):**
+1. **`/api/trial/start` congelava el navegador** (19s síncrons) → email en background, resposta en 0.25s.
+2. **Trial JWT no permetia activació** perquè `sub` era un install_id sintètic (`CD-TRIAL-XXXX`). → Ara `sub` és portable (missing/CD-TRIAL-*/CD-STRIPE-*). Client + servidor accepten JWTs portables i fan bind-on-first-verify.
+3. **Missatges d'error en català** → tots reescrits en castellà.
+4. **Logo M+ no visible a Electron** (URLs relatives resolien contra `file://`) → script inicial al v2.html que reescriu URLs cap al servidor via `window.API_BASE` quan detecta entorn Electron.
+5. **Botó "Powered by" no clicable** (selector `[style*="Powered by"]` no matcheava) → nou id `licSigBox`.
+6. **Post-Stripe: pàgina de success mostrava clau per copiar** encara que fos upgrade des de dins l'app → ara detecta `metadata.install_id` real i mostra "Vuelve a MediCar Plus, se está actualizando automáticamente".
+7. **Guia de instal·lació 404** (apuntava a GitHub Pages inexistent) → link relatiu `/guia-client-installacio.html`.
+8. **Doble consentiment obligatori** al formulari Trial: (a) política privacitat + (b) responsabilitat de dades i copies de seguretat. Nova pàgina legal `/terminos-uso.html`.
+9. **Botons de plans plans i grisos** → gradients colorits amb pulse: Trial verd, Standard blau, Premium daurat, anuals daurat/morat. Card Trial 100% clicable.
+10. **Badge PREMIUM solapava "Ver ejemplo"** a les targetes utilitats → badge mogut a top-left (era right).
+11. **Auto-upgrade de plan**: `/api/licenses/current` nou endpoint + polling v2.html cada 5s (primers 2min) / 30s. Detecta upgrade Stripe i actualitza localStorage + refresca UI + toast. Zero fricció client.
+12. **`isPremiumLicense` no reconeixia `plan=PREMIUM`** amb `type=JWT` → ara comprova ambdós camps.
+13. **Master + Vista prèvia**: quan es fa polling, si l'usuari és MASTER amb `caja.plan.preview.v1` actiu, l'auto-upgrade actualitza la PREVIEW (no la clau real). Perfecte per testing.
+14. **Email de llicència no s'enviava en UPGRADE**: ara `_sync_license_from_subscription` envia email també quan actualitza (`subject_prefix='Pla actualitzat a PREMIUM'`).
+15. **Email editable abans del pagament**: nou camp `#upgEmailInput` al modal "Ver planes" pre-omplert amb `localStorage.caja.billing.email.v1`. Validació + persistència entre compres.
+16. **Multi-dispositiu Premium**: mateixa clau funciona a 2 ordinadors. `linked_hwids` + `linked_install_ids` a `db.licenses`. Standard/Trial segueixen limitats a 1. `/api/licenses/current` cerca en ambdós arrays.
+17. **Claus PREMIUM admin-generades ara portables** (`sub=CD-STRIPE-ADMIN-*`) perquè també funcionin a 2 dispositius (abans només les generades per Stripe eren portables).
+
+**Tests**: iteration_19 (4/4 pass), iteration_20 (4/4 pass), iteration_21 (4 backend + 7 frontend pass).
+
+## Backlog · Feb 23, 2026
+1. **Classificació adaptativa d'autoescoles** (P1): quan un client puji el seu arxiu, detectar patrons únics d'autoescoles del seu dataset i presentar la llista per confirmar/ajustar (ara està hardcoded per Daina/Mabel/Rossell/etc del owner).
+2. **Twilio SMS real** (P1): actualment mocked.
+3. **Domain mapping medicarplus.es → Emergent** (P2): eliminar dependència de GitHub Pages.
+4. **Google Search Console** (P2).
+5. **Reminder emails** dia 45/55/59 del trial (P2).
+
