@@ -23,6 +23,11 @@ def _sender() -> str:
     return (os.environ.get("SENDER_EMAIL") or "onboarding@resend.dev").strip()
 
 
+def _reply_to() -> str:
+    """Adreça on van les respostes dels mails automàtics (suport)."""
+    return (os.environ.get("REPLY_TO_EMAIL") or "suport@medicarplus.es").strip()
+
+
 def is_configured() -> bool:
     return bool(_api_key())
 
@@ -261,6 +266,7 @@ async def send_license_email(
             resend.api_key = _api_key()
             params: dict = {
                 "from": _sender(),
+                "reply_to": [_reply_to()],
                 "to": [to_email],
                 "subject": subject,
                 "html": html,
@@ -358,6 +364,7 @@ async def send_referral_notification_email(
             resend.api_key = _api_key()
             params: dict = {
                 "from": _sender(),
+                "reply_to": [_reply_to()],
                 "to": [referrer_email],
                 "subject": subject,
                 "html": html,
