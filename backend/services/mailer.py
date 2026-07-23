@@ -40,13 +40,10 @@ GUIDE_ATTACHMENTS = [
         "doc_title": "Guía de Instalación",
         "doc_subtitle": "Cómo activar tu licencia MediCar Plus en 5 minutos · Windows",
     },
-    {
-        "pdf_name": "manual-usuario-medicar-plus.pdf",
-        "html_path": "/app/frontend/public/manual-usuari.html",
-        "doc_kind": "manual",
-        "doc_title": "Manual de Usuario",
-        "doc_subtitle": "Referencia completa del software · Registro, estadísticas, campañas SMS y más",
-    },
+    # NOTA: El Manual de Usuario ja NO s'adjunta com a PDF perquè conté
+    # pestanyes interactives (Empezar / Tráfico / Revisiones / Contabilidad …)
+    # que no funcionen en format PDF. En lloc d'això, el correu enllaça a la
+    # versió web online (https://…/manual-usuari.html) on tot funciona.
 ]
 
 
@@ -110,6 +107,10 @@ def _render_html(
     expiry_txt = (
         expires_at.strftime("%d/%m/%Y") if expires_at else "Perpetua (sin caducidad)"
     )
+    public_base = (os.environ.get("PUBLIC_APP_URL") or "https://project-helper-47.emergent.host").rstrip("/")
+    manual_url = f"{public_base}/manual-usuari.html"
+    guia_url = f"{public_base}/guia-client-installacio.html"
+    download_url = "https://github.com/Medicarplus/medicarplus-releases/releases/latest"
     return f"""
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 0;font-family:Georgia,serif">
   <tr><td align="center">
@@ -132,30 +133,30 @@ def _render_html(
 
         <p style="color:#cbd5e1;font-size:14px;margin-top:22px;line-height:1.55">
           <b style="color:#f5b301">Cómo activarla:</b><br>
-          1. Descarga la aplicación MediCar Plus desde <a href="https://github.com/Medicarplus/medicarplus-releases/releases/latest" style="color:#f5b301;text-decoration:underline">este enlace</a>.<br>
-          2. Instala el ejecutable (sigue la <b style="color:#22c55e">guía de instalación</b> adjunta en PDF — <code style="color:#22c55e">guia-instalacion-medicar-plus.pdf</code>).<br>
+          1. <b>Descarga</b> la aplicación MediCar Plus desde <a href="{download_url}" style="color:#f5b301;text-decoration:underline">este enlace</a>.<br>
+          2. <b>Instala</b> el ejecutable (sigue la <a href="{guia_url}" style="color:#22c55e;text-decoration:underline">guía de instalación online</a>, también adjunta en PDF).<br>
           3. En la pantalla "Activación de licencia", pega la clave completa y pulsa <b>Activar</b>.<br>
-          4. Consulta el <b style="color:#7ec8ff">manual de usuario completo</b> adjunto en PDF (<code style="color:#7ec8ff">manual-usuario-medicar-plus.pdf</code>) cuando tengas cualquier duda.
+          4. Consulta el <a href="{manual_url}" style="color:#7ec8ff;text-decoration:underline">manual de usuario online</a> cuando tengas cualquier duda (buscador y secciones interactivas).
         </p>
 
         <table width="100%" cellpadding="12" cellspacing="0" style="margin-top:20px">
           <tr>
-            <td style="background:#0f172a;border:1px solid #f5b301;border-radius:8px;padding:14px;text-align:center;width:33%">
-              <a href="https://github.com/Medicarplus/medicarplus-releases/releases/latest" style="color:#f5b301;text-decoration:none;font-size:13px;font-weight:700">
+            <td style="background:#0f172a;border:1px solid #f5b301;border-radius:8px;padding:0;text-align:center;width:33%">
+              <a href="{download_url}" style="display:block;padding:14px;color:#f5b301;text-decoration:none;font-size:13px;font-weight:700">
                 📥 Descargar<br>la aplicación
               </a>
             </td>
             <td style="width:2%"></td>
-            <td style="background:#0f172a;border:1px solid #22c55e;border-radius:8px;padding:14px;text-align:center;width:33%">
-              <span style="color:#22c55e;font-size:13px;font-weight:700">
-                📄 Guía<br>de instalación<br><span style="font-size:10px;color:#94a3b8;font-weight:400">(PDF adjunto)</span>
-              </span>
+            <td style="background:#0f172a;border:1px solid #22c55e;border-radius:8px;padding:0;text-align:center;width:33%">
+              <a href="{guia_url}" style="display:block;padding:14px;color:#22c55e;text-decoration:none;font-size:13px;font-weight:700">
+                📄 Guía<br>de instalación<br><span style="font-size:10px;color:#94a3b8;font-weight:400">Abrir online →</span>
+              </a>
             </td>
             <td style="width:2%"></td>
-            <td style="background:#0f172a;border:1px solid #7ec8ff;border-radius:8px;padding:14px;text-align:center;width:33%">
-              <span style="color:#7ec8ff;font-size:13px;font-weight:700">
-                📄 Manual<br>de usuario<br><span style="font-size:10px;color:#94a3b8;font-weight:400">(PDF adjunto)</span>
-              </span>
+            <td style="background:#0f172a;border:1px solid #7ec8ff;border-radius:8px;padding:0;text-align:center;width:33%">
+              <a href="{manual_url}" style="display:block;padding:14px;color:#7ec8ff;text-decoration:none;font-size:13px;font-weight:700">
+                📖 Manual<br>de usuario<br><span style="font-size:10px;color:#94a3b8;font-weight:400">Abrir online →</span>
+              </a>
             </td>
           </tr>
         </table>
