@@ -293,7 +293,27 @@ async def create_subscription(body: CreateSubscriptionBody, request: Request):
             checkout_kwargs["discounts"] = discounts_arg
         else:
             checkout_kwargs["allow_promotion_codes"] = True
-        session = stripe_sdk.checkout.Session.create(**checkout_kwargs)
+        # Nota: consent_collection.terms_of_service afegeix un checkbox obligatori
+        # dins el propi Checkout Stripe amb l'enllaç als T&C. Requereix tenir
+        # Terms of Service URL configurat al Stripe Dashboard (Settings → Public details → Legal).
+        # L'afegim si l'usuari té configurada la URL; si no, Stripe rebutja i tornem a
+        # crear la sessió sense aquesta opció.
+        try:
+            checkout_kwargs["consent_collection"] = {"terms_of_service": "required"}
+            session = stripe_sdk.checkout.Session.create(**checkout_kwargs)
+        except stripe_sdk.error.InvalidRequestError as _err:
+            err_msg = str(_err).lower()
+            # Stripe retorna missatges variats: "terms of service", "terms_of_service",
+            # "consent_collection"... capturem qualsevol combinació.
+            if "terms of service" in err_msg or "terms_of_service" in err_msg or "consent" in err_msg:
+                logger.warning(
+                    "Stripe consent_collection ToS URL no configurada al Dashboard "
+                    "(Settings → Public details → Terms of service). Fallback sense consent."
+                )
+                checkout_kwargs.pop("consent_collection", None)
+                session = stripe_sdk.checkout.Session.create(**checkout_kwargs)
+            else:
+                raise
     except stripe_sdk.error.StripeError as e:
         logger.error("Stripe subscription creation failed: %s", e)
         raise HTTPException(status_code=502, detail=f"Stripe error: {str(e)}")

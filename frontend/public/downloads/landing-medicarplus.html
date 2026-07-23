@@ -915,7 +915,17 @@ document.addEventListener('click', async function(ev){
   ev.preventDefault();
   const pkg = btn.getAttribute('data-plan-subscribe');
   const original = btn.textContent;
-  // Demanem email abans de redirigir a Stripe (obligatori pel Checkout)
+  // 1) Consentiment obligatori de responsabilitat de dades (LOPD-GDD + Real Decreto 1/2007)
+  const consentOk = window.confirm(
+    "ANTES DE CONTINUAR — Al suscribirse aceptas:\n\n" +
+    "• Los términos de uso y la política de privacidad\n" +
+    "• Que eres el ÚNICO RESPONSABLE de tus datos y copias de seguridad\n" +
+    "• Que MediCar Plus no responde por pérdidas de datos derivadas del uso incorrecto, borrado accidental, fallo del equipo o falta de copias\n\n" +
+    "Ver términos completos: https://medicarplus.es/terminos-uso.html\n\n" +
+    "¿Aceptas y quieres continuar con el pago?"
+  );
+  if (!consentOk) return;
+  // 2) Demanem email abans de redirigir a Stripe (obligatori pel Checkout)
   let email = window.prompt('Introduce tu email para asociar la suscripción:\n(recibirás el código de licencia aquí)', '');
   if (email === null) return; // usuari ha cancel·lat
   email = (email||'').trim();

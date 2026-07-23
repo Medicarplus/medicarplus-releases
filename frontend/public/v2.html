@@ -4508,6 +4508,16 @@ function openUpgradeModal(){
         if(emailField){ emailField.focus(); emailField.style.borderColor='#f97316'; }
         return;
       }
+      // ⚖️ Consentiment obligatori de responsabilitat sobre dades i copies de seguretat
+      const consentOk = window.confirm(
+        (isCA
+          ? "ABANS DE CONTINUAR — En subscriure't acceptes:\n\n• Els termes d'ús i la política de privacitat\n• Que ets l'ÚNIC RESPONSABLE de les teves dades i copies de seguretat\n• Que MediCar Plus no respon per pèrdues de dades derivades de l'ús incorrecte, esborrat accidental, fallada de l'equip o manca de copies\n\nVeure termes complets: https://medicarplus.es/terminos-uso.html\n\nAcceptes i vols continuar amb el pagament?"
+          : "ANTES DE CONTINUAR — Al suscribirse aceptas:\n\n• Los términos de uso y la política de privacidad\n• Que eres el ÚNICO RESPONSABLE de tus datos y copias de seguridad\n• Que MediCar Plus no responde por pérdidas de datos derivadas del uso incorrecto, borrado accidental, fallo del equipo o falta de copias\n\nVer términos completos: https://medicarplus.es/terminos-uso.html\n\n¿Aceptas y quieres continuar con el pago?")
+      );
+      if(!consentOk){
+        status.innerHTML='<span style="color:#94a3b8">'+(isCA?'Cancel·lat. Cal acceptar els termes per continuar.':'Cancelado. Debes aceptar los términos para continuar.')+'</span>';
+        return;
+      }
       const email = emailVal;
       // Guardem l'email escollit com a predeterminat per properes compres
       try{ localStorage.setItem('caja.billing.email.v1', email); }catch(e){}
