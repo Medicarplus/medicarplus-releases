@@ -26,6 +26,25 @@
   th{background:#065f46;color:#fff;padding:8px;text-align:left}
   td{padding:8px 10px;border-bottom:1px solid #e5e7eb;vertical-align:top}
   tr:nth-child(even) td{background:#f8fafc}
+  /* Botó descarregar PDF */
+  .pdf-download-btn{
+    display:block;width:fit-content;margin:20px auto 0;padding:14px 28px;
+    background:linear-gradient(135deg,#10b981,#065f46);color:#fff;
+    border:none;border-radius:10px;cursor:pointer;font-size:15px;font-weight:800;
+    text-decoration:none;box-shadow:0 6px 20px rgba(16,185,129,.35);
+    transition:transform .15s ease,box-shadow .15s ease;
+    text-align:center;
+  }
+  .pdf-download-btn:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(16,185,129,.5)}
+  /* CSS per impressió (Ctrl+P → Guardar com PDF) */
+  @media print{
+    body{background:#fff;max-width:none;margin:0;padding:15px;font-size:11.5pt}
+    h1,h2,h3{page-break-after:avoid}
+    .step,.callout,table{page-break-inside:avoid}
+    .pdf-download-btn,.no-print{display:none !important}
+    a{color:#0f172a;text-decoration:underline}
+    a[href^="http"]::after{content:" (" attr(href) ")";font-size:9pt;color:#64748b}
+  }
 </style>
 <!-- link-healer · auto-repair links if URL rotates or user hits wrong domain -->
 <script>
@@ -55,6 +74,13 @@
 
 <h1>📖 Com instal·lar MediCar Plus</h1>
 <p style="text-align:center;color:#64748b">Guia ràpida en 6 passos · Aproximadament 5 minuts</p>
+
+<button onclick="downloadAsPDF()" class="pdf-download-btn" data-testid="download-pdf-btn">
+  📄 Descargar esta guía como PDF
+</button>
+<div class="no-print" style="text-align:center;font-size:12px;color:#94a3b8;margin-top:6px">
+  Guarda una copia offline en tu ordenador · Se abrirá el diálogo de "Guardar como PDF"
+</div>
 
 <div class="callout callout-green" style="text-align:center;font-size:14px">
 🎁 <b>Prova gratuïta de 60 dies</b> — Si encara no té llicència, pot descarregar l'app i demanar la prova gratuïta des de <a href="https://medicarplus.es" target="_blank"><b>medicarplus.es</b></a> · <b>Sense targeta</b> · Accés complet a totes les funcions Premium.
@@ -295,5 +321,22 @@ Resposta habitual en menys de 24 hores laborables.<br><br>
 <span style="color:#94a3b8;font-size:12px">MediCar Plus · M.Brugulat Lopez · Actualitzada 02/2026</span>
 </div>
 
+<script>
+function downloadAsPDF(){
+  // Estratègia: usar la funció nativa d'imprimir del navegador → seleccionar "Guardar com a PDF".
+  // Els estils @media print ja adapten el layout perquè quedi net al PDF.
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  if(isMobile){
+    alert('📱 Al mòbil:\n\n1. Toca el botó menú (⋮ o compartir) del navegador\n2. Tria "Imprimir" o "Guardar com PDF"\n3. Guarda el fitxer\n\nAra obrim el diàleg d\'impressió...');
+  } else {
+    // Missatge senzill amb la instrucció clau
+    const btn = document.querySelector('.pdf-download-btn');
+    const original = btn.textContent;
+    btn.textContent = '📄 A la finestra que s\'obri, tria "Guardar com PDF"';
+    setTimeout(()=>{ btn.textContent = original; }, 4000);
+  }
+  setTimeout(()=>window.print(), 500);
+}
+</script>
 </body>
 </html>
