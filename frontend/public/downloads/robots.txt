@@ -1,0 +1,11 @@
+# robots.txt · medicarplus.es
+# Diu als robots de cerca (Google, Bing, etc.) què poden i què no poden indexar
+
+User-agent: *
+Allow: /
+
+# Pàgines que NO volem que apareguin a Google
+Disallow: /subscription-success.html
+
+# Ubicació del sitemap
+Sitemap: https://medicarplus.es/sitemap.xml
