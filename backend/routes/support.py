@@ -1,6 +1,7 @@
 """
 Support router · Formulari de contacte dins l'app comercial
 POST /api/support/contact → guarda el ticket a MongoDB + intenta enviar email (si SMTP està configurat)
+POST /api/support/remote-assist → registra una sol·licitud d'assistència remota (HopToDesk) + notificació Telegram
 GET  /api/support/tickets → llista tickets (protegit per LICENSE_ADMIN_TOKEN)
 """
 import os
@@ -10,8 +11,14 @@ import logging
 from datetime import datetime, timezone
 from email.message import EmailMessage
 from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, HTTPException, Header, Request, BackgroundTasks
 from pydantic import BaseModel, Field, EmailStr
+
+from services.discord_notify import (
+    send_discord_notification,
+    is_configured as discord_ok,
+    COLOR_REMOTE_ASSIST, COLOR_BUG, COLOR_QUESTION, COLOR_BILLING, COLOR_GENERAL,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +42,18 @@ class ContactResult(BaseModel):
     ticket_id: str
     email_sent: bool
     detail: Optional[str] = None
+
+
+class RemoteAssistPayload(BaseModel):
+    client_name: str = Field(..., min_length=1, max_length=120)
+    contact_name: Optional[str] = ""  # persona que truca
+    phone: str = Field(..., min_length=6, max_length=30)  # per si volem trucar-lo nosaltres
+    email: Optional[EmailStr] = None
+    hoptodesk_id: Optional[str] = ""  # ID de HopToDesk del client
+    issue: str = Field(..., min_length=1, max_length=2000)
+    app_version: Optional[str] = ""
+    license_key: Optional[str] = ""
+    install_id: Optional[str] = ""
 
 
 def _send_email_smtp(payload: ContactPayload, ticket_id: str) -> tuple[bool, Optional[str]]:
@@ -84,7 +103,7 @@ def _send_email_smtp(payload: ContactPayload, ticket_id: str) -> tuple[bool, Opt
 
 def build_router(db):
     @router.post("/contact", response_model=ContactResult)
-    async def contact(body: ContactPayload, request: Request):
+    async def contact(body: ContactPayload, request: Request, background_tasks: BackgroundTasks):
         ticket_id = str(uuid.uuid4())
         doc = {
             "_id": ticket_id,
@@ -110,12 +129,99 @@ def build_router(db):
 
         await db.support_tickets.insert_one(doc)
 
+        # 📱 Notificació Discord (async, no bloqueja resposta)
+        if discord_ok():
+            cat = (body.category or "general").upper()
+            emoji_map = {"BUG":"🐛","QUESTION":"❓","BILLING":"💳","GENERAL":"💬"}
+            color_map = {"BUG":COLOR_BUG,"QUESTION":COLOR_QUESTION,"BILLING":COLOR_BILLING,"GENERAL":COLOR_GENERAL}
+            emoji = emoji_map.get(cat, "💬")
+            color = color_map.get(cat, COLOR_GENERAL)
+            background_tasks.add_task(
+                send_discord_notification,
+                title=f"{emoji} Nou ticket · {cat}",
+                description=f"**{body.subject}**\n\n{body.message[:1500]}",
+                color=color,
+                fields=[
+                    {"name": "De", "value": f"{body.name}\n{body.email}", "inline": True},
+                    {"name": "Centre", "value": body.client_name or "—", "inline": True},
+                    {"name": "Versió app", "value": body.app_version or "—", "inline": True},
+                ],
+                footer_text=f"Ticket ID: {ticket_id[:8]}",
+            )
+
         return ContactResult(
             ok=True,
             ticket_id=ticket_id,
             email_sent=ok,
             detail=None if ok else "Ticket guardat. L'enviament d'email pot estar pendent de configuració SMTP.",
         )
+
+    @router.post("/remote-assist")
+    async def remote_assist(body: RemoteAssistPayload, request: Request, background_tasks: BackgroundTasks):
+        ticket_id = str(uuid.uuid4())
+        doc = {
+            "_id": ticket_id,
+            "kind": "remote_assist",
+            "client_name": body.client_name,
+            "contact_name": body.contact_name or "",
+            "phone": body.phone,
+            "email": body.email or "",
+            "hoptodesk_id": (body.hoptodesk_id or "").strip(),
+            "issue": body.issue,
+            "app_version": body.app_version or "",
+            "license_key": body.license_key or "",
+            "install_id": body.install_id or "",
+            "ip": request.client.host if request.client else "",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "status": "open",
+        }
+        await db.support_tickets.insert_one(doc)
+
+        # 📱 Notificació Discord INSTANTÀNIA amb totes les dades
+        if discord_ok():
+            fields = [
+                {"name": "📞 Telèfon", "value": f"**{body.phone}**", "inline": True},
+                {"name": "🏥 Centre", "value": body.client_name, "inline": True},
+                {"name": "👤 Contacte", "value": body.contact_name or body.client_name, "inline": True},
+            ]
+            if body.hoptodesk_id:
+                fields.append({"name": "🖥️ ID HopToDesk", "value": f"`{body.hoptodesk_id}`", "inline": False})
+            if body.email:
+                fields.append({"name": "✉️ Email", "value": body.email, "inline": True})
+            if body.app_version:
+                fields.append({"name": "Versió app", "value": body.app_version, "inline": True})
+            background_tasks.add_task(
+                send_discord_notification,
+                title="🖥️ SOL·LICITUD ASSISTÈNCIA REMOTA",
+                description=f"**Problema:**\n{body.issue[:1500]}",
+                color=COLOR_REMOTE_ASSIST,
+                fields=fields,
+                footer_text=f"Ticket: {ticket_id[:8]}",
+            )
+
+        # Email fallback per si Telegram no està configurat
+        try:
+            fake = ContactPayload(
+                name=body.contact_name or body.client_name,
+                email=body.email or "noemail@medicarplus.local",
+                subject=f"[ASSISTÈNCIA REMOTA] {body.client_name}",
+                message=(
+                    f"Telèfon: {body.phone}\n"
+                    f"ID HopToDesk: {body.hoptodesk_id or '(no informat)'}\n"
+                    f"Versió: {body.app_version or '—'}\n"
+                    f"Install ID: {body.install_id or '—'}\n\n"
+                    f"Problema:\n{body.issue}"
+                ),
+                category="bug",
+                app_version=body.app_version,
+                license_key=body.license_key,
+                client_name=body.client_name,
+            )
+            _send_email_smtp(fake, ticket_id)
+        except Exception as e:
+            logger.warning(f"Remote-assist email fallback failed: {e}")
+
+        return {"ok": True, "ticket_id": ticket_id, "discord_sent": discord_ok()}
 
     @router.get("/tickets")
     async def list_tickets(x_admin_token: Optional[str] = Header(None)):

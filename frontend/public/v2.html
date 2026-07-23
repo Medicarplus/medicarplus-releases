@@ -4152,6 +4152,12 @@ startI18nObserver();
 // MODAL CONFIGURACIÓ · centralitza idioma, actualitzacions, suport, sortir
 // ============================================================================
 function openSettingsModal(){
+  // 📞 Telèfon de suport (canviar aquí quan es tingui el número definitiu)
+  const SUPPORT_PHONE_DISPLAY = '+34 XXX XXX XXX';
+  const SUPPORT_PHONE_TEL = '+34XXXXXXXXX'; // sense espais, per l'atribut tel:
+  const SUPPORT_HOURS_ES = 'Lunes a Viernes · 9h - 17h';
+  const SUPPORT_HOURS_CA = 'Dilluns a Divendres · 9h - 17h';
+  const HOPTODESK_DOWNLOAD_URL = 'https://www.hoptodesk.com/#downloads';
   const existing=document.getElementById('settingsModal');
   if(existing){existing.remove();return}
   const isElec=!!(window.appInfo&&window.appInfo.isDesktop);
@@ -4196,6 +4202,20 @@ function openSettingsModal(){
     sending:isCA?'Enviant...':'Enviando...',
     sentOk:isCA?'✅ Missatge enviat correctament. Et respondrem aviat.':'✅ Mensaje enviado correctamente. Te responderemos pronto.',
     sentErr:isCA?'⚠️ Error enviant. Torna-ho a provar més tard.':'⚠️ Error enviando. Vuelve a intentarlo más tarde.',
+    remoteSec:isCA?'🖥️ Sol·licitar assistència remota':'🖥️ Solicitar asistencia remota',
+    remoteDesc:isCA?'Descarrega HopToDesk (gratuït), obre-lo i copia el teu ID. Envia\'ns aquest ID i et connectarem al teu ordinador per resoldre el problema. Amb el teu permís, activarem el "mode privacitat" i la teva pantalla quedarà en negre mentre solucionem la incidència.':'Descarga HopToDesk (gratuito), ábrelo y copia tu ID. Envíanos ese ID y nos conectaremos a tu ordenador para resolver el problema. Con tu permiso, activaremos el "modo privacidad" y tu pantalla quedará en negro mientras solucionamos la incidencia.',
+    remoteStep1:isCA?'1. Descarrega HopToDesk aquí:':'1. Descarga HopToDesk aquí:',
+    remoteStep2:isCA?'2. Obre-lo i copia el teu ID (el número que apareix a dalt):':'2. Ábrelo y copia tu ID (el número que aparece arriba):',
+    remoteStep3:isCA?'3. Omple el formulari:':'3. Rellena el formulario:',
+    fContact:isCA?'Nom persona de contacte':'Nombre persona de contacto',
+    fPhone:isCA?'Telèfon (per si volem trucar)':'Teléfono (por si queremos llamar)',
+    fHtdId:isCA?'ID HopToDesk (9 dígits)':'ID HopToDesk (9 dígitos)',
+    fIssue:isCA?'Descriu el problema':'Describe el problema',
+    remoteSend:isCA?'🖥️ Sol·licitar assistència ara':'🖥️ Solicitar asistencia ahora',
+    remoteSent:isCA?'✅ Sol·licitud enviada! T\'atendrem al més aviat possible dins l\'horari d\'atenció.':'✅ ¡Solicitud enviada! Te atenderemos lo antes posible dentro del horario de atención.',
+    phoneSec:isCA?'📞 Trucar al suport':'📞 Llamar al soporte',
+    phoneDesc:isCA?'Truca\'ns directament durant l\'horari d\'atenció. Fora d\'aquest horari, deixa un missatge i et retornarem la trucada.':'Llámanos directamente durante el horario de atención. Fuera de ese horario, deja un mensaje y te devolveremos la llamada.',
+    phoneHours:isCA?'Horari: Dilluns a Divendres · 9h - 17h':'Horario: Lunes a Viernes · 9h - 17h',
     logoutSec:isCA?'🚪 Sortir / Canviar llicència':'🚪 Salir / Cambiar licencia',
     logoutDesc:isCA?'Desactiva aquesta llicència en aquest ordinador. Les dades locals NO s\'esborraran.':'Desactiva esta licencia en este ordenador. Los datos locales NO se borrarán.',
     logoutBtn:isCA?'Sortir ara':'Salir ahora',
@@ -4258,6 +4278,34 @@ function openSettingsModal(){
           <textarea id="supMessage" placeholder="${T.fMessage}" rows="4" style="width:100%;background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:12px;font-family:inherit;resize:vertical;box-sizing:border-box" data-testid="support-message"></textarea>
           <button id="setSendSupport" class="btn" style="width:100%;margin-top:8px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;border-color:transparent;font-weight:700;padding:10px" data-testid="btn-send-support">${T.send}</button>
           <div id="setSupportStatus" style="margin-top:8px;font-size:12px;text-align:center;min-height:16px"></div>
+        </div>
+
+        <!-- 🖥️ Assistència remota via HopToDesk -->
+        <div class="settings-section" style="background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 60%,#0f172a 100%);border:1px solid #3b82f6;border-radius:10px;padding:14px" data-testid="section-remote-assist">
+          <div style="font-size:13px;font-weight:700;color:#93c5fd;letter-spacing:.5px;margin-bottom:4px">${T.remoteSec}</div>
+          <div style="font-size:12px;color:#bfdbfe;opacity:.9;line-height:1.5;margin-bottom:10px">${T.remoteDesc}</div>
+          <div style="background:#0b1121;border:1px dashed #3b82f6;border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px;color:#dbeafe;line-height:1.7">
+            <div style="margin-bottom:6px">${T.remoteStep1}</div>
+            <a href="${HOPTODESK_DOWNLOAD_URL}" target="_blank" rel="noopener" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:700;font-size:12px;margin-bottom:8px" data-testid="btn-download-hoptodesk">⬇️ hoptodesk.com/#downloads</a>
+            <div>${T.remoteStep2}</div>
+            <div style="margin-top:4px">${T.remoteStep3}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <input type="text" id="raContact" placeholder="${T.fContact}" style="background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:12px" data-testid="ra-contact" />
+            <input type="tel" id="raPhone" placeholder="${T.fPhone}" style="background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:12px" data-testid="ra-phone" />
+          </div>
+          <input type="text" id="raHtdId" placeholder="${T.fHtdId}" style="width:100%;background:#0e1117;color:#e2e8f0;border:1px solid #3b82f6;border-radius:6px;padding:8px 10px;font-size:13px;margin-bottom:8px;font-family:'Courier New',monospace;font-weight:700;letter-spacing:2px;box-sizing:border-box" data-testid="ra-htdid" />
+          <textarea id="raIssue" placeholder="${T.fIssue}" rows="3" style="width:100%;background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:12px;font-family:inherit;resize:vertical;box-sizing:border-box" data-testid="ra-issue"></textarea>
+          <button id="setSendRemote" class="btn" style="width:100%;margin-top:8px;background:linear-gradient(135deg,#1e40af,#3b82f6);color:#fff;border-color:transparent;font-weight:700;padding:10px" data-testid="btn-send-remote-assist">${T.remoteSend}</button>
+          <div id="setRemoteStatus" style="margin-top:8px;font-size:12px;text-align:center;min-height:16px"></div>
+        </div>
+
+        <!-- 📞 Telèfon de suport -->
+        <div class="settings-section" style="background:linear-gradient(135deg,#052e16 0%,#064e3b 100%);border:1px solid #22c55e;border-radius:10px;padding:14px" data-testid="section-support-phone">
+          <div style="font-size:13px;font-weight:700;color:#86efac;letter-spacing:.5px;margin-bottom:4px">${T.phoneSec}</div>
+          <div style="font-size:12px;color:#bbf7d0;opacity:.9;line-height:1.5;margin-bottom:10px">${T.phoneDesc}</div>
+          <a href="tel:${SUPPORT_PHONE_TEL}" style="display:block;text-align:center;background:#22c55e;color:#0b1121;text-decoration:none;padding:14px;border-radius:8px;font-size:19px;font-weight:800;letter-spacing:.5px;font-family:'Courier New',monospace" data-testid="btn-call-support">📞 ${SUPPORT_PHONE_DISPLAY}</a>
+          <div style="text-align:center;font-size:11px;color:#86efac;margin-top:8px;font-weight:600">${isCA ? SUPPORT_HOURS_CA : SUPPORT_HOURS_ES}</div>
         </div>
 
         <!-- Millora de pla / Suscripció -->
@@ -4360,6 +4408,55 @@ function openSettingsModal(){
     }
     btn.disabled=false;btn.textContent=T.send;
   };
+
+  // 🖥️ Enviar sol·licitud d'assistència remota
+  const btnRemote = document.getElementById('setSendRemote');
+  if(btnRemote){
+    btnRemote.onclick=async()=>{
+      const contact=document.getElementById('raContact').value.trim() || (lic.client_name||'');
+      const phone=document.getElementById('raPhone').value.trim();
+      const htdId=document.getElementById('raHtdId').value.trim();
+      const issue=document.getElementById('raIssue').value.trim();
+      const st=document.getElementById('setRemoteStatus');
+      if(!phone||!issue){
+        st.innerHTML='<span style="color:#f97316">'+(isCA?'⚠️ Cal telèfon i descripció del problema (mínim)':'⚠️ Se necesita teléfono y descripción del problema (mínimo)')+'</span>';
+        return;
+      }
+      btnRemote.disabled=true;
+      const origTxt=btnRemote.textContent;
+      btnRemote.textContent=isCA?'Enviant…':'Enviando…';
+      st.textContent='';
+      try{
+        const backendUrl=(typeof getApiBase==='function')?getApiBase():((typeof LIC!=='undefined'&&LIC.VERIFY_URL)?LIC.VERIFY_URL.replace(/\/api\/.*$/,''):'https://medicarplus.es');
+        const res=await fetch(backendUrl+'/api/support/remote-assist',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            client_name: lic.client_name || (document.getElementById('supName')?.value?.trim() || contact) || 'Sense nom',
+            contact_name: contact,
+            phone: phone,
+            email: (document.getElementById('supEmail')?.value?.trim()) || (lic.email||''),
+            hoptodesk_id: htdId,
+            issue: issue,
+            app_version: appVer || '',
+            license_key: lic.license_key || '',
+            install_id: (typeof getInstallId==='function' ? getInstallId() : (lic.install_id||''))
+          })
+        });
+        const data=await res.json();
+        if(data&&data.ok){
+          st.innerHTML='<span style="color:#22c55e;font-weight:700">'+T.remoteSent+'</span>';
+          document.getElementById('raHtdId').value='';
+          document.getElementById('raIssue').value='';
+        }else{
+          st.innerHTML='<span style="color:#f97316">'+T.sentErr+'</span>';
+        }
+      }catch(e){
+        st.innerHTML='<span style="color:#f97316">'+T.sentErr+' ('+e.message+')</span>';
+      }
+      btnRemote.disabled=false;
+      btnRemote.textContent=origTxt;
+    };
+  }
 
   // Sortir
   document.getElementById('setLogout').onclick=()=>{
