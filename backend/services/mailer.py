@@ -129,7 +129,10 @@ def _render_html(
         </table>
 
         <p style="margin:20px 0 8px 0;color:#f5b301;font-size:13px;letter-spacing:1.2px"><b>TU CLAVE DE LICENCIA</b></p>
-        <div style="background:#0f172a;border:1px dashed #f5b301;border-radius:8px;padding:14px;font-family:'Courier New',monospace;font-size:11px;color:#e2e8f0;word-break:break-all;line-height:1.5">{license_key}</div>
+        <div style="background:#0f172a;border:1px dashed #f5b301;border-radius:8px;padding:14px;font-family:'Courier New',monospace;font-size:11px;color:#e2e8f0;word-break:break-all;line-height:1.5;user-select:all;-webkit-user-select:all;-moz-user-select:all;cursor:text">{license_key}</div>
+        <div style="margin-top:6px;padding:8px 12px;background:#0b1e10;border:1px solid #22c55e;border-radius:6px;text-align:center;font-size:11px;color:#86efac">
+          👆 <b>Haz doble clic sobre la clave</b> · se seleccionará entera automáticamente. Después pulsa <b>Ctrl+C</b> (o <b>Cmd+C</b> en Mac) para copiar.
+        </div>
 
         <p style="color:#cbd5e1;font-size:14px;margin-top:22px;line-height:1.55">
           <b style="color:#f5b301">Cómo activarla:</b><br>
