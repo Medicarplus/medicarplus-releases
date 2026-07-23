@@ -573,7 +573,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
 
           <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;margin-top:8px;cursor:pointer;padding:10px 12px;background:rgba(245,179,1,.06);border:1px dashed rgba(245,179,1,.3);border-radius:8px" for="trial-consent">
             <input type="checkbox" id="trial-consent" data-testid="trial-consent" onchange="onConsentChange()" style="margin-top:3px;width:16px;height:16px;cursor:pointer;flex-shrink:0" required>
-            <span><b style="color:#e2e8f0">Acepto</b> recibir por email (a info@medicarplus.es) la clave de licencia, la guía de instalación y el manual de usuario. Cumplimos la LOPD/RGPD y no compartimos tu email. <b style="color:#f5b301">(obligatorio)</b></span>
+            <span><b style="color:#e2e8f0">Acepto</b> recibir por email (a suport@medicarplus.es) la clave de licencia, la guía de instalación y el manual de usuario. Cumplimos la LOPD/RGPD y no compartimos tu email. <b style="color:#f5b301">(obligatorio)</b></span>
           </label>
 
           <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;margin-top:6px;cursor:pointer;padding:10px 12px;background:rgba(220,38,38,.06);border:1px dashed rgba(220,38,38,.35);border-radius:8px" for="trial-liability">
@@ -758,7 +758,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
       </details>
       <details>
         <summary>¿Ofrecéis soporte técnico?</summary>
-        <p>Sí. Todos los planes incluyen soporte por email en menos de 24h laborables. El plan Premium tiene soporte prioritario (respuesta en 4h). Escríbenos a <a href="mailto:info@medicarplus.es">info@medicarplus.es</a>.</p>
+        <p>Sí. Todos los planes incluyen soporte por email en menos de 24h laborables. El plan Premium tiene soporte prioritario (respuesta en 4h). Escríbenos a <a href="mailto:suport@medicarplus.es">suport@medicarplus.es</a>.</p>
       </details>
     </div>
   </div>
@@ -808,7 +808,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
       </form>
       <div class="contact-info">
         <p>O escríbenos directamente:</p>
-        <p><a href="mailto:info@medicarplus.es">info@medicarplus.es</a></p>
+        <p><a href="mailto:suport@medicarplus.es">suport@medicarplus.es</a></p>
       </div>
     </div>
   </div>
@@ -836,13 +836,13 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
       <div class="footer-col">
         <h4>Contacto</h4>
         <ul>
-          <li><a href="mailto:info@medicarplus.es">info@medicarplus.es</a></li>
+          <li><a href="mailto:suport@medicarplus.es">suport@medicarplus.es</a></li>
           <li><a href="mailto:suport@medicarplus.es">suport@medicarplus.es</a></li>
         </ul>
       </div>
     </div>
     <div class="footer-bottom">
-      © 2026 MediCar Plus · Todos los derechos reservados · <a href="mailto:info@medicarplus.es">Contacto</a>
+      © 2026 MediCar Plus · Todos los derechos reservados · <a href="mailto:suport@medicarplus.es">Contacto</a>
     </div>
   </div>
 </footer>
@@ -862,11 +862,11 @@ function sendContact(e){
   const subject = `[MediCar Plus · ${tipoLabels[tipo]}] Solicitud de ${name}`;
   const body = `Hola,\n\n${msg}\n\n---\nDatos del contacto:\nNombre: ${name}\nEmail: ${email}\nCentro: ${empresa || '(no indicado)'}\nTeléfono: ${tel || '(no indicado)'}\nTipo de consulta: ${tipoLabels[tipo]}\n\n(Enviado desde medicarplus.es)`;
 
-  const mailto = `mailto:info@medicarplus.es?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const mailto = `mailto:suport@medicarplus.es?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.location.href = mailto;
 
   setTimeout(() => {
-    alert('✅ Se ha abierto tu cliente de email con el mensaje preparado. Revisa que se envíe correctamente. Si no se abre nada, escríbenos directamente a info@medicarplus.es');
+    alert('✅ Se ha abierto tu cliente de email con el mensaje preparado. Revisa que se envíe correctamente. Si no se abre nada, escríbenos directamente a suport@medicarplus.es');
   }, 500);
 }
 // Menú mòbil: toggle del hamburguesa
@@ -969,7 +969,7 @@ document.addEventListener('click', async function(ev){
     }
   }catch(err){
     console.error('[Stripe]', err);
-    alert('⚠️ Servicio de pago temporalmente no disponible. Contacta con info@medicarplus.es y te enviaremos las instrucciones de pago manualmente.\n\nDetalle: ' + (err.message||err));
+    alert('⚠️ Servicio de pago temporalmente no disponible. Contacta con suport@medicarplus.es y te enviaremos las instrucciones de pago manualmente.\n\nDetalle: ' + (err.message||err));
     btn.textContent = original;
     btn.style.pointerEvents = '';
   }
@@ -1137,7 +1137,7 @@ async function submitTrial(){
     } else if(data.email_sent){
       note.textContent = '✉️ Email enviado a ' + email + '. Si no lo ves, revisa la carpeta de spam.';
     } else {
-      note.innerHTML = '⚠️ El envío de email ha fallado, pero tu licencia está activa. <b>Copia la clave</b> de arriba antes de cerrar. Si necesitas soporte: <a href="mailto:info@medicarplus.es" style="color:#f5b301">info@medicarplus.es</a>';
+      note.innerHTML = '⚠️ El envío de email ha fallado, pero tu licencia está activa. <b>Copia la clave</b> de arriba antes de cerrar. Si necesitas soporte: <a href="mailto:suport@medicarplus.es" style="color:#f5b301">suport@medicarplus.es</a>';
     }
     document.getElementById('trialForm').style.display = 'none';
     document.getElementById('trialSuccess').style.display = 'block';
@@ -1145,7 +1145,7 @@ async function submitTrial(){
     clearTimeout(to);
     console.error('[Trial]', err);
     const isAbort = err.name === 'AbortError';
-    errBox.textContent = '⚠️ ' + (isAbort ? 'La solicitud tarda demasiado. Revisa tu conexión e inténtalo de nuevo, o escríbenos a info@medicarplus.es.' : (err.message || 'No se ha podido generar la licencia. Contacta con info@medicarplus.es.'));
+    errBox.textContent = '⚠️ ' + (isAbort ? 'La solicitud tarda demasiado. Revisa tu conexión e inténtalo de nuevo, o escríbenos a suport@medicarplus.es.' : (err.message || 'No se ha podido generar la licencia. Contacta con suport@medicarplus.es.'));
     errBox.style.display = 'block';
     btn.disabled = false;
     btn.textContent = '🎁 Empezar prueba gratuita ahora';

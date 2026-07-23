@@ -4557,7 +4557,7 @@ function openUpgradeModal(){
           openExternalUrl(d.url);
         } else throw new Error(isCA?'URL de pagament no rebuda':'URL de pago no recibida');
       }catch(err){
-        status.innerHTML='<span style="color:#f97316">❌ '+err.message+'<br>'+(isCA?'Prova a medicarplus.es o escriu a info@medicarplus.es':'Prueba en medicarplus.es o escribe a info@medicarplus.es')+'</span>';
+        status.innerHTML='<span style="color:#f97316">❌ '+err.message+'<br>'+(isCA?'Prova a medicarplus.es o escriu a suport@medicarplus.es':'Prueba en medicarplus.es o escribe a suport@medicarplus.es')+'</span>';
         btn.disabled=false;
       }
     };
@@ -6458,7 +6458,7 @@ const LIC={
   get GUIDE_INSTALL_URL(){ return getApiBase()+'/guia-client-installacio.html'; },
   get MANUAL_URL(){ return getApiBase()+'/manual-usuari.html'; },
   WEBSITE_URL:'https://medicarplus.es',  // Landing marketing · queda al domini públic
-  SUPPORT_EMAIL:'info@medicarplus.es',
+  SUPPORT_EMAIL:'suport@medicarplus.es',
   MASTER_KEY:'MB-MASTER-BRUGULAT-2026-OWNER',
 };
 function getInstallId(){

@@ -157,7 +157,7 @@ def _render_html(
 
         <p style="color:#64748b;font-size:12px;margin-top:26px;padding-top:18px;border-top:1px solid #334155;line-height:1.5">
           Esta clave está vinculada a tu Install ID. Si cambias de ordenador, contacta con el proveedor para trasladarla.<br>
-          Soporte: info@medicarplus.es · Marc Brugulat Lopez
+          Soporte: suport@medicarplus.es · Marc Brugulat Lopez
         </p>
       </td></tr>
     </table>
@@ -344,7 +344,7 @@ async def send_referral_notification_email(
 
   <hr style="border:0;border-top:1px solid #334155;margin:26px 0 16px">
   <div style="text-align:center;color:#64748b;font-size:11px;line-height:1.5">
-    ¿Preguntas? <a href="mailto:info@medicarplus.es" style="color:#f5b301">info@medicarplus.es</a><br>
+    ¿Preguntas? <a href="mailto:suport@medicarplus.es" style="color:#f5b301">suport@medicarplus.es</a><br>
     Este email es una notificación transaccional relacionada con tu suscripción activa.
   </div>
 </div>

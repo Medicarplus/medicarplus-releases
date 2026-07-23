@@ -97,7 +97,7 @@
 
     <div class="footer-note" id="emailNote">
       ✉️ Email enviado a <b id="emailAddr"></b>. Si no lo ves en 2 minutos, revisa la carpeta de spam.<br>
-      ¿Necesitas ayuda? <a href="mailto:info@medicarplus.es" style="color:#f5b301">info@medicarplus.es</a>
+      ¿Necesitas ayuda? <a href="mailto:suport@medicarplus.es" style="color:#f5b301">suport@medicarplus.es</a>
     </div>
   </div>
 
@@ -113,7 +113,7 @@
     <div class="error">
       <b>⚠️ No hemos podido verificar tu pago automáticamente.</b><br><br>
       No te preocupes: si Stripe te ha confirmado el cobro, el sistema te enviará la clave por email en unos minutos. Si en 5 minutos no ves nada, contacta con
-      <a href="mailto:info@medicarplus.es" style="color:#f5b301">info@medicarplus.es</a> con este identificador:
+      <a href="mailto:suport@medicarplus.es" style="color:#f5b301">suport@medicarplus.es</a> con este identificador:
       <div style="margin-top:8px;font-family:monospace;font-size:11px;background:#020617;padding:8px;border-radius:6px;word-break:break-all" id="errRef"></div>
     </div>
   </div>
@@ -201,12 +201,12 @@
       const plan = String(d.plan || meta.plan || 'PREMIUM').toUpperCase();
       $('newPlanLabel').textContent = plan;
       if(d.customer_email) $('emailAddr').textContent = d.customer_email;
-      $('emailNote').innerHTML = '¿Necesitas ayuda? <a href="mailto:info@medicarplus.es" style="color:#f5b301">info@medicarplus.es</a>';
+      $('emailNote').innerHTML = '¿Necesitas ayuda? <a href="mailto:suport@medicarplus.es" style="color:#f5b301">suport@medicarplus.es</a>';
     } else {
       // Flux de client NOU: mostrem la clau + instruccions d'instal·lació
       $('licenseKey').textContent = d.license_key;
       if(d.customer_email) $('emailAddr').textContent = d.customer_email;
-      else $('emailNote').textContent = '¿Necesitas ayuda? info@medicarplus.es';
+      else $('emailNote').textContent = '¿Necesitas ayuda? suport@medicarplus.es';
     }
   }
   function showSuccessSoft(d){
