@@ -1,0 +1,27 @@
+{
+  "summary": "Iteration 22 · Stripe Checkout locale='es' fix — VERIFIED end-to-end. Backend pytest (6/6 PASSED, /app/test_reports/pytest/pytest_iter22.xml): (1) source code inspection confirms `locale=\"es\"` is passed to stripe_sdk.checkout.Session.create() in create_subscription (payments.py L238); (2) regression — all 4 packages (STD_MES, STD_ANY, PREMIUM_MES, PREMIUM_ANY) return HTTP 200 with valid `url` starting with https://checkout.stripe.com/ and session_id starting with cs_; (3) generated URL contains no `locale=ca` / `lang=ca` / `hl=ca` hint. Playwright dynamic verification with browser locale forced to ca-ES (Accept-Language: ca-ES,ca;q=0.9 + navigator.language override): navigated to the freshly-created checkout URL, waited for Stripe SPA to render, then extracted body innerText. Result: <html lang='es'>, Spanish tokens ['Suscribirse', 'Correo electrónico', 'País', 'Nombre', 'Total'] all present, Catalan tokens ['Subscriure','PROVA','Prova','Correu electrònic','gràcies'] ALL ABSENT. Screenshot at /app/test_reports/stripe_locale_es_ca_browser.png shows full Spanish UI (Suscribirse, Información de contacto, Método de pago, Tarjeta, Información de la tarjeta, Nombre del titular de la tarjeta, Dirección de facturación, Introduce la dirección de forma manual, Guarda mis datos para un proceso de compra más rápido, Total a pagar hoy, facturación mensual). The user-reported 'COMENZAR PROVA GRATIS' mixed-language bug is fixed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter22_stripe_locale_es.py",
+    "/app/test_reports/pytest/pytest_iter22.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "payments.py L228-256: `locale=\"es\"` is correctly placed inside stripe_sdk.checkout.Session.create(...). Fix is minimal, correct and thread-safe (no global state mutation). LGTM.",
+    "The Emergent Stripe test proxy (integrations.emergentagent.com/stripe) accepts CREATE but returns 404 on cross-process RETRIEVE, so `stripe.checkout.Session.retrieve()` cannot be used from external pytest workers to inspect `session.locale`. This test suite verified the fix via (a) source inspection of the create-call, (b) Playwright rendering of the actual Stripe Checkout page in a ca-ES browser context. Backend's own /api/payments/subscription/status/{sid} endpoint DOES successfully retrieve via the proxy (same-process context).",
+    "Consider: the /api/payments/create-checkout (one-off legacy) endpoint at L80-120 does NOT pass locale — if it's ever used from a ca-ES browser, the same mixed-language bug will reappear on the one-off flow. Recommend adding `locale='es'` (or an equivalent option) to CheckoutSessionRequest / the emergentintegrations SDK call for consistency. Low priority since one-off is legacy."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter22_stripe_locale_es.py (new)",
+    "/app/test_reports/pytest/pytest_iter22.xml (new)",
+    "/app/test_reports/stripe_locale_es_ca_browser.png (new · Playwright screenshot)"
+  ],
+  "success_rate": {"backend": "100% (6/6 pytest)", "frontend": "100% (Playwright ca-ES rendering shows pure Spanish, all 3 acceptance criteria met)"},
+  "test_credentials": "None required. Uses Stripe test mode via Emergent proxy (sk_test_emergent).",
+  "seed_data_creation": "Test-only payment_transactions were created with TEST_ / CD-LOCALE-CHECK-* identifiers. Not cleaned up (no cleanup fixture needed for Stripe test-mode sessions — they naturally expire).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "To verify Stripe Checkout locale changes in the future: (1) prefer source-inspection pytest + Playwright over stripe.checkout.Session.retrieve() because the Emergent Stripe proxy at integrations.emergentagent.com/stripe returns 404 on cross-process retrieve (only CREATE is supported). (2) For Playwright: force `Accept-Language: ca-ES,ca;q=0.9` header via context.set_extra_http_headers AND override navigator.language via page.add_init_script BEFORE navigating to the checkout URL. Wait ~6s for the Stripe SPA to render before scraping body innerText. (3) Screenshot at /app/test_reports/stripe_locale_es_ca_browser.png provides visual proof of the fix.",
+  "rca of the issue": "Root cause: Stripe Checkout Session was created without an explicit `locale` argument, defaulting to Stripe's `auto` behaviour which reads the buyer's browser Accept-Language / navigator.language. For Catalan users (ca-ES) Stripe partially translates the UI: pre-built strings (e.g. 'PROVA GRATIS', 'Correu electrònic', 'Subscriure') come from ca while product-defined labels (e.g. 'COMENZAR', product name) remain Spanish → mixed 'COMENZAR PROVA GRATIS' text. Fix: pass locale='es' explicitly to stripe_sdk.checkout.Session.create() at payments.py:238 so Stripe renders the ENTIRE UI in Spanish regardless of the visitor's browser locale. Verified: playwright with navigator.language='ca-ES' now shows full Spanish page (html lang='es', 'Suscribirse', 'Correo electrónico', 'Método de pago', 'Nombre del titular de la tarjeta', 'Dirección de facturación', 'Total a pagar hoy'). Zero Catalan tokens present."
+}

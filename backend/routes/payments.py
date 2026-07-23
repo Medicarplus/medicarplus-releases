@@ -234,6 +234,8 @@ async def create_subscription(body: CreateSubscriptionBody, request: Request):
             cancel_url=cancel_url,
             allow_promotion_codes=True,
             billing_address_collection="required",
+            # Força castellà a tota la UI de Stripe Checkout (evita mescla es/ca)
+            locale="es",
             metadata={
                 "mode": "subscription",
                 "package_id": body.package_id,
