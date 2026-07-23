@@ -872,21 +872,28 @@ async function submitTrial(){
   if(!consent){ errBox.textContent='⚠️ Debes aceptar la política de privacidad para continuar.'; errBox.style.display='block'; return; }
   btn.disabled = true;
   btn.textContent = '⏳ Generando tu licencia…';
+  // Timeout explícit de 25s (l'endpoint respon <1s ara amb email en background)
+  const ctrl = new AbortController();
+  const to = setTimeout(()=>ctrl.abort(), 25000);
   try{
     const r = await fetch(TRIAL_API, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({name, email, company: company||null, consent: true, website})
+      body: JSON.stringify({name, email, company: company||null, consent: true, website}),
+      signal: ctrl.signal
     });
+    clearTimeout(to);
     const data = await r.json().catch(()=>({}));
     if(!r.ok){
       const msg = (data && data.detail) ? data.detail : 'HTTP '+r.status;
       throw new Error(msg);
     }
     document.getElementById('trial-key-display').textContent = data.license_key || '';
-    // Ajusta la nota d'email segons si s'ha enviat de veritat
+    // Ajusta la nota d'email segons el flux (email en background)
     const note = document.getElementById('trial-email-note');
-    if(data.email_sent){
+    if(data.email_pending){
+      note.innerHTML = '✉️ Enviando email a <b>' + email + '</b>… debería llegar en menos de 1 minuto. Si no lo ves, revisa la carpeta de spam. <b>Copia la clave</b> de arriba por si acaso.';
+    } else if(data.email_sent){
       note.textContent = '✉️ Email enviado a ' + email + '. Si no lo ves, revisa la carpeta de spam.';
     } else {
       note.innerHTML = '⚠️ El envío de email ha fallado, pero tu licencia está activa. <b>Copia la clave</b> de arriba antes de cerrar. Si necesitas soporte: <a href="mailto:info@medicarplus.es" style="color:#f5b301">info@medicarplus.es</a>';
@@ -894,8 +901,10 @@ async function submitTrial(){
     document.getElementById('trialForm').style.display = 'none';
     document.getElementById('trialSuccess').style.display = 'block';
   }catch(err){
+    clearTimeout(to);
     console.error('[Trial]', err);
-    errBox.textContent = '⚠️ ' + (err.message || 'No se ha podido generar la licencia. Contacta con info@medicarplus.es.');
+    const isAbort = err.name === 'AbortError';
+    errBox.textContent = '⚠️ ' + (isAbort ? 'La solicitud tarda demasiado. Revisa tu conexión e inténtalo de nuevo, o escríbenos a info@medicarplus.es.' : (err.message || 'No se ha podido generar la licencia. Contacta con info@medicarplus.es.'));
     errBox.style.display = 'block';
     btn.disabled = false;
     btn.textContent = '🎁 Empezar prueba gratuita ahora';

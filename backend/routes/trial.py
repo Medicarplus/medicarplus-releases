@@ -16,11 +16,12 @@ import logging
 import os
 import re
 import uuid
+import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt as _jwt
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, EmailStr, Field
 
@@ -63,7 +64,7 @@ def build_trial_router(db: AsyncIOMotorDatabase) -> APIRouter:
     router = APIRouter(prefix="/trial", tags=["trial"])
 
     @router.post("/start")
-    async def start_trial(body: TrialStartBody, request: Request):
+    async def start_trial(body: TrialStartBody, request: Request, background_tasks: BackgroundTasks):
         # 1) Honeypot antispam
         if body.website and body.website.strip():
             logger.info("trial honeypot triggered by %s", body.email)
@@ -123,22 +124,32 @@ def build_trial_router(db: AsyncIOMotorDatabase) -> APIRouter:
         await db.licenses.insert_one(doc)
         logger.info("Auto-trial created for %s (install_id=%s)", email_norm, install_id)
 
-        # 5) Envia email amb clau + PDFs (mateix mailer que Stripe)
-        email_sent = False
-        email_info = ""
-        try:
-            from services import mailer as _mailer
-            email_sent, email_info = await _mailer.send_license_email(
-                to_email=email_norm,
-                client_name=body.name.strip() or email_norm,
-                install_id=install_id,
-                license_key=jwt_key,
-                plan=TRIAL_PLAN,
-                expires_at=expires_at,
-            )
-            logger.info("Trial email → %s: sent=%s info=%s", email_norm, email_sent, email_info)
-        except Exception as ex:  # noqa: BLE001
-            logger.exception("Trial email failed: %s", ex)
+        # 5) Envia email en BACKGROUND (no bloqueja la resposta HTTP).
+        # L'usuari rep la clau al moment i l'email arriba als 5-15s per correu.
+        async def _send_email_bg():
+            try:
+                from services import mailer as _mailer
+                sent, info = await _mailer.send_license_email(
+                    to_email=email_norm,
+                    client_name=body.name.strip() or email_norm,
+                    install_id=install_id,
+                    license_key=jwt_key,
+                    plan=TRIAL_PLAN,
+                    expires_at=expires_at,
+                )
+                logger.info("Trial email (bg) → %s: sent=%s info=%s", email_norm, sent, info)
+                # Marca el resultat al doc perquè el user pugui saber si va fallar
+                try:
+                    await db.licenses.update_one(
+                        {"id": license_id},
+                        {"$set": {"email_sent": sent, "email_info": info, "email_sent_at": _now().isoformat()}},
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.exception("failed to persist email status")
+            except Exception as ex:  # noqa: BLE001
+                logger.exception("Trial email failed in background: %s", ex)
+
+        background_tasks.add_task(_send_email_bg)
 
         return {
             "ok": True,
@@ -147,8 +158,9 @@ def build_trial_router(db: AsyncIOMotorDatabase) -> APIRouter:
             "plan": TRIAL_PLAN,
             "expires_at": expires_at.isoformat(),
             "days": TRIAL_DAYS,
-            "email_sent": email_sent,
-            "email_info": email_info if not email_sent else None,
+            "email_sent": True,  # optimista · s'envia en background
+            "email_pending": True,
+            "email_info": None,
             "download_url": "https://github.com/Medicarplus/medicarplus-releases/releases/latest",
         }
 
