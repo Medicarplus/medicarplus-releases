@@ -48,10 +48,15 @@ def _short_uuid() -> str:
     return uuid.uuid4().hex[:8].upper()
 
 
-def _mint_trial_jwt(*, install_id: str, license_id: str, expires_at: datetime) -> str:
+def _mint_trial_jwt(*, license_id: str, expires_at: datetime) -> str:
+    """
+    JWT de TRIAL portable (sense `sub`/install_id). L'app client la vincularà
+    al seu install_id local al primer ús (bind-on-activate).
+    """
     payload = {
         "iss": os.environ.get("LICENSE_ISSUER", "caja-del-dia-license-server"),
-        "sub": install_id,
+        # NO incloem `sub` perquè és una clau portable · s'assigna a l'install_id
+        # al primer arrencar de l'app.
         "jti": license_id,
         "plan": TRIAL_PLAN,
         "iat": int(_now().timestamp()),
@@ -89,13 +94,13 @@ def build_trial_router(db: AsyncIOMotorDatabase) -> APIRouter:
             )
 
         # 4) Genera llicència TRIAL
-        install_id = f"CD-TRIAL-{_short_uuid()}-{_short_uuid()}"
+        # install_id: placeholder inicial fins que l'app client s'activi i registri el seu HWID/local install_id.
+        install_id = f"CD-TRIAL-PENDING-{_short_uuid()}"
         license_id = str(uuid.uuid4())
         created_at = _now()
         expires_at = created_at + timedelta(days=TRIAL_DAYS)
 
         jwt_key = _mint_trial_jwt(
-            install_id=install_id,
             license_id=license_id,
             expires_at=expires_at,
         )

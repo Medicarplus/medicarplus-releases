@@ -6427,17 +6427,29 @@ function saveLicense(lic){localStorage.setItem(LIC.KEY,JSON.stringify(lic));loca
 const JWT_RE=/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 const LEGACY_RE=/^MB-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
 function _b64urlDecode(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return decodeURIComponent(atob(s).split('').map(c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join(''));}
-function _decodeJwtPayload(jwt){const parts=jwt.split('.');if(parts.length!==3)throw new Error('JWT malformat');return JSON.parse(_b64urlDecode(parts[1]));}
+function _decodeJwtPayload(jwt){const parts=jwt.split('.');if(parts.length!==3)throw new Error('JWT malformado');return JSON.parse(_b64urlDecode(parts[1]));}
+function _isPortableSub(sub){
+  // Subs portables (bind-on-activate al primer arrencar de l'app):
+  // - Trials automàtics (`CD-TRIAL-...`)
+  // - Subscripcions Stripe emeses abans que el client fes activació (`CD-STRIPE-...`)
+  // - JWTs sense `sub` explícit
+  // El servidor s'encarrega de vincular l'install_id real la primera vegada.
+  if(!sub) return true;
+  var s = String(sub).toUpperCase();
+  return s.indexOf('CD-TRIAL-')===0 || s.indexOf('CD-STRIPE-')===0 || s === 'PORTABLE' || s === 'ANY';
+}
 function _validateJwtLocal(jwt,installId){
-  let p;try{p=_decodeJwtPayload(jwt)}catch(e){return {ok:false,reason:'JWT invàlid: '+e.message}}
-  if(!p||typeof p!=='object')return {ok:false,reason:'JWT invàlid'};
-  if(p.sub&&p.sub!==installId)return {ok:false,reason:"La clau no correspon a aquesta instal·lació"};
-  if(p.exp){const now=Math.floor(Date.now()/1000);if(p.exp<now)return {ok:false,reason:'Llicència expirada'};}
-  const expLabel=p.exp?new Date(p.exp*1000).toLocaleDateString('ca-ES'):'PERPÈTUA';
-  return {ok:true,type:'JWT',plan:p.plan||'STD',centre:'Client comercial',expires:expLabel,expTs:p.exp?p.exp*1000:null,payload:p};
+  let p;try{p=_decodeJwtPayload(jwt)}catch(e){return {ok:false,reason:'JWT inválido: '+e.message}}
+  if(!p||typeof p!=='object')return {ok:false,reason:'JWT inválido'};
+  if(p.sub && !_isPortableSub(p.sub) && p.sub!==installId)return {ok:false,reason:'La clave no corresponde a esta instalación'};
+  if(p.exp){const now=Math.floor(Date.now()/1000);if(p.exp<now)return {ok:false,reason:'Licencia expirada'};}
+  const isCA = (typeof currentLang!=='undefined' && currentLang==='ca');
+  const locale = isCA ? 'ca-ES' : 'es-ES';
+  const expLabel=p.exp?new Date(p.exp*1000).toLocaleDateString(locale):(isCA?'PERPÈTUA':'PERPETUA');
+  return {ok:true,type:'JWT',plan:p.plan||'STD',centre:(isCA?'Client comercial':'Cliente comercial'),expires:expLabel,expTs:p.exp?p.exp*1000:null,payload:p};
 }
 function validateKey(key,installId){
-  if(!key)return {ok:false,reason:'Clau buida'};
+  if(!key)return {ok:false,reason:'Clave vacía'};
   const raw=key.trim();
   if(raw.toUpperCase()===LIC.MASTER_KEY)return {ok:true,type:'MASTER',centre:'MediCar Plus (owner)',expires:'PERMANENT'};
   if(JWT_RE.test(raw))return _validateJwtLocal(raw,installId);
@@ -6447,10 +6459,10 @@ function validateKey(key,installId){
     let sum=0;for(let i=0;i<digits.length;i++)sum=(sum*31+digits.charCodeAt(i))%100000;
     const installDigits=installId.replace(/[^A-Z0-9]/g,'');
     let installSum=0;for(let i=0;i<installDigits.length;i++)installSum=(installSum*17+installDigits.charCodeAt(i))%100000;
-    if(sum===installSum||(sum%1000)===(installSum%1000))return {ok:true,type:'STD',centre:'Client comercial',expires:'ANUAL'};
-    return {ok:false,reason:'Clau no vàlida per aquesta instal·lació'};
+    if(sum===installSum||(sum%1000)===(installSum%1000))return {ok:true,type:'STD',centre:'Cliente comercial',expires:'ANUAL'};
+    return {ok:false,reason:'Clave no válida para esta instalación'};
   }
-  return {ok:false,reason:'Format incorrecte. Introdueix una clau JWT (xxx.yyy.zzz) o MB-XXXX-XXXX-XXXX-XXXX'};
+  return {ok:false,reason:'Formato incorrecto. Introduce una clave JWT (xxx.yyy.zzz) o MB-XXXX-XXXX-XXXX-XXXX'};
 }
 function _getHwid(){
   // Prefer HWID del preload Electron (fort). Fallback a fingerprint de navegador (feble).
@@ -6954,6 +6966,138 @@ setTimeout(()=>{
     });
   }
   window.syncNow = runSyncCycle;
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+
+<!-- ============================================================================
+     AUTO PLAN REFRESH · detecta upgrades Stripe i actualitza la llicència local
+     sense demanar cap clau nova a l'usuari.
+============================================================================ -->
+<script>
+(function(){
+  'use strict';
+  const POLL_INTERVAL_MS = 30 * 1000;      // Cada 30s (barat pel servidor)
+  const FAST_POLL_MS = 5 * 1000;           // Cada 5s durant els primers 2 minuts de sessió (per detectar upgrades acabats de fer)
+  const FAST_POLL_WINDOW_MS = 2 * 60 * 1000;
+  const bootedAt = Date.now();
+
+  function getApiUrl(path){
+    let base = '';
+    try{
+      if(location && /^https?:$/.test(location.protocol)) base = location.origin;
+      else if(typeof getApiBase==='function') base = getApiBase() || '';
+      else if(window.API_BASE) base = window.API_BASE;
+    }catch(e){}
+    return (base||'').replace(/\/$/,'') + path;
+  }
+  function loadLocalLic(){ try{return JSON.parse(localStorage.getItem('caja.license.v1')||'null')}catch(e){return null} }
+  function saveLocalLic(lic){ try{localStorage.setItem('caja.license.v1', JSON.stringify(lic))}catch(e){} }
+  function getInstallId(){ return localStorage.getItem('caja.install.id.v1')||localStorage.getItem('caja.install.v1')||''; }
+  function decodeJwtPayload(jwt){
+    try{
+      const parts = String(jwt||'').split('.');
+      if(parts.length!==3) return null;
+      let p = parts[1].replace(/-/g,'+').replace(/_/g,'/');
+      while(p.length%4) p += '=';
+      return JSON.parse(decodeURIComponent(atob(p).split('').map(c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join('')));
+    }catch(e){ return null }
+  }
+  const PLAN_RANK = { TRIAL:1, STD:2, STANDARD:2, PREMIUM:3, PRM:3 };
+  function planRank(p){ return PLAN_RANK[String(p||'').toUpperCase()] || 0; }
+  function toast(msg, ms){
+    try{
+      if(typeof window.toast === 'function') return window.toast(msg, ms||5000);
+      // fallback simple
+      const t=document.createElement('div');
+      t.textContent=msg;
+      t.style.cssText='position:fixed;bottom:60px;right:20px;background:#22c55e;color:#0b1121;padding:14px 20px;border-radius:8px;font-weight:800;z-index:99999;box-shadow:0 10px 30px rgba(34,197,94,.4);font-family:Georgia,serif;max-width:340px';
+      document.body.appendChild(t);
+      setTimeout(()=>t.remove(), ms||5000);
+    }catch(e){}
+  }
+
+  async function pollAutoUpgrade(){
+    const lic = loadLocalLic();
+    if(!lic || !lic.key) return;
+    // Master no s'actualitza
+    if((lic.type||'').toUpperCase()==='MASTER') return;
+    const installId = getInstallId();
+    // Pot ser útil també l'email de la llicència (per emparellar trials abans que el JWT tingui l'install_id lligat)
+    const email = (lic.email || (decodeJwtPayload(lic.key)||{}).email || '').trim();
+    if(!installId && !email) return;
+
+    const qs = new URLSearchParams();
+    if(installId) qs.set('install_id', installId);
+    if(email) qs.set('email', email);
+    let data;
+    try{
+      const r = await fetch(getApiUrl('/api/licenses/current?')+qs.toString(), {cache:'no-store'});
+      if(!r.ok) return;
+      data = await r.json();
+    }catch(e){ return; }
+    if(!data || !data.found || !data.license_key) return;
+
+    // Compara el JWT actual amb el que ens retorna el servidor
+    const localPayload = decodeJwtPayload(lic.key) || {};
+    const remotePayload = decodeJwtPayload(data.license_key) || {};
+    const localJti = localPayload.jti;
+    const remoteJti = remotePayload.jti;
+    const localPlan = String(lic.plan || localPayload.plan || '').toUpperCase();
+    const remotePlan = String(data.plan || remotePayload.plan || '').toUpperCase();
+
+    // Cas 1: mateixa jti → cap canvi
+    if(localJti && remoteJti && localJti === remoteJti){
+      // Si el pla local no coincideix amb el remot (ex: el webhook ha actualitzat), corregim-ho localment
+      if(remotePlan && localPlan !== remotePlan){
+        const wasLower = planRank(remotePlan) > planRank(localPlan);
+        lic.plan = remotePlan; lic.type = 'JWT'; saveLocalLic(lic);
+        try{ if(typeof refreshUtilitiesPremiumUI==='function') refreshUtilitiesPremiumUI(); }catch(e){}
+        if(wasLower) toast('🎉 Plan actualizado a '+remotePlan+' automáticamente', 6500);
+      }
+      return;
+    }
+
+    // Cas 2: JWT diferent → auto-substitució (només si el nou és >= actual)
+    // (evitem que un downgrade accidental esborri un premium encara vàlid)
+    if(planRank(remotePlan) < planRank(localPlan)) return;
+
+    const newLic = {
+      key: data.license_key,
+      type: 'JWT',
+      plan: remotePlan,
+      centre: data.client_name || lic.centre || 'Cliente comercial',
+      expires: remotePayload.exp ? new Date(remotePayload.exp*1000).toLocaleDateString('es-ES') : (lic.expires||'—'),
+      expTs: remotePayload.exp ? remotePayload.exp*1000 : (lic.expTs||null),
+      activated: new Date().toISOString(),
+      installId: installId,
+      email: data.client_email || email || null,
+    };
+    saveLocalLic(newLic);
+    try{ localStorage.setItem('caja.license.lastcheck.v1', String(Date.now())); }catch(e){}
+    try{ if(typeof refreshUtilitiesPremiumUI==='function') refreshUtilitiesPremiumUI(); }catch(e){}
+    try{ if(typeof refreshCalendarButtonVisibility==='function') refreshCalendarButtonVisibility(); }catch(e){}
+    const wasUpgrade = planRank(remotePlan) > planRank(localPlan);
+    toast(wasUpgrade
+      ? '🎉 ¡Plan actualizado a '+remotePlan+'! Ya puedes usar las nuevas funciones.'
+      : '✓ Licencia refrescada automáticamente ('+remotePlan+')',
+      7000);
+  }
+
+  function scheduleNext(){
+    const withinFastWindow = (Date.now()-bootedAt) < FAST_POLL_WINDOW_MS;
+    const delay = withinFastWindow ? FAST_POLL_MS : POLL_INTERVAL_MS;
+    setTimeout(()=>{ pollAutoUpgrade().finally(scheduleNext); }, delay);
+  }
+
+  function boot(){
+    // Espera 3s inicials perquè s'estabilitzi la resta
+    setTimeout(()=>{ pollAutoUpgrade().finally(scheduleNext); }, 3000);
+    window.addEventListener('focus', ()=>{ setTimeout(pollAutoUpgrade, 500); });
+    window.addEventListener('online', ()=>{ setTimeout(pollAutoUpgrade, 500); });
+  }
+  window.checkPlanUpgradeNow = pollAutoUpgrade;
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();

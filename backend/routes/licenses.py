@@ -246,28 +246,34 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
     @_rate("60/minute")
     async def verify_license(request: Request, body: LicenseVerify) -> LicenseVerifyResponse:
         """Valida una llicència. Pública: la crida el client v2.html."""
-        # 1) Decode JWT
+        # 1) Decode JWT (sub és opcional per suportar claus portables: trials i Stripe)
         try:
             payload = jwt.decode(
                 body.key,
                 _secret(),
                 algorithms=[JWT_ALG],
                 issuer=_issuer(),
-                options={"require": ["iss", "sub", "jti", "iat"]},
+                options={"require": ["iss", "jti", "iat"]},
             )
         except jwt.ExpiredSignatureError:
             return LicenseVerifyResponse(
-                ok=False, expired=True, reason="Llicència expirada", install_id=body.install_id
+                ok=False, expired=True, reason="Licencia expirada", install_id=body.install_id
             )
         except jwt.InvalidTokenError as ex:
-            return LicenseVerifyResponse(ok=False, reason=f"Clau invàlida: {ex}",
+            return LicenseVerifyResponse(ok=False, reason=f"Clave inválida: {ex}",
                                          install_id=body.install_id)
 
-        # 2) Comprovem que el subject del JWT coincideix amb l'install_id enviat
-        if payload.get("sub") != body.install_id:
+        # 2) Comprovació del subject amb suport per claus portables (bind-on-verify)
+        jwt_sub = payload.get("sub")
+        portable = (
+            not jwt_sub
+            or str(jwt_sub).upper().startswith("CD-TRIAL-")
+            or str(jwt_sub).upper().startswith("CD-STRIPE-")
+        )
+        if jwt_sub and not portable and jwt_sub != body.install_id:
             return LicenseVerifyResponse(
                 ok=False,
-                reason="La clau no correspon a aquesta instal·lació",
+                reason="La clave no corresponde a esta instalación",
                 install_id=body.install_id,
             )
 
@@ -275,7 +281,7 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         doc = await coll.find_one({"id": payload["jti"]})
         if not doc:
             return LicenseVerifyResponse(
-                ok=False, reason="Llicència desconeguda al servidor",
+                ok=False, reason="Licencia desconocida en el servidor",
                 install_id=body.install_id,
             )
 
@@ -284,7 +290,7 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
                 ok=False,
                 revoked=True,
                 status="revoked",
-                reason=doc.get("revoked_reason") or "Llicència revocada",
+                reason=doc.get("revoked_reason") or "Licencia revocada",
                 install_id=body.install_id,
                 client_name=doc.get("client_name"),
                 plan=doc.get("plan"),
@@ -296,7 +302,7 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             await coll.update_one({"_id": doc["_id"]}, {"$set": {"status": "expired"}})
             return LicenseVerifyResponse(
                 ok=False, expired=True, status="expired",
-                reason="Llicència expirada",
+                reason="Licencia expirada",
                 install_id=body.install_id, client_name=doc.get("client_name"),
                 plan=doc.get("plan"), expires_at=expires_at,
             )
@@ -325,14 +331,31 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
                     hwid_mismatch=True,
                     status="active",
                     reason=(
-                        "Aquesta llicència està vinculada a un altre ordinador. "
-                        "Contacta amb el proveïdor per fer el canvi."
+                        "Esta licencia está vinculada a otro ordenador. "
+                        "Contacta con el proveedor para hacer el cambio."
                     ),
                     install_id=body.install_id,
                     client_name=doc.get("client_name"),
                     plan=doc.get("plan"),
                     expires_at=expires_at,
                 )
+
+        # 3.6) Install-ID bind-on-first-verify (per claus portables)
+        stored_install = (doc.get("install_id") or "").strip()
+        if body.install_id and (
+            not stored_install
+            or stored_install.upper().startswith("CD-TRIAL-PENDING-")
+            or stored_install.upper().startswith("CD-STRIPE-PENDING-")
+        ):
+            await coll.update_one(
+                {"_id": doc["_id"]},
+                {"$set": {
+                    "install_id": body.install_id,
+                    "install_id_bound_at": _now().isoformat(),
+                }},
+            )
+            logger.info("install_id binding for jti=%s → %s (was %s)",
+                        doc.get("id"), body.install_id, stored_install)
 
         # 4) Tot OK → actualitzem estadístiques
         await coll.update_one(
@@ -374,6 +397,55 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         await _audit(request, "license.revoke", body.install_id, extra={"reason": body.reason})
         updated = await coll.find_one({"_id": doc["_id"]})
         return _doc_to_record(updated)
+
+    # ---------- Current active license (public, per polling d'auto-upgrade) ----------
+    @router.get("/current")
+    @_rate("60/minute")
+    async def current_license(request: Request, install_id: str, email: Optional[str] = None) -> dict:
+        """
+        Retorna la llicència activa més recent per un install_id o email.
+        Usat pel polling del client per detectar auto-upgrades de plan
+        (ex: Trial → Standard/Premium després d'una compra Stripe).
+
+        Cerca en aquest ordre:
+        1) Llicència ACTIVE amb `install_id` exacte
+        2) Llicència ACTIVE portable (CD-TRIAL-PENDING/CD-STRIPE-*) amb `client_email` coincident
+        3) Llicència ACTIVE més recent per `client_email` (fallback)
+        """
+        install_id_norm = (install_id or "").strip()
+        email_norm = (email or "").strip().lower() or None
+        if not install_id_norm and not email_norm:
+            raise HTTPException(status_code=400, detail="install_id o email requerido")
+
+        doc = None
+        # 1) Match directe per install_id
+        if install_id_norm:
+            doc = await coll.find_one(
+                {"install_id": install_id_norm, "status": "active"},
+                sort=[("created_at", -1)],
+            )
+        # 2) Fallback per email (útil després d'un upgrade abans que la clau nova arribi)
+        if not doc and email_norm:
+            doc = await coll.find_one(
+                {"client_email": email_norm, "status": "active"},
+                sort=[("created_at", -1)],
+            )
+        if not doc:
+            return {"ok": False, "found": False}
+
+        return {
+            "ok": True,
+            "found": True,
+            "license_key": doc.get("license_key"),
+            "jti": doc.get("id"),
+            "install_id": doc.get("install_id"),
+            "plan": doc.get("plan"),
+            "status": doc.get("status"),
+            "expires_at": doc.get("expires_at"),
+            "client_name": doc.get("client_name"),
+            "client_email": doc.get("client_email"),
+            "source": doc.get("source") or doc.get("notes", "").split(" ")[0] if doc.get("notes") else None,
+        }
 
     # ---------- Stats (admin dashboard) ----------
     @router.get(
