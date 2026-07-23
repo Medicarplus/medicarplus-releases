@@ -6813,7 +6813,7 @@ function showLicenseInfo(){
     +'<h3 style="margin:0 0 14px 0;color:#f5b301;font-family:Georgia,serif">🔐 Informació de llicència</h3>'
     +'<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;margin-bottom:12px;font-family:\'Courier New\',monospace;font-size:12px;color:#cbd5e1;line-height:1.8">'
     +'<div><b style="color:#f5b301">ID Instal·lació:</b> '+installId+'</div>'
-    +'<div><b style="color:#f5b301">Clau:</b> <span style="word-break:break-all">'+keyDisplay+'</span></div>'
+    +'<div><b style="color:#f5b301">Clau:</b> <span style="word-break:break-all">'+keyDisplay+'</span> <button id="btnCopyLicKey" data-testid="btn-copy-lic-key" style="margin-left:6px;background:#f5b301;color:#0b1121;border:none;padding:2px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:800;font-family:Georgia,serif" title="Copiar la clau sencera">📋 Copiar</button></div>'
     +'<div><b style="color:#f5b301">Tipus:</b> '+((lic&&lic.type)||'—')+((lic&&lic.plan)?' · '+lic.plan:'')+'</div>'
     +'<div><b style="color:#f5b301">Centre:</b> '+((lic&&lic.centre)||'—')+'</div>'
     +'<div><b style="color:#f5b301">Expira:</b> '+((lic&&lic.expires)||'—')+'</div>'
@@ -6844,6 +6844,35 @@ function showLicenseInfo(){
   back.querySelector('[data-no]').onclick=()=>back.remove();
   back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
   back.querySelector('#btnDeactivate').onclick=()=>{if(confirm('Desactivar la llicència? Hauràs de tornar-la a introduir.')){localStorage.removeItem('caja.license.v1');location.reload()}};
+  // 📋 Copiar la clau sencera al portapapers
+  const btnCopyLic = back.querySelector('#btnCopyLicKey');
+  if(btnCopyLic){
+    btnCopyLic.onclick=async(ev)=>{
+      ev.stopPropagation();
+      const fullKey = (lic && lic.key) ? String(lic.key) : '';
+      if(!fullKey){ btnCopyLic.textContent='✗ Sin clave'; return; }
+      const btn = btnCopyLic;
+      const originalTxt = btn.textContent;
+      try{
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          await navigator.clipboard.writeText(fullKey);
+        } else {
+          // Fallback per contextos no-HTTPS (execCommand)
+          const ta = document.createElement('textarea');
+          ta.value = fullKey; ta.style.position='fixed'; ta.style.left='-9999px';
+          document.body.appendChild(ta); ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        btn.textContent='✓ Copiada!';
+        btn.style.background='#22c55e';
+        setTimeout(()=>{btn.textContent=originalTxt; btn.style.background='#f5b301';},1800);
+      }catch(e){
+        btn.textContent='✗ Error';
+        setTimeout(()=>{btn.textContent=originalTxt;},1800);
+      }
+    };
+  }
   // Vista prèvia de pla (només MASTER) → setejar override i recarregar per aplicar
   back.querySelectorAll('.plan-prev-btn').forEach(btn=>{
     btn.onclick=()=>{
