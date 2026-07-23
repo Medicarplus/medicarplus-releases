@@ -7023,8 +7023,12 @@ setTimeout(()=>{
   async function pollAutoUpgrade(){
     const lic = loadLocalLic();
     if(!lic || !lic.key) return;
-    // Master no s'actualitza
-    if((lic.type||'').toUpperCase()==='MASTER') return;
+    // Master normalment no s'actualitza, PERÒ si té preview activa (test client-flow) sí polling.
+    const isMaster = (lic.type||'').toUpperCase()==='MASTER';
+    const preview = (localStorage.getItem('caja.plan.preview.v1')||'').toUpperCase();
+    if(isMaster && !preview) return;
+    // Amb preview activa, farem polling però NO substituirem la llicència Master real,
+    // només mostrarem un toast informatiu perquè el propietari sàpiga que el webhook va bé.
     const installId = getInstallId();
     // Pot ser útil també l'email de la llicència (per emparellar trials abans que el JWT tingui l'install_id lligat)
     const email = (lic.email || (decodeJwtPayload(lic.key)||{}).email || '').trim();
@@ -7064,6 +7068,39 @@ setTimeout(()=>{
     // Cas 2: JWT diferent → auto-substitució (només si el nou és >= actual)
     // (evitem que un downgrade accidental esborri un premium encara vàlid)
     if(planRank(remotePlan) < planRank(localPlan)) return;
+
+    // Si l'usuari és MASTER amb preview activa: NO sobreescrivim la clau real,
+    // però ACTUALITZEM la preview al nou pla perquè vegi la transició completa
+    // (exactament com la veuria un client real). Això permet testejar Trial→Std,
+    // Trial→Premium, Std→Premium sense perdre la llicència Master.
+    const isMasterWithPreview = (lic.type||'').toUpperCase()==='MASTER' && !!(localStorage.getItem('caja.plan.preview.v1')||'');
+    if(isMasterWithPreview){
+      const prevPreview = (localStorage.getItem('caja.plan.preview.v1')||'').toUpperCase();
+      // Mapeja el pla remot al valor de preview (STD/PRM/TRIAL)
+      const previewValue = remotePlan==='PREMIUM' ? 'PRM' : (remotePlan==='STD' || remotePlan==='STANDARD' ? 'STD' : remotePlan==='TRIAL' ? 'TRIAL' : null);
+      if(previewValue && previewValue !== prevPreview){
+        localStorage.setItem('caja.plan.preview.v1', previewValue);
+        try{ if(typeof refreshUtilitiesPremiumUI==='function') refreshUtilitiesPremiumUI(); }catch(e){}
+        try{ if(typeof refreshCalendarButtonVisibility==='function') refreshCalendarButtonVisibility(); }catch(e){}
+        // Actualitza banner de vista prèvia si existeix
+        try{
+          const banner = document.getElementById('planPreviewBanner');
+          const lbl = document.getElementById('planPreviewLabel');
+          const labelMap = {
+            'STD':'💼 Vista prèvia: STANDARD (Premium bloquejat)',
+            'PRM':'⭐ Vista prèvia: PREMIUM',
+            'PREMIUM':'⭐ Vista prèvia: PREMIUM',
+            'TRIAL':'🎁 Vista prèvia: TRIAL (60 dies · Premium desbloquejat)'
+          };
+          if(lbl) lbl.textContent = labelMap[previewValue] || ('Vista prèvia: '+previewValue);
+          if(banner) banner.style.display = 'block';
+        }catch(e){}
+        toast('🎉 ¡Plan actualizado a '+remotePlan+' automáticamente! (Vista previa MASTER: se ha aplicado el nuevo plan como lo vería un cliente real. Tu clave MASTER sigue intacta.)', 9000);
+      } else {
+        toast('🔎 Webhook OK · Licencia '+remotePlan+' detectada para tu install_id', 5000);
+      }
+      return;
+    }
 
     const newLic = {
       key: data.license_key,
