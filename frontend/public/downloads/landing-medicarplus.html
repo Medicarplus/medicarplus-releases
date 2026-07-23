@@ -562,7 +562,10 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
 
           <!-- Codi de referit (opcional) · Aparegut si vé de ?ref=XXX o si l'usuari clica el link -->
           <div id="trial-referral-wrap" style="display:none;padding:10px 12px;background:rgba(168,85,247,.08);border:1px dashed rgba(168,85,247,.35);border-radius:8px;margin-top:6px">
-            <label for="trial-referral" style="display:block;font-size:12px;font-weight:700;color:#c4b5fd;margin-bottom:5px">🎁 Código de referido (opcional)</label>
+            <label for="trial-referral" style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;color:#c4b5fd;margin-bottom:5px">
+              <span>🎁 Código de referido (opcional)</span>
+              <span class="mp-tooltip" tabindex="0" title="Si un amigo cliente te ha dado un código, introdúcelo aquí. Cuando pagues tu primera suscripción tendrás 1 MES GRATIS extra, y él ganará 2 MESES GRATIS." style="cursor:help;background:#7c3aed;color:#fff;width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800">?</span>
+            </label>
             <input type="text" id="trial-referral" data-testid="trial-referral" placeholder="MC-XXXX-XXXX" maxlength="20" style="width:100%;padding:9px 12px;background:#020617;border:1.5px solid #7c3aed;border-radius:8px;color:#e2e8f0;font-size:13px;letter-spacing:1px;text-transform:uppercase;box-sizing:border-box;font-family:'Courier New',monospace">
             <div id="trial-referral-status" style="margin-top:6px;font-size:11px;color:#94a3b8;min-height:16px"></div>
           </div>
@@ -1028,19 +1031,30 @@ function openTrialModal(prefillEmail){
   // Pre-omple el codi de referit si en tenim
   try{
     const savedRef = sessionStorage.getItem('mp_referral_code') || '';
+    const wrap = document.getElementById('trial-referral-wrap');
+    const inp = document.getElementById('trial-referral');
+    const toggle = document.getElementById('trial-referral-toggle');
+    const status = document.getElementById('trial-referral-status');
     if(savedRef){
-      const wrap = document.getElementById('trial-referral-wrap');
-      const inp = document.getElementById('trial-referral');
-      const toggle = document.getElementById('trial-referral-toggle');
-      const status = document.getElementById('trial-referral-status');
       if(inp) inp.value = savedRef;
       if(wrap) wrap.style.display = 'block';
       if(toggle) toggle.style.display = 'none';
-      if(status && window.__referralInfo){
-        status.innerHTML = '✅ Código válido · Te ha referido <b style="color:#c4b5fd">' + (window.__referralInfo.referrer_name||'Cliente') + '</b>';
-        status.style.color = '#a7f3d0';
-      } else if(status){
-        status.innerHTML = '<span style="color:#94a3b8">Verificando código...</span>';
+      if(status){
+        // Re-consultem SEMPRE per si l'inicial validate encara no havia acabat
+        status.innerHTML = '<span style="color:#94a3b8">⏳ Verificando código...</span>';
+        const api = (typeof API_ROOT!=='undefined' && API_ROOT) ? API_ROOT : (location.origin);
+        fetch(api.replace(/\/$/,'') + '/api/referrals/validate?code=' + encodeURIComponent(savedRef))
+          .then(r=>r.json()).then(d=>{
+            if(d && d.valid){
+              window.__referralInfo = d;
+              status.innerHTML = '✅ Código válido · Te ha referido <b style="color:#c4b5fd">' + (d.referrer_name||'Cliente') + '</b> · Recibirás <b style="color:#3ddc97">1 mes gratis</b> al pagar tu 1er cargo';
+              status.style.color = '#a7f3d0';
+            } else {
+              status.innerHTML = '<span style="color:#f97316">⚠️ Código de referido no válido o expirado (se ignorará)</span>';
+            }
+          }).catch(()=>{
+            status.innerHTML = '<span style="color:#94a3b8">No se ha podido verificar (se enviará igualmente)</span>';
+          });
       }
     }
   }catch(e){}

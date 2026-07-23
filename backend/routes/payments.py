@@ -263,7 +263,6 @@ async def create_subscription(body: CreateSubscriptionBody, request: Request):
             customer_email=body.customer_email,
             success_url=success_url,
             cancel_url=cancel_url,
-            allow_promotion_codes=(discounts_arg is None),  # Stripe no permet mesclar
             billing_address_collection="required",
             # Força castellà a tota la UI de Stripe Checkout (evita mescla es/ca)
             locale="es",
@@ -287,8 +286,13 @@ async def create_subscription(body: CreateSubscriptionBody, request: Request):
                 },
             },
         )
+        # Stripe força exclusió mútua entre `discounts` i `allow_promotion_codes`.
+        # Si tenim descompte de referit, l'apliquem directament (sense promo codes).
+        # Si no, permetem que l'usuari introdueixi un codi promocional manualment.
         if discounts_arg:
             checkout_kwargs["discounts"] = discounts_arg
+        else:
+            checkout_kwargs["allow_promotion_codes"] = True
         session = stripe_sdk.checkout.Session.create(**checkout_kwargs)
     except stripe_sdk.error.StripeError as e:
         logger.error("Stripe subscription creation failed: %s", e)

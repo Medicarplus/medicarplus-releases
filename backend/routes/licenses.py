@@ -104,6 +104,11 @@ def _doc_to_record(doc: dict, include_key: bool = False) -> LicenseRecord:
         hwid_lock=doc.get("hwid_lock"),
         hwid_locked_at=_to_dt(doc.get("hwid_locked_at")),
         hwid_reset_count=int(doc.get("hwid_reset_count", 0) or 0),
+        linked_hwids=doc.get("linked_hwids"),
+        linked_install_ids=doc.get("linked_install_ids"),
+        referral_code=doc.get("referral_code"),
+        referred_by=doc.get("referred_by"),
+        referral_reward_count=int(doc.get("referral_reward_count", 0) or 0),
         license_key=doc.get("license_key") if include_key else None,
     )
 

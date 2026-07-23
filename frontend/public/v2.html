@@ -6649,8 +6649,11 @@ function showLicenseInfo(){
     +'</div>'
     +previewBlock
     +'<div id="referralBlock" style="display:none;background:linear-gradient(135deg,rgba(168,85,247,.12),rgba(34,197,94,.04));border:1.5px dashed #a855f7;border-radius:8px;padding:14px;margin-bottom:12px">'
-    +'<div style="font-weight:800;color:#e9d5ff;font-size:12px;letter-spacing:.5px;margin-bottom:8px">🎁 Programa de referidos · Gana 2 meses gratis</div>'
-    +'<div style="font-size:12px;color:#c4b5fd;line-height:1.5;margin-bottom:10px">Comparte tu código o enlace. Cuando un amigo <b>pague</b> su suscripción (trial no cuenta), recibes <b>+2 meses gratis</b> del mismo tipo que ya tienes.</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;font-weight:800;color:#e9d5ff;font-size:12px;letter-spacing:.5px;margin-bottom:8px">'
+    +'<span>🎁 Programa de referidos</span>'
+    +'<span class="ref-info-toggle" tabindex="0" title="¿Cómo funciona? · TÚ ganas 2 MESES GRATIS de tu plan actual cada vez que un cliente al que refieres PAGA su primera suscripción. · EL REFERIDO gana 1 MES GRATIS de su primera factura. · Trial no cuenta. · Comparte tu enlace y multiplica las ventajas." style="cursor:help;background:#a855f7;color:#fff;width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;user-select:none">?</span>'
+    +'</div>'
+    +'<div style="font-size:11.5px;color:#c4b5fd;line-height:1.5;margin-bottom:10px"><b>Tú ganas 2 meses gratis</b> · <b>El referido gana 1 mes gratis</b> (trial no cuenta).</div>'
     +'<div id="refCodeDisplay" style="font-family:\'Courier New\',monospace;font-size:16px;font-weight:800;color:#f5b301;background:#0b1121;padding:10px;border-radius:6px;text-align:center;letter-spacing:2px;margin-bottom:8px" data-testid="referral-code-display">Cargando...</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
     +'<button class="btn" id="btnCopyRefCode" data-testid="btn-copy-ref-code" style="flex:1;background:#a855f7;color:#fff;border-color:#a855f7">📋 Copiar código</button>'
@@ -6698,7 +6701,13 @@ function showLicenseInfo(){
       const paidPlans = ['STD','STANDARD','PRM','PREMIUM'];
       const canRefer = paidPlans.includes(planUp) && typeUp !== 'MASTER';
       if(!canRefer) return;
-      const api = (typeof getApiBase==='function' ? getApiBase() : (window.API_BASE||location.origin)).replace(/\/$/,'');
+      // Al navegador web usem l'origin actual (preview/prod). Només a Electron usem getApiBase()
+      let api = '';
+      if(location && /^https?:$/.test(location.protocol)){
+        api = location.origin.replace(/\/$/,'');
+      } else {
+        api = (typeof getApiBase==='function' ? getApiBase() : (window.API_BASE||'')).replace(/\/$/,'');
+      }
       const r = await fetch(api + '/api/referrals/my-code?install_id=' + encodeURIComponent(installId));
       const data = await r.json();
       if(!data || !data.ok || !data.referral_code) return;

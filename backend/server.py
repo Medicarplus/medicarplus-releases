@@ -365,15 +365,77 @@ async def _sync_license_from_subscription(sub: dict, install_id: str | None,
             prev_plan = str(existing.get("plan") or "").upper()
             new_plan = str(plan_family or "").upper()
             plan_changed = prev_plan != new_plan
+            # 🔁 Si el pla canvia (trial → paid, standard → premium…), NO fem UPDATE
+            # in-place perquè trencaríem la generació de referral_code i l'aplicació
+            # de recompenses del referrer. En comptes d'això, revoquem l'antic i
+            # creem un doc NOU (mateix flux que el branch else).
+            if plan_changed:
+                await db.licenses.update_one(
+                    {"id": existing["id"]},
+                    {"$set": {"status": "revoked",
+                              "revoked_at": _dt.now(_tz.utc).isoformat(),
+                              "revoked_reason": f"upgraded_from_{prev_plan}_to_{new_plan}"}},
+                )
+                # També heretem el referred_by de l'antic doc si el nou no en tenia
+                if not doc.get("referred_by") and existing.get("referred_by"):
+                    doc["referred_by"] = existing["referred_by"]
+                # Cal un id NOU pel doc nou (l'antic ha estat revocat però continua
+                # existint amb el mateix id → l'índex únic bloquejaria l'insert).
+                new_license_id = str(_uuid.uuid4())
+                doc["id"] = new_license_id
+                # Regenera el JWT amb el nou jti perquè coincideixi
+                payload_new = dict(payload)
+                payload_new["jti"] = new_license_id
+                doc["license_key"] = _jwt.encode(payload_new, secret, algorithm="HS256")
+                # Genera referral_code únic
+                try:
+                    from services.referrals import ensure_unique_referral_code
+                    doc["referral_code"] = await ensure_unique_referral_code(db.licenses)
+                except Exception as _rex:  # noqa: BLE001
+                    logger.warning("Could not generate referral_code on upgrade: %s", _rex)
+                await db.licenses.insert_one(doc)
+                # Aplica recompensa al referrer si hi ha codi vàlid
+                if doc.get("referred_by"):
+                    try:
+                        from services.referrals import find_active_referrer, apply_stripe_referral_reward
+                        referrer_doc = await find_active_referrer(db.licenses, doc["referred_by"])
+                        if referrer_doc:
+                            ok, info = await apply_stripe_referral_reward(
+                                referrer_doc=referrer_doc,
+                                referred_install_id=install_id,
+                                referred_email=client_email,
+                                referred_plan=plan_family,
+                                coll=db.licenses,
+                            )
+                            logger.info(
+                                "Referral reward (via trial-upgrade) for code=%s: ok=%s info=%s",
+                                doc["referred_by"], ok, info,
+                            )
+                    except Exception as _ref:  # noqa: BLE001
+                        logger.exception("Referral reward (upgrade path) failed: %s", _ref)
+                # Envia email amb la nova clau
+                if client_email:
+                    try:
+                        from services import mailer as _mailer
+                        sent, info = await _mailer.send_license_email(
+                            to_email=client_email,
+                            client_name=company_name or client_email,
+                            install_id=install_id,
+                            license_key=jwt_key,
+                            plan=plan_family,
+                            expires_at=expires_at,
+                            subject_prefix=f"Plan actualizado a {new_plan}",
+                        )
+                        logger.info("Upgrade email (%s → %s) → %s: sent=%s info=%s",
+                                    prev_plan, new_plan, client_email, sent, info)
+                    except Exception as _em:  # noqa: BLE001
+                        logger.exception("Upgrade email failed: %s", _em)
+                return
+            # No canvi de pla → simple $set (renovació, canvi de període…)
             await db.licenses.update_one({"id": license_id}, {"$set": doc})
-            # 🆕 Envia email SEMPRE que canvii el pla o es renovi la llicència (útil per activar altres dispositius)
             if client_email:
                 try:
                     from services import mailer as _mailer
-                    if plan_changed:
-                        subject_ctx = f"Pla actualitzat a {new_plan}"
-                    else:
-                        subject_ctx = f"Renovació subscripció {new_plan}"
                     sent, info = await _mailer.send_license_email(
                         to_email=client_email,
                         client_name=company_name or client_email,
@@ -381,7 +443,7 @@ async def _sync_license_from_subscription(sub: dict, install_id: str | None,
                         license_key=jwt_key,
                         plan=plan_family,
                         expires_at=expires_at,
-                        subject_prefix=subject_ctx,
+                        subject_prefix=f"Renovación suscripción {new_plan}",
                     )
                     logger.info("Stripe subscription UPDATE email → %s (plan=%s): sent=%s info=%s",
                                 client_email, new_plan, sent, info)

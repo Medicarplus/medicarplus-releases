@@ -1,0 +1,63 @@
+{
+  "summary": "Iteration 24 · REGRESSION verified: both critical bugs from iter23 are FIXED and additional E2E + regression flows are green. Pytest: 17/17 PASSED across tests/test_iter23_referrals.py (10/10) and tests/test_iter24_regression.py (7/7). Frontend landing?ref= flow: sessionStorage capture ✓, modal pre-fill ✓, status label shows 'Código válido · Te ha referido X · Recibirás 1 mes gratis'  ✓. Admin dashboard '🎁 Codi referit' column: header rendered ✓, code button visible ✓, click triggers correct alert ('Codi copiat: MC-…\\n\\nEnllaç: https://medicarplus.es/?ref=…\\n\\nReferits fins ara: N') ✓. Fixed 1 additional minor bug found during retest (see rca_of_the_issue).",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "services/referrals.py (regex REF_CODE_PATTERN)",
+        "issue": "Referral code format is STRICTLY `^MC-[A-Z0-9]{4}-[A-Z0-9]{4}$` (4-char groups). The problem statement referenced 'MC-E2E-9999' (E2E = 3 chars) which silently fails validation both server-side (find_active_referrer returns None → no reward) AND client-side (initReferralCapture skips sessionStorage save). For the test to pass, we used 'MC-E2E9-9999' instead. No user impact in production because auto-generated codes always use 4-char groups, but any hand-crafted admin code that violates the format will silently fail. Consider improving the error path (log a warning when a malformed code is received)."
+      },
+      {
+        "endpoint": "services/referrals.py::apply_stripe_referral_reward",
+        "issue": "When the referrer HAS a stripe_subscription_id but Stripe.Subscription.modify() raises (e.g. invalid sub id, expired, network), the function returns (False, 'stripe_error:...') and NEVER records the reward. The referrer permanently loses the +2m credit even though the referred customer paid. Consider a fallback: on Stripe failure, still call _record_reward with info='stripe_failed_fallback' + _extend_license_expiration, OR at minimum push a pending reward for manual retry."
+      }
+    ]
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "test_report_links": [
+    "/app/backend/tests/test_iter23_referrals.py",
+    "/app/backend/tests/test_iter24_regression.py",
+    "/app/test_reports/pytest/pytest_iter24_final.xml"
+  ],
+
+  "action_items": [
+    "OPTIONAL: In services/referrals.py, log a WARNING when a `referred_by` code arrives that fails is_valid_referral_format(), instead of silently ignoring it. Would catch cases like 'MC-E2E-9999' (3-char group) early during QA.",
+    "OPTIONAL: In apply_stripe_referral_reward, when the Stripe.Subscription.modify path fails, fall back to _record_reward + _extend_license_expiration (or push a pending reward for manual retry) so the referrer never silently loses their +2m credit."
+  ],
+
+  "critical_code_review_comments": [
+    "Bug A fix VERIFIED: routes/payments.py L292-295 now uses if/else — mutual exclusion between discounts and allow_promotion_codes preserved. Confirmed by 4 pytest scenarios (referred + non-referred + invalid-ref + idempotency) all returning HTTP 200 with valid Stripe checkout URLs.",
+    "Bug B fix VERIFIED (with 1 sub-bug fixed by me): server.py::_sync_license_from_subscription trial→paid branch now revokes trial + inserts new paid doc with generated referral_code + applies referrer reward. However, the original patch reused existing['id'] for the new doc, which collides with the unique `id_1` index (the revoked trial still occupies that id). I patched this by generating a NEW uuid + re-encoding the JWT with the new jti — see /app/backend/server.py L382-389.",
+    "routes/licenses.py::_doc_to_record was NOT mapping the new referral fields (referral_code, referred_by, referral_reward_count, linked_hwids, linked_install_ids) even though they exist on the LicenseRecord model + are stored in DB. Admin dashboard column always showed '—'. FIXED: added the 5 fields to the converter (L107-111).",
+    "services/referrals.py idempotent coupon-retrieve pattern (MEDICAR_REFERRED_1M) confirmed via source inspection and via 2 consecutive successful referred checkouts (no CouponAlreadyExists error).",
+    "frontend/public/downloads/landing-medicarplus.html openTrialModal() now re-triggers the /api/referrals/validate fetch every time the modal opens (fixes iter23 minor issue where status stuck at 'Verificando código...' if modal opened before initial fetch resolved)."
+  ],
+
+  "updated_files": [
+    "/app/backend/server.py (fix: generate new uuid + re-mint JWT when plan_changed to avoid duplicate-key on unique `id` index)",
+    "/app/backend/routes/licenses.py (fix: map referral_code, referred_by, referral_reward_count, linked_hwids, linked_install_ids in _doc_to_record so admin GET /api/licenses returns them)",
+    "/app/backend/tests/test_iter24_regression.py (new: 7 tests covering direct-checkout, idempotency, non-referred regression, and full E2E trial→paid inheritance + reward)",
+    "/app/test_reports/pytest/pytest_iter24_final.xml (new: JUnit XML)",
+    "/app/test_reports/iteration_24.json (this file)"
+  ],
+
+  "success_rate": {"backend": "17/17 (100%)", "frontend": "100% — landing capture + modal validation + admin column + copy button all verified"},
+
+  "test_credentials": "Admin token: MB-ADMIN-BRUGULAT-2026-4F8E2A1C (used for /admin login). Test referral code used: MC-E2E9-9999 (valid 4-char groups; the problem-statement 'MC-E2E-9999' fails the regex).",
+
+  "seed_data_creation": "Automatic module-scoped pytest fixtures create + teardown all test docs. Test-only referrer license (referral_code=MC-E2E9-9999, install_id=CD-E2E-REF, CD-E2E-REF-FE, or CD-REF-TEST-1 depending on suite) is cleaned up after each module. FE seed doc for the admin browser test was also cleaned up post-run. Post-testing DB scan confirmed 0 residual test rows.",
+
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+
+  "context_for_next_testing_agent": "Iteration 23's two critical bugs (A: Stripe mutual-exclusion; B: trial-upgrade skipped reward) are fully verified. During iter24 retest, one additional bug was found + fixed in the same trial-upgrade code path (duplicate id on unique index) and one converter-mapping bug in routes/licenses.py::_doc_to_record. Both are surgical fixes and safe. Only remaining open items are two OPTIONAL enhancements (see action_items) — neither blocks the referral program shipping. If future changes touch the trial→paid path, re-run: `cd /app/backend && pytest tests/test_iter23_referrals.py tests/test_iter24_regression.py -v`.",
+
+  "rca_of_the_issue": "Bug A (Stripe mutual-exclusion): FIXED at routes/payments.py L292-295 by moving `discounts` / `allow_promotion_codes` into a conditional if/else on `discounts_arg`. Verified by 4 test cases. Bug B (trial→paid skipped reward): FIXED at server.py L372-433 by revoking the old trial doc + inserting a NEW paid doc that goes through the full referral_code-generation + reward-application flow. During retest, a follow-up bug surfaced: the new doc was inserted with the SAME `id` as the revoked trial doc → DuplicateKeyError on the unique `id_1` index. Fixed by generating `new_license_id = str(_uuid.uuid4())`, assigning to `doc['id']`, and re-encoding the JWT with the new `jti`. Additionally found: routes/licenses.py::_doc_to_record dropped referral_code/referred_by/referral_reward_count/linked_hwids/linked_install_ids when converting docs to LicenseRecord, so the admin dashboard column stayed empty even after the seed had populated these fields. Fixed by adding the 5 fields to the converter."
+}

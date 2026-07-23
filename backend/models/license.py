@@ -95,6 +95,13 @@ class LicenseRecord(BaseModel):
     hwid_lock: Optional[str] = None
     hwid_locked_at: Optional[datetime] = None
     hwid_reset_count: int = 0
+    # Multi-dispositiu: HWIDs i install_ids addicionals (Premium fins a 2)
+    linked_hwids: Optional[list[str]] = None
+    linked_install_ids: Optional[list[str]] = None
+    # Programa de referits
+    referral_code: Optional[str] = None
+    referred_by: Optional[str] = None
+    referral_reward_count: Optional[int] = 0
     # La clau JWT — es retorna només al moment de generar-la. En verificar
     # només retornem metadades.
     license_key: Optional[str] = None

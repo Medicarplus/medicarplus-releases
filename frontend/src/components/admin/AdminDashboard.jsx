@@ -860,6 +860,7 @@ export default function AdminDashboard({ onLogout }) {
                       <th style={th}>Email</th>
                       <th style={th}>Plan</th>
                       <th style={th}>Estat</th>
+                      <th style={th}>🎁 Codi referit</th>
                       <th style={th}>Creada</th>
                       <th style={th}>Caduca</th>
                       <th style={th}>Verify #</th>
@@ -869,7 +870,7 @@ export default function AdminDashboard({ onLogout }) {
                   <tbody>
                     {filteredLicenses.length === 0 && (
                       <tr>
-                        <td colSpan={9} style={{ ...td, textAlign: "center", color: "#64748b", padding: 32 }}>
+                        <td colSpan={10} style={{ ...td, textAlign: "center", color: "#64748b", padding: 32 }}>
                           {loading ? "Carregant…" : "Cap llicència"}
                         </td>
                       </tr>
@@ -883,6 +884,28 @@ export default function AdminDashboard({ onLogout }) {
                         <td style={{ ...td, color: "#94a3b8" }}>{l.client_email || "—"}</td>
                         <td style={td}>{l.plan}</td>
                         <td style={td}>{statusBadge(l.status)}</td>
+                        <td style={{ ...td, fontFamily: "'Courier New',monospace", fontSize: 11 }}>
+                          {l.referral_code ? (
+                            <button
+                              data-testid={`copy-ref-${l.install_id}`}
+                              onClick={() => {
+                                try { navigator.clipboard.writeText(l.referral_code); } catch(_){}
+                                alert(`Codi copiat: ${l.referral_code}\n\nEnllaç: https://medicarplus.es/?ref=${l.referral_code}\n\nReferits fins ara: ${l.referral_reward_count || 0}`);
+                              }}
+                              title={`Codi de referit · ${l.referral_reward_count || 0} referits`}
+                              style={{ background: "transparent", border: "1px solid #a855f7", color: "#c4b5fd", padding: "3px 8px", borderRadius: 4, cursor: "pointer", fontFamily: "inherit", fontSize: 11 }}
+                            >
+                              {l.referral_code}
+                              {(l.referral_reward_count || 0) > 0 && (
+                                <span style={{ marginLeft: 4, background: "#22c55e", color: "#0b1121", padding: "1px 5px", borderRadius: 8, fontSize: 10, fontWeight: 800 }}>
+                                  +{l.referral_reward_count}
+                                </span>
+                              )}
+                            </button>
+                          ) : (
+                            <span style={{ color: "#64748b" }}>—</span>
+                          )}
+                        </td>
                         <td style={{ ...td, color: "#94a3b8" }}>{fmtDate(l.created_at)}</td>
                         <td style={{ ...td, color: "#94a3b8" }}>
                           {l.expires_at ? fmtDate(l.expires_at) : "Perpètua"}
