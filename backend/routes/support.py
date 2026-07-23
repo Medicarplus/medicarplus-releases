@@ -192,8 +192,8 @@ def build_router(db):
                 fields.append({"name": "Versió app", "value": body.app_version, "inline": True})
             background_tasks.add_task(
                 send_discord_notification,
-                title="🖥️ SOL·LICITUD ASSISTÈNCIA REMOTA",
-                description=f"**Problema:**\n{body.issue[:1500]}",
+                title="🖥️ Solicitar asistencia remota",
+                description=f"**Motivo de la asistencia:**\n{body.issue[:1500]}",
                 color=COLOR_REMOTE_ASSIST,
                 fields=fields,
                 footer_text=f"Ticket: {ticket_id[:8]}",
