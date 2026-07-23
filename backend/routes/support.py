@@ -44,7 +44,7 @@ def _send_email_smtp(payload: ContactPayload, ticket_id: str) -> tuple[bool, Opt
     pwd = os.environ.get("SMTP_PASS", "").strip()
     port = int(os.environ.get("SMTP_PORT", "587") or 587)
     sender = os.environ.get("SMTP_FROM", user).strip() or user
-    recipient = os.environ.get("SUPPORT_INBOX", "info@medicarplus.es").strip()
+    recipient = os.environ.get("SUPPORT_INBOX", "suport@medicarplus.es").strip()
 
     if not (host and user and pwd):
         return False, "SMTP no configurat"
