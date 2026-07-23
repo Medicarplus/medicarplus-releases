@@ -226,13 +226,17 @@ async def send_license_email(
     license_key: str,
     plan: str,
     expires_at: Optional[datetime],
+    subject_prefix: Optional[str] = None,
 ) -> tuple[bool, str]:
     """Envia l'email de llicència aprovada. Intenta Resend, fallback a SMTP.
 
     Returns:
         (sent, info). sent=True si algun mètode ha reeixit.
     """
-    subject = f"MediCar Plus · Licencia activada ({plan})"
+    if subject_prefix:
+        subject = f"MediCar Plus · {subject_prefix} ({plan})"
+    else:
+        subject = f"MediCar Plus · Licencia activada ({plan})"
     html = _render_html(
         client_name=client_name,
         install_id=install_id,

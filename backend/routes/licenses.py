@@ -307,55 +307,91 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
                 plan=doc.get("plan"), expires_at=expires_at,
             )
 
-        # 3.5) HWID lock: la 1a activació registra el HWID; les següents han de coincidir
+        # 3.5) HWID lock multi-dispositiu:
+        # · Standard/Trial: 1 HWID (hwid_lock)
+        # · Premium: fins a 2 HWIDs (hwid_lock + linked_hwids)
         stored_hwid = (doc.get("hwid_lock") or "").strip()
+        linked_hwids = [h for h in (doc.get("linked_hwids") or []) if h]
         req_hwid = (body.hwid or "").strip()
+        plan_upper = str(doc.get("plan") or "").upper()
+        max_devices = 2 if plan_upper == "PREMIUM" else 1
         if req_hwid:
-            if not stored_hwid:
-                # Primera vegada que aquest client verifica amb HWID → binding
+            all_bound = ([stored_hwid] if stored_hwid else []) + linked_hwids
+            if req_hwid in all_bound:
+                # Ja registrat, seguim endavant
+                pass
+            elif not stored_hwid:
+                # Primera vegada → binding principal
                 await coll.update_one(
                     {"_id": doc["_id"]},
-                    {"$set": {
-                        "hwid_lock": req_hwid,
-                        "hwid_locked_at": _now().isoformat(),
-                    }},
+                    {"$set": {"hwid_lock": req_hwid, "hwid_locked_at": _now().isoformat()}},
                 )
-                logger.info("HWID binding for %s → %s", body.install_id, req_hwid)
-            elif stored_hwid != req_hwid:
+                logger.info("HWID binding (primary) for %s → %s", body.install_id, req_hwid)
+            elif len(all_bound) < max_devices:
+                # Encara hi ha slots → afegim com a HWID vinculat (Premium 2n dispositiu)
+                new_linked = linked_hwids + [req_hwid]
+                await coll.update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": {"linked_hwids": new_linked,
+                              "linked_hwids_updated_at": _now().isoformat()}},
+                )
+                logger.info("HWID binding (device #%s) for %s → %s (plan=%s max=%s)",
+                            len(all_bound)+1, body.install_id, req_hwid, plan_upper, max_devices)
+            else:
+                # Slots plens → rebutgem
                 logger.warning(
-                    "HWID mismatch for %s (stored=%s, request=%s)",
-                    body.install_id, stored_hwid, req_hwid,
+                    "HWID limit reached for %s (bound=%s, request=%s, max=%s)",
+                    body.install_id, all_bound, req_hwid, max_devices,
+                )
+                msg_multi = (
+                    f"Esta licencia {plan_upper} ya está en uso en {max_devices} ordenador"
+                    f"{'es' if max_devices > 1 else ''}. "
+                    "Contacta con el proveedor para hacer el cambio."
                 )
                 return LicenseVerifyResponse(
                     ok=False,
                     hwid_mismatch=True,
                     status="active",
-                    reason=(
-                        "Esta licencia está vinculada a otro ordenador. "
-                        "Contacta con el proveedor para hacer el cambio."
-                    ),
+                    reason=msg_multi,
                     install_id=body.install_id,
                     client_name=doc.get("client_name"),
                     plan=doc.get("plan"),
                     expires_at=expires_at,
                 )
 
-        # 3.6) Install-ID bind-on-first-verify (per claus portables)
+        # 3.6) Install-ID bind: 1r dispositiu → `install_id` principal.
+        # Dispositius addicionals (Premium 2n dispositiu) → array `linked_install_ids`.
         stored_install = (doc.get("install_id") or "").strip()
-        if body.install_id and (
-            not stored_install
-            or stored_install.upper().startswith("CD-TRIAL-PENDING-")
-            or stored_install.upper().startswith("CD-STRIPE-PENDING-")
-        ):
-            await coll.update_one(
-                {"_id": doc["_id"]},
-                {"$set": {
-                    "install_id": body.install_id,
-                    "install_id_bound_at": _now().isoformat(),
-                }},
+        linked_installs = [i for i in (doc.get("linked_install_ids") or []) if i]
+        if body.install_id:
+            is_portable_placeholder = (
+                not stored_install
+                or stored_install.upper().startswith("CD-TRIAL-PENDING-")
+                or stored_install.upper().startswith("CD-STRIPE-PENDING-")
             )
-            logger.info("install_id binding for jti=%s → %s (was %s)",
-                        doc.get("id"), body.install_id, stored_install)
+            already_bound = (body.install_id == stored_install) or (body.install_id in linked_installs)
+            if is_portable_placeholder:
+                await coll.update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": {
+                        "install_id": body.install_id,
+                        "install_id_bound_at": _now().isoformat(),
+                    }},
+                )
+                logger.info("install_id binding for jti=%s → %s (was %s)",
+                            doc.get("id"), body.install_id, stored_install)
+            elif not already_bound and plan_upper == "PREMIUM" and len(linked_installs) + 1 < max_devices:
+                # Premium admet un install_id addicional (2n dispositiu)
+                new_linked = linked_installs + [body.install_id]
+                await coll.update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": {
+                        "linked_install_ids": new_linked,
+                        "linked_install_ids_updated_at": _now().isoformat(),
+                    }},
+                )
+                logger.info("linked install_id added (Premium device #%s) for jti=%s → %s",
+                            len(new_linked) + 1, doc.get("id"), body.install_id)
 
         # 4) Tot OK → actualitzem estadístiques
         await coll.update_one(
@@ -418,10 +454,14 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             raise HTTPException(status_code=400, detail="install_id o email requerido")
 
         doc = None
-        # 1) Match directe per install_id
+        # 1) Match directe per install_id (principal) O linked_install_ids (Premium 2n dispositiu)
         if install_id_norm:
             doc = await coll.find_one(
-                {"install_id": install_id_norm, "status": "active"},
+                {"status": "active",
+                 "$or": [
+                     {"install_id": install_id_norm},
+                     {"linked_install_ids": install_id_norm},
+                 ]},
                 sort=[("created_at", -1)],
             )
         # 2) Fallback per email (útil després d'un upgrade abans que la clau nova arribi)

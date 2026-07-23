@@ -339,7 +339,31 @@ async def _sync_license_from_subscription(sub: dict, install_id: str | None,
             "stripe_subscription_id": sub["id"],
         }
         if existing:
+            prev_plan = str(existing.get("plan") or "").upper()
+            new_plan = str(plan_family or "").upper()
+            plan_changed = prev_plan != new_plan
             await db.licenses.update_one({"id": license_id}, {"$set": doc})
+            # 🆕 Envia email SEMPRE que canvii el pla o es renovi la llicència (útil per activar altres dispositius)
+            if client_email:
+                try:
+                    from services import mailer as _mailer
+                    if plan_changed:
+                        subject_ctx = f"Pla actualitzat a {new_plan}"
+                    else:
+                        subject_ctx = f"Renovació subscripció {new_plan}"
+                    sent, info = await _mailer.send_license_email(
+                        to_email=client_email,
+                        client_name=company_name or client_email,
+                        install_id=install_id,
+                        license_key=jwt_key,
+                        plan=plan_family,
+                        expires_at=expires_at,
+                        subject_prefix=subject_ctx,
+                    )
+                    logger.info("Stripe subscription UPDATE email → %s (plan=%s): sent=%s info=%s",
+                                client_email, new_plan, sent, info)
+                except Exception as _em:
+                    logger.exception("Stripe update email failed: %s", _em)
         else:
             # Revoca llicències actives anteriors d'aquest install_id
             await db.licenses.update_many(

@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 21 · Full end-to-end verification of MediCar Plus multi-device Premium licensing + editable checkout email. ALL 5 test areas PASS. Backend (pytest 4/4 tests): (1) TEST 1 Premium multi-device HWID lock — seeded Premium key with portable sub=CD-STRIPE-TEST-*, verified device 1 (HW-A/CD-PREM-DEV1-…-1001) OK, device 2 (HW-B/CD-PREM-DEV2-…-1002) OK (2nd Premium device allowed), device 3 (HW-C/CD-PREM-DEV3-…-1003) rejected with ok=false, hwid_mismatch=true, reason contains 'ya está en uso en 2 ordenadores'; DB doc has hwid_lock=HW-A, linked_hwids=[HW-B], linked_install_ids=[CD-PREM-DEV2-…-1002]. (2) TEST 2 Standard single-device — 1st device OK, 2nd rejected with reason 'ya está en uso en 1 ordenador' (singular, grammatically correct, 'ordenadores' NOT in string). (3) TEST 3 /api/licenses/current — queried by install_id_2 (2nd Premium device) → found=true, plan=PREMIUM, same license_key JWT, matching jti. (4) TEST 4 _sync_license_from_subscription UPDATE branch — monkey-patched services.mailer.send_license_email, seeded existing STD license, invoked with package_id=PREMIUM_ANY → send_license_email called with subject_prefix='Pla actualitzat a PREMIUM', to_email/plan/install_id all correct; DB license now plan=PREMIUM. Frontend (Playwright 7/7 sub-assertions): (5) openUpgradeModal — email input #upgEmailInput visible & editable; empty when no localStorage; clicking Suscribirme with empty email shows '⚠️ Introduce un email válido para recibir la clave'; with 'test-editable@example.com' the intercepted POST body to /api/payments/create-subscription equals {package_id:'PREMIUM_MES', customer_email:'test-editable@example.com', install_id:'CD-UITEST-…', origin_url:'https://medicarplus.es'}; localStorage 'caja.billing.email.v1' saved to that value; reopening the modal pre-fills the input from localStorage.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter21_multi_device_premium.py",
+    "/app/test_reports/pytest/pytest_iter21.xml",
+    "/app/tests/inject_standard.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "licenses.py L316-317 (max_devices calculation): max_devices=2 for PREMIUM plans and 1 otherwise. Grammar branch at L347-350 (`ordenador{'es' if max_devices > 1 else ''}`) is correct — verified singular 'ordenador' for STD and plural 'ordenadores' for PREMIUM.",
+    "licenses.py L383 install_id linking condition (`len(linked_installs) + 1 < max_devices`) is slightly non-symmetric with HWID logic (`len(all_bound) < max_devices`). For PREMIUM max=2 the effect is the same (adds 1 linked_install_id then stops), and the HWID lock at L340-360 acts as the hard rejection gate; but consider unifying the two to `len(linked_installs) < max_devices - 1` for clarity. Not a bug — verified DB state matches expectations end-to-end.",
+    "server.py L346-366 _sync_license_from_subscription UPDATE branch: correctly triggers email on plan change AND on renewal (`if client_email`), using subject_prefix='Pla actualitzat a PREMIUM' when plan changes, else 'Renovació subscripció {plan}'. Log line 'Stripe subscription UPDATE email → …' visible after monkey-patched invocation. Good defensive try/except.",
+    "licenses.py L266-278 JWT sub check: only CD-TRIAL-* and CD-STRIPE-* subs are portable → non-portable subs (e.g. sub=install_id_1) will fail with 'La clave no corresponde a esta instalación' when trying the same key on a 2nd device. This is intentional and matches production Stripe flow (mint_jwt in server.py:311-321 uses sub=install_id, but for real Stripe-generated licenses the install_id is prefixed with 'CD-STRIPE-*' at L273-274). Verified in tests using portable_sub='CD-STRIPE-TEST-*'.",
+    "v2.html L4498-4540 openUpgradeModal buy handler: correct email regex validation (`^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$`), saves to localStorage BEFORE the fetch call, sends customer_email in the exact key expected by /api/payments/create-subscription. UI feedback shows red border on invalid, green on valid. LGTM.",
+    "v2.html L4444-4445 email pre-fill priority (localStorage → lic.client_email → lic.email) is user-friendly and correct."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter21_multi_device_premium.py (new)",
+    "/app/tests/inject_standard.py (new · STD seed script)"
+  ],
+  "success_rate": {
+    "backend": "100% (4/4 pytest tests)",
+    "frontend": "100% (7/7 sub-assertions)"
+  },
+  "test_credentials": "Master key MB-MASTER-BRUGULAT-2026-OWNER from /app/memory/test_credentials.md.",
+  "seed_data_creation": "Test seeded Premium licenses with portable JWT sub='CD-STRIPE-TEST-*' for install_ids CD-PREM-DEV1-BUG1-{1001,3001} and CD-STDT-DEV1-BUG1-2001 + STD license for update-branch test CD-STRP-UPGR-BUG1-4001. Teardown at module end deletes all TEST-prefixed licenses (CD-PREM-DEV*, CD-STDT-DEV*, CD-STRP-UPGR*).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Multi-device Premium: JWT MUST be minted with portable sub (CD-TRIPE-* / CD-TRIAL-*) or empty sub — using sub=install_id_1 breaks 2nd device verify with reason 'La clave no corresponde a esta instalación'. The real Stripe flow (server.py:273-274) auto-generates install_id='CD-STRIPE-{sub_id}' which is portable, so production is fine; but any admin-generated PREMIUM license via /api/licenses/generate uses the real install_id as sub and would NOT support 2nd device. Consider making PREMIUM admin-generated keys portable too (mint_jwt with sub=None or CD-STRIPE-ADMIN-*). For frontend E2E: need localStorage caja.config.v1 with {configured:true, company1:{name:'…'}} to skip the 'Configuración inicial' modal that otherwise blocks click handlers on openUpgradeModal. Reload page after setting localStorage. Test file: /app/backend/tests/test_iter21_multi_device_premium.py. Run: pytest backend/tests/test_iter21_multi_device_premium.py -v.",
+  "rca of the issue": "No bug found in this iteration — all fixes from the review request are correctly implemented and behave as specified. One code-quality observation: admin-issued PREMIUM keys via /api/licenses/generate use sub=install_id (non-portable), which prevents multi-device even for legitimate Premium plans. This does not affect the Stripe subscription flow (which always uses portable CD-STRIPE-* sub). Recommend a follow-up: pass portable_sub for PREMIUM plan inside _create_license (licenses.py:170-222) so any Premium key — regardless of origin — is portable to 2 devices."
+}

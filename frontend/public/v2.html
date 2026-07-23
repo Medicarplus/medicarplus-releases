@@ -4440,7 +4440,9 @@ function openUpgradeModal(){
   const isCA=currentLang==='ca';
   const lic=loadLicense()||{};
   const installId=lic.install_id||localStorage.getItem('caja.install.id.v1')||'';
-  const clientEmail=lic.client_email||'';
+  // Email: prioritzem el guardat per l'usuari, després el de la llicència, després l'històric del pagament
+  const savedEmail = (localStorage.getItem('caja.billing.email.v1')||'').trim();
+  const clientEmail=(savedEmail || lic.client_email || lic.email || '').trim();
   const currentPlan=(lic.plan||'TRIAL').toUpperCase();
 
   const plans=[
@@ -4475,6 +4477,15 @@ function openUpgradeModal(){
         `).join('')}
       </div>
       <div id="upgStatus" style="margin-top:16px;font-size:12px;text-align:center;color:#94a3b8;min-height:20px"></div>
+      <div style="margin-top:14px;padding:14px;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.3);border-radius:10px">
+        <label for="upgEmailInput" style="display:block;font-size:12px;font-weight:700;color:#bfdbfe;margin-bottom:6px">
+          ✉️ ${isCA?'Email on rebre la clau i la factura':'Email donde recibir la clave y la factura'}
+        </label>
+        <input id="upgEmailInput" type="email" data-testid="upgrade-email-input" value="${(clientEmail||'').replace(/"/g,'&quot;')}" placeholder="${isCA?'tu@correu.com':'tu@correo.com'}" style="width:100%;padding:10px 12px;background:#1e293b;border:1.5px solid #475569;border-radius:8px;color:#e2e8f0;font-size:13px;box-sizing:border-box;font-family:inherit" required autocomplete="email" />
+        <div style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.4">
+          ${isCA?'⚠️ La clau Premium és <b>la mateixa per als 2 ordinadors permesos</b>. Guarda l\'email per activar el segon dispositiu.':'⚠️ La clave Premium es <b>la misma para los 2 ordenadores permitidos</b>. Guarda el email para activar el segundo dispositivo.'}
+        </div>
+      </div>
       <div style="margin-top:12px;padding-top:12px;border-top:1px solid #334155;font-size:11px;color:#64748b;line-height:1.6;text-align:center">
         ${isCA?'Pagament segur via Stripe · Reps l\'email amb la nova clau al moment · La teva llicència s\'actualitza sola':'Pago seguro vía Stripe · Recibes el email con la nueva clave al momento · Tu licencia se actualiza sola'}
       </div>
@@ -4488,8 +4499,19 @@ function openUpgradeModal(){
     btn.onclick=async()=>{
       const pkgId=btn.getAttribute('data-buy-plan');
       const status=back.querySelector('#upgStatus');
-      // Email: si el tenim de la llicència l'usem; si no, deixem que Stripe el demani al Checkout
-      const email=clientEmail && clientEmail.includes('@') ? clientEmail : ('client-'+installId.slice(-8)+'@medicarplus.es');
+      // Recuperem l'email editat per l'usuari al modal (obligatori)
+      const emailField = back.querySelector('#upgEmailInput');
+      const emailVal = (emailField && emailField.value || '').trim();
+      const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal);
+      if(!emailValid){
+        status.innerHTML='<span style="color:#f97316">⚠️ '+(isCA?'Introdueix un email vàlid per rebre la clau':'Introduce un email válido para recibir la clave')+'</span>';
+        if(emailField){ emailField.focus(); emailField.style.borderColor='#f97316'; }
+        return;
+      }
+      const email = emailVal;
+      // Guardem l'email escollit com a predeterminat per properes compres
+      try{ localStorage.setItem('caja.billing.email.v1', email); }catch(e){}
+      if(emailField) emailField.style.borderColor='#22c55e';
       status.innerHTML='<span style="color:#a855f7">⏳ '+(isCA?'Preparant pagament...':'Preparando pago...')+'</span>';
       btn.disabled=true;
       try{
