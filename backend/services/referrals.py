@@ -52,9 +52,16 @@ async def ensure_unique_referral_code(coll) -> str:
 async def find_active_referrer(coll, referral_code: str) -> Optional[dict]:
     """Cerca la llicència ACTIVA del referrer per codi. None si no existeix o inactiva."""
     if not is_valid_referral_format(referral_code):
+        if referral_code:
+            logger.warning(
+                "Ignoring malformed referral code: %r (expected format MC-XXXX-XXXX)",
+                referral_code,
+            )
         return None
     code = str(referral_code).upper()
     doc = await coll.find_one({"referral_code": code, "status": "active"})
+    if not doc:
+        logger.warning("Referral code %s does not match any active license", code)
     return doc
 
 
@@ -100,7 +107,16 @@ async def apply_stripe_referral_reward(
     api_key = os.environ.get("STRIPE_API_KEY") or ""
     if not api_key:
         logger.error("STRIPE_API_KEY missing — cannot apply referral coupon")
-        return False, "stripe_key_missing"
+        # Fallback: registra el reward per no perdre el crèdit del referrer
+        await _extend_license_expiration(coll, referrer_doc, months=2)
+        await _record_reward(
+            coll, referrer_doc,
+            referred_install_id=referred_install_id,
+            referred_email=referred_email,
+            referred_plan=referred_plan,
+            info="stripe_key_missing_fallback_license_extension",
+        )
+        return True, "fallback_license_extended_no_stripe_key"
 
     stripe_sdk.api_key = api_key
 
@@ -132,8 +148,23 @@ async def apply_stripe_referral_reward(
         )
         return True, f"stripe_coupon_applied:{coupon.id}"
     except Exception as ex:  # noqa: BLE001
+        # Fallback robust: si Stripe falla (sub invàlida, network, etc.) NO perdem
+        # el crèdit del referrer. Estenem el seu expires_at 2 mesos i deixem
+        # una entrada 'stripe_failed_fallback' amb l'error real per retry manual.
         logger.exception("Stripe coupon application failed: %s", ex)
-        return False, f"stripe_error:{ex}"
+        try:
+            await _extend_license_expiration(coll, referrer_doc, months=2)
+            await _record_reward(
+                coll, referrer_doc,
+                referred_install_id=referred_install_id,
+                referred_email=referred_email,
+                referred_plan=referred_plan,
+                info=f"stripe_failed_fallback:{ex.__class__.__name__}",
+            )
+            return True, f"fallback_license_extension_after_stripe_error:{ex.__class__.__name__}"
+        except Exception as fex:  # noqa: BLE001
+            logger.exception("Fallback license extension also failed: %s", fex)
+            return False, f"stripe_error_and_fallback_error:{ex}"
 
 
 async def _get_or_create_referral_coupon():

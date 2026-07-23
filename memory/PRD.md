@@ -146,7 +146,40 @@ User's preferred language: **Catalan** (UI/code strings in **Spanish**).
 - Admin token: `MB-ADMIN-BRUGULAT-2026-4F8E2A1C`
 - PRM license (DB, 2/2 devices used): install_ids `CD-PR8E-D4D8-A71A-2842` + `CD-D299-4E88-1F92-364A`
 
-## Session Feb 23, 2026 · Auto-upgrade + Multi-device Premium + Editable email
+## Session Feb 23-24, 2026 · Programa de Referits + hardening
+**Programa de referits complet (validat 17/17 pytest + FE E2E):**
+- Cada llicència PAGADA (STD/PRM) rep un `referral_code` únic `MC-XXXX-XXXX`.
+- URL a compartir: `https://medicarplus.es/?ref=CODE` — captura automàtica a sessionStorage.
+- Modal Trial de la landing: input opcional "🎁 Código de referido" amb validació en directe + tooltip "?" explicatiu.
+- Recompenses via Stripe (idempotents):
+  - **Referrer (A)** → cupó `MEDICAR_REFERRAL_2M` (100% off, 2 mesos) aplicat a la subscripció existent.
+  - **Referit (B)** → cupó `MEDICAR_REFERRED_1M` (100% off, 1 mes) aplicat al Checkout de B → **visible ABANS de pagar**.
+- Trial → Paid: backend revoca doc trial + crea doc paid nou + hereta `referred_by` + genera referral_code + aplica recompensa al referrer.
+- Fallback robust: si Stripe falla, s'estén l'`expires_at` de la llicència del referrer 2 mesos i queda registrat per retry.
+- Panel `/admin`: nova columna "🎁 Codi referit" amb botó de copiar + badge amb el count de referits.
+- Modal `Informació de llicència` del v2.html: bloc morat amb codi + botons "Copiar codi" i "Copiar enllaç" + estadístiques + tooltip "?".
+
+**Bugs fixats durant la implementació:**
+- Stripe `discounts` + `allow_promotion_codes` són mútuament exclusius (bug A iter23).
+- Trial→Paid path saltava referral_code + reward (bug B iter23).
+- Duplicate `id_1` key quan es revoca trial i s'insereix paid amb mateix id (bug C iter24).
+- `_doc_to_record` no mapejava els camps nous (referral_code, linked_hwids, etc) (bug D iter24).
+
+**Fitxers claus creats/modificats:**
+- `/app/backend/services/referrals.py` (nou)
+- `/app/backend/routes/referrals.py` (nou · endpoints `/validate` + `/my-code`)
+- `/app/backend/server.py` (webhook capture referred_by + reward apply)
+- `/app/backend/routes/payments.py` (conditional discounts / allow_promotion_codes)
+- `/app/backend/models/license.py` (nous camps LicenseRecord)
+- `/app/backend/routes/licenses.py` (`_doc_to_record` + verify multi-device HWID)
+- `/app/backend/routes/trial.py` (captura referred_by)
+- `/app/frontend/public/downloads/landing-medicarplus.html` (?ref= + input opcional trial + tooltip)
+- `/app/frontend/public/v2.html` (referral block en showLicenseInfo + tooltip + create-subscription amb referred_by)
+- `/app/frontend/src/components/admin/AdminDashboard.jsx` (columna "🎁 Codi referit")
+
+**Tests**: iteration_23 (10/10 + 2 bugs found+fixed), iteration_24 (17/17 pass + 2 optional hardening applied).
+
+
 **Bugs fixats en aquesta sessió (tots verificats per testing agent):**
 1. **`/api/trial/start` congelava el navegador** (19s síncrons) → email en background, resposta en 0.25s.
 2. **Trial JWT no permetia activació** perquè `sub` era un install_id sintètic (`CD-TRIAL-XXXX`). → Ara `sub` és portable (missing/CD-TRIAL-*/CD-STRIPE-*). Client + servidor accepten JWTs portables i fan bind-on-first-verify.
