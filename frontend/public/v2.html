@@ -5095,7 +5095,9 @@ function isPremiumLicense(){
       return true;
     }
     // PRM/PREMIUM = Premium. TRIAL també inclou accés total a Premium.
-    return t==='PRM'||t==='PREMIUM'||p==='TRIAL'||t==='TRIAL';
+    // Comprovem tant `type` com `plan` perquè les llicències de Stripe auto-upgrade
+    // poden tenir type='JWT' i plan='PREMIUM'.
+    return t==='PRM'||t==='PREMIUM'||p==='PRM'||p==='PREMIUM'||p==='TRIAL'||t==='TRIAL';
   }catch(e){return false}
 }
 

@@ -63,7 +63,8 @@
       <div style="background:rgba(2,132,199,.1);border:1px dashed #0284c7;border-radius:8px;padding:10px 14px;color:#bae6fd;font-size:12.5px;line-height:1.5">
         📩 Además, te hemos enviado la clave por email por si algún día necesitaras reinstalar la app o cambiar de ordenador.
       </div>
-      <button onclick="window.close()" style="margin-top:14px;background:#22c55e;padding:11px 22px;font-size:13.5px" data-testid="close-btn">✅ Cerrar esta pestaña</button>
+      <button onclick="attemptClose()" style="margin-top:14px;background:#22c55e;padding:11px 22px;font-size:13.5px" data-testid="close-btn">✅ Volver a MediCar Plus</button>
+      <div id="closeHint" style="margin-top:8px;font-size:12px;color:#94a3b8;display:none">↑ Cierra esta pestaña manualmente con la X del navegador ↑</div>
     </div>
 
     <!-- Bloc per a NOUS clients (sense install_id): mostren la clau -->
@@ -240,6 +241,19 @@ function copyKey(){
     const btn = document.querySelector('[data-testid="copy-key-btn"]');
     if(btn){ const t=btn.textContent; btn.textContent='✅ Copiada!'; setTimeout(()=>btn.textContent=t,1800); }
   }).catch(()=>{});
+}
+
+function attemptClose(){
+  // window.close() només funciona a pestanyes obertes per JS. Per pestanyes
+  // obertes directament (redirect Stripe → nova pestanya del navegador), no.
+  // Intentem tancar primer, i si no ho aconseguim en 300ms mostrem la pista.
+  try{ window.close(); }catch(e){}
+  setTimeout(function(){
+    if(!document.hidden){
+      var h = document.getElementById('closeHint');
+      if(h) h.style.display = 'block';
+    }
+  }, 350);
 }
 </script>
 </body>
