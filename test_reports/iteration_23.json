@@ -1,0 +1,85 @@
+{
+  "summary": "Iteration 23 · Referral Program (MediCar Plus) — Backend + Frontend tests executed. Pytest: 8 PASSED / 2 FAILED (/app/test_reports/pytest/pytest_iter23.xml). Playwright: TEST 5 (landing capture + auto-fill + trial submit + DB propagation) fully PASSED; TEST 6 (v2.html referral block + copy button) PASSED after overriding hard-coded prod URL in fetch. TWO CRITICAL BACKEND BUGS FOUND blocking the referral reward flow end-to-end (see backend_issues.critical).",
+
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/payments/create-subscription (routes/payments.py L266+L290-292)",
+        "issue": "Stripe rejects the checkout.Session.create call with 400: 'You may only specify one of these parameters: allow_promotion_codes, discounts.' Root cause: code sets `allow_promotion_codes=(discounts_arg is None)` which passes `allow_promotion_codes=False` even when `discounts` is included. Stripe treats specifying the key at all (any value) as mutually exclusive with `discounts`. Result: whenever a referred customer arrives with a valid `referred_by`, backend returns HTTP 502 'Stripe error' and NO checkout URL is produced — the entire referred-checkout flow is broken. Fix: only add the `allow_promotion_codes` key when there are no discounts, e.g. build kwargs conditionally: `if discounts_arg: kwargs['discounts']=discounts_arg else: kwargs['allow_promotion_codes']=True`.",
+        "priority": "CRITICAL",
+        "log_evidence": "backend log 2026-07-23 10:02:19,946 — error_code=None error_message='You may only specify one of these parameters: allow_promotion_codes, discounts.' error_param=allow_promotion_codes"
+      },
+      {
+        "endpoint": "server.py::_sync_license_from_subscription (L327-390)",
+        "issue": "When a user upgrades from TRIAL to a paid plan, the existing active TRIAL license is found by `existing = db.licenses.find_one({install_id, status:'active'})` — so the code takes the `if existing:` UPDATE branch. That branch skips BOTH (a) generating a new `referral_code` for the paid license AND (b) applying the referral reward to the referrer. Consequence: TEST 7 second scenario 'test_trial_inheritance_to_paid' fails — the referred_by is correctly inherited on the doc, but the referrer's `referral_rewards` array remains empty. This means anyone who signed up via ?ref= on the trial modal and then upgrades to Std/Prm will never trigger the +2m reward. Fix: run the referral-reward block regardless of `existing` (or revoke the trial first, then insert a new paid doc, which was the original design intent).",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "frontend/public/downloads/landing-medicarplus.html initReferralCapture()",
+        "issue": "The /api/referrals/validate fetch fires on landing load and populates window.__referralInfo asynchronously (~200ms). If the user opens the trial modal FASTER than the fetch resolves, the status shows 'Verificando código...' forever — openTrialModal is not re-notified when the fetch completes. Consider retriggering the status update via a promise/observer or re-fetch inside openTrialModal itself."
+      },
+      {
+        "endpoint": "frontend/public/v2.html showLicenseInfo L6701",
+        "issue": "`getApiBase()` returns hard-coded `https://project-helper-47.emergent.host` (production) so preview installs hit the wrong host and get 404 for /api/referrals/my-code. Only affects preview testing — once code ships to prod both hosts exist. But it also breaks any pre-prod QA on preview. Recommendation: allow window.API_BASE override or read from a meta tag for stage/preview builds."
+      }
+    ]
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Trial signup with ?ref= — status label",
+        "issue": "trial-referral-status stays at 'Verificando código...' when modal opens before the initial /api/referrals/validate call resolves (see backend_issues.minor entry above).",
+        "affected_selectors": ["#trial-referral-status"]
+      }
+    ],
+    "design_issues": []
+  },
+
+  "test_report_links": [
+    "/app/backend/tests/test_iter23_referrals.py",
+    "/app/test_reports/pytest/pytest_iter23.xml",
+    "/app/test_reports/iter23_landing_after_trial.png",
+    "/app/test_reports/iter23_v2_referral_block_success.png"
+  ],
+
+  "action_items": [
+    "FIX BUG A (payments.py): make allow_promotion_codes conditional — omit the key entirely when discounts is set. Stripe throws 400 otherwise, breaking the entire referred-checkout flow. Suggested patch: replace L266 with `if discounts_arg: checkout_kwargs['discounts']=discounts_arg else: checkout_kwargs['allow_promotion_codes']=True` and remove the current allow_promotion_codes line.",
+    "FIX BUG B (server.py::_sync_license_from_subscription): when `existing` license is a TRIAL and status is being upgraded to a paid plan, either (a) revoke the trial first + fall through to the create-new branch (which handles referral_code + reward), or (b) duplicate the referral_code-generation and reward-application logic into the update branch. Currently trial→paid upgrades silently swallow referral rewards.",
+    "IMPROVE landing-medicarplus.html: propagate the /api/referrals/validate result to trial-referral-status even when the modal opens before fetch resolves (retrigger update on fetch.then, or fire fetch again inside openTrialModal)."
+  ],
+
+  "critical_code_review_comments": [
+    "payments.py L266: `allow_promotion_codes=(discounts_arg is None)` is buggy — Stripe rejects the request when BOTH keys are present regardless of the boolean value; the discount+promo combo path was never tested end-to-end.",
+    "server.py L327-390: dual-branch logic (update vs insert) diverges non-trivially — the update branch omits referral_code generation + reward application, breaking the primary business use-case (trial→paid upgrade with referred_by). This is the exact scenario the whole feature was built for.",
+    "services/referrals.py: idempotent coupon-creation via `stripe.Coupon.retrieve → InvalidRequestError → create` works correctly (verified via backend logs: coupon MEDICAR_REFERRED_1M was auto-created on first invocation).",
+    "referrals.py /my-code correctly rejects TRIAL with reason 'trial_cannot_refer' + Spanish message ('pagado'). ✅",
+    "referrals.py /my-code correctly derives referrer_name from client_name (or email prefix) and returns plan='STD'. ✅",
+    "landing-medicarplus.html submit flow correctly propagates referred_by to /api/trial/start payload (verified in DB: trial doc has referred_by='MC-TEST-2024'). ✅"
+  ],
+
+  "updated_files": [
+    "/app/backend/tests/test_iter23_referrals.py (new)",
+    "/app/test_reports/pytest/pytest_iter23.xml (new)",
+    "/app/test_reports/iteration_23.json (this file)"
+  ],
+
+  "success_rate": {
+    "backend": "8/10 pytest passed (80%). 2 real backend bugs blocking the reward flow end-to-end (Bug A: Stripe 400 on referred checkout; Bug B: trial-upgrade path skips reward).",
+    "frontend": "TEST 5 (landing) 100% pass — sessionStorage capture + validate → status label + submit + DB propagation all confirmed. TEST 6 (v2.html) 100% pass on functional side (block visible, refCodeDisplay=MC-TEST-2024, clipboard.writeText called with MC-TEST-2024) after fetch override; minor prod-URL config issue in v2.html only affects preview environments."
+  },
+
+  "test_credentials": "MASTER: MB-MASTER-BRUGULAT-2026-OWNER used for v2.html activation. Referrer seed: install_id=CD-REF-TEST-1, referral_code=MC-TEST-2024, plan=STD, email=referrer@test.com.",
+
+  "seed_data_creation": "Test fixtures create/cleanup: STD license (install=CD-REF-TEST-1, code=MC-TEST-2024), TRIAL license (install=CD-TRIAL-REF-1), plus dynamic trial docs from Playwright submit (client_email=refe2e-*@example.com). All test docs are cleaned up in the pytest fixture teardown + a final manual cleanup after the Playwright run. Post-testing verified 0 residual test rows.",
+
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+
+  "context_for_next_testing_agent": "To retest the referral reward flow after Bugs A+B are fixed: (1) re-run /app/backend/tests/test_iter23_referrals.py — TEST 4 (TestCreateSubscriptionWithReferral::test_create_subscription_with_referral) should now return 200 + Stripe checkout URL, and TEST 7 (TestSyncLicenseFromSubscription::test_trial_inheritance_to_paid) should now find 1+ entries in referrer_doc.referral_rewards. (2) For frontend, MC-TEST-2024 must be pre-seeded before TEST 5/6 (the fixture also does this). (3) v2.html testing on the preview URL requires the fetch-override init script that redirects project-helper-47.emergent.host → location.origin — this is a test-environment workaround only, not a fix in the app.",
+
+  "rca_of_the_issue": "Bug A RCA: Stripe API contract requires MUTUAL EXCLUSION between the `discounts` and `allow_promotion_codes` parameters — passing `allow_promotion_codes=False` still counts as passing the key. Current code always passes the key (`allow_promotion_codes=(discounts_arg is None)` evaluates to True or False, never omitted). When a referred customer arrives (discounts_arg=[coupon]), both keys are present → Stripe 400 → backend 502 → NO checkout URL → referred customer cannot subscribe → reward never fires. Bug B RCA: The trial→paid upgrade lookup `db.licenses.find_one({install_id, status:'active'})` finds the ACTIVE TRIAL doc as `existing`. The update branch (`if existing:`) does an in-place $set → doc becomes plan='STD' but the original referral_code generation (L399-403) and reward application (L407-426) live exclusively in the `else:` (insert) branch. Net effect: trial referrer never gets +2m credit even though the whole workflow (?ref= → modal → trial → upgrade) was designed around this exact scenario."
+}

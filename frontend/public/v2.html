@@ -4516,6 +4516,19 @@ function openUpgradeModal(){
       btn.disabled=true;
       try{
         const apiBase=(typeof getApiBase==='function')?getApiBase():'https://project-helper-47.preview.emergentagent.com';
+        // Codi de referit: si el client ve d'una referència (guardat al trial o passat via URL)
+        // el propaguem perquè Stripe apliqui automàticament -1 mes al 1r càrrec.
+        let refBy = null;
+        try{
+          refBy = (localStorage.getItem('caja.referral.received.v1')||'').trim().toUpperCase() || null;
+          // També acceptem un possible ?ref= a la URL actual
+          if(!refBy){
+            const u = new URL(location.href);
+            const qr = (u.searchParams.get('ref')||'').trim().toUpperCase();
+            if(/^MC-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(qr)) refBy = qr;
+          }
+        }catch(_){ }
+
         const r=await fetch(apiBase+'/api/payments/create-subscription',{
           method:'POST',
           headers:{'Content-Type':'application/json'},
@@ -4523,7 +4536,8 @@ function openUpgradeModal(){
             package_id:pkgId,
             customer_email:email,
             install_id:installId,
-            origin_url:'https://medicarplus.es'
+            origin_url:'https://medicarplus.es',
+            referred_by: refBy
           })
         });
         if(!r.ok){const t=await r.text();throw new Error('HTTP '+r.status+' · '+t.slice(0,180))}
@@ -6634,6 +6648,16 @@ function showLicenseInfo(){
     +'<div><b style="color:#f5b301">Última verif.:</b> '+lastCheckLabel+'</div>'
     +'</div>'
     +previewBlock
+    +'<div id="referralBlock" style="display:none;background:linear-gradient(135deg,rgba(168,85,247,.12),rgba(34,197,94,.04));border:1.5px dashed #a855f7;border-radius:8px;padding:14px;margin-bottom:12px">'
+    +'<div style="font-weight:800;color:#e9d5ff;font-size:12px;letter-spacing:.5px;margin-bottom:8px">🎁 Programa de referidos · Gana 2 meses gratis</div>'
+    +'<div style="font-size:12px;color:#c4b5fd;line-height:1.5;margin-bottom:10px">Comparte tu código o enlace. Cuando un amigo <b>pague</b> su suscripción (trial no cuenta), recibes <b>+2 meses gratis</b> del mismo tipo que ya tienes.</div>'
+    +'<div id="refCodeDisplay" style="font-family:\'Courier New\',monospace;font-size:16px;font-weight:800;color:#f5b301;background:#0b1121;padding:10px;border-radius:6px;text-align:center;letter-spacing:2px;margin-bottom:8px" data-testid="referral-code-display">Cargando...</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+    +'<button class="btn" id="btnCopyRefCode" data-testid="btn-copy-ref-code" style="flex:1;background:#a855f7;color:#fff;border-color:#a855f7">📋 Copiar código</button>'
+    +'<button class="btn" id="btnCopyRefUrl" data-testid="btn-copy-ref-url" style="flex:1;background:#22c55e;color:#0b1121;border-color:#22c55e">🔗 Copiar enlace</button>'
+    +'</div>'
+    +'<div id="refStats" style="margin-top:10px;font-size:11px;color:#94a3b8;text-align:center"></div>'
+    +'</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">'
     +((lic&&lic.type==='JWT'&&LIC.VERIFY_URL)?'<button class="btn" id="btnVerifyNow" style="background:#0891b2;color:#fff;border-color:#0891b2">↻ Verificar ara</button>':'')
     +'<button class="btn" id="btnDeactivate" style="background:#b91c1c;color:#fff;border-color:#b91c1c">↺ Desactivar</button>'
@@ -6666,6 +6690,34 @@ function showLicenseInfo(){
       }catch(e){alert('⚠ No s\'ha pogut contactar el servidor: '+e.message);verifyBtn.disabled=false;verifyBtn.textContent='↻ Verificar ara';}
     };
   }
+  // 🎁 Programa de referits: només visible per llicències PAGADES (STD/PRM), no Trial ni Master
+  (async function loadReferralBlock(){
+    try{
+      const planUp = String((lic && lic.plan)||'').toUpperCase();
+      const typeUp = String((lic && lic.type)||'').toUpperCase();
+      const paidPlans = ['STD','STANDARD','PRM','PREMIUM'];
+      const canRefer = paidPlans.includes(planUp) && typeUp !== 'MASTER';
+      if(!canRefer) return;
+      const api = (typeof getApiBase==='function' ? getApiBase() : (window.API_BASE||location.origin)).replace(/\/$/,'');
+      const r = await fetch(api + '/api/referrals/my-code?install_id=' + encodeURIComponent(installId));
+      const data = await r.json();
+      if(!data || !data.ok || !data.referral_code) return;
+      const block = back.querySelector('#referralBlock'); if(!block) return;
+      block.style.display = 'block';
+      back.querySelector('#refCodeDisplay').textContent = data.referral_code;
+      const stats = back.querySelector('#refStats');
+      if(data.total_referrals && data.total_referrals > 0){
+        stats.innerHTML = '🎉 <b style="color:#3ddc97">'+data.total_referrals+'</b> referid'+(data.total_referrals===1?'o':'os')+' pagando · <b style="color:#3ddc97">+'+(data.months_earned||0)+'</b> meses gratis ganados';
+      } else {
+        stats.innerHTML = 'Aún no tienes referidos. ¡Comparte tu enlace!';
+      }
+      const copy = (txt, label)=>{
+        try{ navigator.clipboard.writeText(txt); alert(label+' copiado al portapapeles.'); }catch(e){}
+      };
+      back.querySelector('#btnCopyRefCode').onclick = ()=>copy(data.referral_code, 'Código');
+      back.querySelector('#btnCopyRefUrl').onclick = ()=>copy(data.share_url, 'Enlace de referido');
+    }catch(_){ /* no bloquegem si falla */ }
+  })();
 }
 // ============================================================================
 // CONFIGURACIÓ DEL CLIENT · noms de les 2 empreses

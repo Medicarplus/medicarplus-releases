@@ -559,6 +559,15 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
           </div>
           <!-- honeypot: ocult, si un bot l'omple, es bloqueja -->
           <input type="text" id="trial-website" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" aria-hidden="true">
+
+          <!-- Codi de referit (opcional) · Aparegut si vé de ?ref=XXX o si l'usuari clica el link -->
+          <div id="trial-referral-wrap" style="display:none;padding:10px 12px;background:rgba(168,85,247,.08);border:1px dashed rgba(168,85,247,.35);border-radius:8px;margin-top:6px">
+            <label for="trial-referral" style="display:block;font-size:12px;font-weight:700;color:#c4b5fd;margin-bottom:5px">🎁 Código de referido (opcional)</label>
+            <input type="text" id="trial-referral" data-testid="trial-referral" placeholder="MC-XXXX-XXXX" maxlength="20" style="width:100%;padding:9px 12px;background:#020617;border:1.5px solid #7c3aed;border-radius:8px;color:#e2e8f0;font-size:13px;letter-spacing:1px;text-transform:uppercase;box-sizing:border-box;font-family:'Courier New',monospace">
+            <div id="trial-referral-status" style="margin-top:6px;font-size:11px;color:#94a3b8;min-height:16px"></div>
+          </div>
+          <a href="#" onclick="event.preventDefault();document.getElementById('trial-referral-wrap').style.display='block';document.getElementById('trial-referral').focus()" id="trial-referral-toggle" style="display:block;text-align:right;font-size:11px;color:#a855f7;text-decoration:none;margin-top:-2px" data-testid="trial-referral-toggle">🎁 ¿Tienes código de referido?</a>
+
           <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;margin-top:8px;cursor:pointer;padding:10px 12px;background:rgba(245,179,1,.06);border:1px dashed rgba(245,179,1,.3);border-radius:8px" for="trial-consent">
             <input type="checkbox" id="trial-consent" data-testid="trial-consent" onchange="onConsentChange()" style="margin-top:3px;width:16px;height:16px;cursor:pointer;flex-shrink:0" required>
             <span><b style="color:#e2e8f0">Acepto</b> recibir por email (a info@medicarplus.es) la clave de licencia, la guía de instalación y el manual de usuario. Cumplimos la LOPD/RGPD y no compartimos tu email. <b style="color:#f5b301">(obligatorio)</b></span>
@@ -915,13 +924,24 @@ document.addEventListener('click', async function(ev){
   btn.style.pointerEvents = 'none';
   try{
     const originUrl = window.location.origin;
+    // 🎁 Programa de referits: propagar el codi ?ref= si el visitant ve d'un
+    let referralCode = null;
+    try{
+      referralCode = (sessionStorage.getItem('mp_referral_code')||'').trim().toUpperCase() || null;
+      if(!referralCode){
+        const u = new URL(location.href);
+        const qr = (u.searchParams.get('ref')||'').trim().toUpperCase();
+        if(/^MC-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(qr)) referralCode = qr;
+      }
+    }catch(_){ }
     const r = await fetch(CHECKOUT_API, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         package_id: pkg,
         customer_email: email,
-        origin_url: originUrl
+        origin_url: originUrl,
+        referred_by: referralCode
       })
     });
     if (!r.ok){
@@ -976,6 +996,26 @@ document.addEventListener('keydown', function(ev){
 
 // ── Prova gratuïta automàtica (60 dies) ──────────────────────────────────
 const TRIAL_API = TRIAL_API_URL;
+
+// ── Programa de referits: captura ?ref= de la URL i pre-omple el modal Trial ─────
+(function initReferralCapture(){
+  try{
+    const url = new URL(location.href);
+    const ref = (url.searchParams.get('ref') || '').trim().toUpperCase();
+    if(ref && /^MC-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(ref)){
+      try{ sessionStorage.setItem('mp_referral_code', ref); }catch(e){}
+      // Validem contra el backend per mostrar visualment el nom del referrer
+      const api = (typeof API_ROOT!=='undefined' && API_ROOT) ? API_ROOT : (location.origin);
+      fetch(api.replace(/\/$/,'') + '/api/referrals/validate?code=' + encodeURIComponent(ref))
+        .then(r=>r.json()).then(d=>{
+          if(d && d.valid){
+            window.__referralInfo = d;
+          }
+        }).catch(()=>{});
+    }
+  }catch(e){}
+})();
+
 function openTrialModal(prefillEmail){
   document.getElementById('trialForm').style.display = '';
   document.getElementById('trialSuccess').style.display = 'none';
@@ -985,6 +1025,25 @@ function openTrialModal(prefillEmail){
   if(liability) liability.checked = false;
   onConsentChange();
   if(prefillEmail){ document.getElementById('trial-email').value = prefillEmail; }
+  // Pre-omple el codi de referit si en tenim
+  try{
+    const savedRef = sessionStorage.getItem('mp_referral_code') || '';
+    if(savedRef){
+      const wrap = document.getElementById('trial-referral-wrap');
+      const inp = document.getElementById('trial-referral');
+      const toggle = document.getElementById('trial-referral-toggle');
+      const status = document.getElementById('trial-referral-status');
+      if(inp) inp.value = savedRef;
+      if(wrap) wrap.style.display = 'block';
+      if(toggle) toggle.style.display = 'none';
+      if(status && window.__referralInfo){
+        status.innerHTML = '✅ Código válido · Te ha referido <b style="color:#c4b5fd">' + (window.__referralInfo.referrer_name||'Cliente') + '</b>';
+        status.style.color = '#a7f3d0';
+      } else if(status){
+        status.innerHTML = '<span style="color:#94a3b8">Verificando código...</span>';
+      }
+    }
+  }catch(e){}
   document.getElementById('trialModal').classList.add('open');
   document.body.style.overflow = 'hidden';
   setTimeout(()=>{ try{document.getElementById('trial-name').focus()}catch(e){} }, 100);
@@ -1033,10 +1092,11 @@ async function submitTrial(){
   const ctrl = new AbortController();
   const to = setTimeout(()=>ctrl.abort(), 25000);
   try{
+    const referredBy = (document.getElementById('trial-referral') && document.getElementById('trial-referral').value || '').trim().toUpperCase();
     const r = await fetch(TRIAL_API, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({name, email, company: company||null, consent: true, website}),
+      body: JSON.stringify({name, email, company: company||null, consent: true, website, referred_by: referredBy || null}),
       signal: ctrl.signal
     });
     clearTimeout(to);

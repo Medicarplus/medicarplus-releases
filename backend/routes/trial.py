@@ -38,6 +38,7 @@ class TrialStartBody(BaseModel):
     phone: Optional[str] = Field(default=None, max_length=40)
     consent: bool = Field(default=False)
     website: Optional[str] = Field(default=None, max_length=200)  # honeypot
+    referred_by: Optional[str] = Field(default=None, max_length=20)  # MC-XXXX-XXXX (opcional)
 
 
 def _now() -> datetime:
@@ -125,9 +126,14 @@ def build_trial_router(db: AsyncIOMotorDatabase) -> APIRouter:
             "license_key": jwt_key,
             "source": "trial_auto",
             "ip": request.client.host if request and request.client else "-",
+            # Tracking del programa de referits (Trial NO desencadena recompensa,
+            # només queda registrat. Quan el trial paga i passa a Std/Prm,
+            # el webhook recupera aquest referred_by i aplica la recompensa).
+            "referred_by": (body.referred_by or "").upper().strip() or None,
         }
         await db.licenses.insert_one(doc)
-        logger.info("Auto-trial created for %s (install_id=%s)", email_norm, install_id)
+        logger.info("Auto-trial created for %s (install_id=%s, referred_by=%s)",
+                    email_norm, install_id, doc.get("referred_by") or "-")
 
         # 5) Envia email en BACKGROUND (no bloqueja la resposta HTTP).
         # L'usuari rep la clau al moment i l'email arriba als 5-15s per correu.

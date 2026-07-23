@@ -242,6 +242,10 @@ app.include_router(build_sync_router(db), prefix="/api")
 from routes.trial import build_trial_router
 app.include_router(build_trial_router(db), prefix="/api")
 
+# Referral program (Feb 2026)
+from routes.referrals import create_router as build_referrals_router
+app.include_router(build_referrals_router(db))
+
 # Stripe webhook (obligatori per playbook: /api/webhook/stripe)
 # Gestiona tant one-off (via emergentintegrations) com subscriptions (via stripe SDK)
 from fastapi import Request as _FastReq
@@ -260,11 +264,14 @@ _SUBSCRIPTION_EVENTS = {
 
 async def _sync_license_from_subscription(sub: dict, install_id: str | None,
                                           package_id: str | None, client_email: str | None,
-                                          company_name: str | None):
+                                          company_name: str | None,
+                                          referred_by: str | None = None):
     """
     Crea/actualitza una llicència JWT que reflecteix l'estat de la subscripció Stripe.
     - Si status='active' → llicència active amb expires_at = current_period_end
     - Si status='canceled'/'unpaid' → llicència marcada com 'revoked'
+    - Si `referred_by` és un referral_code vàlid i és la 1a activació d'aquest install_id,
+      aplica la recompensa al referrer (2 mesos gratis via cupó Stripe).
     """
     import jwt as _jwt
     import uuid as _uuid
@@ -272,6 +279,21 @@ async def _sync_license_from_subscription(sub: dict, install_id: str | None,
 
     if not install_id or install_id == "":
         install_id = f"CD-STRIPE-{sub['id'][:16].upper()}"
+
+    # 🆕 Herència automàtica del referred_by des del trial actiu (si l'usuari
+    # va usar un codi al signup del trial i ara està upgradeant a paid)
+    if not referred_by and install_id:
+        try:
+            trial_doc = await db.licenses.find_one(
+                {"install_id": install_id, "plan": "TRIAL", "referred_by": {"$exists": True, "$ne": None}},
+                sort=[("created_at", -1)],
+            )
+            if trial_doc and trial_doc.get("referred_by"):
+                referred_by = trial_doc.get("referred_by")
+                logger.info("Inherited referred_by=%s from trial for install_id=%s",
+                            referred_by, install_id)
+        except Exception:  # noqa: BLE001
+            pass
 
     plan_key = package_id or "STD_ANY"
     plan_family = "PREMIUM" if plan_key.startswith("PREMIUM") else "STD"
@@ -337,6 +359,7 @@ async def _sync_license_from_subscription(sub: dict, install_id: str | None,
             "verify_count": 0,
             "license_key": jwt_key,
             "stripe_subscription_id": sub["id"],
+            "referred_by": (referred_by or "").upper() if referred_by else None,
         }
         if existing:
             prev_plan = str(existing.get("plan") or "").upper()
@@ -372,7 +395,35 @@ async def _sync_license_from_subscription(sub: dict, install_id: str | None,
                           "revoked_at": _dt.now(_tz.utc).isoformat(),
                           "revoked_reason": "replaced_by_subscription"}},
             )
+            # 🆕 Genera referral_code únic per la nova llicència
+            try:
+                from services.referrals import ensure_unique_referral_code
+                doc["referral_code"] = await ensure_unique_referral_code(db.licenses)
+            except Exception as _rex:  # noqa: BLE001
+                logger.warning("Could not generate referral_code: %s", _rex)
             await db.licenses.insert_one(doc)
+            # 🆕 Aplica recompensa al referrer si el codi és vàlid (Trial no compta,
+            # aquesta funció només es crida des de Stripe subscription events → sempre paid)
+            if referred_by:
+                try:
+                    from services.referrals import find_active_referrer, apply_stripe_referral_reward
+                    referrer_doc = await find_active_referrer(db.licenses, referred_by)
+                    if referrer_doc:
+                        ok, info = await apply_stripe_referral_reward(
+                            referrer_doc=referrer_doc,
+                            referred_install_id=install_id,
+                            referred_email=client_email,
+                            referred_plan=plan_family,
+                            coll=db.licenses,
+                        )
+                        logger.info(
+                            "Referral reward for code=%s referrer=%s: ok=%s info=%s",
+                            referred_by, referrer_doc.get("client_email"), ok, info,
+                        )
+                    else:
+                        logger.warning("Referral code %s is invalid or inactive", referred_by)
+                except Exception as _ref:  # noqa: BLE001
+                    logger.exception("Referral reward processing failed: %s", _ref)
             # 🆕 Envia email automàtic al client amb la llicència + guia
             if client_email:
                 try:
@@ -441,6 +492,7 @@ async def stripe_webhook(request: _FastReq):
                         package_id=md.get("package_id"),
                         client_email=data.get("customer_email") or md.get("customer_email"),
                         company_name=md.get("company_name"),
+                        referred_by=md.get("referred_by") or md.get("referral_code"),
                     )
                     # Marca la request com paid si té request_id
                     req_id = md.get("request_id")
@@ -464,6 +516,7 @@ async def stripe_webhook(request: _FastReq):
                         package_id=md.get("package_id"),
                         client_email=md.get("customer_email"),
                         company_name=md.get("company_name"),
+                        referred_by=md.get("referred_by") or md.get("referral_code"),
                     )
             elif etype in ("customer.subscription.updated", "customer.subscription.deleted"):
                 sub = data  # aquest event ja porta l'objecte Subscription
@@ -474,6 +527,7 @@ async def stripe_webhook(request: _FastReq):
                     package_id=md.get("package_id"),
                     client_email=md.get("customer_email"),
                     company_name=md.get("company_name"),
+                    referred_by=md.get("referred_by") or md.get("referral_code"),
                 )
         except Exception as e:
             logger.exception("Error handling subscription webhook: %s", e)

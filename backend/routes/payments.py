@@ -177,6 +177,7 @@ class CreateSubscriptionBody(BaseModel):
     customer_email: str        # obligatori per crear el Stripe Customer
     install_id: Optional[str] = None
     company_name: Optional[str] = None
+    referred_by: Optional[str] = None   # Codi de referit (MC-XXXX-XXXX) — opcional
 
 
 @router.get("/subscription/enabled")
@@ -224,15 +225,45 @@ async def create_subscription(body: CreateSubscriptionBody, request: Request):
     success_url = f"{PROD_HOST}/subscription-success.html?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{PROD_HOST}/subscription-success.html?cancelled=1"
 
+    # 🎁 Programa de referits · Si el nou client ve d'un codi vàlid,
+    # apliquem el cupó REFERRED_1M (100% off del 1r mes) al Checkout.
+    discounts_arg = None
+    referred_by_valid = None
+    if body.referred_by:
+        try:
+            from services.referrals import (
+                is_valid_referral_format,
+                find_active_referrer,
+                get_or_create_referred_coupon,
+            )
+            code_upper = str(body.referred_by).upper().strip()
+            if is_valid_referral_format(code_upper):
+                # Import lazy per no crear dependència circular
+                from server import db as _db  # type: ignore
+                ref_doc = await find_active_referrer(_db.licenses, code_upper)
+                if ref_doc:
+                    referred_by_valid = code_upper
+                    try:
+                        coupon = await get_or_create_referred_coupon()
+                        discounts_arg = [{"coupon": coupon.id}]
+                        logger.info(
+                            "Applying referred-1m coupon %s for referred_by=%s",
+                            coupon.id, code_upper,
+                        )
+                    except Exception as ex:  # noqa: BLE001
+                        logger.warning("Could not apply referred coupon: %s", ex)
+        except Exception as ex:  # noqa: BLE001
+            logger.warning("Referral pre-flight check failed: %s", ex)
+
     try:
-        session = stripe_sdk.checkout.Session.create(
+        checkout_kwargs = dict(
             mode="subscription",
             payment_method_types=["card"],
             line_items=[{"price": price_id, "quantity": 1}],
             customer_email=body.customer_email,
             success_url=success_url,
             cancel_url=cancel_url,
-            allow_promotion_codes=True,
+            allow_promotion_codes=(discounts_arg is None),  # Stripe no permet mesclar
             billing_address_collection="required",
             # Força castellà a tota la UI de Stripe Checkout (evita mescla es/ca)
             locale="es",
@@ -243,6 +274,7 @@ async def create_subscription(body: CreateSubscriptionBody, request: Request):
                 "install_id": body.install_id or "",
                 "company_name": body.company_name or "",
                 "customer_email": body.customer_email,
+                "referred_by": referred_by_valid or "",
             },
             subscription_data={
                 "metadata": {
@@ -251,9 +283,13 @@ async def create_subscription(body: CreateSubscriptionBody, request: Request):
                     "install_id": body.install_id or "",
                     "company_name": body.company_name or "",
                     "customer_email": body.customer_email,
+                    "referred_by": referred_by_valid or "",
                 },
             },
         )
+        if discounts_arg:
+            checkout_kwargs["discounts"] = discounts_arg
+        session = stripe_sdk.checkout.Session.create(**checkout_kwargs)
     except stripe_sdk.error.StripeError as e:
         logger.error("Stripe subscription creation failed: %s", e)
         raise HTTPException(status_code=502, detail=f"Stripe error: {str(e)}")
