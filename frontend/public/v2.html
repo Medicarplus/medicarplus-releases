@@ -6643,6 +6643,10 @@ function showLicenseInfo(){
     +'<button class="btn plan-prev-btn" data-preview="STD" data-testid="prev-std" style="'+(currentPreview==='STD'?'background:#94a3b8;color:#0b1121;border-color:#94a3b8':'background:transparent;color:#94a3b8;border-color:#94a3b8')+'">Standard</button>'
     +'<button class="btn plan-prev-btn" data-preview="PRM" data-testid="prev-prm" style="'+(currentPreview==='PRM'?'background:#a855f7;color:#fff;border-color:#a855f7':'background:transparent;color:#c4b5fd;border-color:#a855f7')+'">⭐ Premium</button>'
     +'</div>'
+    +'<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #334155">'
+    +'<button class="btn" id="btnResetPreview" data-testid="btn-reset-preview" style="width:100%;background:#f59e0b;color:#0b1121;border-color:#f59e0b;font-weight:800">🔄 Reiniciar pruebas (limpiar simulación)</button>'
+    +'<div style="font-size:10.5px;color:#94a3b8;margin-top:6px;line-height:1.4">Borra el estado de simulación (preview + auto-upgrade) y vuelve a la vista Real MASTER. Tu clave MASTER y tus datos NO se tocan.</div>'
+    +'</div>'
     +'</div>'
   ):'';
   const back=document.createElement('div');back.className='modal-back';
@@ -6687,9 +6691,27 @@ function showLicenseInfo(){
       const p=btn.getAttribute('data-preview')||'';
       if(p) localStorage.setItem('caja.plan.preview.v1', p);
       else localStorage.removeItem('caja.plan.preview.v1');
+      // Cada canvi manual de preview reseteja el flag d'auto-upgrade del preview,
+      // així el master pot moure's lliurement entre plans sense que el polling l'arrossegui.
+      try{ localStorage.removeItem('caja.plan.preview.autoupg.v1'); }catch(e){}
       location.reload();
     };
   });
+  // 🔄 Reiniciar pruebas: neteja TOTA la simulació del Master
+  const btnResetPrev = back.querySelector('#btnResetPreview');
+  if(btnResetPrev){
+    btnResetPrev.onclick=()=>{
+      if(!confirm('¿Reiniciar simulación?\n\nEsto borrará:\n• Vista previa de plan (Trial/Standard/Premium)\n• Historial de auto-upgrade simulado\n\nTu licencia MASTER real y tus datos NO se tocan.')) return;
+      try{
+        localStorage.removeItem('caja.plan.preview.v1');
+        localStorage.removeItem('caja.plan.preview.autoupg.v1');
+        // Neteja també qualsevol trial local que hagi pogut quedar del test client-flow
+        localStorage.removeItem('caja.plan.preview.trialkey.v1');
+      }catch(e){}
+      alert('✓ Simulación reiniciada. Volviendo a la vista Real MASTER…');
+      location.reload();
+    };
+  }
   const verifyBtn=back.querySelector('#btnVerifyNow');
   if(verifyBtn){
     verifyBtn.onclick=async()=>{
@@ -7162,36 +7184,21 @@ setTimeout(()=>{
     // (evitem que un downgrade accidental esborri un premium encara vàlid)
     if(planRank(remotePlan) < planRank(localPlan)) return;
 
-    // Si l'usuari és MASTER amb preview activa: NO sobreescrivim la clau real,
-    // però ACTUALITZEM la preview al nou pla perquè vegi la transició completa
-    // (exactament com la veuria un client real). Això permet testejar Trial→Std,
-    // Trial→Premium, Std→Premium sense perdre la llicència Master.
+    // Si l'usuari és MASTER amb preview activa: NO sobreescrivim la clau real
+    // NI canviem el valor de preview automàticament. El Master decideix manualment
+    // quin pla vol simular. Només mostrem un toast informatiu perquè sàpiga que
+    // el webhook va bé. Això evita quedar "encallat" en un pla superior.
     const isMasterWithPreview = (lic.type||'').toUpperCase()==='MASTER' && !!(localStorage.getItem('caja.plan.preview.v1')||'');
     if(isMasterWithPreview){
-      const prevPreview = (localStorage.getItem('caja.plan.preview.v1')||'').toUpperCase();
-      // Mapeja el pla remot al valor de preview (STD/PRM/TRIAL)
-      const previewValue = remotePlan==='PREMIUM' ? 'PRM' : (remotePlan==='STD' || remotePlan==='STANDARD' ? 'STD' : remotePlan==='TRIAL' ? 'TRIAL' : null);
-      if(previewValue && previewValue !== prevPreview){
-        localStorage.setItem('caja.plan.preview.v1', previewValue);
-        try{ if(typeof refreshUtilitiesPremiumUI==='function') refreshUtilitiesPremiumUI(); }catch(e){}
-        try{ if(typeof refreshCalendarButtonVisibility==='function') refreshCalendarButtonVisibility(); }catch(e){}
-        // Actualitza banner de vista prèvia si existeix
-        try{
-          const banner = document.getElementById('planPreviewBanner');
-          const lbl = document.getElementById('planPreviewLabel');
-          const labelMap = {
-            'STD':'💼 Vista prèvia: STANDARD (Premium bloquejat)',
-            'PRM':'⭐ Vista prèvia: PREMIUM',
-            'PREMIUM':'⭐ Vista prèvia: PREMIUM',
-            'TRIAL':'🎁 Vista prèvia: TRIAL (60 dies · Premium desbloquejat)'
-          };
-          if(lbl) lbl.textContent = labelMap[previewValue] || ('Vista prèvia: '+previewValue);
-          if(banner) banner.style.display = 'block';
-        }catch(e){}
-        toast('🎉 ¡Plan actualizado a '+remotePlan+' automáticamente! (Vista previa MASTER: se ha aplicado el nuevo plan como lo vería un cliente real. Tu clave MASTER sigue intacta.)', 9000);
-      } else {
-        toast('🔎 Webhook OK · Licencia '+remotePlan+' detectada para tu install_id', 5000);
-      }
+      // Toast només una vegada per sessió per no ser sorollós
+      try{
+        const shownKey = 'caja.plan.preview.webhookToast.v1';
+        const shownFor = sessionStorage.getItem(shownKey) || '';
+        if(shownFor !== remotePlan){
+          sessionStorage.setItem(shownKey, remotePlan);
+          toast('🔎 Webhook OK · Licencia '+remotePlan+' detectada en backend (tu simulación se mantiene · usa "Reiniciar pruebas" para limpiar)', 6500);
+        }
+      }catch(e){}
       return;
     }
 

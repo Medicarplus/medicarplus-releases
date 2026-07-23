@@ -208,3 +208,15 @@ User's preferred language: **Catalan** (UI/code strings in **Spanish**).
 4. **Google Search Console** (P2).
 5. **Reminder emails** dia 45/55/59 del trial (P2).
 
+
+
+## Session Feb 23, 2026 (P0 Master preview stuck fix)
+
+**Bug fix**: Master Admin quedava "encallat" en simulació Premium després de testejar el flow d'upgrade Trial→Premium. El polling auto-migrava el preview cap al pla remot (PRM al backend) impedint tornar a Trial/Standard manualment.
+
+**Canvis a `/app/frontend/public/v2.html`**:
+1. **Nou botó "🔄 Reiniciar pruebas"** al modal de llicència (només visible a MASTER). Neteja `caja.plan.preview.v1`, `caja.plan.preview.autoupg.v1` i `caja.plan.preview.trialkey.v1`. La clau MASTER real i les dades NO es toquen. Confirmació prèvia + toast + reload.
+2. **`pollAutoUpgrade` simplificat per MASTER amb preview**: ja NO canvia automàticament el valor del preview quan el backend té un pla superior. Només mostra un toast informatiu (`Webhook OK · Licencia X detectada · tu simulación se mantiene`) una vegada per sessió (via `sessionStorage`). Això permet al MASTER moure's lliurement entre Trial/Std/Prm sense ser arrossegat cap al pla real del backend.
+3. Cada clic manual als botons de preview reseteja el flag intern d'auto-upgrade.
+
+**Test**: screenshot tool · botons `btn-reset-preview` i `prev-off` renderitzats correctament al modal.
