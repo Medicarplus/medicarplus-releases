@@ -189,6 +189,152 @@ h2{font-size:clamp(28px,4vw,42px);font-weight:800;line-height:1.15;margin-bottom
 }
 .plan:hover{transform:translateY(-4px)}
 .plan.featured{border:2px solid var(--gold);box-shadow:0 8px 32px rgba(245,179,1,.15)}
+/* Trial plan: tota la card clicable amb gradient verd i glow */
+.plan.trial-plan{
+  cursor:pointer;
+  border:2px solid #22c55e;
+  background:linear-gradient(155deg, rgba(34,197,94,.10) 0%, var(--card) 55%);
+  box-shadow:0 8px 32px rgba(34,197,94,.18), inset 0 1px 0 rgba(255,255,255,.04);
+}
+.plan.trial-plan:hover{
+  transform:translateY(-6px) scale(1.015);
+  border-color:#3ddc97;
+  box-shadow:0 20px 60px rgba(34,197,94,.35), inset 0 1px 0 rgba(255,255,255,.06);
+}
+.plan.trial-plan .plan-name{color:#3ddc97}
+.plan.trial-plan .btn-trial{
+  width:100%;justify-content:center;margin-top:16px;
+  background:linear-gradient(135deg,#3ddc97 0%,#22c55e 55%,#16a34a 100%);
+  color:#0a1a10;font-weight:900;font-size:15px;letter-spacing:.3px;
+  padding:15px 20px;border:none;border-radius:10px;cursor:pointer;
+  box-shadow:0 8px 24px rgba(34,197,94,.4), 0 2px 8px rgba(34,197,94,.25);
+  position:relative;overflow:hidden;
+  animation:trialPulse 2.4s ease-in-out infinite;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.plan.trial-plan .btn-trial::before{
+  content:'';position:absolute;top:0;left:-100%;width:60%;height:100%;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
+  animation:trialShine 3.5s ease-in-out infinite;
+}
+.plan.trial-plan:hover .btn-trial{
+  transform:translateY(-2px) scale(1.03);
+  box-shadow:0 14px 40px rgba(34,197,94,.55), 0 4px 12px rgba(34,197,94,.35);
+}
+@keyframes trialPulse{
+  0%,100%{box-shadow:0 8px 24px rgba(34,197,94,.4), 0 2px 8px rgba(34,197,94,.25)}
+  50%{box-shadow:0 10px 32px rgba(61,220,151,.6), 0 3px 12px rgba(34,197,94,.4)}
+}
+@keyframes trialShine{
+  0%{left:-100%} 60%{left:120%} 100%{left:120%}
+}
+@media (prefers-reduced-motion: reduce){
+  .plan.trial-plan .btn-trial{animation:none}
+  .plan.trial-plan .btn-trial::before{display:none}
+  .btn-cta-std,.btn-cta-std-year,.btn-cta-prm,.btn-cta-prm-year{animation:none !important}
+  .btn-cta-std::before,.btn-cta-prm::before{display:none !important}
+}
+
+/* CTAs Standard · gradient blau elèctric amb glow */
+.btn-cta-std{
+  width:100%;justify-content:center;margin-top:16px;text-align:center;
+  background:linear-gradient(135deg,#38bdf8 0%,#0ea5e9 55%,#0284c7 100%);
+  color:#0a1220;font-weight:900;font-size:15px;letter-spacing:.3px;
+  padding:15px 20px;border:none;border-radius:10px;cursor:pointer;text-decoration:none;
+  display:flex;align-items:center;gap:8px;
+  box-shadow:0 8px 24px rgba(14,165,233,.4), 0 2px 8px rgba(14,165,233,.25);
+  position:relative;overflow:hidden;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.btn-cta-std::before{
+  content:'';position:absolute;top:0;left:-100%;width:55%;height:100%;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
+  animation:trialShine 4s ease-in-out infinite;
+}
+.btn-cta-std:hover{
+  transform:translateY(-2px) scale(1.02);
+  box-shadow:0 14px 40px rgba(56,189,248,.55), 0 4px 12px rgba(14,165,233,.35);
+  color:#0a1220;
+}
+.btn-cta-std-year{
+  width:100%;justify-content:center;margin-top:10px;text-align:center;
+  background:linear-gradient(135deg, rgba(245,179,1,.15) 0%, rgba(245,179,1,.06) 100%);
+  color:#f5b301;font-weight:800;font-size:13px;letter-spacing:.3px;
+  padding:12px 16px;border:1.5px solid #f5b301;border-radius:10px;cursor:pointer;text-decoration:none;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  transition:all .15s ease;
+}
+.btn-cta-std-year:hover{
+  background:linear-gradient(135deg,#f5b301 0%,#e08600 100%);
+  color:#0a1220;transform:translateY(-2px);
+  box-shadow:0 10px 28px rgba(245,179,1,.45);
+}
+.trial-badge-cta{
+  display:block;margin-top:10px;padding:11px 12px;
+  background:linear-gradient(135deg, rgba(61,220,151,.18) 0%, rgba(34,197,94,.08) 100%);
+  border:1.5px dashed #22c55e;border-radius:10px;text-align:center;
+  font-size:12.5px;color:#a7f3d0;text-decoration:none;font-weight:700;
+  transition:all .18s ease;cursor:pointer;
+}
+.trial-badge-cta:hover{
+  background:linear-gradient(135deg,#22c55e 0%,#16a34a 100%);
+  color:#0a1a10;border-style:solid;
+  box-shadow:0 8px 24px rgba(34,197,94,.4);
+  transform:translateY(-2px);
+}
+
+/* CTAs Premium · gradient dourat amb pulse (star product) */
+.btn-cta-prm{
+  width:100%;justify-content:center;margin-top:16px;text-align:center;
+  background:linear-gradient(135deg,#fbbf24 0%,#f5b301 45%,#e08600 100%);
+  color:#0a1220;font-weight:900;font-size:15.5px;letter-spacing:.3px;
+  padding:15px 20px;border:none;border-radius:10px;cursor:pointer;text-decoration:none;
+  display:flex;align-items:center;gap:8px;
+  box-shadow:0 8px 28px rgba(245,179,1,.45), 0 2px 8px rgba(245,179,1,.3);
+  position:relative;overflow:hidden;
+  animation:trialPulseGold 2.6s ease-in-out infinite;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.btn-cta-prm::before{
+  content:'';position:absolute;top:0;left:-100%;width:55%;height:100%;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent);
+  animation:trialShine 3.2s ease-in-out infinite;
+}
+.btn-cta-prm:hover{
+  transform:translateY(-2px) scale(1.03);
+  box-shadow:0 16px 44px rgba(251,191,36,.65), 0 4px 12px rgba(245,179,1,.4);
+  color:#0a1220;
+}
+.btn-cta-prm-year{
+  width:100%;justify-content:center;margin-top:10px;text-align:center;
+  background:linear-gradient(135deg, rgba(168,85,247,.18) 0%, rgba(139,92,246,.08) 100%);
+  color:#c4b5fd;font-weight:800;font-size:13px;letter-spacing:.3px;
+  padding:12px 16px;border:1.5px solid #a855f7;border-radius:10px;cursor:pointer;text-decoration:none;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  transition:all .15s ease;
+}
+.btn-cta-prm-year:hover{
+  background:linear-gradient(135deg,#a855f7 0%,#7c3aed 100%);
+  color:#f5f3ff;transform:translateY(-2px);
+  box-shadow:0 10px 28px rgba(168,85,247,.5);
+}
+.trial-badge-cta-prm{
+  display:block;margin-top:10px;padding:11px 12px;
+  background:linear-gradient(135deg, rgba(168,85,247,.18) 0%, rgba(124,58,237,.08) 100%);
+  border:1.5px dashed #a855f7;border-radius:10px;text-align:center;
+  font-size:12.5px;color:#e9d5ff;text-decoration:none;font-weight:700;
+  transition:all .18s ease;cursor:pointer;
+}
+.trial-badge-cta-prm:hover{
+  background:linear-gradient(135deg,#a855f7 0%,#7c3aed 100%);
+  color:#faf5ff;border-style:solid;
+  box-shadow:0 8px 24px rgba(168,85,247,.45);
+  transform:translateY(-2px);
+}
+@keyframes trialPulseGold{
+  0%,100%{box-shadow:0 8px 28px rgba(245,179,1,.45), 0 2px 8px rgba(245,179,1,.3)}
+  50%{box-shadow:0 12px 36px rgba(251,191,36,.65), 0 3px 12px rgba(245,179,1,.45)}
+}
 .plan-tag{
   position:absolute;top:-12px;left:50%;transform:translateX(-50%);
   background:var(--gold);color:#0a0f1a;padding:4px 16px;border-radius:20px;
@@ -417,6 +563,11 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
             <input type="checkbox" id="trial-consent" data-testid="trial-consent" onchange="onConsentChange()" style="margin-top:3px;width:16px;height:16px;cursor:pointer;flex-shrink:0" required>
             <span><b style="color:#e2e8f0">Acepto</b> recibir por email (a info@medicarplus.es) la clave de licencia, la guía de instalación y el manual de usuario. Cumplimos la LOPD/RGPD y no compartimos tu email. <b style="color:#f5b301">(obligatorio)</b></span>
           </label>
+
+          <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;margin-top:6px;cursor:pointer;padding:10px 12px;background:rgba(220,38,38,.06);border:1px dashed rgba(220,38,38,.35);border-radius:8px" for="trial-liability">
+            <input type="checkbox" id="trial-liability" data-testid="trial-liability" onchange="onConsentChange()" style="margin-top:3px;width:16px;height:16px;cursor:pointer;flex-shrink:0" required>
+            <span><b style="color:#fecaca">Acepto la responsabilidad sobre mis datos y copias de seguridad</b>. MediCar Plus incluye funciones de exportación e importación de copias, pero soy el único responsable de guardarlas y custodiarlas. En caso de pérdida, borrado accidental o mal uso, <b style="color:#e2e8f0">MediCar Plus no se hace responsable</b> de la recuperación de los datos. <b style="color:#fca5a5">(obligatorio)</b> · <a href="/terminos-uso.html" target="_blank" style="color:#f5b301">Ver términos completos</a></span>
+          </label>
           <button type="button" id="trial-submit" data-testid="trial-submit" onclick="submitTrial()" disabled style="margin-top:8px;width:100%;background:linear-gradient(135deg,#3ddc97 0%,#22c55e 100%);color:#0b1121;border:none;padding:14px;border-radius:8px;font-weight:800;font-size:15px;cursor:pointer;letter-spacing:.3px;box-shadow:0 4px 16px rgba(61,220,151,.25);opacity:.45;pointer-events:none;transition:opacity .2s">🎁 Empezar prueba gratuita ahora</button>
           <div id="trial-consent-hint" style="font-size:11px;color:#f59e0b;text-align:center;margin-top:-2px">👆 Marca la casilla de arriba para continuar</div>
           <div id="trial-error" data-testid="trial-error" style="display:none;background:rgba(220,38,38,.1);border:1px solid #dc2626;color:#fecaca;padding:10px 12px;border-radius:8px;font-size:13px;margin-top:4px"></div>
@@ -458,7 +609,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
     </div>
     <div class="plans">
 
-      <div class="plan">
+      <div class="plan trial-plan" role="button" tabindex="0" aria-label="Empezar prueba gratuita de 60 días" onclick="openTrialModal()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openTrialModal();}" data-testid="landing-trial-card">
         <div class="plan-tag" style="background:#22c55e;color:#0f172a">🎁 60 días GRATIS</div>
         <div class="plan-name">Prueba gratuita</div>
         <div class="plan-desc">Explora <b>todas</b> las funciones Premium sin límites</div>
@@ -470,7 +621,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
           <li>1 ordenador</li>
           <li>Soporte por email</li>
         </ul>
-        <a href="#" class="btn btn-secondary" onclick="event.preventDefault();openTrialModal()" data-testid="landing-trial-cta">🎁 Empezar prueba gratuita</a>
+        <button type="button" class="btn-trial" onclick="event.stopPropagation();openTrialModal()" data-testid="landing-trial-cta">🎁 Empezar prueba gratuita</button>
       </div>
 
       <div class="plan" data-plan-std>
@@ -492,9 +643,9 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
         <div style="margin:14px 0 10px;padding:10px 12px;background:rgba(148,163,184,.08);border-radius:8px;border:1px dashed rgba(148,163,184,.2);font-size:12px;color:#94a3b8">
           🔒 <b>No incluye Utilidades:</b> SMS, Citas, IA, Auditoría
         </div>
-        <a href="#" class="btn btn-secondary" data-plan-subscribe="STD_MES" data-testid="landing-std-subscribe">💳 Suscribirse (mensual)</a>
-        <a href="#" class="btn btn-secondary" data-plan-subscribe="STD_ANY" data-testid="landing-std-subscribe-year" style="margin-top:8px;background:transparent;color:#94a3b8;border:1px solid #64748b;font-size:12.5px;padding:10px 12px;white-space:nowrap;font-weight:700">🗓️ Pago anual · ahorra 58,90€</a>
-        <a href="#contacto" class="trial-badge trial-badge-std" data-testid="landing-std-trial-badge" style="display:block;margin-top:10px;padding:9px 10px;background:rgba(61,220,151,.1);border:1px dashed rgba(61,220,151,.45);border-radius:8px;text-align:center;font-size:12px;color:#a7f3d0;text-decoration:none;cursor:pointer;transition:all .2s">
+        <a href="#" class="btn-cta-std" data-plan-subscribe="STD_MES" data-testid="landing-std-subscribe">💳 Suscribirse (mensual)</a>
+        <a href="#" class="btn-cta-std-year" data-plan-subscribe="STD_ANY" data-testid="landing-std-subscribe-year">🗓️ Pago anual · ahorra 58,90€</a>
+        <a href="#" class="trial-badge-cta trial-badge-std" onclick="event.preventDefault();openTrialModal()" data-testid="landing-std-trial-badge">
           🎁 <b>Prueba gratuita 60 días · Sin tarjeta</b> <span style="opacity:.7">→</span>
         </a>
         <div style="margin-top:6px;text-align:center;font-size:11px;color:#94a3b8">Cancela cuando quieras · Sin permanencia</div>
@@ -525,11 +676,11 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:40px 0 2
         <ul class="plan-features" style="margin-top:8px">
           <li>Soporte prioritario (4h)</li>
         </ul>
-        <a href="#" class="btn btn-primary" data-plan-subscribe="PREMIUM_MES" data-testid="landing-prm-subscribe">🚀 Suscribirse (mensual)</a>
-        <a href="#" class="btn btn-primary" data-plan-subscribe="PREMIUM_ANY" data-testid="landing-prm-subscribe-year" style="margin-top:8px;background:transparent;color:#c4b5fd;border:2px solid #a855f7;font-size:12px;box-shadow:none">Suscribirse anual · ahorra 78,90€</a>
-        <div style="margin-top:10px;padding:8px 10px;background:rgba(168,85,247,.12);border:1px dashed rgba(168,85,247,.4);border-radius:8px;text-align:center;font-size:12px;color:#e9d5ff" data-testid="landing-prm-trial-badge">
+        <a href="#" class="btn-cta-prm" data-plan-subscribe="PREMIUM_MES" data-testid="landing-prm-subscribe">🚀 Suscribirse (mensual)</a>
+        <a href="#" class="btn-cta-prm-year" data-plan-subscribe="PREMIUM_ANY" data-testid="landing-prm-subscribe-year">Suscribirse anual · ahorra 78,90€</a>
+        <a href="#" class="trial-badge-cta-prm" onclick="event.preventDefault();openTrialModal()" data-testid="landing-prm-trial-badge">
           🎁 <b>Prueba gratuita 60 días • Sin tarjeta</b>
-        </div>
+        </a>
         <div style="margin-top:6px;text-align:center;font-size:11px;color:#c4b5fd">Cancela cuando quieras · Sin permanencia</div>
       </div>
 
@@ -830,6 +981,8 @@ function openTrialModal(prefillEmail){
   document.getElementById('trialSuccess').style.display = 'none';
   document.getElementById('trial-error').style.display = 'none';
   document.getElementById('trial-consent').checked = false;
+  const liability = document.getElementById('trial-liability');
+  if(liability) liability.checked = false;
   onConsentChange();
   if(prefillEmail){ document.getElementById('trial-email').value = prefillEmail; }
   document.getElementById('trialModal').classList.add('open');
@@ -838,9 +991,11 @@ function openTrialModal(prefillEmail){
 }
 function onConsentChange(){
   const consent = document.getElementById('trial-consent').checked;
+  const liability = document.getElementById('trial-liability') && document.getElementById('trial-liability').checked;
+  const acceptedAll = consent && liability;
   const btn = document.getElementById('trial-submit');
   const hint = document.getElementById('trial-consent-hint');
-  if(consent){
+  if(acceptedAll){
     btn.disabled = false;
     btn.style.opacity = '1';
     btn.style.pointerEvents = '';
@@ -850,7 +1005,7 @@ function onConsentChange(){
     btn.disabled = true;
     btn.style.opacity = '0.45';
     btn.style.pointerEvents = 'none';
-    btn.textContent = '🔒 Marca "Acepto" para activar';
+    btn.textContent = '🔒 Marca las 2 casillas para activar';
     if(hint) hint.style.display = 'block';
   }
 }
@@ -867,9 +1022,11 @@ async function submitTrial(){
   const company = document.getElementById('trial-company').value.trim();
   const website = document.getElementById('trial-website').value.trim();
   const consent = document.getElementById('trial-consent').checked;
+  const liability = document.getElementById('trial-liability') && document.getElementById('trial-liability').checked;
   if(!name || name.length < 2){ errBox.textContent='⚠️ Introduce tu nombre.'; errBox.style.display='block'; return; }
   if(!isValidEmail(email)){ errBox.textContent='⚠️ Introduce un email válido.'; errBox.style.display='block'; return; }
   if(!consent){ errBox.textContent='⚠️ Debes aceptar la política de privacidad para continuar.'; errBox.style.display='block'; return; }
+  if(!liability){ errBox.textContent='⚠️ Debes aceptar la responsabilidad sobre tus datos y copias de seguridad.'; errBox.style.display='block'; return; }
   btn.disabled = true;
   btn.textContent = '⏳ Generando tu licencia…';
   // Timeout explícit de 25s (l'endpoint respon <1s ara amb email en background)

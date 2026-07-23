@@ -50,32 +50,48 @@
   </div>
 
   <div id="successBox" style="display:none">
-    <h1>✅ ¡Pago recibido! Tu licencia está lista</h1>
-    <p class="sub">Gracias por confiar en MediCar Plus. Te hemos enviado un email con la clave, la guía de instalación y el manual de usuario en PDF.</p>
+    <h1 id="successTitle">✅ ¡Pago recibido! Tu licencia está lista</h1>
+    <p class="sub" id="successSub">Gracias por confiar en MediCar Plus. Te hemos enviado un email con la clave, la guía de instalación y el manual de usuario en PDF.</p>
 
-    <div class="key-box">
-      <div class="key-label">🔑 TU CLAVE DE LICENCIA</div>
-      <div class="key-value" id="licenseKey" data-testid="license-key"></div>
-      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;font-size:12px;color:#94a3b8">
-        <button onclick="copyKey()" data-testid="copy-key-btn">📋 Copiar clave</button>
-        <span style="align-self:center">o cópiala manualmente del email que acabamos de enviarte</span>
+    <!-- Bloc per a UPGRADE des de dins l'app: no cal fer res -->
+    <div id="upgradeBox" style="display:none;background:linear-gradient(135deg,rgba(34,197,94,.15),rgba(34,197,94,.05));border:2px solid #22c55e;border-radius:12px;padding:22px 24px;margin:16px 0;text-align:center">
+      <div style="font-size:44px;margin-bottom:8px">🎉</div>
+      <div style="color:#4ade80;font-weight:800;font-size:18px;font-family:Georgia,serif;margin-bottom:6px">Tu plan se está actualizando automáticamente</div>
+      <div style="color:#bbf7d0;font-size:14px;line-height:1.6;margin-bottom:16px">
+        <b>Vuelve a la ventana de MediCar Plus</b>. En menos de 10 segundos verás una notificación<br>confirmando que tu plan ya es <b id="newPlanLabel">PREMIUM</b>. No necesitas copiar ni pegar nada.
       </div>
+      <div style="background:rgba(2,132,199,.1);border:1px dashed #0284c7;border-radius:8px;padding:10px 14px;color:#bae6fd;font-size:12.5px;line-height:1.5">
+        📩 Además, te hemos enviado la clave por email por si algún día necesitaras reinstalar la app o cambiar de ordenador.
+      </div>
+      <button onclick="window.close()" style="margin-top:14px;background:#22c55e;padding:11px 22px;font-size:13.5px" data-testid="close-btn">✅ Cerrar esta pestaña</button>
     </div>
 
-    <div class="steps">
-      <b>Cómo activarla en 3 pasos:</b><br>
-      1️⃣ Descarga MediCar Plus para Windows con el botón de abajo.<br>
-      2️⃣ Instala el <code>.exe</code> (si Windows avisa, haz clic en "Más información" → "Ejecutar de todos modos").<br>
-      3️⃣ Abre la app, pega la clave en el campo <b>CLAVE DE LICENCIA</b> y pulsa <b>ACTIVAR</b>.
-    </div>
+    <!-- Bloc per a NOUS clients (sense install_id): mostren la clau -->
+    <div id="newClientBox">
+      <div class="key-box">
+        <div class="key-label">🔑 TU CLAVE DE LICENCIA</div>
+        <div class="key-value" id="licenseKey" data-testid="license-key"></div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;font-size:12px;color:#94a3b8">
+          <button onclick="copyKey()" data-testid="copy-key-btn">📋 Copiar clave</button>
+          <span style="align-self:center">o cópiala manualmente del email que acabamos de enviarte</span>
+        </div>
+      </div>
 
-    <div class="cta-row">
-      <a href="https://github.com/Medicarplus/medicarplus-releases/releases/latest" class="cta-primary" data-testid="download-btn" target="_blank">
-        📥 Descargar MediCar Plus (Windows)
-      </a>
-      <a href="https://medicarplus.es/guia-client-installacio.html" class="cta-secondary" target="_blank">
-        📖 Guía completa
-      </a>
+      <div class="steps">
+        <b>Cómo activarla en 3 pasos:</b><br>
+        1️⃣ Descarga MediCar Plus para Windows con el botón de abajo.<br>
+        2️⃣ Instala el <code>.exe</code> (si Windows avisa, haz clic en "Más información" → "Ejecutar de todos modos").<br>
+        3️⃣ Abre la app, pega la clave en el campo <b>CLAVE DE LICENCIA</b> y pulsa <b>ACTIVAR</b>.
+      </div>
+
+      <div class="cta-row">
+        <a href="https://github.com/Medicarplus/medicarplus-releases/releases/latest" class="cta-primary" data-testid="download-btn" target="_blank">
+          📥 Descargar MediCar Plus (Windows)
+        </a>
+        <a href="/guia-client-installacio.html" class="cta-secondary" target="_blank" data-testid="guide-btn">
+          📖 Guía de instalación
+        </a>
+      </div>
     </div>
 
     <div class="footer-note" id="emailNote">
@@ -157,18 +173,56 @@
     }
   }
 
+  function _isRealInstallId(id){
+    if(!id) return false;
+    const s = String(id).toUpperCase();
+    // Placeholders del servidor per subscripcions sense app instal·lada
+    if(s.startsWith('CD-STRIPE-PENDING-')) return false;
+    if(s.startsWith('CD-TRIAL-PENDING-')) return false;
+    return true;
+  }
+
   function showSuccess(d){
     $('loadingBox').style.display='none';
     $('successBox').style.display='block';
-    $('licenseKey').textContent = d.license_key;
-    if(d.customer_email) $('emailAddr').textContent = d.customer_email;
-    else $('emailNote').textContent = '¿Necesitas ayuda? info@medicarplus.es';
+    // Detecta si el pagament ve d'un UPGRADE des de dins l'app
+    // (metadata.install_id ha estat enviat i és un install_id real, no un placeholder)
+    const meta = d.metadata || {};
+    const metaInstall = meta.install_id || d.install_id || '';
+    const isUpgradeFromApp = _isRealInstallId(metaInstall);
+
+    if(isUpgradeFromApp){
+      // Flux d'UPGRADE: no cal mostrar la clau, l'app la recollirà sola
+      $('successTitle').textContent = '✅ ¡Pago recibido!';
+      $('successSub').textContent = 'Ya está todo listo. Tu MediCar Plus se está actualizando automáticamente en segundo plano.';
+      $('upgradeBox').style.display = 'block';
+      $('newClientBox').style.display = 'none';
+      const plan = String(d.plan || meta.plan || 'PREMIUM').toUpperCase();
+      $('newPlanLabel').textContent = plan;
+      if(d.customer_email) $('emailAddr').textContent = d.customer_email;
+      $('emailNote').innerHTML = '¿Necesitas ayuda? <a href="mailto:info@medicarplus.es" style="color:#f5b301">info@medicarplus.es</a>';
+    } else {
+      // Flux de client NOU: mostrem la clau + instruccions d'instal·lació
+      $('licenseKey').textContent = d.license_key;
+      if(d.customer_email) $('emailAddr').textContent = d.customer_email;
+      else $('emailNote').textContent = '¿Necesitas ayuda? info@medicarplus.es';
+    }
   }
   function showSuccessSoft(d){
     // Pagament OK però encara sense clau: mostrem missatge tranquil·litzador
     $('loadingBox').style.display='none';
     $('successBox').style.display='block';
-    $('licenseKey').textContent = '(Generando… llegará al email en 1-2 minutos)';
+    const meta = d.metadata || {};
+    const isUpgradeFromApp = _isRealInstallId(meta.install_id || '');
+    if(isUpgradeFromApp){
+      $('successTitle').textContent = '✅ ¡Pago recibido!';
+      $('successSub').textContent = 'Tu MediCar Plus se está actualizando automáticamente. Vuelve a la app.';
+      $('upgradeBox').style.display = 'block';
+      $('newClientBox').style.display = 'none';
+      $('newPlanLabel').textContent = String(meta.plan || 'PREMIUM').toUpperCase();
+    } else {
+      $('licenseKey').textContent = '(Generando… llegará al email en 1-2 minutos)';
+    }
     if(d.customer_email) $('emailAddr').textContent = d.customer_email;
   }
   function showError(sid){
