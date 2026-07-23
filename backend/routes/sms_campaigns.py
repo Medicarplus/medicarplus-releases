@@ -64,6 +64,15 @@ class SmsCampaignCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     template: str = Field(..., min_length=10, max_length=1600)
     contacts: List[dict]  # llista de contacts que passin
+    # BYOA: credencials Twilio del client (opcionals). Si es passen, s'usen només
+    # per aquesta petició. NO es persisteixen al backend.
+    twilio_creds: Optional[dict] = None  # {"sid": "...", "token": "...", "from": "+34..."}
+
+
+class TwilioTestReq(BaseModel):
+    sid: str = Field(..., min_length=10)
+    token: str = Field(..., min_length=10)
+    from_number: str = Field(..., min_length=6)
 
 
 class Campaign(BaseModel):
@@ -94,16 +103,37 @@ def _has_twilio() -> bool:
     )
 
 
-def _send_sms(mobile: str, message: str) -> tuple[bool, str]:
-    """Envia SMS via Twilio si configurat, si no mode MOCK. Retorna (ok, detail)."""
-    if not _has_twilio():
+def _extract_creds(creds: Optional[dict]) -> Optional[tuple]:
+    """Retorna (sid, token, from) si les creds són vàlides, None altrament."""
+    if not creds or not isinstance(creds, dict):
+        return None
+    sid = (creds.get("sid") or "").strip()
+    token = (creds.get("token") or "").strip()
+    from_num = (creds.get("from") or "").strip()
+    if sid and token and from_num:
+        return sid, token, from_num
+    return None
+
+
+def _send_sms(mobile: str, message: str, creds: Optional[dict] = None) -> tuple[bool, str]:
+    """Envia SMS via Twilio. Prioritat:
+    1) Credencials passades per la request (BYOA · Bring Your Own Account).
+    2) Credencials globals del .env (fallback per master/admin).
+    3) MODE MOCK si res configurat.
+    Retorna (ok, detail).
+    """
+    user_creds = _extract_creds(creds)
+    if user_creds:
+        sid, token, from_num = user_creds
+    elif _has_twilio():
+        sid = os.environ["TWILIO_ACCOUNT_SID"]
+        token = os.environ["TWILIO_AUTH_TOKEN"]
+        from_num = os.environ["TWILIO_FROM_NUMBER"]
+    else:
         # MODE PROVA — no envia res, marca com si s'hagués enviat
         return True, "mock:no-twilio"
     try:
         from twilio.rest import Client  # type: ignore
-        sid = os.environ["TWILIO_ACCOUNT_SID"]
-        token = os.environ["TWILIO_AUTH_TOKEN"]
-        from_num = os.environ["TWILIO_FROM_NUMBER"]
         client = Client(sid, token)
         msg = client.messages.create(
             to=f"+34{mobile}",
@@ -118,13 +148,63 @@ def _send_sms(mobile: str, message: str) -> tuple[bool, str]:
 def build_router(db):
     """
     Endpoints:
-        POST   /api/sms/preview          — puja CSV i retorna llista de contactes amb valid=True/False
-        POST   /api/sms/campaigns        — crea + envia una campanya
-        GET    /api/sms/campaigns        — llista de campanyes (històric)
-        GET    /api/sms/campaigns/{id}   — detalls (contactes amb estat)
-        GET    /api/sms/stats            — estadístiques agregades
+        POST   /api/sms/preview            — puja CSV i retorna llista de contactes amb valid=True/False
+        POST   /api/sms/campaigns          — crea + envia una campanya
+        GET    /api/sms/campaigns          — llista de campanyes (històric)
+        GET    /api/sms/campaigns/{id}     — detalls (contactes amb estat)
+        GET    /api/sms/stats              — estadístiques agregades
+        POST   /api/sms/test-credentials   — valida credencials Twilio BYOA (fa una crida read-only a Twilio)
     Tots requereixen X-Admin-Token (només l'usuari master pot enviar).
     """
+
+    @router.post("/test-credentials")
+    async def test_credentials(
+        body: TwilioTestReq,
+        x_admin_token: Optional[str] = Header(None),
+    ):
+        _admin(x_admin_token)
+        sid = body.sid.strip()
+        token = body.token.strip()
+        from_num = body.from_number.strip()
+        try:
+            from twilio.rest import Client  # type: ignore
+            client = Client(sid, token)
+            # Comprovació 1: fetch account info (valida SID + Token)
+            acc = client.api.accounts(sid).fetch()
+            acc_name = getattr(acc, "friendly_name", None) or sid
+            acc_status = getattr(acc, "status", "unknown")
+            # Comprovació 2: verifica que el número from existeix al compte
+            numbers = client.incoming_phone_numbers.list(phone_number=from_num, limit=1)
+            from_valid = len(numbers) > 0
+            # Alternativa: pot ser un Alphanumeric Sender ID → no apareix a incoming_phone_numbers
+            if not from_valid and not from_num.startswith("+"):
+                # Assumim que és Alphanumeric Sender (Espanya el permet). Twilio l'accepta sense validació prèvia.
+                from_valid = True
+                from_kind = "alphanumeric"
+            else:
+                from_kind = "phone_number" if from_valid else "unknown"
+            return {
+                "ok": True,
+                "account_name": acc_name,
+                "account_status": acc_status,
+                "from_valid": from_valid,
+                "from_kind": from_kind,
+            }
+        except Exception as e:
+            emsg = str(e)
+            # Detecta errors comuns per donar missatge amigable
+            lower = emsg.lower()
+            if "authenticate" in lower or "20003" in lower:
+                reason = "credentials_invalid"
+            elif "not found" in lower or "20404" in lower:
+                reason = "account_not_found"
+            else:
+                reason = "unknown_error"
+            return {
+                "ok": False,
+                "reason": reason,
+                "detail": emsg[:250],
+            }
 
     @router.post("/preview")
     async def preview_csv(
@@ -251,7 +331,7 @@ def build_router(db):
                 "id": c.get("external_id", ""),
             }
             msg = render_template(body.template, ctx)
-            ok, detail = _send_sms(c["mobile"], msg)
+            ok, detail = _send_sms(c["mobile"], msg, creds=body.twilio_creds)
             if ok:
                 sent_count += 1
             else:
@@ -274,6 +354,9 @@ def build_router(db):
                 "sent_at": None,
             })
 
+        # Determinar si es va utilitzar Twilio real (BYOA o global) o mock
+        used_twilio_real = bool(_extract_creds(body.twilio_creds)) or _has_twilio()
+
         status = "sent" if error_count == 0 else ("partial" if sent_count > 0 else "failed")
 
         doc = {
@@ -287,7 +370,8 @@ def build_router(db):
             "error_count": error_count,
             "filtered_invalid": len(invalid_contacts),
             "contacts": processed_contacts,
-            "twilio_used": _has_twilio(),
+            "twilio_used": used_twilio_real,
+            "twilio_source": "byoa" if _extract_creds(body.twilio_creds) else ("global" if _has_twilio() else "mock"),
         }
         await db.sms_campaigns.insert_one(doc)
 
@@ -298,7 +382,8 @@ def build_router(db):
             "error_count": error_count,
             "filtered_invalid": len(invalid_contacts),
             "status": status,
-            "twilio_mode": "real" if _has_twilio() else "mock",
+            "twilio_mode": "real" if used_twilio_real else "mock",
+            "twilio_source": doc["twilio_source"],
         }
 
     @router.get("/campaigns")

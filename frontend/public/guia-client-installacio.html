@@ -181,6 +181,99 @@ També pot forçar la comprovació manualment al menú <b>Ajuda → Comprovar ac
 </div>
 </div>
 
+<div class="step">
+<h2><span class="step-num">7</span>Enviar SMS als seus pacients (opcional · Twilio)</h2>
+
+MediCar Plus inclou un mòdul <b>Avisos SMS</b> per enviar recordatoris de revisió mèdica als seus pacients (ex: "Hola {{nom}}, li recordem que ha de renovar el seu carnet abans de {{data_revisio}}"). Per activar-lo cal <b>configurar el seu propi compte Twilio</b>. Vostè paga directament a Twilio (no a nosaltres); això li garanteix el control total i els millors preus.
+
+<div class="callout" style="background:#eff6ff;border-color:#3b82f6;color:#1e3a8a">
+<b>💡 Per què el seu propi compte?</b> Twilio cobra per SMS enviat. Amb el seu compte:
+<ul style="margin:6px 0 0 0">
+<li>Vostè controla el pressupost i les despeses.</li>
+<li>Vostè escull el número remitent (o un nom com "MediCar" a Espanya).</li>
+<li>Nosaltres no toquem els seus diners ni podem cobrar-li res extra.</li>
+</ul>
+</div>
+
+<h3>Pas 1 · Crear compte Twilio</h3>
+<ol>
+<li>Vagi a <a href="https://www.twilio.com/try-twilio" target="_blank">www.twilio.com/try-twilio</a> i registri's amb el seu email.</li>
+<li>Confirmi l'email + telèfon (Twilio li enviarà un codi SMS).</li>
+<li>Twilio li obsequia <b>~15 $ de crèdit gratuït</b> per començar a provar.</li>
+</ol>
+
+<h3>Pas 2 · Comprar un número (recomanat)</h3>
+<ol>
+<li>Al Dashboard de Twilio, vagi a <b>Phone Numbers ▸ Manage ▸ Buy a Number</b>.</li>
+<li>Filtri per <b>País: Spain</b> i cerqui un número mòbil (comença per +346... o +347...).</li>
+<li>Preu aprox: <b>~1 €/mes</b> per número. Cliqui <b>Buy</b> i confirmi.</li>
+<li>Copiï el número complet amb el prefix internacional: <code>+34612345678</code>.</li>
+</ol>
+
+<div class="callout">
+<b>Alternativa sense llogar número (més barat):</b> a Espanya pot usar un <i>Alphanumeric Sender ID</i>. En comptes d'un número, els seus SMS apareixeran signats amb un nom com <b>MediCar</b> o <b>ClinicaXXX</b> (màxim 11 caràcters, sense espais). L'inconvenient: els pacients <b>no podran respondre</b> a l'SMS. Configuri-ho al mòdul Twilio (i escrigui el nom directament al camp "Número remitent" del pas 4, sense el signe +).
+</div>
+
+<h3>Pas 3 · Copiar les credencials Twilio</h3>
+<ol>
+<li>Al Dashboard de Twilio (pàgina principal), busqui la secció <b>Account Info</b>.</li>
+<li>Copiï els dos valors:
+  <ul>
+  <li><b>Account SID</b>: comença per <code>AC...</code> (34 caràcters).</li>
+  <li><b>Auth Token</b>: cliqui l'ull 👁️ per revelar-lo, després copiï.</li>
+  </ul>
+</li>
+</ol>
+
+<h3>Pas 4 · Configurar dins de MediCar Plus</h3>
+<ol>
+<li>Obri l'app MediCar Plus.</li>
+<li>Al menú principal, cliqui l'apartat <b>📱 Avisos SMS</b>.</li>
+<li>A dalt a la dreta, cliqui el botó <b>⚙️ Twilio</b>.</li>
+<li>Enganxi els tres camps:
+  <ul>
+  <li>Account SID</li>
+  <li>Auth Token</li>
+  <li>Número remitent (ex: <code>+34612345678</code>) o Alphanumeric Sender (ex: <code>MediCar</code>)</li>
+  </ul>
+</li>
+<li>Cliqui <b>🔎 Provar credencials</b> per verificar. Si tot està bé apareixerà: <span style="color:#059669;font-weight:700">✅ Credencials vàlides!</span></li>
+<li>Cliqui <b>💾 Desar</b>. Les credencials es guarden <b>només al seu navegador</b> (no s'envien a MediCar Plus).</li>
+</ol>
+
+<h3>Pas 5 · Enviar la primera campanya de prova</h3>
+<ol>
+<li>Al mòdul Avisos SMS, cliqui <b>+ Nova campanya</b>.</li>
+<li>Pugi un CSV amb els seus contactes (nom, cognom, mòbil).</li>
+<li>Escrigui la plantilla del missatge amb variables (ex: <code>Hola {{nom}}, recordi passar la revisió abans del {{data_revisio}}. Gràcies · MediCar</code>).</li>
+<li>Cliqui <b>🚀 Enviar campanya</b>. Els SMS surten immediatament del seu compte Twilio.</li>
+</ol>
+
+<div class="callout" style="background:#fef3c7;border-color:#f59e0b;color:#78350f">
+<b>💰 Costos aproximats (Twilio Espanya · 2026)</b>
+<ul style="margin:6px 0 0 0">
+<li>SMS individual: <b>~0,07 €</b> per missatge de fins a 160 caràcters (comprovi preus actualitzats a Twilio).</li>
+<li>Missatges de més de 160 caràcters es divideixen en 2 o 3 SMS (i costen el doble/triple).</li>
+<li>Lloguer de número: <b>~1 €/mes</b>.</li>
+<li>Alphanumeric Sender: sense cost fix, només paga els SMS enviats.</li>
+</ul>
+Twilio té una calculadora oficial a <a href="https://www.twilio.com/sms/pricing/es" target="_blank">twilio.com/sms/pricing/es</a>.
+</div>
+
+<h3>❓ Problemes freqüents amb Twilio</h3>
+
+<div style="margin-left:10px">
+<p><b>· "Trial Account limitations"</b>: mentre el compte estigui en mode Trial, Twilio només permet enviar SMS a números <i>verificats</i> (que hagi afegit manualment al dashboard). Per enviar a qualsevol número cal <b>carregar crèdit</b> (activa el compte).</p>
+
+<p><b>· "Number not valid"</b>: assegureu-vos que el número remitent està escrit amb el prefix <code>+34</code> i sense espais.</p>
+
+<p><b>· "Error: 21610 · Recipient unsubscribed"</b>: el destinatari ha respost STOP a un SMS previ. Twilio bloqueja per llei aquesta baixa. Elimineu-lo de la llista.</p>
+
+<p><b>· No em surten els SMS enviats a l'històric del dashboard Twilio</b>: si al mòdul apareix "modo PRUEBA (simulación)", les credencials no s'han desat correctament. Torneu a la configuració ⚙️ Twilio, cliqueu Provar credencials, i confirmeu que apareix ✅ Credencials vàlides abans de desar.</p>
+</div>
+
+</div>
+
 <h2>❓ Problemes freqüents</h2>
 
 <div class="step">

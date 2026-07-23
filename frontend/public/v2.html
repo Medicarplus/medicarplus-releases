@@ -4573,6 +4573,29 @@ function getSmsApiBase(){
 }
 const SMS_ADMIN_TOKEN='MB-ADMIN-BRUGULAT-2026-4F8E2A1C';
 
+// ─────────────────────────────────────────────────────────────────────────
+// Twilio BYOA (Bring Your Own Account) · credencials del client
+// Guardades en localStorage · s'envien només amb cada request de campanya SMS
+// ─────────────────────────────────────────────────────────────────────────
+const TWILIO_LS_KEY = 'caja.twilio.creds.v1';
+function getTwilioCreds(){
+  try{
+    const raw = localStorage.getItem(TWILIO_LS_KEY);
+    if(!raw) return null;
+    const p = JSON.parse(raw);
+    if(p && p.sid && p.token && p.from) return {sid:p.sid, token:p.token, from:p.from};
+  }catch(e){}
+  return null;
+}
+function saveTwilioCreds(sid, token, from_number){
+  try{
+    localStorage.setItem(TWILIO_LS_KEY, JSON.stringify({sid:sid.trim(), token:token.trim(), from:from_number.trim()}));
+    return true;
+  }catch(e){ return false; }
+}
+function clearTwilioCreds(){ try{ localStorage.removeItem(TWILIO_LS_KEY); }catch(e){} }
+function hasTwilioCreds(){ return !!getTwilioCreds(); }
+
 async function apiSms(path, opts={}){
   const buildUrl=(base)=>base+'/api/sms'+path;
   const doFetch=(url)=>fetch(url,{...opts, headers:{'X-Admin-Token':SMS_ADMIN_TOKEN, ...(opts.headers||{})}});
@@ -4604,6 +4627,122 @@ async function apiSms(path, opts={}){
   return await res.json();
 }
 
+function openTwilioCfgModal(){
+  const isCA = (typeof currentLang !== 'undefined' && currentLang === 'ca');
+  const existing = document.getElementById('twilioCfgModal');
+  if(existing) existing.remove();
+  const cur = getTwilioCreds() || {sid:'', token:'', from:''};
+  const back = document.createElement('div');
+  back.id = 'twilioCfgModal';
+  back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:10001;backdrop-filter:blur(8px);padding:20px';
+  back.innerHTML = `
+    <div style="background:linear-gradient(135deg,#0f172a,#0a0f1a);border:1px solid #334155;border-radius:14px;max-width:640px;width:100%;max-height:92vh;overflow:auto;padding:26px;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;box-shadow:0 25px 60px rgba(0,0,0,.7)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+        <div>
+          <h3 style="margin:0;font-size:19px;color:#22c55e;letter-spacing:.3px">⚙️ ${isCA?'Configurar Twilio':'Configurar Twilio'} (SMS)</h3>
+          <div style="font-size:12px;color:#94a3b8;margin-top:4px">${isCA?'Cada centre configura el seu propi compte Twilio. Tu pagues directament a Twilio.':'Cada centro configura su propia cuenta Twilio. Tú pagas directamente a Twilio.'}</div>
+        </div>
+        <button id="twCfgClose" style="background:transparent;border:1px solid #475569;color:#cbd5e1;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:13px">✕</button>
+      </div>
+
+      <div style="background:#0e1a2e;border:1px solid #1e293b;border-radius:8px;padding:14px;margin-bottom:16px;font-size:12px;color:#cbd5e1;line-height:1.6">
+        <div style="font-weight:800;color:#7ec8ff;margin-bottom:6px">📖 ${isCA?'Com obtenir aquestes dades':'Cómo obtener estos datos'}</div>
+        1. ${isCA?'Crea un compte a':'Crea una cuenta en'} <a href="https://www.twilio.com/try-twilio" target="_blank" style="color:#f5b301;text-decoration:underline">twilio.com</a> ${isCA?'(t\'obsequien ~15 $ de crèdit).':'(regalan ~15 $ de crédito).'}<br>
+        2. ${isCA?'Al Dashboard trobaràs':'En el Dashboard encontrarás'}: <b>Account SID</b> ${isCA?'i':'y'} <b>Auth Token</b>.<br>
+        3. ${isCA?'A "Phone Numbers ▸ Buy a Number" compra un número espanyol (~1 €/mes).':'En "Phone Numbers ▸ Buy a Number" compra un número español (~1 €/mes).'}<br>
+        4. ${isCA?'Copia el número complet amb el prefix':'Copia el número completo con el prefijo'} <code style="background:#1e293b;padding:1px 6px;border-radius:4px;color:#f5b301">+34...</code><br>
+        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #334155;color:#94a3b8;font-size:11px">🔒 ${isCA?'Les credencials es guarden ÚNICAMENT al teu navegador (localStorage). No es persisteixen al servidor.':'Las credenciales se guardan ÚNICAMENTE en tu navegador (localStorage). No se persisten en el servidor.'}</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <label style="display:block">
+          <div style="font-size:11px;font-weight:700;color:#f5b301;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Account SID</div>
+          <input id="twSid" data-testid="twilio-sid" type="text" value="${(cur.sid||'').replace(/"/g,'&quot;')}" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" style="width:100%;padding:9px 12px;background:#0e1a2e;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:12px">
+        </label>
+        <label style="display:block">
+          <div style="font-size:11px;font-weight:700;color:#f5b301;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Auth Token</div>
+          <input id="twToken" data-testid="twilio-token" type="password" value="${(cur.token||'').replace(/"/g,'&quot;')}" placeholder="********************************" style="width:100%;padding:9px 12px;background:#0e1a2e;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:12px">
+          <div style="font-size:10px;color:#64748b;margin-top:3px">${isCA?'Trobaràs aquest token al Dashboard de Twilio (has de fer clic per revelar-lo).':'Encontrarás este token en el Dashboard de Twilio (haz clic para revelarlo).'}</div>
+        </label>
+        <label style="display:block">
+          <div style="font-size:11px;font-weight:700;color:#f5b301;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">${isCA?'Número remitent':'Número remitente'} (From)</div>
+          <input id="twFrom" data-testid="twilio-from" type="text" value="${(cur.from||'').replace(/"/g,'&quot;')}" placeholder="+34612345678" style="width:100%;padding:9px 12px;background:#0e1a2e;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:12px">
+          <div style="font-size:10px;color:#64748b;margin-top:3px">${isCA?'Format internacional. També accepta un "Alphanumeric Sender ID" (ex: MediCar), útil per no llogar número però no pot rebre respostes.':'Formato internacional. También acepta un "Alphanumeric Sender ID" (ej: MediCar), útil para no alquilar número pero no puede recibir respuestas.'}</div>
+        </label>
+      </div>
+
+      <div id="twTestResult" style="margin-top:12px;font-size:12px;min-height:20px"></div>
+
+      <div style="display:flex;gap:8px;justify-content:space-between;margin-top:18px;flex-wrap:wrap">
+        <button id="twCfgDel" data-testid="twilio-cfg-del" style="background:#7f1d1d;color:#fecaca;border:1px solid #b91c1c;padding:9px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">🗑 ${isCA?'Eliminar credencials':'Eliminar credenciales'}</button>
+        <div style="display:flex;gap:8px">
+          <button id="twCfgTest" data-testid="twilio-cfg-test" style="background:#1e40af;color:#fff;border:none;padding:9px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800">🔎 ${isCA?'Provar credencials':'Probar credenciales'}</button>
+          <button id="twCfgSave" data-testid="twilio-cfg-save" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;padding:9px 20px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800">💾 ${isCA?'Desar':'Guardar'}</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(back);
+  back.addEventListener('click',(e)=>{if(e.target===back)back.remove()});
+  document.getElementById('twCfgClose').onclick=()=>back.remove();
+
+  const getVals = () => ({
+    sid: document.getElementById('twSid').value.trim(),
+    token: document.getElementById('twToken').value.trim(),
+    from: document.getElementById('twFrom').value.trim(),
+  });
+
+  document.getElementById('twCfgDel').onclick=()=>{
+    if(!confirm(isCA?'Eliminar les credencials Twilio guardades? Els SMS tornaran a mode PROVA (simulació).':'¿Eliminar las credenciales Twilio guardadas? Los SMS volverán a modo PRUEBA (simulación).')) return;
+    clearTwilioCreds();
+    document.getElementById('twSid').value='';
+    document.getElementById('twToken').value='';
+    document.getElementById('twFrom').value='';
+    document.getElementById('twTestResult').innerHTML='<span style="color:#94a3b8">🗑 '+(isCA?'Credencials eliminades.':'Credenciales eliminadas.')+'</span>';
+  };
+
+  document.getElementById('twCfgSave').onclick=()=>{
+    const {sid, token, from} = getVals();
+    if(!sid || !token || !from){
+      document.getElementById('twTestResult').innerHTML='<span style="color:#ef4444">⚠ '+(isCA?'Cal omplir tots tres camps.':'Debes rellenar los tres campos.')+'</span>';
+      return;
+    }
+    saveTwilioCreds(sid, token, from);
+    document.getElementById('twTestResult').innerHTML='<span style="color:#22c55e">✅ '+(isCA?'Credencials desades al teu navegador. Ja pots enviar SMS reals.':'Credenciales guardadas en tu navegador. Ya puedes enviar SMS reales.')+'</span>';
+    setTimeout(()=>{back.remove();},1200);
+  };
+
+  document.getElementById('twCfgTest').onclick=async(ev)=>{
+    const btn=ev.target;
+    const {sid, token, from} = getVals();
+    if(!sid || !token || !from){
+      document.getElementById('twTestResult').innerHTML='<span style="color:#ef4444">⚠ '+(isCA?'Omple tots tres camps abans de provar.':'Rellena los tres campos antes de probar.')+'</span>';
+      return;
+    }
+    btn.disabled=true;
+    const oldTxt=btn.textContent;
+    btn.textContent=isCA?'Provant…':'Probando…';
+    document.getElementById('twTestResult').innerHTML='<span style="color:#94a3b8">⏳ '+(isCA?'Contactant amb Twilio…':'Contactando con Twilio…')+'</span>';
+    try{
+      const r=await apiSms('/test-credentials',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sid,token,from_number:from})});
+      if(r.ok){
+        document.getElementById('twTestResult').innerHTML='<div style="color:#22c55e;font-weight:700">✅ '+(isCA?'Credencials vàlides!':'¡Credenciales válidas!')+'</div><div style="font-size:11px;color:#94a3b8;margin-top:3px">'+(isCA?'Compte':'Cuenta')+': <b>'+r.account_name+'</b> · Status: <b>'+r.account_status+'</b>'+(r.from_valid?' · '+(isCA?'Remitent OK':'Remitente OK')+' ('+r.from_kind+')':' · <span style="color:#f97316">⚠ '+(isCA?'Remitent no reconegut':'Remitente no reconocido')+'</span>')+'</div>';
+      } else {
+        const reasons={
+          'credentials_invalid':(isCA?'SID o Token incorrectes':'SID o Token incorrectos'),
+          'account_not_found':(isCA?'Compte no trobat':'Cuenta no encontrada'),
+          'unknown_error':(isCA?'Error desconegut':'Error desconocido'),
+        };
+        document.getElementById('twTestResult').innerHTML='<div style="color:#ef4444;font-weight:700">✗ '+(reasons[r.reason]||r.reason)+'</div><div style="font-size:11px;color:#94a3b8;margin-top:3px;font-family:Courier New,monospace">'+(r.detail||'').replace(/</g,'&lt;')+'</div>';
+      }
+    }catch(e){
+      document.getElementById('twTestResult').innerHTML='<span style="color:#ef4444">✗ '+(isCA?'Error de xarxa':'Error de red')+': '+e.message+'</span>';
+    }finally{
+      btn.disabled=false;
+      btn.textContent=oldTxt;
+    }
+  };
+}
+
 function openSmsModal(){
   const existing=document.getElementById('smsModal');
   if(existing){existing.remove();return}
@@ -4627,6 +4766,7 @@ function openSmsModal(){
       <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #334155;background:linear-gradient(135deg,#052e16,#0f172a)">
         <h3 style="margin:0;font-size:20px;color:#22c55e;letter-spacing:.5px">${T.title}</h3>
         <div style="display:flex;gap:8px;align-items:center">
+          <button id="smsBtnTwilioCfg" data-testid="btn-sms-twilio-cfg" style="background:#1e293b;border:1px solid #475569;color:#cbd5e1;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600" title="${isCA?'Configurar el teu compte Twilio':'Configurar tu cuenta Twilio'}">⚙️ Twilio</button>
           <button id="smsBtnStats" style="background:#1e293b;border:1px solid #475569;color:#cbd5e1;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">${T.stats}</button>
           <button id="smsBtnNew" style="background:linear-gradient(135deg,#059669,#10b981);border:none;color:#fff;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700" data-testid="btn-sms-new">${T.newCamp}</button>
           <button id="smsClose" style="background:transparent;border:1px solid #475569;color:#cbd5e1;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:13px">${T.close} ✕</button>
@@ -4640,6 +4780,7 @@ function openSmsModal(){
   document.getElementById('smsClose').onclick=()=>back.remove();
   document.getElementById('smsBtnNew').onclick=()=>renderSmsNew();
   document.getElementById('smsBtnStats').onclick=()=>renderSmsStats();
+  document.getElementById('smsBtnTwilioCfg').onclick=()=>openTwilioCfgModal();
 
   renderSmsList();
   // Exposa renderSmsDetail globalment perquè `openSmsCampaignDetail` (des del modal
@@ -4651,7 +4792,20 @@ function openSmsModal(){
     body.innerHTML='<div style="text-align:center;padding:40px;color:#94a3b8">'+T.loading+'</div>';
     try{
       const d=await apiSms('/campaigns');
-      const twilioBanner=`<div style="padding:10px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:16px;background:#7c2d12;color:#fed7aa;border:1px solid #ea580c">${T.mockMode}</div>`;
+    const twilioBanner=(()=>{
+        if(hasTwilioCreds()){
+          const c=getTwilioCreds();
+          const fromDisp=(c.from||'').length>16?c.from.slice(0,16)+'…':c.from;
+          return `<div style="padding:10px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:16px;background:#052e16;color:#86efac;border:1px solid #22c55e;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+            <span>✅ ${isCA?'Twilio configurat · Compte propi':'Twilio configurado · Cuenta propia'} · <b>${fromDisp}</b></span>
+            <button onclick="openTwilioCfgModal()" style="background:#052e16;color:#86efac;border:1px solid #22c55e;padding:3px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700">⚙️ ${isCA?'Editar':'Editar'}</button>
+          </div>`;
+        }
+        return `<div style="padding:12px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:16px;background:#7c2d12;color:#fed7aa;border:1px solid #ea580c;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <span>⚠️ ${isCA?'Twilio no configurat · Els SMS es simularan (mode PROVA). Configura el teu compte Twilio per enviar SMS reals.':'Twilio no configurado · Los SMS se simularán (modo PRUEBA). Configura tu cuenta Twilio para enviar SMS reales.'}</span>
+          <button onclick="openTwilioCfgModal()" style="background:#f59e0b;color:#0b1121;border:1px solid #f59e0b;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:800">⚙️ ${isCA?'Configurar Twilio':'Configurar Twilio'}</button>
+        </div>`;
+      })();
       const items=d.campaigns||[];
       if(!items.length){
         body.innerHTML=twilioBanner+`<div style="text-align:center;padding:60px 20px;color:#94a3b8"><div style="font-size:48px;margin-bottom:12px">📭</div><div style="font-size:15px">${T.noItems}</div></div>`;
@@ -4832,8 +4986,13 @@ function openSmsModal(){
       try{
         const name=document.getElementById('smsCampName').value.trim();
         const template=tpl.value.trim();
-        const r=await apiSms('/campaigns',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,template,contacts:d.contacts})});
-        alert((isCA?'✅ Campanya creada\n\nEnviats: ':'✅ Campaña creada\n\nEnviados: ')+r.sent_count+'\n'+(isCA?'Errors: ':'Errores: ')+r.error_count+'\n'+(isCA?'Sense mòbil: ':'Sin móvil: ')+r.filtered_invalid+'\n\nMode: '+r.twilio_mode.toUpperCase());
+        // BYOA: si el client té les seves creds Twilio a localStorage, les enviem
+        // amb la petició. Si no, backend farà fallback a mock/env.
+        const creds = getTwilioCreds();
+        const payload = { name, template, contacts:d.contacts };
+        if(creds) payload.twilio_creds = creds;
+        const r=await apiSms('/campaigns',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        alert((isCA?'✅ Campanya creada\n\nEnviats: ':'✅ Campaña creada\n\nEnviados: ')+r.sent_count+'\n'+(isCA?'Errors: ':'Errores: ')+r.error_count+'\n'+(isCA?'Sense mòbil: ':'Sin móvil: ')+r.filtered_invalid+'\n\nMode: '+r.twilio_mode.toUpperCase()+(r.twilio_source==='byoa'?' (tu cuenta Twilio)':(r.twilio_source==='global'?' (cuenta administrador)':' (simulación)')));
         renderSmsList();
       }catch(e){
         alert('Error: '+e.message);

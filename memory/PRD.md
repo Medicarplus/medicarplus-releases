@@ -220,3 +220,36 @@ User's preferred language: **Catalan** (UI/code strings in **Spanish**).
 3. Cada clic manual als botons de preview reseteja el flag intern d'auto-upgrade.
 
 **Test**: screenshot tool · botons `btn-reset-preview` i `prev-off` renderitzats correctament al modal.
+
+
+## Session Feb 23, 2026 (P1 · Twilio BYOA integration)
+
+**Decisió del propietari**: Model **BYOA (Bring Your Own Account)**. Cada centre client configura el seu propi compte Twilio; ells paguen directament a Twilio; MediCar Plus no toca diners. WhatsApp queda ajornat.
+
+**Canvis backend (`/app/backend/routes/sms_campaigns.py`)**:
+1. `SmsCampaignCreate` accepta camp opcional `twilio_creds: {sid, token, from}`.
+2. `_send_sms(mobile, message, creds=None)` refactoritzat amb prioritat:
+   - (1) creds del request (BYOA) → (2) `.env` global (fallback admin) → (3) MOCK.
+3. Nou endpoint **`POST /api/sms/test-credentials`**: valida SID+Token cridant Twilio (`accounts(sid).fetch()`) i comprova que el número `from` existeix al compte o és Alphanumeric Sender. Retorna `{ok, account_name, account_status, from_valid, from_kind}` o `{ok:false, reason}`.
+4. La resposta de `/campaigns` afegeix `twilio_source: "byoa"|"global"|"mock"` per traçabilitat.
+5. La campanya guarda `twilio_used` i `twilio_source` a MongoDB.
+
+**Canvis frontend (`/app/frontend/public/v2.html`)**:
+1. Helpers globals: `getTwilioCreds()`, `saveTwilioCreds()`, `clearTwilioCreds()`, `hasTwilioCreds()`. Emmagatzemat a `localStorage['caja.twilio.creds.v1']`.
+2. Nou botó **⚙️ Twilio** al header del modal Avisos SMS (obre `openTwilioCfgModal()`).
+3. Modal complet de configuració amb 3 camps (SID, Token, From), botó **🔎 Provar credencials** que crida `/test-credentials`, botó **💾 Desar** i botó **🗑 Eliminar credencials**.
+4. Banner dinàmic dins el modal SMS: verd (✅ Twilio configurat · Compte propi) o taronja (⚠️ Twilio no configurat · Mode PROVA). Botó "Configurar" al banner mateix.
+5. `/campaigns` POST injecta automàticament `twilio_creds` si el client té creds a localStorage.
+6. Alert post-campanya ara mostra `(tu cuenta Twilio)`, `(cuenta administrador)` o `(simulación)`.
+
+**Canvis guia client (`/app/frontend/public/guia-client-installacio.html`)**:
+- Nova secció **Pas 7 · Enviar SMS als seus pacients (opcional · Twilio)** amb 5 sub-passos: crear compte Twilio → comprar número → copiar credencials → configurar dins l'app → enviar campanya. Costos aproximats + troubleshooting.
+
+**Tests**:
+- `curl POST /api/sms/test-credentials` amb fake creds → retorna `credentials_invalid` correctament.
+- `curl POST /api/sms/campaigns` amb `twilio_creds` fake → retorna `twilio_source: "byoa"` i `twilio_mode: "real"`.
+- Screenshot: `openTwilioCfgModal` exposada globalment, 6 data-testid presents (twilio-sid, twilio-token, twilio-from, twilio-cfg-test, twilio-cfg-save, twilio-cfg-del).
+
+**Data-testids afegits**: `btn-sms-twilio-cfg`, `twilio-sid`, `twilio-token`, `twilio-from`, `twilio-cfg-test`, `twilio-cfg-save`, `twilio-cfg-del`.
+
+**Seguretat**: Credencials mai persistents al backend. Es passen amb cada request via body JSON. localStorage-only al client. El master admin pot continuar usant les creds `.env` si les té definides (fallback automàtic).
