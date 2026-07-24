@@ -566,7 +566,9 @@ async def stripe_webhook(request: _FastReq):
                                       "paid_via": "stripe_subscription",
                                       "stripe_subscription_id": sub_id}},
                         )
-            elif etype in ("invoice.paid", "invoice.payment_failed"):
+            elif etype == "invoice.payment_failed":
+                # Cobrament fallit → NO revoquem llicència (Stripe farà retries automàtics
+                # durant ~3 setmanes). Només re-sincronitzem l'estat per si ha canviat.
                 sub_id = data.get("subscription")
                 if sub_id:
                     _stripe_sdk.api_key = api_key
@@ -580,17 +582,69 @@ async def stripe_webhook(request: _FastReq):
                         company_name=md.get("company_name"),
                         referred_by=md.get("referred_by") or md.get("referral_code"),
                     )
+                    logger.info(f"[stripe] invoice.payment_failed for sub={sub_id} (Stripe retriarà automàticament)")
             elif etype in ("customer.subscription.updated", "customer.subscription.deleted"):
                 sub = data  # aquest event ja porta l'objecte Subscription
                 md = sub.get("metadata", {}) or {}
+                install_id_from_md = md.get("install_id")
                 await _sync_license_from_subscription(
                     sub,
-                    install_id=md.get("install_id"),
+                    install_id=install_id_from_md,
                     package_id=md.get("package_id"),
                     client_email=md.get("customer_email"),
                     company_name=md.get("company_name"),
                     referred_by=md.get("referred_by") or md.get("referral_code"),
                 )
+                # 💰 SMS BILLING · Facturació final si es cancel·la definitivament
+                # (evita perdre diners quan un client cancel·la sense pagar els SMS del mes)
+                sub_status = sub.get("status")
+                if etype == "customer.subscription.deleted" or sub_status in ("canceled", "unpaid", "incomplete_expired"):
+                    try:
+                        from services.sms_billing import bill_pending_sms_for_subscription
+                        install_id_final = install_id_from_md
+                        # Fallback: mira si tenim install_id lligat al subscription_id
+                        if not install_id_final:
+                            lic_doc = await db.licenses.find_one({"stripe_subscription_id": sub.get("id")})
+                            if lic_doc:
+                                install_id_final = lic_doc.get("install_id")
+                        if install_id_final:
+                            result = await bill_pending_sms_for_subscription(
+                                db, _stripe_sdk, sub.get("id"), install_id_final, mode="one_off"
+                            )
+                            logger.info(f"[sms_billing] final invoice on cancel: {result}")
+                    except Exception as bill_err:
+                        logger.exception(f"[sms_billing] failed on subscription cancel: {bill_err}")
+            elif etype == "invoice.paid":
+                # També re-sincronitza la llicència + factura SMS pendents del mes anterior
+                sub_id = data.get("subscription")
+                if sub_id:
+                    _stripe_sdk.api_key = api_key
+                    sub = _stripe_sdk.Subscription.retrieve(sub_id)
+                    md = sub.get("metadata", {}) or {}
+                    install_id_paid = md.get("install_id")
+                    await _sync_license_from_subscription(
+                        sub,
+                        install_id=install_id_paid,
+                        package_id=md.get("package_id"),
+                        client_email=md.get("customer_email"),
+                        company_name=md.get("company_name"),
+                        referred_by=md.get("referred_by") or md.get("referral_code"),
+                    )
+                    # 💰 SMS BILLING · adjunta SMS pendents a la següent factura
+                    try:
+                        from services.sms_billing import bill_pending_sms_for_subscription
+                        if not install_id_paid:
+                            lic_doc = await db.licenses.find_one({"stripe_subscription_id": sub_id})
+                            if lic_doc:
+                                install_id_paid = lic_doc.get("install_id")
+                        if install_id_paid:
+                            result = await bill_pending_sms_for_subscription(
+                                db, _stripe_sdk, sub_id, install_id_paid, mode="attach_next"
+                            )
+                            if result.get("billed", 0) > 0:
+                                logger.info(f"[sms_billing] attached to next invoice: {result}")
+                    except Exception as bill_err:
+                        logger.exception(f"[sms_billing] failed on invoice.paid: {bill_err}")
         except Exception as e:
             logger.exception("Error handling subscription webhook: %s", e)
         return {"received": True, "event_type": etype, "handled": "subscription"}

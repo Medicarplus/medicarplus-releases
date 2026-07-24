@@ -4693,6 +4693,46 @@ function saveTwilioCreds(sid, token, from_number){
 function clearTwilioCreds(){ try{ localStorage.removeItem(TWILIO_LS_KEY); }catch(e){} }
 function hasTwilioCreds(){ return !!getTwilioCreds(); }
 
+// ─── Twilio Billing Mode · BYOA vs MediCar (només Premium) ────────────────
+const TWILIO_MODE_LS_KEY = 'caja.twilio.mode.v1';        // 'byoa' | 'medicar'
+const TWILIO_MEDICAR_SENDER_LS_KEY = 'caja.twilio.medicar.sender.v1';
+function getTwilioMode(){
+  try{ return localStorage.getItem(TWILIO_MODE_LS_KEY) || 'byoa'; }catch(e){ return 'byoa'; }
+}
+function setTwilioMode(mode){
+  try{ localStorage.setItem(TWILIO_MODE_LS_KEY, mode); }catch(e){}
+}
+function getMedicarSender(){
+  try{ return localStorage.getItem(TWILIO_MEDICAR_SENDER_LS_KEY) || ''; }catch(e){ return ''; }
+}
+function setMedicarSender(s){
+  try{ localStorage.setItem(TWILIO_MEDICAR_SENDER_LS_KEY, s || ''); }catch(e){}
+}
+// Sanitize: max 11 chars, alfanumèric ASCII sense espais
+function sanitizeAlphaSender(s){
+  if(!s) return '';
+  // Elimina accents
+  const normalized = s.normalize('NFKD').replace(/[\u0300-\u036f]/g,'');
+  return normalized.replace(/[^A-Za-z0-9]/g,'').slice(0,11);
+}
+// Detecta si el pla actual permet MediCar Cloud (Premium o MASTER)
+function isTwilioMedicarEligible(){
+  try{
+    // Preview del master
+    const prev = (localStorage.getItem('caja.plan.preview.v1')||'').toUpperCase();
+    if(prev==='TRIAL' || prev==='STD' || prev==='STANDARD') return false;
+    if(prev==='PRM' || prev==='PREMIUM') return true;
+    // Sense preview → llegir la llicència real
+    const raw = localStorage.getItem('caja.license.v1');
+    if(!raw) return false;
+    const lic = JSON.parse(raw);
+    const t = (lic.type||'').toUpperCase();
+    if(t==='MASTER') return true;
+    const plan = (lic.plan||'').toUpperCase();
+    return plan==='PREMIUM' || plan==='PRM';
+  }catch(e){ return false; }
+}
+
 async function apiSms(path, opts={}){
   const buildUrl=(base)=>base+'/api/sms'+path;
   const doFetch=(url)=>fetch(url,{...opts, headers:{'X-Admin-Token':SMS_ADMIN_TOKEN, ...(opts.headers||{})}});
@@ -4724,120 +4764,245 @@ async function apiSms(path, opts={}){
   return await res.json();
 }
 
-function openTwilioCfgModal(){
+async function openTwilioCfgModal(){
   const isCA = (typeof currentLang !== 'undefined' && currentLang === 'ca');
   const existing = document.getElementById('twilioCfgModal');
   if(existing) existing.remove();
   const cur = getTwilioCreds() || {sid:'', token:'', from:''};
+  const curMode = getTwilioMode(); // 'byoa' | 'medicar'
+  const curSender = getMedicarSender();
+  const eligible = isTwilioMedicarEligible();
+
+  // Comprova al backend si el compte MediCar Cloud està operatiu
+  // Fem servir apiSms però amb fallback resistent: si apiSms falla,
+  // provem fetch directe amb el REACT_APP_BACKEND_URL derivat.
+  let medAvail = {available:false, price_per_sms_eur:0.10};
+  try{
+    const rAvail = await apiSms('/medicar-availability');
+    if(rAvail && typeof rAvail.available !== 'undefined') medAvail = rAvail;
+  }catch(e){
+    // Fallback: fetch directe (endpoint no requereix admin token)
+    try{
+      const base = (typeof getApiBase==='function') ? getApiBase() : (typeof LIC!=='undefined' && LIC.VERIFY_URL ? LIC.VERIFY_URL.replace(/\/api\/.*$/,'') : '');
+      if(base){
+        const r = await fetch(base+'/api/sms/medicar-availability');
+        if(r.ok){ const j = await r.json(); if(j && typeof j.available !== 'undefined') medAvail = j; }
+      }
+    }catch(e2){}
+  }
+  const medReady = eligible && medAvail.available;
+  const pricePerSms = (medAvail.price_per_sms_eur || 0.10).toFixed(2);
+
+  // Nom empresa per defecte (per l'Alphanumeric Sender)
+  let defaultSender = curSender;
+  if(!defaultSender){
+    try{
+      const raw = localStorage.getItem('caja.license.v1');
+      if(raw){ const lic = JSON.parse(raw); defaultSender = sanitizeAlphaSender(lic.client_name||lic.centre||''); }
+    }catch(e){}
+  }
+
+  // Tab actiu inicial: si té preview eligible i MediCar disponible, mostra MediCar
+  const initialTab = (curMode === 'medicar' && medReady) ? 'medicar' : 'byoa';
+
   const back = document.createElement('div');
   back.id = 'twilioCfgModal';
   back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:10001;backdrop-filter:blur(8px);padding:20px';
   back.innerHTML = `
-    <div style="background:linear-gradient(135deg,#0f172a,#0a0f1a);border:1px solid #334155;border-radius:14px;max-width:640px;width:100%;max-height:92vh;overflow:auto;padding:26px;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;box-shadow:0 25px 60px rgba(0,0,0,.7)">
+    <div style="background:linear-gradient(135deg,#0f172a,#0a0f1a);border:1px solid #334155;border-radius:14px;max-width:680px;width:100%;max-height:92vh;overflow:auto;padding:26px;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;box-shadow:0 25px 60px rgba(0,0,0,.7)">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
         <div>
-          <h3 style="margin:0;font-size:19px;color:#22c55e;letter-spacing:.3px">⚙️ ${isCA?'Configurar Twilio':'Configurar Twilio'} (SMS)</h3>
-          <div style="font-size:12px;color:#94a3b8;margin-top:4px">${isCA?'Cada centre configura el seu propi compte Twilio. Tu pagues directament a Twilio.':'Cada centro configura su propia cuenta Twilio. Tú pagas directamente a Twilio.'}</div>
+          <h3 style="margin:0;font-size:19px;color:#22c55e;letter-spacing:.3px">⚙️ ${isCA?'Configurar SMS':'Configurar SMS'} (Twilio)</h3>
+          <div style="font-size:12px;color:#94a3b8;margin-top:4px">${isCA?'Tria com vols enviar SMS als teus pacients.':'Elige cómo quieres enviar SMS a tus pacientes.'}</div>
         </div>
         <button id="twCfgClose" style="background:transparent;border:1px solid #475569;color:#cbd5e1;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:13px">✕</button>
       </div>
 
-      <div style="background:#0e1a2e;border:1px solid #1e293b;border-radius:8px;padding:14px;margin-bottom:16px;font-size:12px;color:#cbd5e1;line-height:1.6">
-        <div style="font-weight:800;color:#7ec8ff;margin-bottom:6px">📖 ${isCA?'Com obtenir aquestes dades':'Cómo obtener estos datos'}</div>
-        1. ${isCA?'Crea un compte a':'Crea una cuenta en'} <a href="https://www.twilio.com/try-twilio" target="_blank" style="color:#f5b301;text-decoration:underline">twilio.com</a> ${isCA?'(t\'obsequien ~15 $ de crèdit).':'(regalan ~15 $ de crédito).'}<br>
-        2. ${isCA?'Al Dashboard trobaràs':'En el Dashboard encontrarás'}: <b>Account SID</b> ${isCA?'i':'y'} <b>Auth Token</b>.<br>
-        3. ${isCA?'A "Phone Numbers ▸ Buy a Number" compra un número espanyol (~1 €/mes).':'En "Phone Numbers ▸ Buy a Number" compra un número español (~1 €/mes).'}<br>
-        4. ${isCA?'Copia el número complet amb el prefix':'Copia el número completo con el prefijo'} <code style="background:#1e293b;padding:1px 6px;border-radius:4px;color:#f5b301">+34...</code><br>
-        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #334155;color:#94a3b8;font-size:11px">🔒 ${isCA?'Les credencials es guarden ÚNICAMENT al teu navegador (localStorage). No es persisteixen al servidor.':'Las credenciales se guardan ÚNICAMENTE en tu navegador (localStorage). No se persisten en el servidor.'}</div>
+      <!-- Tabs -->
+      <div style="display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid #1e293b">
+        <button id="tabByoa" data-tab="byoa" data-testid="tab-twilio-byoa" style="flex:1;padding:10px 14px;background:transparent;border:none;border-bottom:3px solid transparent;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:700;transition:.2s">🔧 ${isCA?'La meva cuenta Twilio':'Mi cuenta Twilio'}<div style="font-size:10px;color:#64748b;font-weight:400;margin-top:2px">${isCA?'Pagues directament a Twilio':'Pagas directamente a Twilio'}</div></button>
+        <button id="tabMedicar" data-tab="medicar" data-testid="tab-twilio-medicar" ${medReady?'':'disabled'} style="flex:1;padding:10px 14px;background:transparent;border:none;border-bottom:3px solid transparent;color:${medReady?'#94a3b8':'#475569'};cursor:${medReady?'pointer':'not-allowed'};font-size:13px;font-weight:700;transition:.2s;opacity:${medReady?'1':'.55'}">⭐ ${isCA?'Compte MediCar Cloud':'Cuenta MediCar Cloud'}<div style="font-size:10px;color:#64748b;font-weight:400;margin-top:2px">${eligible ? (medAvail.available ? (isCA?'Facturat amb la teva subscripció':'Facturado con tu suscripción') : (isCA?'Properament':'Próximamente')) : (isCA?'Només Premium':'Solo Premium')}</div></button>
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <label style="display:block">
-          <div style="font-size:11px;font-weight:700;color:#f5b301;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Account SID</div>
-          <input id="twSid" data-testid="twilio-sid" type="text" value="${(cur.sid||'').replace(/"/g,'&quot;')}" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" style="width:100%;padding:9px 12px;background:#0e1a2e;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:12px">
-        </label>
-        <label style="display:block">
-          <div style="font-size:11px;font-weight:700;color:#f5b301;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Auth Token</div>
-          <input id="twToken" data-testid="twilio-token" type="password" value="${(cur.token||'').replace(/"/g,'&quot;')}" placeholder="********************************" style="width:100%;padding:9px 12px;background:#0e1a2e;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:12px">
-          <div style="font-size:10px;color:#64748b;margin-top:3px">${isCA?'Trobaràs aquest token al Dashboard de Twilio (has de fer clic per revelar-lo).':'Encontrarás este token en el Dashboard de Twilio (haz clic para revelarlo).'}</div>
-        </label>
-        <label style="display:block">
-          <div style="font-size:11px;font-weight:700;color:#f5b301;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">${isCA?'Número remitent':'Número remitente'} (From)</div>
-          <input id="twFrom" data-testid="twilio-from" type="text" value="${(cur.from||'').replace(/"/g,'&quot;')}" placeholder="+34612345678" style="width:100%;padding:9px 12px;background:#0e1a2e;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:12px">
-          <div style="font-size:10px;color:#64748b;margin-top:3px">${isCA?'Format internacional. També accepta un "Alphanumeric Sender ID" (ex: MediCar), útil per no llogar número però no pot rebre respostes.':'Formato internacional. También acepta un "Alphanumeric Sender ID" (ej: MediCar), útil para no alquilar número pero no puede recibir respuestas.'}</div>
-        </label>
+      <!-- Tab BYOA -->
+      <div id="paneByoa" style="display:${initialTab==='byoa'?'block':'none'}">
+        <div style="background:#0e1a2e;border:1px solid #1e293b;border-radius:8px;padding:14px;margin-bottom:16px;font-size:12px;color:#cbd5e1;line-height:1.6">
+          <div style="font-weight:800;color:#7ec8ff;margin-bottom:6px">📖 ${isCA?'Com obtenir aquestes dades':'Cómo obtener estos datos'}</div>
+          1. ${isCA?'Crea un compte a':'Crea una cuenta en'} <a href="https://www.twilio.com/try-twilio" target="_blank" style="color:#f5b301;text-decoration:underline">twilio.com</a> ${isCA?'(t\'obsequien ~15 $ de crèdit).':'(regalan ~15 $ de crédito).'}<br>
+          2. ${isCA?'Al Dashboard trobaràs':'En el Dashboard encontrarás'}: <b>Account SID</b> ${isCA?'i':'y'} <b>Auth Token</b>.<br>
+          3. ${isCA?'A "Phone Numbers ▸ Buy a Number" compra un número espanyol (~1 €/mes) o usa Alphanumeric Sender.':'En "Phone Numbers ▸ Buy a Number" compra un número español (~1 €/mes) o usa Alphanumeric Sender.'}<br>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #334155;color:#94a3b8;font-size:11px">🔒 ${isCA?'Les credencials es guarden ÚNICAMENT al teu navegador. No es persisteixen al servidor.':'Las credenciales se guardan ÚNICAMENTE en tu navegador. No se persisten en el servidor.'}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <label style="display:block">
+            <div style="font-size:11px;font-weight:700;color:#f5b301;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Account SID</div>
+            <input id="twSid" data-testid="twilio-sid" type="text" value="${(cur.sid||'').replace(/"/g,'&quot;')}" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" style="width:100%;padding:9px 12px;background:#0e1a2e;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:12px;box-sizing:border-box">
+          </label>
+          <label style="display:block">
+            <div style="font-size:11px;font-weight:700;color:#f5b301;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Auth Token</div>
+            <input id="twToken" data-testid="twilio-token" type="password" value="${(cur.token||'').replace(/"/g,'&quot;')}" placeholder="********************************" style="width:100%;padding:9px 12px;background:#0e1a2e;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:12px;box-sizing:border-box">
+          </label>
+          <label style="display:block">
+            <div style="font-size:11px;font-weight:700;color:#f5b301;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">${isCA?'Número remitent':'Número remitente'} (From)</div>
+            <input id="twFrom" data-testid="twilio-from" type="text" value="${(cur.from||'').replace(/"/g,'&quot;')}" placeholder="+34612345678" style="width:100%;padding:9px 12px;background:#0e1a2e;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:12px;box-sizing:border-box">
+            <div style="font-size:10px;color:#64748b;margin-top:3px">${isCA?'Format internacional (ex: +34612345678) o Alphanumeric Sender (ex: AutoescolaCB, max 11 caràcters).':'Formato internacional (ej: +34612345678) o Alphanumeric Sender (ej: AutoescolaCB, max 11 caracteres).'}</div>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:space-between;margin-top:18px;flex-wrap:wrap">
+          <button id="twCfgDel" data-testid="twilio-cfg-del" style="background:#7f1d1d;color:#fecaca;border:1px solid #b91c1c;padding:9px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">🗑 ${isCA?'Eliminar':'Eliminar'}</button>
+          <div style="display:flex;gap:8px">
+            <button id="twCfgTest" data-testid="twilio-cfg-test" style="background:#1e40af;color:#fff;border:none;padding:9px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800">🔎 ${isCA?'Provar':'Probar'}</button>
+            <button id="twCfgSave" data-testid="twilio-cfg-save" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;padding:9px 20px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800">💾 ${isCA?'Desar':'Guardar'}</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab MediCar Cloud -->
+      <div id="paneMedicar" style="display:${initialTab==='medicar'?'block':'none'}">
+        ${!eligible ? `
+          <div style="background:#7c2d12;color:#fed7aa;border:1px solid #ea580c;border-radius:8px;padding:14px;font-size:12px;line-height:1.55">
+            ⚠️ <b>${isCA?'Aquesta opció només està disponible amb el pla Premium.':'Esta opción solo está disponible con el plan Premium.'}</b><br>
+            ${isCA?'Ara mateix tens el pla TRIAL o STANDARD. Actualitza a Premium per activar l\'enviament de SMS des del compte MediCar Plus (sense necessitat de configurar Twilio pel teu compte).':'Actualmente tienes el plan TRIAL o STANDARD. Actualiza a Premium para activar el envío de SMS desde la cuenta MediCar Plus (sin necesidad de configurar Twilio por tu cuenta).'}
+          </div>
+        ` : (!medAvail.available ? `
+          <div style="background:#78350f;color:#fed7aa;border:1px solid #f59e0b;border-radius:8px;padding:14px;font-size:12px;line-height:1.55">
+            🚧 <b>${isCA?'Servei en preparació':'Servicio en preparación'}</b><br>
+            ${isCA?'Estem configurant el compte central de MediCar Plus per SMS. Molt aviat podràs enviar SMS sense configurar Twilio pel teu compte i pagar-los directament amb la teva subscripció mensual. Mentrestant, pots usar la teva pròpia cuenta Twilio.':'Estamos configurando la cuenta central de MediCar Plus para SMS. Muy pronto podrás enviar SMS sin configurar Twilio por tu cuenta y pagarlos directamente con tu suscripción mensual. Mientras tanto, puedes usar tu propia cuenta Twilio.'}
+          </div>
+        ` : `
+          <div style="background:linear-gradient(135deg,#052e16 0%,#064e3b 100%);border:1px solid #22c55e;border-radius:8px;padding:14px;margin-bottom:14px;font-size:12px;color:#bbf7d0;line-height:1.65">
+            <div style="font-weight:800;color:#86efac;margin-bottom:6px;font-size:13px">✨ ${isCA?'Facturació automàtica amb la teva subscripció':'Facturación automática con tu suscripción'}</div>
+            ${isCA?'Els SMS s\'envien des del compte de MediCar Plus. El consum es calcula automàticament i es suma al teu rebut mensual de la subscripció (mateixa targeta que ja tens). Zero configuració.':'Los SMS se envían desde la cuenta de MediCar Plus. El consumo se calcula automáticamente y se suma a tu recibo mensual de la suscripción (misma tarjeta que ya tienes). Cero configuración.'}
+            <div style="margin-top:8px;padding:8px 10px;background:#064e3b;border-radius:6px;font-family:'Courier New',monospace;font-size:13px;color:#86efac;text-align:center">
+              <b>${pricePerSms} € ${isCA?'per SMS enviat':'por SMS enviado'}</b>
+            </div>
+            <div style="margin-top:8px;font-size:11px;color:#86efac;opacity:.85">🔍 ${isCA?'Els SMS fallits NO es facturen. Consulta el consum del mes en qualsevol moment al panell d\'estadístiques.':'Los SMS fallidos NO se facturan. Consulta el consumo del mes en cualquier momento en el panel de estadísticas.'}</div>
+          </div>
+          <label style="display:block;margin-bottom:14px">
+            <div style="font-size:11px;font-weight:700;color:#22c55e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">${isCA?'Nom del remitent (com apareixerà al SMS)':'Nombre del remitente (como aparecerá en el SMS)'}</div>
+            <input id="medSender" data-testid="medicar-sender" type="text" value="${(defaultSender||'').replace(/"/g,'&quot;')}" placeholder="AutoescolaCB" maxlength="11" style="width:100%;padding:10px 12px;background:#0e1a2e;border:1px solid #22c55e;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:14px;font-weight:700;letter-spacing:1.5px;text-transform:none;box-sizing:border-box">
+            <div style="font-size:11px;color:#86efac;margin-top:6px;line-height:1.5">💡 ${isCA?'Els teus pacients rebran el SMS amb aquest nom com a remitent. Màxim 11 caràcters, només lletres i números (sense espais ni accents). Aquest és el nom del TEU centre, no de MediCar.':'Tus pacientes recibirán el SMS con este nombre como remitente. Máximo 11 caracteres, solo letras y números (sin espacios ni acentos). Este es el nombre de TU centro, no de MediCar.'}</div>
+            <div id="medSenderPreview" style="margin-top:8px;padding:8px 10px;background:#0b1121;border:1px dashed #22c55e;border-radius:6px;font-size:11px;color:#94a3b8"></div>
+          </label>
+        `)}
+        ${medReady ? `
+          <div id="twMedResult" style="margin-top:6px;font-size:12px;min-height:20px"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+            <button id="medCfgSave" data-testid="medicar-cfg-save" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;padding:10px 22px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800">✅ ${isCA?'Activar compte MediCar Cloud':'Activar cuenta MediCar Cloud'}</button>
+          </div>
+        `:''}
       </div>
 
       <div id="twTestResult" style="margin-top:12px;font-size:12px;min-height:20px"></div>
-
-      <div style="display:flex;gap:8px;justify-content:space-between;margin-top:18px;flex-wrap:wrap">
-        <button id="twCfgDel" data-testid="twilio-cfg-del" style="background:#7f1d1d;color:#fecaca;border:1px solid #b91c1c;padding:9px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">🗑 ${isCA?'Eliminar credencials':'Eliminar credenciales'}</button>
-        <div style="display:flex;gap:8px">
-          <button id="twCfgTest" data-testid="twilio-cfg-test" style="background:#1e40af;color:#fff;border:none;padding:9px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800">🔎 ${isCA?'Provar credencials':'Probar credenciales'}</button>
-          <button id="twCfgSave" data-testid="twilio-cfg-save" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;padding:9px 20px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800">💾 ${isCA?'Desar':'Guardar'}</button>
-        </div>
-      </div>
     </div>`;
   document.body.appendChild(back);
   back.addEventListener('click',(e)=>{if(e.target===back)back.remove()});
   document.getElementById('twCfgClose').onclick=()=>back.remove();
 
-  const getVals = () => ({
-    sid: document.getElementById('twSid').value.trim(),
-    token: document.getElementById('twToken').value.trim(),
-    from: document.getElementById('twFrom').value.trim(),
+  // Tabs handler
+  function switchTab(tab){
+    const isMedTab = tab==='medicar';
+    document.getElementById('paneByoa').style.display = isMedTab?'none':'block';
+    document.getElementById('paneMedicar').style.display = isMedTab?'block':'none';
+    document.getElementById('tabByoa').style.color = isMedTab?'#94a3b8':'#22c55e';
+    document.getElementById('tabByoa').style.borderBottomColor = isMedTab?'transparent':'#22c55e';
+    document.getElementById('tabMedicar').style.color = isMedTab?'#a855f7':'#94a3b8';
+    document.getElementById('tabMedicar').style.borderBottomColor = isMedTab?'#a855f7':'transparent';
+  }
+  document.getElementById('tabByoa').onclick=()=>switchTab('byoa');
+  const tabMed = document.getElementById('tabMedicar');
+  if(!tabMed.disabled) tabMed.onclick=()=>switchTab('medicar');
+  switchTab(initialTab);
+
+  // ── BYOA handlers ──
+  const getBYOAVals = () => ({
+    sid: (document.getElementById('twSid')||{}).value?.trim() || '',
+    token: (document.getElementById('twToken')||{}).value?.trim() || '',
+    from: (document.getElementById('twFrom')||{}).value?.trim() || '',
   });
-
-  document.getElementById('twCfgDel').onclick=()=>{
-    if(!confirm(isCA?'Eliminar les credencials Twilio guardades? Els SMS tornaran a mode PROVA (simulació).':'¿Eliminar las credenciales Twilio guardadas? Los SMS volverán a modo PRUEBA (simulación).')) return;
-    clearTwilioCreds();
-    document.getElementById('twSid').value='';
-    document.getElementById('twToken').value='';
-    document.getElementById('twFrom').value='';
-    document.getElementById('twTestResult').innerHTML='<span style="color:#94a3b8">🗑 '+(isCA?'Credencials eliminades.':'Credenciales eliminadas.')+'</span>';
-  };
-
-  document.getElementById('twCfgSave').onclick=()=>{
-    const {sid, token, from} = getVals();
-    if(!sid || !token || !from){
-      document.getElementById('twTestResult').innerHTML='<span style="color:#ef4444">⚠ '+(isCA?'Cal omplir tots tres camps.':'Debes rellenar los tres campos.')+'</span>';
-      return;
-    }
-    saveTwilioCreds(sid, token, from);
-    document.getElementById('twTestResult').innerHTML='<span style="color:#22c55e">✅ '+(isCA?'Credencials desades al teu navegador. Ja pots enviar SMS reals.':'Credenciales guardadas en tu navegador. Ya puedes enviar SMS reales.')+'</span>';
-    setTimeout(()=>{back.remove();},1200);
-  };
-
-  document.getElementById('twCfgTest').onclick=async(ev)=>{
-    const btn=ev.target;
-    const {sid, token, from} = getVals();
-    if(!sid || !token || !from){
-      document.getElementById('twTestResult').innerHTML='<span style="color:#ef4444">⚠ '+(isCA?'Omple tots tres camps abans de provar.':'Rellena los tres campos antes de probar.')+'</span>';
-      return;
-    }
-    btn.disabled=true;
-    const oldTxt=btn.textContent;
-    btn.textContent=isCA?'Provant…':'Probando…';
-    document.getElementById('twTestResult').innerHTML='<span style="color:#94a3b8">⏳ '+(isCA?'Contactant amb Twilio…':'Contactando con Twilio…')+'</span>';
-    try{
-      const r=await apiSms('/test-credentials',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sid,token,from_number:from})});
-      if(r.ok){
-        document.getElementById('twTestResult').innerHTML='<div style="color:#22c55e;font-weight:700">✅ '+(isCA?'Credencials vàlides!':'¡Credenciales válidas!')+'</div><div style="font-size:11px;color:#94a3b8;margin-top:3px">'+(isCA?'Compte':'Cuenta')+': <b>'+r.account_name+'</b> · Status: <b>'+r.account_status+'</b>'+(r.from_valid?' · '+(isCA?'Remitent OK':'Remitente OK')+' ('+r.from_kind+')':' · <span style="color:#f97316">⚠ '+(isCA?'Remitent no reconegut':'Remitente no reconocido')+'</span>')+'</div>';
-      } else {
-        const reasons={
-          'credentials_invalid':(isCA?'SID o Token incorrectes':'SID o Token incorrectos'),
-          'account_not_found':(isCA?'Compte no trobat':'Cuenta no encontrada'),
-          'unknown_error':(isCA?'Error desconegut':'Error desconocido'),
-        };
-        document.getElementById('twTestResult').innerHTML='<div style="color:#ef4444;font-weight:700">✗ '+(reasons[r.reason]||r.reason)+'</div><div style="font-size:11px;color:#94a3b8;margin-top:3px;font-family:Courier New,monospace">'+(r.detail||'').replace(/</g,'&lt;')+'</div>';
+  const twDel = document.getElementById('twCfgDel');
+  if(twDel){
+    twDel.onclick=()=>{
+      if(!confirm(isCA?'Eliminar les credencials Twilio guardades?':'¿Eliminar las credenciales Twilio guardadas?')) return;
+      clearTwilioCreds();
+      const s=document.getElementById('twSid'),t=document.getElementById('twToken'),f=document.getElementById('twFrom');
+      if(s)s.value='';if(t)t.value='';if(f)f.value='';
+      document.getElementById('twTestResult').innerHTML='<span style="color:#94a3b8">🗑 '+(isCA?'Credencials eliminades.':'Credenciales eliminadas.')+'</span>';
+    };
+  }
+  const twSave = document.getElementById('twCfgSave');
+  if(twSave){
+    twSave.onclick=()=>{
+      const {sid, token, from} = getBYOAVals();
+      if(!sid || !token || !from){
+        document.getElementById('twTestResult').innerHTML='<span style="color:#ef4444">⚠ '+(isCA?'Cal omplir tots tres camps.':'Debes rellenar los tres campos.')+'</span>';
+        return;
       }
-    }catch(e){
-      document.getElementById('twTestResult').innerHTML='<span style="color:#ef4444">✗ '+(isCA?'Error de xarxa':'Error de red')+': '+e.message+'</span>';
-    }finally{
-      btn.disabled=false;
-      btn.textContent=oldTxt;
+      saveTwilioCreds(sid, token, from);
+      setTwilioMode('byoa');
+      document.getElementById('twTestResult').innerHTML='<span style="color:#22c55e">✅ '+(isCA?'Configuració desada. Mode: Cuenta pròpia (BYOA).':'Configuración guardada. Modo: Cuenta propia (BYOA).')+'</span>';
+      setTimeout(()=>{back.remove();},1500);
+    };
+  }
+  const twTest = document.getElementById('twCfgTest');
+  if(twTest){
+    twTest.onclick=async(ev)=>{
+      const btn=ev.target;
+      const {sid, token, from} = getBYOAVals();
+      if(!sid || !token || !from){
+        document.getElementById('twTestResult').innerHTML='<span style="color:#ef4444">⚠ '+(isCA?'Omple tots tres camps abans de provar.':'Rellena los tres campos antes de probar.')+'</span>';
+        return;
+      }
+      btn.disabled=true; const oldTxt=btn.textContent; btn.textContent=isCA?'Provant…':'Probando…';
+      document.getElementById('twTestResult').innerHTML='<span style="color:#94a3b8">⏳ '+(isCA?'Contactant amb Twilio…':'Contactando con Twilio…')+'</span>';
+      try{
+        const r=await apiSms('/test-credentials',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sid,token,from_number:from})});
+        if(r.ok){
+          document.getElementById('twTestResult').innerHTML='<div style="color:#22c55e;font-weight:700">✅ '+(isCA?'Credencials vàlides!':'¡Credenciales válidas!')+'</div><div style="font-size:11px;color:#94a3b8;margin-top:3px">'+(isCA?'Compte':'Cuenta')+': <b>'+r.account_name+'</b> · Status: <b>'+r.account_status+'</b></div>';
+        } else {
+          const reasons={'credentials_invalid':(isCA?'SID o Token incorrectes':'SID o Token incorrectos'),'account_not_found':(isCA?'Compte no trobat':'Cuenta no encontrada'),'unknown_error':(isCA?'Error desconegut':'Error desconocido')};
+          document.getElementById('twTestResult').innerHTML='<div style="color:#ef4444;font-weight:700">✗ '+(reasons[r.reason]||r.reason)+'</div><div style="font-size:11px;color:#94a3b8;margin-top:3px">'+(r.detail||'').replace(/</g,'&lt;')+'</div>';
+        }
+      }catch(e){
+        document.getElementById('twTestResult').innerHTML='<span style="color:#ef4444">✗ '+(isCA?'Error de xarxa':'Error de red')+': '+e.message+'</span>';
+      }finally{btn.disabled=false;btn.textContent=oldTxt;}
+    };
+  }
+
+  // ── MediCar Cloud handlers ──
+  const medSenderInput = document.getElementById('medSender');
+  const medSenderPrev = document.getElementById('medSenderPreview');
+  function updateSenderPreview(){
+    if(!medSenderInput || !medSenderPrev) return;
+    const cleaned = sanitizeAlphaSender(medSenderInput.value);
+    medSenderInput.value = cleaned;
+    if(cleaned){
+      medSenderPrev.innerHTML = '📱 '+(isCA?'Els teus pacients rebran':'Tus pacientes recibirán')+': "<b style=\'color:#e2e8f0\'>De: '+cleaned+'</b>: Hola Maria, li recordem…"';
+    } else {
+      medSenderPrev.innerHTML = (isCA?'⚠️ Introdueix un nom d\'empresa (mínim 1 caràcter alfanumèric).':'⚠️ Introduce un nombre de empresa (mínimo 1 carácter alfanumérico).');
     }
-  };
+  }
+  if(medSenderInput){
+    medSenderInput.addEventListener('input', updateSenderPreview);
+    updateSenderPreview();
+  }
+  const medSave = document.getElementById('medCfgSave');
+  if(medSave){
+    medSave.onclick=()=>{
+      const s = sanitizeAlphaSender(medSenderInput.value);
+      if(!s || s.length<3){
+        document.getElementById('twMedResult').innerHTML='<span style="color:#ef4444;font-weight:700">⚠ '+(isCA?'Cal un nom de remitent (mín. 3 caràcters alfanumèrics).':'Se necesita un nombre de remitente (mín. 3 caracteres alfanuméricos).')+'</span>';
+        return;
+      }
+      if(!confirm((isCA
+        ? 'Activar compte MediCar Cloud?\n\nEls SMS s\'enviaran des del compte de MediCar Plus i el consum es cobrarà automàticament al teu rebut mensual ('+pricePerSms+' € / SMS).\n\nEls SMS apareixeran signats com a "'+s+'".\n\nAcceptes?'
+        : '¿Activar cuenta MediCar Cloud?\n\nLos SMS se enviarán desde la cuenta de MediCar Plus y el consumo se cobrará automáticamente en tu recibo mensual ('+pricePerSms+' € / SMS).\n\nLos SMS aparecerán firmados como "'+s+'".\n\n¿Aceptas?'))) return;
+      setTwilioMode('medicar');
+      setMedicarSender(s);
+      document.getElementById('twMedResult').innerHTML='<span style="color:#22c55e;font-weight:700">✅ '+(isCA?'Compte MediCar Cloud activat. Els SMS apareixeran com a "':'Cuenta MediCar Cloud activada. Los SMS aparecerán como "')+s+'".</span>';
+      setTimeout(()=>{back.remove();},1800);
+    };
+  }
 }
 
 function openSmsModal(){
@@ -4890,6 +5055,16 @@ function openSmsModal(){
     try{
       const d=await apiSms('/campaigns');
     const twilioBanner=(()=>{
+        const mode = getTwilioMode();
+        // Mode MediCar Cloud (Premium)
+        if(mode==='medicar' && isTwilioMedicarEligible()){
+          const sender = getMedicarSender() || '(sense nom)';
+          return `<div style="padding:12px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:16px;background:linear-gradient(135deg,#052e16,#064e3b);color:#86efac;border:1px solid #22c55e;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+            <span>⭐ ${isCA?'MediCar Cloud actiu':'MediCar Cloud activo'} · <b>${sender}</b> · ${isCA?'facturat amb la subscripció':'facturado con la suscripción'}</span>
+            <button onclick="openTwilioCfgModal()" style="background:#052e16;color:#86efac;border:1px solid #22c55e;padding:3px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700">⚙️ ${isCA?'Canviar':'Cambiar'}</button>
+          </div>`;
+        }
+        // Mode BYOA amb creds configurades
         if(hasTwilioCreds()){
           const c=getTwilioCreds();
           const fromDisp=(c.from||'').length>16?c.from.slice(0,16)+'…':c.from;
@@ -4899,8 +5074,8 @@ function openSmsModal(){
           </div>`;
         }
         return `<div style="padding:12px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:16px;background:#7c2d12;color:#fed7aa;border:1px solid #ea580c;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-          <span>⚠️ ${isCA?'Twilio no configurat · Els SMS es simularan (mode PROVA). Configura el teu compte Twilio per enviar SMS reals.':'Twilio no configurado · Los SMS se simularán (modo PRUEBA). Configura tu cuenta Twilio para enviar SMS reales.'}</span>
-          <button onclick="openTwilioCfgModal()" style="background:#f59e0b;color:#0b1121;border:1px solid #f59e0b;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:800">⚙️ ${isCA?'Configurar Twilio':'Configurar Twilio'}</button>
+          <span>⚠️ ${isCA?'SMS no configurats · Els SMS es simularan. Tria una opció:':'SMS no configurados · Los SMS se simularán. Elige una opción:'}</span>
+          <button onclick="openTwilioCfgModal()" style="background:#f59e0b;color:#0b1121;border:1px solid #f59e0b;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:800">⚙️ ${isCA?'Configurar':'Configurar'}</button>
         </div>`;
       })();
       const items=d.campaigns||[];
@@ -5083,13 +5258,34 @@ function openSmsModal(){
       try{
         const name=document.getElementById('smsCampName').value.trim();
         const template=tpl.value.trim();
-        // BYOA: si el client té les seves creds Twilio a localStorage, les enviem
-        // amb la petició. Si no, backend farà fallback a mock/env.
-        const creds = getTwilioCreds();
+        // Modes: 'byoa' (creds del client) o 'medicar' (compte central + sender custom)
+        const mode = getTwilioMode();
         const payload = { name, template, contacts:d.contacts };
-        if(creds) payload.twilio_creds = creds;
+        let liInstallId='', liClientName='';
+        try{
+          const raw = localStorage.getItem('caja.license.v1');
+          if(raw){ const lc=JSON.parse(raw); liInstallId = lc.installId||lc.install_id||''; liClientName = lc.client_name||lc.centre||''; }
+        }catch(e){}
+        payload.install_id = liInstallId;
+        payload.client_name = liClientName;
+        if(mode === 'medicar' && isTwilioMedicarEligible()){
+          const sender = sanitizeAlphaSender(getMedicarSender());
+          if(!sender){
+            alert(isCA?'⚠️ Falta configurar el nom del remitent al mode MediCar Cloud. Obre "⚙️ Twilio" i configura\'l.':'⚠️ Falta configurar el nombre del remitente en el modo MediCar Cloud. Abre "⚙️ Twilio" y configúralo.');
+            return;
+          }
+          payload.use_medicar = true;
+          payload.medicar_sender = sender;
+        } else {
+          const creds = getTwilioCreds();
+          if(creds) payload.twilio_creds = creds;
+        }
         const r=await apiSms('/campaigns',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-        alert((isCA?'✅ Campanya creada\n\nEnviats: ':'✅ Campaña creada\n\nEnviados: ')+r.sent_count+'\n'+(isCA?'Errors: ':'Errores: ')+r.error_count+'\n'+(isCA?'Sense mòbil: ':'Sin móvil: ')+r.filtered_invalid+'\n\nMode: '+r.twilio_mode.toUpperCase()+(r.twilio_source==='byoa'?' (tu cuenta Twilio)':(r.twilio_source==='global'?' (cuenta administrador)':' (simulación)')));
+        const srcTxt = r.twilio_source==='byoa' ? (isCA?'la teva cuenta Twilio':'tu cuenta Twilio')
+                     : (r.twilio_source==='medicar' ? (isCA?'compte MediCar Cloud (facturat amb la subscripció)':'cuenta MediCar Cloud (facturado con la suscripción)')
+                     : (r.twilio_source==='env' ? (isCA?'compte administrador':'cuenta administrador')
+                     : (isCA?'simulació (mode prova)':'simulación (modo prueba)')));
+        alert((isCA?'✅ Campanya creada\n\nEnviats: ':'✅ Campaña creada\n\nEnviados: ')+r.sent_count+'\n'+(isCA?'Errors: ':'Errores: ')+r.error_count+'\n'+(isCA?'Sense mòbil: ':'Sin móvil: ')+r.filtered_invalid+'\n\nMode: '+r.twilio_mode.toUpperCase()+' · '+srcTxt);
         renderSmsList();
       }catch(e){
         alert('Error: '+e.message);

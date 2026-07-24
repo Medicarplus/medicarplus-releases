@@ -64,9 +64,17 @@ class SmsCampaignCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     template: str = Field(..., min_length=10, max_length=1600)
     contacts: List[dict]  # llista de contacts que passin
-    # BYOA: credencials Twilio del client (opcionals). Si es passen, s'usen només
-    # per aquesta petició. NO es persisteixen al backend.
+    # ─── Twilio billing mode ────────────────────────────────────────────
+    # BYOA: credencials Twilio del client (mode 'byoa')
     twilio_creds: Optional[dict] = None  # {"sid": "...", "token": "...", "from": "+34..."}
+    # Mode 'medicar': usa el compte central de MediCar Plus (només Premium).
+    # El client no envia creds; només decideix el remitent (Alphanumeric Sender)
+    # perquè els pacients rebin els SMS amb el nom del CENTRE, no de MediCar.
+    use_medicar: bool = False
+    medicar_sender: Optional[str] = None   # Alphanumeric Sender (1-11 chars, sense espais)
+    # Identifica al client centre per tracking de consum a MongoDB
+    install_id: Optional[str] = None
+    client_name: Optional[str] = None
 
 
 class TwilioTestReq(BaseModel):
@@ -115,23 +123,58 @@ def _extract_creds(creds: Optional[dict]) -> Optional[tuple]:
     return None
 
 
-def _send_sms(mobile: str, message: str, creds: Optional[dict] = None) -> tuple[bool, str]:
-    """Envia SMS via Twilio. Prioritat:
-    1) Credencials passades per la request (BYOA · Bring Your Own Account).
-    2) Credencials globals del .env (fallback per master/admin).
-    3) MODE MOCK si res configurat.
-    Retorna (ok, detail).
+def _sanitize_alpha_sender(s: str) -> str:
+    """Twilio Alphanumeric Sender ID: màxim 11 caràcters, alfanumèric,
+    admet lletres i dígits. Espais/accents fora."""
+    import re
+    if not s:
+        return ""
+    # Elimina accents i caràcters no ASCII
+    import unicodedata
+    normalized = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
+    cleaned = re.sub(r"[^A-Za-z0-9]", "", normalized)
+    return cleaned[:11]
+
+
+def _send_sms(
+    mobile: str,
+    message: str,
+    creds: Optional[dict] = None,
+    use_medicar: bool = False,
+    medicar_sender: Optional[str] = None,
+) -> tuple[bool, str, str]:
+    """Envia SMS via Twilio. Retorna (ok, detail, source).
+
+    Modes (per prioritat):
+    1) use_medicar=True + env creds configurades → compte MediCar Plus + sender custom.
+       source='medicar'
+    2) creds válides al payload → BYOA (compte del client). source='byoa'
+    3) Env creds configurades → fallback per master/admin. source='env'
+    4) Res configurat → MOCK. source='mock'
     """
-    user_creds = _extract_creds(creds)
-    if user_creds:
-        sid, token, from_num = user_creds
-    elif _has_twilio():
+    # Mode MediCar centralitzat
+    if use_medicar:
+        if not _has_twilio():
+            return False, "error:medicar_twilio_not_configured", "medicar_unavailable"
         sid = os.environ["TWILIO_ACCOUNT_SID"]
         token = os.environ["TWILIO_AUTH_TOKEN"]
-        from_num = os.environ["TWILIO_FROM_NUMBER"]
+        # Alphanumeric Sender custom del client (nom del centre)
+        sender = _sanitize_alpha_sender(medicar_sender or "")
+        from_num = sender if sender else os.environ["TWILIO_FROM_NUMBER"]
+        source = "medicar"
     else:
-        # MODE PROVA — no envia res, marca com si s'hagués enviat
-        return True, "mock:no-twilio"
+        user_creds = _extract_creds(creds)
+        if user_creds:
+            sid, token, from_num = user_creds
+            source = "byoa"
+        elif _has_twilio():
+            sid = os.environ["TWILIO_ACCOUNT_SID"]
+            token = os.environ["TWILIO_AUTH_TOKEN"]
+            from_num = os.environ["TWILIO_FROM_NUMBER"]
+            source = "env"
+        else:
+            # MODE PROVA — no envia res, marca com si s'hagués enviat
+            return True, "mock:no-twilio", "mock"
     try:
         from twilio.rest import Client  # type: ignore
         client = Client(sid, token)
@@ -140,9 +183,9 @@ def _send_sms(mobile: str, message: str, creds: Optional[dict] = None) -> tuple[
             from_=from_num,
             body=message,
         )
-        return True, f"sid:{msg.sid}"
+        return True, f"sid:{msg.sid}", source
     except Exception as e:
-        return False, f"error:{str(e)[:200]}"
+        return False, f"error:{str(e)[:200]}", source
 
 
 def build_router(db):
@@ -301,12 +344,53 @@ def build_router(db):
             "twilio_configured": _has_twilio(),
         }
 
+    @router.get("/medicar-availability")
+    async def medicar_availability():
+        """Retorna si el compte central MediCar Plus per SMS està operatiu.
+        Útil pel frontend per mostrar l'opció 'Usar cuenta MediCar' com a
+        disponible/pendent. No requereix admin token (info pública).
+        """
+        return {
+            "available": _has_twilio(),
+            "price_per_sms_eur": float(os.environ.get("MEDICAR_SMS_PRICE_EUR", "0.10")),
+        }
+
+    @router.get("/medicar-usage")
+    async def medicar_usage(
+        install_id: Optional[str] = None,
+        period: Optional[str] = None,  # YYYY-MM
+        x_admin_token: Optional[str] = Header(None),
+    ):
+        """Retorna el consum SMS del mode 'medicar' per facturació metered.
+        Si install_id → consum del client. Si no → agregat tots els clients.
+        """
+        _admin(x_admin_token)
+        query: dict = {}
+        if install_id:
+            query["install_id"] = install_id
+        if period:
+            query["period"] = period
+        cursor = db.sms_usage_medicar.find(query).sort("period", -1)
+        items = [doc async for doc in cursor]
+        price = float(os.environ.get("MEDICAR_SMS_PRICE_EUR", "0.10"))
+        for it in items:
+            it["_id"] = str(it.get("_id", ""))
+            it["cost_estimated_eur"] = round(it.get("sent_count", 0) * price, 2)
+        return {"items": items, "count": len(items), "price_per_sms_eur": price}
+
     @router.post("/campaigns")
     async def create_campaign(
         body: SmsCampaignCreate,
         x_admin_token: Optional[str] = Header(None),
     ):
         _admin(x_admin_token)
+
+        # Si el client vol usar el compte MediCar però no està configurat, error clar
+        if body.use_medicar and not _has_twilio():
+            raise HTTPException(
+                status_code=503,
+                detail="La cuenta central MediCar Plus para SMS aún no está disponible. Configura tu cuenta propia de Twilio (BYOA) mientras tanto.",
+            )
 
         campaign_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
@@ -318,6 +402,7 @@ def build_router(db):
         sent_count = 0
         error_count = 0
         processed_contacts = []
+        source_final = "mock"
 
         for c in valid_contacts:
             ctx = {
@@ -331,9 +416,54 @@ def build_router(db):
                 "id": c.get("external_id", ""),
             }
             msg = render_template(body.template, ctx)
-            ok, detail = _send_sms(c["mobile"], msg, creds=body.twilio_creds)
+            ok, detail, source = _send_sms(
+                c["mobile"], msg,
+                creds=body.twilio_creds,
+                use_medicar=body.use_medicar,
+                medicar_sender=body.medicar_sender,
+            )
+            source_final = source  # es queda amb l'últim
             if ok:
                 sent_count += 1
+                # 💰 TRACKING ATÒMIC PER-MISSATGE (mode medicar)
+                # Es fa immediatament després de cada SMS enviat amb èxit
+                # perquè encara que la campanya crashi més tard, els SMS que ja
+                # s'han cobrat a Twilio quedin comptabilitzats a la nostra facturació.
+                if source == "medicar" and body.install_id:
+                    try:
+                        now_dt = datetime.now(timezone.utc)
+                        period = f"{now_dt.year:04d}-{now_dt.month:02d}"
+                        await db.sms_usage_medicar.update_one(
+                            {"install_id": body.install_id, "period": period},
+                            {
+                                "$inc": {"sent_count": 1},
+                                "$setOnInsert": {
+                                    "install_id": body.install_id,
+                                    "client_name": body.client_name or "",
+                                    "period": period,
+                                    "first_seen": now,
+                                    "billed": False,
+                                },
+                                "$set": {
+                                    "last_seen": datetime.now(timezone.utc).isoformat(),
+                                    "medicar_sender": _sanitize_alpha_sender(body.medicar_sender or ""),
+                                },
+                            },
+                            upsert=True,
+                        )
+                    except Exception as track_err:
+                        # Guardem l'error a un log separat perquè no perdem la traça
+                        try:
+                            await db.sms_usage_errors.insert_one({
+                                "install_id": body.install_id,
+                                "campaign_id": campaign_id,
+                                "mobile": c.get("mobile"),
+                                "twilio_sid": detail.replace("sid:", ""),
+                                "error": str(track_err)[:500],
+                                "ts": datetime.now(timezone.utc).isoformat(),
+                            })
+                        except Exception:
+                            pass
             else:
                 error_count += 1
             processed_contacts.append({
@@ -354,8 +484,8 @@ def build_router(db):
                 "sent_at": None,
             })
 
-        # Determinar si es va utilitzar Twilio real (BYOA o global) o mock
-        used_twilio_real = bool(_extract_creds(body.twilio_creds)) or _has_twilio()
+        # Determinar si es va utilitzar Twilio real
+        used_twilio_real = source_final in ("medicar", "byoa", "env")
 
         status = "sent" if error_count == 0 else ("partial" if sent_count > 0 else "failed")
 
@@ -371,9 +501,27 @@ def build_router(db):
             "filtered_invalid": len(invalid_contacts),
             "contacts": processed_contacts,
             "twilio_used": used_twilio_real,
-            "twilio_source": "byoa" if _extract_creds(body.twilio_creds) else ("global" if _has_twilio() else "mock"),
+            "twilio_source": source_final,
+            "install_id": body.install_id or None,
+            "client_name": body.client_name or None,
+            "medicar_sender": _sanitize_alpha_sender(body.medicar_sender) if body.use_medicar else None,
         }
         await db.sms_campaigns.insert_one(doc)
+
+        # NOTA: El tracking del consum SMS pel mode 'medicar' es fa
+        # de forma ATÒMICA per cada SMS enviat (dins el bucle anterior)
+        # per garantir que ni un sol SMS enviat es perdi de comptabilitzar.
+        # Aquí només afegim la campaign_id a la llista per consultes.
+        if source_final == "medicar" and sent_count > 0 and body.install_id:
+            try:
+                now_dt = datetime.now(timezone.utc)
+                period = f"{now_dt.year:04d}-{now_dt.month:02d}"
+                await db.sms_usage_medicar.update_one(
+                    {"install_id": body.install_id, "period": period},
+                    {"$push": {"campaign_ids": campaign_id}},
+                )
+            except Exception:
+                pass
 
         return {
             "ok": True,
@@ -383,7 +531,7 @@ def build_router(db):
             "filtered_invalid": len(invalid_contacts),
             "status": status,
             "twilio_mode": "real" if used_twilio_real else "mock",
-            "twilio_source": doc["twilio_source"],
+            "twilio_source": source_final,
         }
 
     @router.get("/campaigns")
