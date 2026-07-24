@@ -486,17 +486,16 @@ El programa GIC exporta el llistat de renovacions via <b>Clientes a Revisar</b> 
 
 **RCA**: El PDF es genera dinàmicament des de `/app/frontend/public/guia-client-installacio.html` (referenciat a `mailer.py L38 · GUIDE_ATTACHMENTS`). El fitxer HTML tenia `<html lang="ca">` i tot el contingut en català heretat del propietari.
 
-**Fix aplicat**: Reescrit tot el fitxer (459 línies) en castellà preservant:
-- Estructura, estils, classes CSS
-- URLs absolutes cap a Emergent (`.host/downloads/gic-templates/...`)
-- Script `linkHealer` intacte
-- Script `downloadAsPDF()` amb missatges també traduïts
-- Callout del Pas 7 SMS amb la plantilla GIC (mantingut amb URL absoluta)
+**Fix**: Reescrita `guia-client-installacio.html` (459 línies) 100% en castellà (`lang="es"`) + creada versió catalana `guia-client-installacio-ca.html` a partir del git log per preservar la traducció catalana. Selector d'idioma afegit al capçal de les dues versions amb pill daurada per l'idioma actual i botó/enllaç per l'altre.
 
-**Verificació**:
-- `lang="es"`, title = "Guía de instalación · MediCar Plus", H1 = "📖 Cómo instalar MediCar Plus".
-- 100 matches de paraules castellanes, 0 de catalanes.
-- Callout GIC verificat visualment renderitzant a Playwright: "Paso previo · Exportar el listado desde el programa GIC" + botó "📥 Descargar plantilla GIC".
-- Manual d'usuari (`manual-usuari.html`) ja estava en castellà (verificat), no cal modificar.
+**Data-testids**: `lang-switcher`, `lang-current`, `lang-switch-ca`, `lang-switch-es`.
 
-**⚠️ IMPORTANT**: Cal **redesplegar producció** perquè el nou email envii el PDF castellà. També el propietari ha de **repujar el fitxer a GitHub Pages** (segons la guia `/app/GUIA_ACTUALITZAR_GUIA_SMS_GITHUB.md`) perquè `medicarplus.es/guia-client-installacio.html` reflecteixi la traducció.
+**Verificat E2E** (Playwright):
+- Pàgina per defecte castellana → `lang="es"`, H1 "Cómo instalar MediCar Plus", pill = "🇪🇸 Castellano".
+- Clic al botó "🇦🇩 Català" → navega a `/guia-client-installacio-ca.html` → `lang="ca"`, H1 "Com instal·lar MediCar Plus".
+- Clic al botó "🇪🇸 Castellano" → torna a la versió per defecte.
+- Selector amb classe `no-print`: no apareix al PDF generat via `downloadAsPDF()`.
+
+**⚠️ IMPORTANT**: Cal **redesplegar producció** i **pujar 2 fitxers a GitHub Pages** (castellà i català):
+1. `guia-client-installacio.html` (castellà, per defecte, ja pujat un cop però ara amb selector)
+2. `guia-client-installacio-ca.html` (nou fitxer català)

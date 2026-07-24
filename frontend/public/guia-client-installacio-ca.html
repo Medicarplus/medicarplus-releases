@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guia d'instal·lació · MediCar Plus</title>
+<style>
+  body{font-family:'Segoe UI',Calibri,Arial,sans-serif;max-width:760px;margin:30px auto;padding:0 20px;color:#1a1a1a;line-height:1.65;background:#f8fafc}
+  h1{color:#0f172a;border-bottom:3px solid #10b981;padding-bottom:10px;font-size:26px;text-align:center}
+  h2{color:#065f46;font-size:19px;margin-top:30px;background:linear-gradient(90deg,#dcfce7,transparent);padding:6px 12px;border-left:4px solid #10b981}
+  h3{color:#065f46;font-size:15px;margin-top:20px}
+  .step{background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:18px;margin:16px 0;box-shadow:0 2px 6px rgba(0,0,0,.06)}
+  .step-num{display:inline-block;background:#10b981;color:#fff;width:32px;height:32px;border-radius:50%;text-align:center;line-height:32px;font-weight:700;margin-right:10px;font-size:16px}
+  .callout{background:#fef3c7;border-left:5px solid #f59e0b;padding:12px 16px;margin:14px 0;border-radius:4px;font-size:14px}
+  .callout-red{background:#fee2e2;border-left:5px solid #dc2626}
+  .callout-blue{background:#dbeafe;border-left:5px solid #2563eb}
+  .callout-green{background:#dcfce7;border-left:5px solid #16a34a}
+  code{background:#0f172a;color:#f5b301;padding:3px 8px;border-radius:5px;font-family:'Courier New',monospace;font-size:13px;word-break:break-all}
+  b,strong{color:#0f172a}
+  a{color:#2563eb;font-weight:600}
+  .contact{background:#0f172a;color:#e2e8f0;padding:20px;border-radius:12px;text-align:center;margin-top:30px}
+  .contact a{color:#f5b301}
+  ul,ol{padding-left:22px}
+  li{margin-bottom:6px}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+  th{background:#065f46;color:#fff;padding:8px;text-align:left}
+  td{padding:8px 10px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+  tr:nth-child(even) td{background:#f8fafc}
+  /* Botó descarregar PDF */
+  .pdf-download-btn{
+    display:block;width:fit-content;margin:20px auto 0;padding:14px 28px;
+    background:linear-gradient(135deg,#10b981,#065f46);color:#fff;
+    border:none;border-radius:10px;cursor:pointer;font-size:15px;font-weight:800;
+    text-decoration:none;box-shadow:0 6px 20px rgba(16,185,129,.35);
+    transition:transform .15s ease,box-shadow .15s ease;
+    text-align:center;
+  }
+  .pdf-download-btn:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(16,185,129,.5)}
+  /* CSS per impressió (Ctrl+P → Guardar com PDF) */
+  @media print{
+    body{background:#fff;max-width:none;margin:0;padding:15px;font-size:11.5pt}
+    h1,h2,h3{page-break-after:avoid}
+    .step,.callout,table{page-break-inside:avoid}
+    .pdf-download-btn,.no-print{display:none !important}
+    a{color:#0f172a;text-decoration:underline}
+    a[href^="http"]::after{content:" (" attr(href) ")";font-size:9pt;color:#64748b}
+  }
+</style>
+<!-- link-healer · auto-repair links if URL rotates or user hits wrong domain -->
+<script>
+(function linkHealer(){
+  'use strict';
+  var DISCOVERY = 'https://raw.githubusercontent.com/Medicarplus/medicarplus-releases/main/api-endpoint.json';
+  var CACHE_KEY = 'mc.linkhealer.api.v1';
+  var CACHE_TS  = 'mc.linkhealer.ts.v1';
+  var MAX_AGE   = 24*60*60*1000;
+  var LANDING_HOSTS = ['medicarplus.es','www.medicarplus.es'];
+  var FUNC_PATHS = ['/admin','/request-license','/panel-admin.html','/guia-','/manual-usuari','/index-guies.html','/downloads/'];
+  function currentHost(){ return location.hostname.toLowerCase(); }
+  function isOnLanding(){ return LANDING_HOSTS.indexOf(currentHost()) !== -1; }
+  function stripTrail(u){ return u.replace(/\/+$/,''); }
+  function getCached(){ try{ var u=localStorage.getItem(CACHE_KEY); var t=parseInt(localStorage.getItem(CACHE_TS)||'0'); if(u && (Date.now()-t)<MAX_AGE) return u; }catch(e){} return null; }
+  function setCache(u){ try{ localStorage.setItem(CACHE_KEY,u); localStorage.setItem(CACHE_TS,String(Date.now())); }catch(e){} }
+  function funcMatch(p){ for(var i=0;i<FUNC_PATHS.length;i++) if(p.indexOf(FUNC_PATHS[i])===0) return true; return false; }
+  async function fetchDiscovery(){ var c=new AbortController(); var t=setTimeout(function(){c.abort()},4000); try{ var r=await fetch(DISCOVERY+'?t='+Date.now(),{cache:'no-store',signal:c.signal}); clearTimeout(t); if(!r.ok) return null; var j=await r.json(); if(j&&j.api&&/^https?:\/\//.test(j.api)) return stripTrail(j.api); }catch(e){clearTimeout(t)} return null; }
+  function rewriteLinks(base){ if(!base) return; var bh=new URL(base).hostname.toLowerCase(); var links=document.querySelectorAll('a[href]'); for(var i=0;i<links.length;i++){ var a=links[i]; var h=a.getAttribute('href')||''; if(!h) continue; if(h.charAt(0)==='/' && funcMatch(h)){ if(isOnLanding()) a.href=base+h; continue; } var m=h.match(/^https?:\/\/([^\/]+)(\/.*)?$/i); if(!m) continue; var host=m[1].toLowerCase(); var path=m[2]||'/'; if(!funcMatch(path)) continue; if(host!==bh) a.href=base+path; } }
+  async function maybeRedirectSelf(base){ if(!base||!isOnLanding()) return false; var p=location.pathname; if(funcMatch(p) && p!=='/'){ location.replace(base+p+location.search+location.hash); return true; } return false; }
+  async function run(){ var base=getCached(); if(!base){ base=await fetchDiscovery(); if(base) setCache(base); } if(!base) return; if(await maybeRedirectSelf(base)) return; if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){rewriteLinks(base)}); else rewriteLinks(base); }
+  run();
+})();
+</script>
+</head>
+<body>
+
+<div class="no-print" style="text-align:right;margin-bottom:8px;font-size:12px" data-testid="lang-switcher">
+  <span style="color:#64748b">Idioma:</span>
+  <a href="guia-client-installacio.html" style="background:#fff;border:1px solid #cbd5e1;color:#334155;padding:3px 10px;border-radius:14px;margin-left:4px;text-decoration:none;font-weight:600" data-testid="lang-switch-es">🇪🇸 Castellano</a>
+  <b style="background:#0f172a;color:#f5b301;padding:3px 10px;border-radius:14px;margin-left:4px" data-testid="lang-current">🇦🇩 Català</b>
+</div>
+
+<h1>📖 Com instal·lar MediCar Plus</h1>
+<p style="text-align:center;color:#64748b">Guia ràpida en 6 passos · Aproximadament 5 minuts</p>
+
+<button onclick="downloadAsPDF()" class="pdf-download-btn" data-testid="download-pdf-btn">
+  📄 Descargar esta guía como PDF
+</button>
+<div class="no-print" style="text-align:center;font-size:12px;color:#94a3b8;margin-top:6px">
+  Guarda una copia offline en tu ordenador · Se abrirá el diálogo de "Guardar como PDF"
+</div>
+
+<div class="callout callout-green" style="text-align:center;font-size:14px">
+🎁 <b>Prova gratuïta de 60 dies</b> — Si encara no té llicència, pot descarregar l'app i demanar la prova gratuïta des de <a href="https://medicarplus.es" target="_blank"><b>medicarplus.es</b></a> · <b>Sense targeta</b> · Accés complet a totes les funcions Premium.
+</div>
+
+<div class="step">
+<h2><span class="step-num">1</span>Descarregar l'aplicació</h2>
+El seu proveïdor li ha enviat un email amb:
+<ul>
+<li>Un <b>enllaç de descàrrega</b> (WeTransfer, Google Drive o GitHub Releases)</li>
+<li>Una <b>clau de llicència</b> molt llarga que comença per <code>eyJhb...</code></li>
+</ul>
+Cliqui l'enllaç i guardi el fitxer <code>MediCar Plus Setup 2.0.0.exe</code> a la carpeta Descàrregues.
+</div>
+
+<div class="step">
+<h2><span class="step-num">2</span>Instal·lar l'aplicació</h2>
+Feu <b>doble clic</b> al fitxer descarregat.
+
+<div class="callout callout-red">
+<b>⚠️ IMPORTANT:</b> Windows possiblement mostri "Windows protegió su equipo".
+Això és <b>normal</b> — l'app és segura, però encara no té certificat digital comercial oficial (té un cost anual elevat).
+<ul style="margin-top:6px">
+<li>Cliqui <b>"Más información"</b></li>
+<li>Cliqui <b>"Ejecutar de todos modos"</b></li>
+</ul>
+</div>
+
+Segueixi l'assistent (Següent → Següent → Instal·lar). Quan acabi, l'app s'obrirà automàticament.
+</div>
+
+<div class="step">
+<h2><span class="step-num">3</span>Activar la llicència</h2>
+Al primer arrencament apareix la pantalla <b>🔐 Activació de llicència</b>.
+
+<ol>
+<li>Localitzi l'apartat <b>"CLAU DE LLICÈNCIA"</b></li>
+<li>Enganxi la clau que ha rebut per email (comença per <code>eyJhb...</code>)</li>
+<li>Cliqui el botó groc <b>"✓ ACTIVAR LLICÈNCIA"</b></li>
+</ol>
+
+<div class="callout callout-blue">
+<b>💡 Consell:</b> copiï la clau <b>sencera</b> del email (sense espais al principi/final). Si li dóna problemes, torni a copiar-la fent triple clic per seleccionar-la tota.
+</div>
+
+L'app verifica la clau contra el servidor. Si tot va bé, veurà <b>"✓ Llicència activada!"</b>.
+</div>
+
+<div class="step">
+<h2><span class="step-num">4</span>Configurar les seves empreses (wizard)</h2>
+Un cop activada, apareix el <b>Wizard de configuració</b>:
+
+<ul>
+<li><b>Empresa 1</b> — La seva empresa principal (Autoescola X, Centre Mèdic Y, Gestoria Z)</li>
+<li><b>Empresa 2</b> — <i>Opcional</i>. Si té una segona activitat (revisions, esport, etc.). Si no en té, deixi-ho <b>buit</b> i l'app amagarà aquest tab.</li>
+<li><b>Socis</b> — <i>Opcional</i>. Si reparteix ingressos amb 1-5 metges/socis, afegeixi'ls amb el seu % (han de sumar 100). Si va sol, deixi-ho buit.</li>
+</ul>
+
+Un cop omplert, cliqui <b>"✓ Començar"</b>.
+</div>
+
+<div class="step">
+<h2><span class="step-num">5</span>Començar a treballar!</h2>
+Ja té MediCar Plus operatiu. La pantalla principal té:
+
+<table>
+<tr><th>Element</th><th>Què fa</th></tr>
+<tr><td>🚗 Empresa 1 / 🩺 Empresa 2</td><td>Commuta entre les 2 empreses amb un clic (només si té 2)</td></tr>
+<tr><td>Chips de conceptes</td><td>Botons ràpids: renovacions, revisions, certificats... clica per afegir</td></tr>
+<tr><td>Debe / Haber</td><td>Introdueix ingressos i despeses del dia</td></tr>
+<tr><td>🔍 Cercar clients</td><td>Buscador ràpid per trobar clients registrats històricament</td></tr>
+<tr><td>📖 Llibreta</td><td>Registre acumulat de tot el que ha fet</td></tr>
+<tr><td>📋 IRPF</td><td>Preparat per la declaració trimestral</td></tr>
+<tr><td>📊 Estadístiques</td><td>Menú desplegable amb 3 opcions: <b>Facturación mensual</b> (informe anual complet) · <b>Estadísticas autoescuelas</b> (per autoescola i mes) · <b>Comparativa años</b> (compara 2–6 anys en paral·lel)</td></tr>
+<tr><td>📱 Avisos</td><td>Enviar SMS/WhatsApp de recordatori <i>(només plan PREMIUM)</i></td></tr>
+<tr><td>💾 Guardar còpia</td><td>Backup local de totes les dades</td></tr>
+<tr><td>🖨 Imprimir</td><td>Tancament de dia per Hisenda</td></tr>
+</table>
+
+<div class="callout callout-green">
+<b>📌 Bona pràctica:</b> al final de cada jornada cliqui <b>💾 Guardar còpia</b>. Fa un backup local del dia, per si algun dia falla el PC no perd res.
+</div>
+</div>
+
+<div class="step">
+<h2><span class="step-num">6</span>Actualitzacions automàtiques</h2>
+Quan hi hagi una versió nova de MediCar Plus, l'app <b>detecta el canvi sola</b> a l'arrencar i li mostra un avís:
+
+<div style="background:#f0f9ff;border:1px solid #93c5fd;border-radius:8px;padding:12px;margin:10px 0;font-family:monospace;font-size:13px;color:#1e40af">
+🔔 MediCar Plus v2.X.X està llest per instal·lar<br>
+[ Reiniciar i actualitzar ara ]&nbsp;&nbsp;[ Més tard ]
+</div>
+
+Cliqui <b>"Reiniciar i actualitzar ara"</b> i l'app s'actualitza sola en 30 segons. Les seves dades es mantenen intactes.
+
+<div class="callout">
+També pot forçar la comprovació manualment al menú <b>Ajuda → Comprovar actualitzacions</b>.
+</div>
+</div>
+
+<div class="step">
+<h2><span class="step-num">7</span>Enviar SMS als seus pacients (opcional · Twilio)</h2>
+
+MediCar Plus inclou un mòdul <b>Avisos SMS</b> per enviar recordatoris als seus pacients (ex: <i>"Hola {{nom}}, li recordem que ha de renovar el seu carnet abans de {{data_revisio}}"</i>). Ofereix <b>dues modalitats a triar</b>, adaptades al seu perfil:
+
+<div class="callout" style="background:#fef3c7;border-color:#f5b301;color:#78350f;margin-top:12px">
+<b>🖨️ Pas previ · Exportar el llistat des del programa GIC</b><br>
+Per generar el CSV amb els pacients que els toca renovar, aplica una <b>plantilla especial</b> al GIC (Clientes a Revisar):
+<ol style="margin:8px 0 4px 20px">
+<li>Al GIC obre <b>Clientes a Revisar</b> i introdueix <b>Fecha Inicial</b> / <b>Fecha Final</b>.</li>
+<li>A <b>Selección de Ficheros</b> marca <b>Conducción</b> (i qualsevol altre grup necessari).</li>
+<li>A <b>Salida</b> tria <b>Listados</b>.</li>
+<li>Clica el botó de la <b>carpeta 📂</b> (dreta de "Salida") i carrega la plantilla <code>F_revision_con_telefono_y_movil.lst</code>. <a href="https://project-helper-47.emergent.host/downloads/gic-templates/F_revision_con_telefono_y_movil.lst" download="F_revision_con_telefono_y_movil.lst" style="background:#f5b301;color:#0a0f1a;padding:3px 10px;border-radius:4px;font-weight:700;text-decoration:none;font-size:12px">📥 Descarregar plantilla GIC</a></li>
+<li>Verifica que el nom mostra <code>ListadoPorDefecto</code> (o el nom que carreguis), prem <b>FICHERO</b> i desa el CSV.</li>
+<li>Puja aquest CSV a MediCar Plus (mòdul <b>📱 Avisos SMS</b>). Les 7 columnes exportades són: <code>Numero · Nombre · Apellido1 · Apellido2 · Movil · Telefono · FechaRevision</code>.</li>
+</ol>
+<i>La plantilla només cal carregar-la una vegada — el GIC la recordarà per a exportacions futures.</i>
+</div>
+
+<div class="callout" style="background:#eff6ff;border-color:#3b82f6;color:#1e3a8a">
+<b>📊 Comparativa ràpida</b>
+<table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:13px">
+<tr style="border-bottom:1px solid #93c5fd"><th style="text-align:left;padding:6px">Modalitat</th><th style="text-align:left;padding:6px">Compte propi Twilio</th><th style="text-align:left;padding:6px">Compte MediCar Cloud</th></tr>
+<tr style="border-bottom:1px solid #dbeafe"><td style="padding:6px"><b>Configuració</b></td><td style="padding:6px">Crear compte Twilio (10-15 min)</td><td style="padding:6px">Zero setup (només nom remitent)</td></tr>
+<tr style="border-bottom:1px solid #dbeafe"><td style="padding:6px"><b>Facturació</b></td><td style="padding:6px">Vostè paga directament a Twilio</td><td style="padding:6px">Se li suma al rebut mensual MediCar</td></tr>
+<tr style="border-bottom:1px solid #dbeafe"><td style="padding:6px"><b>Preu per SMS</b></td><td style="padding:6px">~0,07 € (preu directe Twilio)</td><td style="padding:6px">0,10 € (preu tancat inclou gestió)</td></tr>
+<tr style="border-bottom:1px solid #dbeafe"><td style="padding:6px"><b>Disponibilitat</b></td><td style="padding:6px">✅ Tots els plans (Trial i Premium)</td><td style="padding:6px">✅ Només Premium</td></tr>
+<tr><td style="padding:6px"><b>Recomanat per...</b></td><td style="padding:6px">Volums alts &gt; 300 SMS/mes</td><td style="padding:6px">Volums baixos-mitjans, evitar burocràcia</td></tr>
+</table>
+</div>
+
+<h3>🅰️ Opció A · Compte propi Twilio (BYOA · Bring Your Own Account)</h3>
+
+Vostè es crea un compte a Twilio i configura les credencials a l'app. Twilio li cobra directament a la seva targeta cada mes en funció del consum.
+
+<h4>Pas 1 · Crear compte Twilio</h4>
+<ol>
+<li>Vagi a <a href="https://www.twilio.com/try-twilio" target="_blank">www.twilio.com/try-twilio</a> i registri's amb el seu email.</li>
+<li>Confirmi l'email + telèfon (Twilio li enviarà un codi SMS).</li>
+<li>Twilio li obsequia <b>~15 $ de crèdit gratuït</b> per començar a provar.</li>
+</ol>
+
+<h4>Pas 2 · Comprar un número (recomanat)</h4>
+<ol>
+<li>Al Dashboard de Twilio, vagi a <b>Phone Numbers ▸ Manage ▸ Buy a Number</b>.</li>
+<li>Filtri per <b>País: Spain</b> i cerqui un número mòbil (+346... o +347...).</li>
+<li>Preu aprox: <b>~1 €/mes</b> per número. Cliqui <b>Buy</b> i confirmi.</li>
+<li>Copiï el número complet: <code>+34612345678</code>.</li>
+</ol>
+
+<div class="callout"><b>Alternativa sense llogar número:</b> a Espanya pot usar un <i>Alphanumeric Sender ID</i>. Els seus SMS apareixeran signats amb un nom com <b>MediCar</b> o <b>ClinicaXX</b> (màxim 11 caràcters, sense espais). Els pacients <b>no podran respondre</b>.</div>
+
+<h4>Pas 3 · Copiar credencials i configurar dins de MediCar Plus</h4>
+<ol>
+<li>Al Dashboard Twilio busqui <b>Account Info</b>. Copiï el <b>Account SID</b> (comença per <code>AC...</code>) i l'<b>Auth Token</b> (cliqui 👁️ per revelar-lo).</li>
+<li>Obri l'app MediCar Plus → <b>📱 Avisos SMS</b> → botó <b>⚙️ Twilio</b> (a dalt a la dreta).</li>
+<li>Al modal que s'obre, triï la pestanya <b>🔧 La meva cuenta Twilio</b>.</li>
+<li>Enganxi els 3 camps (SID, Token, Número o Alphanumeric Sender).</li>
+<li>Cliqui <b>🔎 Provar</b> per verificar. Si tot està bé: <span style="color:#059669;font-weight:700">✅ Credencials vàlides!</span></li>
+<li>Cliqui <b>💾 Desar</b>. Ja pot enviar SMS reals des del seu compte.</li>
+</ol>
+
+<h3>🅱️ Opció B · Compte MediCar Cloud (només Premium)</h3>
+
+Els SMS s'envien des del compte central de MediCar Plus. Vostè no configura res tècnic: només tria el <b>nom del seu centre</b> (que apareixerà com a remitent als SMS que rebi el pacient). El consum es factura automàticament amb la seva subscripció mensual.
+
+<div class="callout" style="background:#ecfdf5;border-color:#22c55e;color:#064e3b">
+<b>✨ Com funciona la facturació automàtica</b>
+<ul style="margin:6px 0 0 0;line-height:1.7">
+<li>Cada SMS enviat es comptabilitza en temps real (només els SMS <b>entregats</b> compten; els fallits no).</li>
+<li>El <b>preu per SMS és de 0,10 €</b> (fixe, sense sorpreses).</li>
+<li>Cada mes, quan es renova la subscripció, l'import dels SMS del mes anterior s'afegeix a la factura Stripe: <b>subscripció base + SMS</b> = factura total, cobrada de la mateixa targeta.</li>
+<li>Rebrà un únic rebut de Stripe amb les línies detallades. Legal, automàtic i traçable per Verifactu.</li>
+</ul>
+</div>
+
+<h4>Pas 1 · Activar mode MediCar Cloud (30 segons)</h4>
+<ol>
+<li>Obri l'app MediCar Plus → <b>📱 Avisos SMS</b> → botó <b>⚙️ Twilio</b>.</li>
+<li>Al modal, cliqui la pestanya <b>⭐ Compte MediCar Cloud</b>.</li>
+<li>Introdueixi el <b>nom del seu centre</b> tal com vol que aparegui als SMS (màx. 11 caràcters, només lletres i números, sense espais ni accents).<br>
+   <span style="color:#64748b">Exemple: si el seu centre és "Autoescola Costa Brava", pot posar <code>AutoescolaCB</code> o <code>AECostaBrav</code>.</span>
+</li>
+<li>Verifiqui a la previsualització que el remitent es veu bé.</li>
+<li>Cliqui <b>✅ Activar compte MediCar Cloud</b>.</li>
+</ol>
+
+<h4>Pas 2 · Enviar la primera campanya</h4>
+
+Igual que amb l'opció A: mòdul Avisos SMS → Nova campanya → puja CSV → envia. La diferència és que ara els seus pacients rebran el SMS <b>signat amb el nom del seu centre</b>, no de MediCar. Zero configuració addicional.
+
+<h3>❓ Què passa amb els SMS si cancel·lo la subscripció?</h3>
+
+<div class="callout" style="background:#fef3c7;border-color:#f59e0b;color:#78350f;line-height:1.7">
+<b>💰 Cobrament dels SMS pendents en cas de cancel·lació</b>
+<ul style="margin:6px 0 0 0">
+<li>Si cancel·la la subscripció abans que arribi la propera renovació, el sistema <b>generarà automàticament una factura final</b> amb els SMS consumits fins aquell moment i la cobrarà de la seva targeta guardada.</li>
+<li>Aquesta és una obligació contractual: els SMS ja enviats són un servei prestat que ha de ser abonat, cancel·li o no la subscripció.</li>
+<li>La factura final es genera i cobra en el moment de la cancel·lació definitiva, no s'endarrereix.</li>
+<li>Si en canvi <b>només es retarda un pagament mensual</b> (targeta sense saldo, etc.), la subscripció NO es cancel·la immediatament: Stripe fa 4 intents automàtics durant 3 setmanes. Vostè pot actualitzar la targeta i tot es reactiva sol al primer intent que funcioni.</li>
+</ul>
+</div>
+
+<h3>❓ Problemes freqüents amb Twilio (Opció A · Compte propi)</h3>
+
+<div style="margin-left:10px">
+<p><b>· "Trial Account limitations"</b>: mentre el compte estigui en mode Trial de Twilio, només permet enviar SMS a números <i>verificats</i>. Per enviar a qualsevol número cal <b>carregar crèdit</b> (activa el compte).</p>
+
+<p><b>· "Number not valid"</b>: assegureu-vos que el número remitent està escrit amb el prefix <code>+34</code> i sense espais.</p>
+
+<p><b>· "Error: 21610 · Recipient unsubscribed"</b>: el destinatari ha respost STOP a un SMS previ. Twilio bloqueja per llei aquesta baixa. Elimineu-lo de la llista.</p>
+
+<p><b>· No em surten els SMS enviats al dashboard Twilio</b>: si al mòdul apareix "modo PRUEBA (simulación)", les credencials no s'han desat correctament. Torneu a la configuració ⚙️ Twilio, cliqueu Provar credencials, i confirmeu ✅ Credencials vàlides abans de desar.</p>
+</div>
+
+</div>
+
+<h2>❓ Problemes freqüents</h2>
+
+<div class="step">
+<h3>La clau no s'accepta</h3>
+Comprovi que ha copiat la <b>clau sencera</b> (sense espais al principi ni al final). Torni a obrir el email i faci triple clic sobre la clau per seleccionar-la tota, després enganxi-la.
+</div>
+
+<div class="step">
+<h3>"Windows protegió su equipo"</h3>
+És normal (pas 2). Cliqui <b>"Más información"</b> → <b>"Ejecutar de todos modos"</b>. L'app és segura.
+</div>
+
+<div class="step">
+<h3>Vull canviar el nom de les empreses o socis</h3>
+Cliqui la icona <b>⚙️ Configuració</b> al header. El wizard es tornarà a obrir amb els valors actuals.
+</div>
+
+<div class="step">
+<h3>He canviat d'ordinador</h3>
+Contacti amb el seu proveïdor. La llicència està <b>vinculada al PC on la va activar per primer cop</b> per seguretat (impedeix que qualsevol pugui copiar-la a un altre PC).
+<br><br>
+El proveïdor <b>desbloqueja el vincle en 30 segons</b> i, quan obri l'app al nou PC, quedarà activada automàticament sense fer res més.<br>
+Les dades es poden migrar copiant la carpeta <code>%APPDATA%\medicar-plus\</code> del PC antic al nou.
+</div>
+
+<div class="step">
+<h3>Necessito 2 ordinadors (oficina + casa)</h3>
+El pla <b>PREMIUM</b> inclou <b>2 ordinadors sincronitzats</b> amb la <b>mateixa llicència</b>. La sincronització és automàtica cada minut i inclou totes les dades diàries (registre, cites, avisos SMS, etc.):
+<ul>
+<li>Instal·li l'app als 2 ordinadors i activi la mateixa clau de llicència a tots dos.</li>
+<li>El primer cop, cada ordinador es registra automàticament. A partir d'aquí, tot el que faci en un aparell apareix a l'altre en menys d'1 minut.</li>
+<li>Al cantó superior dret veurà l'indicador <b>☁️ Sincronizado</b> quan la connexió amb el núvol funciona correctament.</li>
+</ul>
+Si té el pla <b>STANDARD</b> i vol passar a Premium, obri <b>⚙️ Configuración → ⬆ Millora el plan</b> i completi el pagament amb Stripe. La clau nova arriba per email en menys d'1 minut.
+</div>
+
+<div class="step">
+<h3>Com funciona la Auditoría de tasas</h3>
+Al menú <b>🔎 Auditoría</b> pot trobar els clients que apareixen repetits en el rang de dates que triï. L'app els classifica automàticament en 3 categories:
+<ul>
+<li>🔴 <b>Mismo grupo</b> — un mateix client apareix 2+ vegades dins el mateix grup (per exemple 2 renovacions de Conducir del mateix nom). Pot ser un <b>duplicat</b> per error o un <b>interromput</b> (que va tornar dies més tard per completar el tràmit). L'ha de revisar vostè manualment.</li>
+<li>⚠️ <b>Error 0€</b> — hi ha una fitxa amb 0€ d'import sense una entrada Debe/Haber que la compensi. Probablement és una devolució de tasa DGT que va oblidar apuntar.</li>
+<li>🟡 <b>Info</b> — el mateix client apareix en grups diferents (per exemple Conducir + Marina). És normal si ha fet varis serveis; només informatiu.</li>
+</ul>
+Amb la barra de <b>Filtrar</b> pot activar/desactivar cada categoria per centrar-se en els casos que li interessin. Molt útil per trobar descuadres de caixa quan els comptes no li quadren.
+</div>
+
+<div class="step">
+<h3>Cóm generar un Informe Anual per la gestoria</h3>
+Al menú <b>📊 Estadísticas → 📅 Facturación mensual</b> pot generar un resum complet de l'any:
+<ul>
+<li>Facturació anual total, entrades, taxes DGT, mitjana mensual</li>
+<li>Desglossament per empreses (si en té 2)</li>
+<li>Resum trimestral IRPF (15% al T1/T2/T3/T4)</li>
+<li>Facturació mensual (12 mesos)</li>
+<li>Facturació per concepte i per forma de pagament</li>
+<li>Repartiment entre socis (si els té configurats)</li>
+</ul>
+Cliqui <b>"🖨️ Imprimir / PDF"</b> per generar un PDF que pot enviar directament a la seva gestoria o comptable.
+</div>
+
+<div class="step">
+<h3>Comparar la facturació de diversos anys</h3>
+Al menú <b>📊 Estadísticas → 📈 Comparativa años</b> pot veure fins a <b>6 anys en paral·lel</b>:
+<ul>
+<li>Targetes amb facturació neta i entrades de cada any</li>
+<li>Taula comparativa amb % de variació (▲ creixement · ▼ decreixement) entre l'any inicial i el final</li>
+<li>Taula mensual creuada (12 mesos × N anys) per detectar tendències i estacionalitat</li>
+</ul>
+Molt útil per veure d'un cop d'ull si la facturació creix o baixa, i quins mesos són més forts cada any.
+</div>
+
+<div class="step">
+<h3>Vull millorar el pla (STD → PREMIUM) sense sortir de l'app</h3>
+Al menú <b>⚙️ Configuración</b> hi ha un botó <b>"⬆ Millora el plan"</b>. Clicant-lo:
+<ol>
+<li>S'obre una <b>finestra de pagament segur</b> de Stripe al seu navegador (targeta / Bizum / SEPA).</li>
+<li>Un cop pagat, tornarà automàticament a la seva pàgina de MediCar Plus amb un missatge de confirmació.</li>
+<li>La <b>nova clau PREMIUM li arriba per email</b> en menys d'1 minut.</li>
+<li>A la propera vegada que obri l'app, el pla s'actualitzarà sol i podrà usar les funcions Premium (Avisos SMS, Cites, Asesor IA...).</li>
+</ol>
+<b>És una subscripció mensual o anual</b>: Stripe li carregarà automàticament cada mes/any la mateixa quantitat sense necessitat que faci res. Rebrà cada rebut per email amb la factura adjunta.
+<br><br>
+<b>No cal reinstal·lar res.</b> Si no rep el correu en 5 minuts, revisi la carpeta de correu no desitjat o escrigui a <a href="mailto:suport@medicarplus.es">suport@medicarplus.es</a>.
+</div>
+
+<div class="step">
+<h3>Com cancel·lar la meva subscripció</h3>
+Té dues opcions, totes dues fàcils:
+<ol>
+<li><b>Des de l'app:</b> obri <b>⚙️ Configuración → 🧾 Gestionar subscripció / Cancel·lar</b>. Aquest botó només apareix si té una subscripció activa. Obrirà el <b>Portal de Client de Stripe</b> al navegador, on pot:
+  <ul>
+    <li>Cancel·lar la subscripció (deixarà de cobrar-li quan acabi el període ja pagat)</li>
+    <li>Canviar la targeta de pagament</li>
+    <li>Descarregar les factures de tots els mesos</li>
+    <li>Actualitzar l'adreça de facturació</li>
+  </ul>
+</li>
+<li><b>Des de la web:</b> vagi a <a href="https://medicarplus.es">medicarplus.es</a>, cliqui a peu de pàgina "Gestionar mi suscripción" i introdueixi l'email amb el qual es va subscriure. L'obrirà al mateix Portal de Client.</li>
+</ol>
+<b>Important:</b> quan cancel·la, <b>NO deixa de funcionar immediatament</b> — l'app segueix activa fins al final del període que ja va pagar (per exemple, si ha pagat el mes fins al dia 15, seguirà funcionant fins aquell dia). A partir d'aquí passa a mode "sense llicència" i haurà de renovar si vol continuar.
+</div>
+
+<div class="step">
+<h3>Com sé quants dies em queden de prova?</h3>
+Durant la <b>prova gratuïta de 60 dies</b>, el programa mostra a la <b>cantonada superior dreta</b> un indicador amb els dies restants:
+<ul>
+<li>✨ <b>Verd</b> (més de 10 dies): "Prueba activa · X días · Premium desbloqueado"</li>
+<li>⏳ <b>Taronja</b> (4–10 dies): "Quedan X días de prueba · Ahorra con el plan anual"</li>
+<li>⚠️ <b>Vermell</b> (1–3 dies): "Solo quedan X días · Suscríbete y no pierdas tus datos"</li>
+<li>⛔ <b>Vermell + parpelleig</b> (expirat): "PRUEBA EXPIRADA · Suscríbete para continuar"</li>
+</ul>
+Al costat de cada missatge hi ha un botó per subscriure's directament amb Stripe (targeta / Bizum / SEPA). Un cop pagat, la clau Premium arriba per email en menys d'1 minut i s'aplica sola a l'app sense reinstal·lar res.
+</div>
+
+<div class="step">
+<h3>He perdut la connexió a Internet</h3>
+L'app <b>funciona sense Internet durant 30 dies</b>. Passat aquest temps, obliga a reconnectar per verificar la llicència. Reintenteu-ho quan tornin la connexió.
+</div>
+
+<div class="step">
+<h3>Windows Defender bloqueja completament l'app</h3>
+Vés a <b>Configuración → Actualización y seguridad → Seguridad de Windows → Protección contra virus y amenazas → Historial de protección</b>. Localitzi l'entrada de MediCar Plus i cliqui <b>"Permitir"</b>.
+</div>
+
+<div class="step">
+<h3>Vull passar de STD a PREMIUM (o a l'inrevés)</h3>
+<b>Opció ràpida:</b> obri <b>⚙️ Configuración → ⬆ Millora el plan</b> i pagui online amb Stripe. La clau nova arriba per email en menys d'1 minut i s'aplica sola.
+<br><br>
+<b>Opció manual:</b> contacti amb el seu proveïdor. Li generarà una clau nova amb el pla que li interessi. Substitueixi l'antiga al camp d'activació (⚙️ → Canviar llicència).
+</div>
+
+<div class="contact">
+<h2 style="color:#f5b301;background:none;border:none;padding:0;margin-top:0;text-align:center">Necessita ajuda?</h2>
+Contacte directe:<br><br>
+📧 <a href="mailto:suport@medicarplus.es">suport@medicarplus.es</a><br><br>
+Resposta habitual en menys de 24 hores laborables.<br><br>
+<span style="color:#94a3b8;font-size:12px">MediCar Plus · M.Brugulat Lopez · Actualitzada 02/2026</span>
+</div>
+
+<script>
+function downloadAsPDF(){
+  // Estratègia: usar la funció nativa d'imprimir del navegador → seleccionar "Guardar com a PDF".
+  // Els estils @media print ja adapten el layout perquè quedi net al PDF.
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  if(isMobile){
+    alert('📱 Al mòbil:\n\n1. Toca el botó menú (⋮ o compartir) del navegador\n2. Tria "Imprimir" o "Guardar com PDF"\n3. Guarda el fitxer\n\nAra obrim el diàleg d\'impressió...');
+  } else {
+    // Missatge senzill amb la instrucció clau
+    const btn = document.querySelector('.pdf-download-btn');
+    const original = btn.textContent;
+    btn.textContent = '📄 A la finestra que s\'obri, tria "Guardar com PDF"';
+    setTimeout(()=>{ btn.textContent = original; }, 4000);
+  }
+  setTimeout(()=>window.print(), 500);
+}
+</script>
+</body>
+</html>
