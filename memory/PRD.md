@@ -396,3 +396,25 @@ El programa GIC exporta el llistat de renovacions via <b>Clientes a Revisar</b> 
 
 **Fitxers modificats**:
 - `/app/frontend/public/v2.html` (funció `openGicHelpModal` afegida + `renderSmsNew` refactoritzat compacte)
+
+
+## Session Feb 24, 2026 (Bug fix P0 · Web purchase flow mostrava "upgrade" incorrectament)
+
+**Bug reportat pel propietari**: Va provar de comprar la subscripció mensual des d'un ordinador nou, sense l'app instal·lada, via web (`medicarplus.es`). Després de pagar amb Stripe, la pàgina de retorn (`subscription-success.html`) mostrava incorrectament el bloc "Tu plan se está actualizando automáticamente · Vuelve a la ventana de MediCar Plus" — però el client no tenia cap app oberta i necessitava (a) la URL de descàrrega i (b) la clau visible per copiar.
+
+**RCA**:
+- El webhook Stripe (`backend/server.py L281`) genera un install_id placeholder `CD-STRIPE-{sub_id[:16]}` quan la metadata del checkout NO porta install_id (compra des de la web).
+- La funció `_isRealInstallId()` a `subscription-success.html` només detectava com a placeholder els que començaven per `CD-STRIPE-PENDING-` o `CD-TRIAL-PENDING-`.
+- Resultat: `CD-STRIPE-SUB_1TESTABCD12` era considerat "real install_id" → codi ramificava incorrectament per la branca d'UPGRADE.
+
+**Fix aplicat** (`/app/frontend/public/subscription-success.html · _isRealInstallId`):
+- Ampliada la detecció: ara qualsevol install_id que comenci per `CD-STRIPE-` o `CD-TRIAL-` es considera placeholder del backend.
+- Els install_ids reals de l'app (`v2.html · getInstallId()`) són `CD-XXXX-XXXX-XXXX-XXXX` (hex random), MAI comencen amb aquests prefixos.
+
+**Verificació E2E** (Playwright · rutes interceptades):
+- Web purchase (`install_id: "CD-STRIPE-SUB_..."`, metadata buida): ✅ mostra `newClientBox` amb clau visible + Copiar + Descargar + Guía + 3 passos.
+- Upgrade des de l'app (`install_id: "CD-A1B2-C3D4-E5F6-7890"`, metadata real): ✅ continua mostrant `upgradeBox`.
+
+**Impacte**: Bug present en producció (`https://project-helper-47.emergent.host`). Fix aplicat a preview; cal **redesplegament** perquè els nous compradors web vegin la UI correcta.
+
+**Fitxer modificat**: `/app/frontend/public/subscription-success.html` (funció `_isRealInstallId`)

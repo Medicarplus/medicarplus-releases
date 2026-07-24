@@ -177,9 +177,12 @@
   function _isRealInstallId(id){
     if(!id) return false;
     const s = String(id).toUpperCase();
-    // Placeholders del servidor per subscripcions sense app instal·lada
-    if(s.startsWith('CD-STRIPE-PENDING-')) return false;
-    if(s.startsWith('CD-TRIAL-PENDING-')) return false;
+    // Placeholders del servidor per subscripcions sense app instal·lada.
+    // El webhook genera "CD-STRIPE-{sub_id[:16]}" quan la metadata no porta install_id
+    // (compra des de la web medicarplus.es, no des de dins l'app). Qualsevol
+    // install_id que comenci per CD-STRIPE- o CD-TRIAL- és, per definició, un placeholder.
+    if(s.startsWith('CD-STRIPE-')) return false;
+    if(s.startsWith('CD-TRIAL-')) return false;
     return true;
   }
 
