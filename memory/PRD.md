@@ -253,3 +253,17 @@ User's preferred language: **Catalan** (UI/code strings in **Spanish**).
 **Data-testids afegits**: `btn-sms-twilio-cfg`, `twilio-sid`, `twilio-token`, `twilio-from`, `twilio-cfg-test`, `twilio-cfg-save`, `twilio-cfg-del`.
 
 **Seguretat**: Credencials mai persistents al backend. Es passen amb cada request via body JSON. localStorage-only al client. El master admin pot continuar usant les creds `.env` si les té definides (fallback automàtic).
+
+
+## Session Feb 24, 2026 (P0 · Fix Admin Panel login)
+
+**Bug reportat pel client**: Al panell `/admin.html`, després d'introduir el token i clicar "Entrar" no passava res.
+
+**RCA**: Error de sintaxi JS al script inline d'`admin.html`. Línia 366 tenia una cadena JS `'... s\\'ha connectat ...'` on `\\'` es parseja com "un backslash escapat" + "apòstrof que TANCA la cadena", trencant el parsing de la resta del `<script>` sencer. Com que el `<script>` sencer no es carregava, `doLogin` mai es definia i el botó era inert. Confirmat amb `acorn.parse` (error "Missing } in template expression" a línia 242 col 355 del script extret).
+
+**Fix aplicat** (`/app/frontend/public/admin.html` L366): substituït `s\\'ha connectat` per `s\'ha connectat` (escape JS correcte d'un apòstrof dins una cadena delimitada per `'`).
+
+**Verificació**:
+- `acorn.parse` sobre el `<script>` extret → `PARSE OK`.
+- Playwright: navegació a `/admin.html` + fill token + click → `typeof doLogin === 'function'`, `login.display === 'none'`, `app.display === 'block'`, 11 files a `#tbody`, 0 page errors.
+- Screenshot del panell mostra estadístiques i taula de llicències renderitzades correctament.

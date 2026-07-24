@@ -363,7 +363,7 @@ async function openDetail(install_id){
       <b>Estat</b><span>${l.status||'—'}</span>
       <b>Creada</b><span class="mono">${l.created_at?new Date(l.created_at).toLocaleString('ca-ES'):'—'}</span>
       <b>Expira</b><span class="mono">${l.expires_at?new Date(l.expires_at).toLocaleString('ca-ES'):'—'} ${dl!==null?'('+dl+' dies)':''}</span>
-      <b>Última activitat</b><span>${enP.activity && enP.activity.last_verify_at ? `<span class="mono">${new Date(enP.activity.last_verify_at).toLocaleString('ca-ES')}</span> · <span style="color:var(--muted)">fa ${enP.activity.days_since_last_verify}d · ${enP.activity.verify_count} connexions</span>` : '<span style="color:var(--muted)">⚪ Encara no s\\'ha connectat</span>'}</span>
+      <b>Última activitat</b><span>${enP.activity && enP.activity.last_verify_at ? `<span class="mono">${new Date(enP.activity.last_verify_at).toLocaleString('ca-ES')}</span> · <span style="color:var(--muted)">fa ${enP.activity.days_since_last_verify}d · ${enP.activity.verify_count} connexions</span>` : '<span style="color:var(--muted)">⚪ Encara no s\'ha connectat</span>'}</span>
       <b>Stripe Sub ID</b><span class="mono">${l.stripe_subscription_id||'—'}</span>
       <b>Stripe Customer</b><span class="mono">${l.stripe_customer_id||'—'}</span>
     </div>
