@@ -217,7 +217,9 @@ Amb 2 clients pagant STD anual (299,90€×2 = 599,80€) ja tens el fix cobert 
 <h2 class="blue" style="color:#065f46;margin-top:20px;padding:8px 14px;background:linear-gradient(90deg,#dcfce7,transparent);border-left:5px solid #22c55e">🔗 Eines diàries</h2>
 <ul style="line-height:2.4;list-style:none;padding-left:0">
   <li>🏠 <a href="/v2.html" target="_blank"><b>Aplicació de caixa</b></a> — obrir MediCar Plus (per proves)</li>
-  <li>🔐 <a href="/admin" target="_blank"><b>Admin panel</b></a> — llicències, sol·licituds, estadístiques MRR/ARR</li>
+  <li>⭐ <a href="/admin.html" target="_blank"><b>Panel Admin visual (NOU)</b></a> — llicències + filtres + stats + ajustar dies Trial · <b style="color:#0ea5e9">RECOMANAT</b> · token: <code>MB-ADMIN-BRUGULAT-2026-4F8E2A1C</code></li>
+  <li>🔐 <a href="/admin" target="_blank">Admin API tècnic</a> — endpoints en cru (compatibilitat)</li>
+  <li>💬 <b>Discord alertes</b> — obre l'app Discord al mòbil, canal <code>#general</code> del teu servidor MediCar</li>
   <li>🌐 <a href="https://medicarplus.es" target="_blank"><b>Landing pública</b></a> — medicarplus.es</li>
   <li>📊 <a href="/caja_del_dia.html" target="_blank"><b>App v1</b></a> — versió personal antiga</li>
   <li>📧 <a href="https://mailbusiness.ionos.es" target="_blank"><b>Correu IONOS</b></a> — App Suite amb tots els buzones</li>
@@ -267,19 +269,46 @@ Amb 2 clients pagant STD anual (299,90€×2 = 599,80€) ja tens el fix cobert 
 
 <table>
 <tr><th>Qui l'usa</th><th>URL (preview actual)</th><th>Per què</th></tr>
-<tr><td>🔴 <b>Tu (admin)</b></td><td><code>/admin</code></td><td>Gestionar llicències, sol·licituds, generar JWTs, veure MRR</td></tr>
+<tr><td>🔴 <b>Tu (admin) · NOU</b></td><td><code>/admin.html</code> ⭐</td><td><b>Panel admin visual complet</b>: llistat llicències, filtres (estat/pla/mode SMS), stats (MRR + usuaris MediCar Cloud/BYOA + SMS mes), ajustar dies TRIAL (+7/+15/+30/-7/custom), modal detall amb Stripe IDs + consum SMS + històric</td></tr>
+<tr><td>🔴 Tu (admin API-only)</td><td><code>/admin</code></td><td>Endpoints tècnics de gestió (compatibilitat)</td></tr>
 <tr><td>🟢 <b>Clients potencials</b></td><td><code>/request-license</code></td><td>Formulari públic per demanar llicència</td></tr>
 <tr><td>🟡 <b>App v1 (per tu)</b></td><td><code>/caja_del_dia.html</code></td><td>La teva versió de sempre, inalterada</td></tr>
 <tr><td>🔵 <b>App v2 comercial</b></td><td><code>/v2.html</code></td><td>Preview de l'app comercial (abans d'ofuscar)</td></tr>
 <tr><td>📖 Guia admin (aquesta)</td><td><code>/guia-medicar-plus.html</code></td><td>La que estàs llegint</td></tr>
-<tr><td>📖 Guia client</td><td><code>/guia-client-installacio.html</code></td><td>Enviar al client quan compri</td></tr>
+<tr><td>📖 Guia client</td><td><code>/guia-client-installacio.html</code></td><td>Enviar al client quan compri · <b>ara amb Secció 7 Twilio Dual Mode</b></td></tr>
+<tr><td>📖 Manual usuari (web)</td><td><code>/manual-usuari.html</code></td><td>Manual complet amb tabs (Emergency, Tráfico, Revisiones, SMS...)</td></tr>
 <tr><td>🚀 Guia deploy</td><td><code>/guia-deploy.html</code></td><td>Passar-la a l'informàtic quan facis el deploy</td></tr>
 <tr><td>💳 Guia Stripe Subscriptions</td><td><code>/guia-stripe-setup.html</code></td><td>Per quan tinguis empresa + IBAN</td></tr>
 <tr><td>🚀 Guia Auto-updates</td><td><code>/guia-github-releases.html</code></td><td>Per fer que els clients rebin updates sols</td></tr>
+<tr><td>💬 <b>Guia Discord notificacions · NOU</b></td><td><code>/GUIA_DISCORD_NOTIFICACIONS.md</code></td><td>Com configurar el webhook Discord (ja fet). Notificacions push al mòbil quan un client demana assistència o reporta bug</td></tr>
+<tr><td>🔎 <b>Guia Google Search Console · NOU</b></td><td><code>/GUIA_GOOGLE_SEARCH_CONSOLE.md</code></td><td>Configurar Search Console per rebre estadístiques d'SEO de medicarplus.es</td></tr>
 </table>
 
 <div class="callout callout-blue">
 <b>💡 La landing pública</b> (medicarplus.es) està a GitHub Pages i funciona perfectament. El backend (API llicències, admin panel, SMS) està al sandbox Emergent. Quan facis deploy del backend, aquests links canviaran de <code>project-helper-47.preview.emergentagent.com</code> a <code>api.medicarplus.es</code> (o similar).
+</div>
+
+<h2 style="color:#065f46;margin-top:20px;padding:8px 14px;background:linear-gradient(90deg,#fef3c7,transparent);border-left:5px solid #f59e0b">⭐ Novetats · Notificacions Discord + Assistència remota</h2>
+
+<div class="callout callout-blue">
+<b>📱 El teu Discord bot ja rep alertes push al mòbil de:</b>
+<ul style="margin-top:6px">
+<li>🖥️ <b>Sol·licituds d'assistència remota</b> — el client omple el form a l'app (Configuració → Suport → Sol·licitar assistència remota), tu reps al Discord: nom centre + telèfon clicable + motiu + ID HopToDesk (per connectar-t'hi amb pantalla en negre).</li>
+<li>🐛 <b>Reports de bugs / consultes</b> — mateixa via.</li>
+</ul>
+El webhook està configurat a <code>DISCORD_WEBHOOK_URL</code> del <code>.env</code>. Confirmat funcional amb un missatge de prova enviat el 23/07/2026.
+</div>
+
+<h2 style="color:#065f46;margin-top:20px;padding:8px 14px;background:linear-gradient(90deg,#dcfce7,transparent);border-left:5px solid #22c55e">📱 Twilio SMS · Model Dual (BYOA + MediCar Cloud)</h2>
+
+<div class="callout callout-blue">
+<b>Els clients premium poden triar entre 2 modes de Twilio:</b>
+<ol style="margin-top:6px">
+<li>🔧 <b>Compte propi (BYOA)</b>: crea el seu compte Twilio, paga directament a Twilio. Disponible per Trial i Premium.</li>
+<li>⭐ <b>Compte MediCar Cloud</b>: usa el TEU compte Twilio central, el consum es factura automàticament al recibo mensual de la subscripció Stripe (0,10€/SMS · marge net ~0,03-0,05€ per SMS per tu). Només Premium. Els pacients reben els SMS signats amb el nom del centre (Alphanumeric Sender ID).</li>
+</ol>
+<b>Estat actual:</b> el mode BYOA funciona 100%. El mode MediCar Cloud està programat i preparat però NO OPERATIU fins que configuris el teu compte Twilio central i posis les creds al <code>.env</code> (<code>TWILIO_ACCOUNT_SID</code>, <code>TWILIO_AUTH_TOKEN</code>, <code>TWILIO_FROM_NUMBER</code>).<br>
+<b>Facturació anti-pèrdues:</b> Tracking atòmic per-message. En cancel·lació de subscripció → factura one-off final immediata amb els SMS pendents. Impossible perdre diners.
 </div>
 
 <hr>
