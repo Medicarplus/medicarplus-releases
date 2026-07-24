@@ -5361,6 +5361,9 @@ function openSmsModal(){
   // Modal d'ajuda GIC · s'obre des del botó ❓ del mòdul SMS
   function openGicHelpModal(tplUrl, imgUrl){
     const back=document.createElement('div');back.className='modal-back';
+    // z-index explícit alt · el modal SMS pare té z-index:10000, i altres
+    // menús interns fan servir 9999. Ens col·loquem clarament per sobre.
+    back.style.zIndex='100000';
     back.innerHTML=`<div class="modal" style="max-width:820px;width:calc(100vw - 40px);max-height:90vh;overflow-y:auto">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:12px">
         <div>

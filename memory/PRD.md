@@ -418,3 +418,14 @@ El programa GIC exporta el llistat de renovacions via <b>Clientes a Revisar</b> 
 **Impacte**: Bug present en producció (`https://project-helper-47.emergent.host`). Fix aplicat a preview; cal **redesplegament** perquè els nous compradors web vegin la UI correcta.
 
 **Fitxer modificat**: `/app/frontend/public/subscription-success.html` (funció `_isRealInstallId`)
+
+
+## Session Feb 24, 2026 (Fix ràpid · z-index modal ajuda GIC + Verifactu ajornat)
+
+**Bug reportat**: Al mòdul SMS, clicar el botó `❓` obria el modal d'ajuda **darrere** del modal SMS pare — la captura del GIC quedava tapada.
+
+**RCA**: El modal SMS pare té `z-index: 10000` (inline a `#smsModal.style`), però el modal d'ajuda usa la classe `.modal-back` amb `z-index: 1000`. Diferència de 10× → l'ajuda quedava enterrada.
+
+**Fix** (`/app/frontend/public/v2.html · openGicHelpModal`): sobreescrit `back.style.zIndex='100000'` (10× per sobre del SMS modal). Verificat via `elementFromPoint()` — el punt central de la captura ara pertany al modal d'ajuda. ✅
+
+**Verifactu ajornat**: El propietari ha demanat deixar la configuració Verifactu pel futur (no sap encara si obrirà empresa o farà autònom). Reverits els canvis a `/app/backend/routes/payments.py` — es manté només el `tax_id_collection={"enabled": True}` que ja hi era abans (permet als clients introduir el seu NIF/CIF al checkout, apareix a les factures Stripe generades).
