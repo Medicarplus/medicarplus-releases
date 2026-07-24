@@ -353,17 +353,19 @@ async function openDetail(install_id){
       <button class="ghost" onclick="this.closest('.modal-back').remove()">✕</button>
     </div>
     <div class="kv">
-      <b>Install ID</b><span class="mono">${l.install_id||'—'}</span>
+      <b>Install ID</b><span><span class="mono">${l.install_id||'—'}</span> <button class="ghost" style="padding:2px 8px;font-size:10px" onclick="copyVal(this,'${(l.install_id||'').replace(/'/g,"\\\\'")}')">📋 Copiar</button></span>
+      <b>Clau (license_key)</b><span><span class="mono" style="word-break:break-all;font-size:10px;color:#94a3b8">${(l.license_key||'—').substring(0,60)}${(l.license_key||'').length>60?'…':''}</span> ${l.license_key?`<button class="ghost" style="padding:2px 8px;font-size:10px" onclick="copyVal(this,\`${(l.license_key||'').replace(/`/g,'\\\\`')}\`)">📋 Copiar clau sencera</button>`:''}</span>
+      <b>Codi de referit propi</b><span>${l.referral_code?`<span class="mono" style="color:#3ddc97;font-weight:700;font-size:14px">${l.referral_code}</span> <button class="ghost" style="padding:2px 8px;font-size:10px" onclick="copyVal(this,'${l.referral_code}')">📋 Copiar</button>`:'<span style="color:var(--muted)">— (no generat encara)</span>'}</span>
+      <b>Referred by (l'ha convidat)</b><span class="mono">${l.referred_by||'—'}</span>
       <b>Centre</b><span>${(l.client_name||l.company_name||'—').replace(/</g,'&lt;')}</span>
       <b>Email</b><span class="mono">${(l.client_email||'—').replace(/</g,'&lt;')}</span>
       <b>Pla</b><span>${p}</span>
       <b>Estat</b><span>${l.status||'—'}</span>
       <b>Creada</b><span class="mono">${l.created_at?new Date(l.created_at).toLocaleString('ca-ES'):'—'}</span>
       <b>Expira</b><span class="mono">${l.expires_at?new Date(l.expires_at).toLocaleString('ca-ES'):'—'} ${dl!==null?'('+dl+' dies)':''}</span>
+      <b>Última activitat</b><span>${enP.activity && enP.activity.last_verify_at ? `<span class="mono">${new Date(enP.activity.last_verify_at).toLocaleString('ca-ES')}</span> · <span style="color:var(--muted)">fa ${enP.activity.days_since_last_verify}d · ${enP.activity.verify_count} connexions</span>` : '<span style="color:var(--muted)">⚪ Encara no s\\'ha connectat</span>'}</span>
       <b>Stripe Sub ID</b><span class="mono">${l.stripe_subscription_id||'—'}</span>
       <b>Stripe Customer</b><span class="mono">${l.stripe_customer_id||'—'}</span>
-      <b>Referred by</b><span class="mono">${l.referred_by||'—'}</span>
-      <b>Codi de referit</b><span class="mono">${l.referral_code||'—'}</span>
     </div>
     <hr style="border-color:#1e293b;margin:12px 0">
     <h4 style="color:var(--purple);margin:8px 0">📱 SMS</h4>

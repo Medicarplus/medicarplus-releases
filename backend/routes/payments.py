@@ -264,6 +264,12 @@ async def create_subscription(body: CreateSubscriptionBody, request: Request):
             success_url=success_url,
             cancel_url=cancel_url,
             billing_address_collection="required",
+            # 🏢 Habilita recol·lecció de NIF/CIF per facturació B2B
+            # Els clients poden introduir el NIF/CIF de la seva empresa durant
+            # el checkout. Stripe l'inclou automàticament a les factures generades
+            # (subscripció + one-off SMS pendents en cancel·lació). Compatible amb
+            # Verifactu (registre fiscal ES 2026).
+            tax_id_collection={"enabled": True},
             # Força castellà a tota la UI de Stripe Checkout (evita mescla es/ca)
             locale="es",
             metadata={
