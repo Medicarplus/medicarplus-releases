@@ -458,3 +458,23 @@ El programa GIC exporta el llistat de renovacions via <b>Clientes a Revisar</b> 
 - Payload amb email vàlid → continua funcionant ✅
 
 **⚠️ IMPORTANT**: Bug present a producció. Cal **redesplegar** perquè els clients puguin sol·licitar assistència remota sense email.
+
+
+## Session Feb 24, 2026 (Anti-abuse investigat + badge visibility al panell admin)
+
+**Reportat**: Marc no rebia alertes Discord quan provava múltiples trials amb `marcbrugulat@hotmail.com` a producció.
+
+**Diagnosi**:
+- Test E2E al preview: 2 crides consecutives al mateix email → 2n trial correctament marca `flags=['email idèntic','mateixa IP','mateixa empresa']` → **Discord webhook retorna HTTP 204** (success).
+- Conclusió: **producció executa versió antiga sense anti-abuse**. Cal redesplegar.
+
+**Millora afegida com a segona font de veritat al panell admin**:
+- `models/license.py · LicenseRecord`: nou camp `abuse_flags: Optional[list[str]] = None`.
+- `routes/licenses.py · _doc_to_record`: propaga `abuse_flags` a la resposta de `GET /api/licenses`.
+- `admin.html`: 
+  1. Badge taronja `⚠️ N FLAGS` a la columna Centre/Email de cada fila flagged, amb tooltip complet al hover (data-testid `abuse-flag-badge-{install_id}`).
+  2. Al modal "Detall" nova entrada `⚠️ Senyals d'abús` amb `<ul>` desglossant els flags.
+
+**Verificat visualment** (Playwright): la llicència `CD-TRIAL-PENDING-F056105` mostra `⚠️ 3 FLAGS` amb tooltip complet ("email idèntic · mateixa IP · mateixa empresa").
+
+**⚠️ Cal redesplegar producció** perquè l'anti-abuse funcioni a `.host` i el badge apareixi al panel admin de prod.

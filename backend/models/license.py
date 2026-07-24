@@ -102,6 +102,10 @@ class LicenseRecord(BaseModel):
     referral_code: Optional[str] = None
     referred_by: Optional[str] = None
     referral_reward_count: Optional[int] = 0
+    # 🚨 Anti-abús SOFT · flags marcats a la creació (email idèntic, mateixa IP,
+    # mateixa empresa en 90 dies). No bloqueja el trial, només notifica Discord
+    # i queda registrat. El panell admin ho mostra amb badge taronja.
+    abuse_flags: Optional[list[str]] = None
     # La clau JWT — es retorna només al moment de generar-la. En verificar
     # només retornem metadades.
     license_key: Optional[str] = None

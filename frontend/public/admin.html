@@ -297,7 +297,7 @@ function applyFilters(){
     const isTrial = p==='TRIAL';
     return `<tr>
       <td><span class="mono">${(l.install_id||'').slice(0,18)}${(l.install_id||'').length>18?'…':''}</span></td>
-      <td><b>${(l.client_name||l.company_name||'—').replace(/</g,'&lt;')}</b><br><span class="mono" style="color:var(--muted)">${(l.client_email||'—').replace(/</g,'&lt;')}</span></td>
+      <td><b>${(l.client_name||l.company_name||'—').replace(/</g,'&lt;')}</b>${(Array.isArray(l.abuse_flags)&&l.abuse_flags.length)?` <span data-testid="abuse-flag-badge-${l.install_id}" title="${l.abuse_flags.map(f=>String(f).replace(/"/g,'&quot;')).join(' · ')}" style="background:#78350f;color:#fbbf24;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:800;letter-spacing:.3px">⚠️ ${l.abuse_flags.length} FLAG${l.abuse_flags.length>1?'S':''}</span>`:''}<br><span class="mono" style="color:var(--muted)">${(l.client_email||'—').replace(/</g,'&lt;')}</span></td>
       <td><span class="pill ${pillCls}">${p||'—'}</span></td>
       <td><span class="pill ${stCls}">${l.status||'—'}</span></td>
       <td class="mono">${l.expires_at?new Date(l.expires_at).toLocaleDateString('ca-ES'):'—'}</td>
@@ -366,6 +366,7 @@ async function openDetail(install_id){
       <b>Última activitat</b><span>${enP.activity && enP.activity.last_verify_at ? `<span class="mono">${new Date(enP.activity.last_verify_at).toLocaleString('ca-ES')}</span> · <span style="color:var(--muted)">fa ${enP.activity.days_since_last_verify}d · ${enP.activity.verify_count} connexions</span>` : '<span style="color:var(--muted)">⚪ Encara no s\'ha connectat</span>'}</span>
       <b>Stripe Sub ID</b><span class="mono">${l.stripe_subscription_id||'—'}</span>
       <b>Stripe Customer</b><span class="mono">${l.stripe_customer_id||'—'}</span>
+      ${(Array.isArray(l.abuse_flags)&&l.abuse_flags.length)?`<b style="color:#fbbf24">⚠️ Senyals d'abús</b><span><ul style="margin:0;padding-left:18px;color:#fbbf24">${l.abuse_flags.map(f=>`<li>${String(f).replace(/</g,'&lt;')}</li>`).join('')}</ul></span>`:''}
     </div>
     <hr style="border-color:#1e293b;margin:12px 0">
     <h4 style="color:var(--purple);margin:8px 0">📱 SMS</h4>

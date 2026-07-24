@@ -109,6 +109,7 @@ def _doc_to_record(doc: dict, include_key: bool = False) -> LicenseRecord:
         referral_code=doc.get("referral_code"),
         referred_by=doc.get("referred_by"),
         referral_reward_count=int(doc.get("referral_reward_count", 0) or 0),
+        abuse_flags=doc.get("abuse_flags") if isinstance(doc.get("abuse_flags"), list) else None,
         license_key=doc.get("license_key") if include_key else None,
     )
 
