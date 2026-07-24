@@ -478,3 +478,25 @@ El programa GIC exporta el llistat de renovacions via <b>Clientes a Revisar</b> 
 **Verificat visualment** (Playwright): la llicència `CD-TRIAL-PENDING-F056105` mostra `⚠️ 3 FLAGS` amb tooltip complet ("email idèntic · mateixa IP · mateixa empresa").
 
 **⚠️ Cal redesplegar producció** perquè l'anti-abuse funcioni a `.host` i el badge apareixi al panel admin de prod.
+
+
+## Session Feb 24, 2026 (Traducció · guia-client-installacio.html català → castellà)
+
+**Reportat pel propietari**: El PDF `guia-instalacion-medicar-plus.pdf` que reben els clients al comprar/subscriure's estava en català. Ha d'estar en castellà per coherència amb el públic objectiu.
+
+**RCA**: El PDF es genera dinàmicament des de `/app/frontend/public/guia-client-installacio.html` (referenciat a `mailer.py L38 · GUIDE_ATTACHMENTS`). El fitxer HTML tenia `<html lang="ca">` i tot el contingut en català heretat del propietari.
+
+**Fix aplicat**: Reescrit tot el fitxer (459 línies) en castellà preservant:
+- Estructura, estils, classes CSS
+- URLs absolutes cap a Emergent (`.host/downloads/gic-templates/...`)
+- Script `linkHealer` intacte
+- Script `downloadAsPDF()` amb missatges també traduïts
+- Callout del Pas 7 SMS amb la plantilla GIC (mantingut amb URL absoluta)
+
+**Verificació**:
+- `lang="es"`, title = "Guía de instalación · MediCar Plus", H1 = "📖 Cómo instalar MediCar Plus".
+- 100 matches de paraules castellanes, 0 de catalanes.
+- Callout GIC verificat visualment renderitzant a Playwright: "Paso previo · Exportar el listado desde el programa GIC" + botó "📥 Descargar plantilla GIC".
+- Manual d'usuari (`manual-usuari.html`) ja estava en castellà (verificat), no cal modificar.
+
+**⚠️ IMPORTANT**: Cal **redesplegar producció** perquè el nou email envii el PDF castellà. També el propietari ha de **repujar el fitxer a GitHub Pages** (segons la guia `/app/GUIA_ACTUALITZAR_GUIA_SMS_GITHUB.md`) perquè `medicarplus.es/guia-client-installacio.html` reflecteixi la traducció.
