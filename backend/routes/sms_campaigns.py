@@ -344,6 +344,27 @@ def build_router(db):
             "twilio_configured": _has_twilio(),
         }
 
+    @router.get("/my-usage")
+    async def my_usage(install_id: str):
+        """Endpoint PÚBLIC (només requereix install_id) perquè el client vegi
+        el seu propi consum SMS mode 'medicar' del mes actual + estimació de cost.
+        NO revela dades d'altres clients."""
+        if not install_id:
+            return {"install_id":"","period":"","sent_count":0,"cost_eur":0.0,"price_per_sms_eur":float(os.environ.get("MEDICAR_SMS_PRICE_EUR","0.10"))}
+        now_dt = datetime.now(timezone.utc)
+        period = f"{now_dt.year:04d}-{now_dt.month:02d}"
+        doc = await db.sms_usage_medicar.find_one({"install_id": install_id, "period": period})
+        sent = int((doc or {}).get("sent_count", 0) or 0)
+        price = float(os.environ.get("MEDICAR_SMS_PRICE_EUR","0.10"))
+        return {
+            "install_id": install_id,
+            "period": period,
+            "sent_count": sent,
+            "cost_eur": round(sent * price, 2),
+            "price_per_sms_eur": price,
+            "billed": bool((doc or {}).get("billed", False)),
+        }
+
     @router.get("/medicar-availability")
     async def medicar_availability():
         """Retorna si el compte central MediCar Plus per SMS està operatiu.

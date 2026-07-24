@@ -724,6 +724,101 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             items=[_doc_to_record(d) for d in docs],
         )
 
+    # ---------- Ajustar dies d'una llicència TRIAL (extend/reduce) ----------
+    @router.post("/{install_id}/adjust-trial", dependencies=[Depends(require_admin)])
+    async def adjust_trial_days(install_id: str, request: Request):
+        """Amplia o redueix manualment els dies d'una llicència TRIAL.
+        Body JSON: {"days": +N o -N}. Positive extends, negative reduces.
+        NO afecta llicències de subscripció Stripe."""
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        try:
+            days = int(body.get("days", 0))
+        except Exception:
+            days = 0
+        if days == 0 or abs(days) > 3650:
+            raise HTTPException(status_code=400, detail="days must be a non-zero integer within ±3650")
+        lic = await coll.find_one({"install_id": install_id, "status": "active"})
+        if not lic:
+            raise HTTPException(status_code=404, detail="Active license not found")
+        plan_family = (lic.get("plan_family") or lic.get("plan") or "").upper()
+        if plan_family != "TRIAL":
+            raise HTTPException(status_code=400, detail=f"License is not TRIAL (plan={plan_family})")
+        # Nou expires_at
+        from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+        cur_exp = lic.get("expires_at")
+        if isinstance(cur_exp, str):
+            try:
+                cur_exp = _dt.fromisoformat(cur_exp.replace("Z","+00:00"))
+            except Exception:
+                cur_exp = _dt.now(_tz.utc)
+        elif not cur_exp:
+            cur_exp = _dt.now(_tz.utc)
+        new_exp = cur_exp + _td(days=days)
+        new_exp_iso = new_exp.isoformat()
+        await coll.update_one(
+            {"_id": lic["_id"]},
+            {"$set": {"expires_at": new_exp_iso, "trial_adjusted_at": _dt.now(_tz.utc).isoformat(), "trial_adjusted_by": days}},
+        )
+        await _audit(request, "trial_adjust", install_id, extra={"days": days, "new_exp": new_exp_iso})
+        return {"ok": True, "install_id": install_id, "days_adjusted": days, "new_expires_at": new_exp_iso}
+
+    # ---------- Info enriquida d'una llicència (SMS mode + subscription state) ----------
+    @router.get("/{install_id}/enriched", dependencies=[Depends(require_admin)])
+    async def enriched_license(install_id: str):
+        """Retorna la llicència amb dades addicionals per el panel admin:
+        - Info de subscripció Stripe (status, next renewal)
+        - SMS del mes actual + total històric
+        - Sender del mode MediCar Cloud (si l'usa)
+        """
+        lic = await coll.find_one({"install_id": install_id}, {"_id": 0})
+        if not lic:
+            raise HTTPException(status_code=404, detail="License not found")
+        from datetime import datetime as _dt, timezone as _tz
+        now_dt = _dt.now(_tz.utc)
+        cur_period = f"{now_dt.year:04d}-{now_dt.month:02d}"
+        # SMS consum actual (mode medicar)
+        usage_cur = await db.sms_usage_medicar.find_one({"install_id": install_id, "period": cur_period})
+        # SMS històric total
+        agg = await db.sms_usage_medicar.aggregate([
+            {"$match": {"install_id": install_id}},
+            {"$group": {"_id": None, "total_sent": {"$sum": "$sent_count"}, "months": {"$sum": 1}}},
+        ]).to_list(1)
+        total_hist = agg[0] if agg else {"total_sent": 0, "months": 0}
+        # Detecta si té campanyes BYOA (twilio_source='byoa')
+        byoa_camps = await db.sms_campaigns.count_documents({"install_id": install_id, "twilio_source": "byoa"})
+        medicar_camps = await db.sms_campaigns.count_documents({"install_id": install_id, "twilio_source": "medicar"})
+        # Determinar mode preferit del client
+        if medicar_camps > 0:
+            sms_mode = "medicar"
+        elif byoa_camps > 0:
+            sms_mode = "byoa"
+        else:
+            sms_mode = "none"
+        price = float(os.environ.get("MEDICAR_SMS_PRICE_EUR","0.10")) if "MEDICAR_SMS_PRICE_EUR" in __import__("os").environ else 0.10
+        return {
+            "license": lic,
+            "sms": {
+                "mode_used": sms_mode,
+                "byoa_campaigns": byoa_camps,
+                "medicar_campaigns": medicar_camps,
+                "current_month": {
+                    "period": cur_period,
+                    "sent_count": int((usage_cur or {}).get("sent_count", 0)),
+                    "cost_eur": round(int((usage_cur or {}).get("sent_count", 0)) * price, 2),
+                    "billed": bool((usage_cur or {}).get("billed", False)),
+                    "medicar_sender": (usage_cur or {}).get("medicar_sender", ""),
+                },
+                "total_historic": {
+                    "sent_count": int(total_hist.get("total_sent", 0)),
+                    "months": int(total_hist.get("months", 0)),
+                },
+                "price_per_sms_eur": price,
+            },
+        }
+
     # =========================================================================
     # LLICÈNCIES · SOL·LICITUDS PÚBLIQUES (portal /request-license + admin)
     # Declarades ABANS de /{install_id} perquè la ruta literal /requests

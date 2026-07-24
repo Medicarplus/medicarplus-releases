@@ -5078,9 +5078,33 @@ function openSmsModal(){
           <button onclick="openTwilioCfgModal()" style="background:#f59e0b;color:#0b1121;border:1px solid #f59e0b;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:800">⚙️ ${isCA?'Configurar':'Configurar'}</button>
         </div>`;
       })();
+      // 📊 Widget de consum SMS MediCar Cloud (només si el client usa aquest mode)
+      let usageWidget = '';
+      if(getTwilioMode() === 'medicar'){
+        try{
+          const raw = localStorage.getItem('caja.license.v1');
+          const lic = raw ? JSON.parse(raw) : {};
+          const iid = lic.installId || lic.install_id || '';
+          if(iid){
+            const base = (typeof getApiBase==='function') ? getApiBase() : '';
+            if(base){
+              const r = await fetch(base+'/api/sms/my-usage?install_id='+encodeURIComponent(iid));
+              if(r.ok){
+                const u = await r.json();
+                const isCA2 = isCA;
+                const monthLabel = u.period || '—';
+                usageWidget = `<div style="padding:11px 14px;border-radius:8px;font-size:12px;margin-bottom:14px;background:linear-gradient(135deg,#1e1b4b,#312e81);border:1px solid #6366f1;color:#c7d2fe;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+                  <div>📊 <b>${isCA2?'Consum SMS aquest mes':'Consumo SMS este mes'}</b> (${monthLabel}): <span style="color:#fff;font-weight:800">${u.sent_count}</span> SMS · <span style="color:#a5b4fc;font-weight:800">${(u.cost_eur||0).toFixed(2)} €</span></div>
+                  <div style="font-size:10px;color:#a5b4fc;opacity:.8">${isCA2?'Es facturarà al rebut de la subscripció · '+u.price_per_sms_eur.toFixed(2)+' € / SMS':'Se facturará en el recibo de la suscripción · '+u.price_per_sms_eur.toFixed(2)+' € / SMS'}</div>
+                </div>`;
+              }
+            }
+          }
+        }catch(e){}
+      }
       const items=d.campaigns||[];
       if(!items.length){
-        body.innerHTML=twilioBanner+`<div style="text-align:center;padding:60px 20px;color:#94a3b8"><div style="font-size:48px;margin-bottom:12px">📭</div><div style="font-size:15px">${T.noItems}</div></div>`;
+        body.innerHTML=twilioBanner+usageWidget+`<div style="text-align:center;padding:60px 20px;color:#94a3b8"><div style="font-size:48px;margin-bottom:12px">📭</div><div style="font-size:15px">${T.noItems}</div></div>`;
         return;
       }
       const rows=items.map(c=>{
@@ -5096,7 +5120,7 @@ function openSmsModal(){
           <td style="padding:10px;text-align:center"><button class="sms-row-del" data-testid="sms-list-del" data-id="${c.id}" data-name="${cName}" style="background:#7f1d1d;color:#fecaca;border:1px solid #b91c1c;padding:4px 9px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700" title="${isCA?'Eliminar campanya':'Eliminar campaña'}">🗑</button></td>
         </tr>`;
       }).join('');
-      body.innerHTML=twilioBanner+`
+      body.innerHTML=twilioBanner+usageWidget+`
         <div style="font-size:13px;color:#94a3b8;margin-bottom:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase">${T.hist} (${items.length})</div>
         <table style="width:100%;border-collapse:collapse;background:#0e1a2e;border:1px solid #1e293b;border-radius:8px;overflow:hidden">
           <thead><tr style="background:#1e293b"><th style="padding:10px;text-align:left;color:#f5b301;font-size:11px;text-transform:uppercase">${isCA?'Campanya':'Campaña'}</th><th style="padding:10px;color:#22c55e;font-size:11px">✓ ${isCA?'Enviats':'Enviados'}</th><th style="padding:10px;color:#f97316;font-size:11px">✗ Errors</th><th style="padding:10px;color:#94a3b8;font-size:11px">${isCA?'Invàlids':'Inválidos'}</th><th style="padding:10px;color:#cbd5e1;font-size:11px">Status</th><th style="padding:10px;color:#fecaca;font-size:11px">${isCA?'Accions':'Acciones'}</th></tr></thead>

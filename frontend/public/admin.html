@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MediCar Plus · Admin Panel</title>
+<style>
+  :root{--bg:#0b1121;--card:#0f172a;--card2:#0e1a2e;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;--gold:#f5b301;--green:#22c55e;--red:#ef4444;--blue:#3b82f6;--purple:#a855f7;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;line-height:1.5}
+  header{padding:14px 20px;background:linear-gradient(135deg,#0a0f1a,#1a2540);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+  header h1{margin:0;font-size:18px;color:var(--gold);font-family:Georgia,serif;letter-spacing:.5px}
+  .container{padding:16px 20px;max-width:1400px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px}
+  input,button,select{font-family:inherit;font-size:12px}
+  input,select{background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 10px}
+  button{cursor:pointer;background:var(--blue);color:#fff;border:none;padding:7px 14px;border-radius:6px;font-weight:700}
+  button:hover{opacity:.9}
+  button.gold{background:var(--gold);color:#0b1121}
+  button.red{background:var(--red)}
+  button.green{background:var(--green);color:#0b1121}
+  button.ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;padding:9px 8px;background:#1e293b;color:var(--gold);font-weight:700;letter-spacing:.3px;border-bottom:2px solid var(--gold);position:sticky;top:0}
+  td{padding:8px;border-bottom:1px solid #1e293b;vertical-align:top}
+  tr:hover td{background:#111827}
+  .pill{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:800;letter-spacing:.3px;text-transform:uppercase}
+  .pill-active{background:#052e16;color:var(--green);border:1px solid var(--green)}
+  .pill-revoked{background:#450a0a;color:var(--red);border:1px solid var(--red)}
+  .pill-trial{background:#78350f;color:#fbbf24;border:1px solid #f59e0b}
+  .pill-premium{background:#4a044e;color:#e879f9;border:1px solid var(--purple)}
+  .pill-std{background:#1e3a8a;color:#93c5fd;border:1px solid var(--blue)}
+  .pill-master{background:#0b1121;color:#ffd700;border:1px solid #ffd700}
+  .mono{font-family:'Courier New',monospace;font-size:11px;color:#cbd5e1}
+  .badge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;background:#1e293b;color:var(--muted);margin-left:4px}
+  .badge-medicar{background:#4a044e;color:#e879f9}
+  .badge-byoa{background:#052e16;color:var(--green)}
+  #login{max-width:400px;margin:80px auto;text-align:center}
+  .modal-back{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(6px);padding:20px}
+  .modal{background:var(--card);border:1px solid var(--border);border-radius:14px;max-width:720px;width:100%;max-height:90vh;overflow:auto;padding:22px}
+  .kv{display:grid;grid-template-columns:180px 1fr;gap:6px 12px;font-size:12px;margin-bottom:10px}
+  .kv b{color:var(--gold)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:14px}
+  .stat{background:linear-gradient(135deg,var(--card2),#0e1a2e);border:1px solid var(--border);border-radius:10px;padding:12px}
+  .stat-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .stat-val{font-size:22px;font-weight:800;color:var(--gold);margin-top:4px}
+  #err{color:var(--red);font-size:12px;margin-top:6px}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h1 style="color:var(--gold);font-family:Georgia,serif">🔐 MediCar Plus Admin</h1>
+  <p style="color:var(--muted);font-size:12px">Introdueix el token d'administrador</p>
+  <input id="tokenInput" type="password" placeholder="Admin Token" style="width:100%;padding:10px;margin:10px 0" autocomplete="off" data-testid="admin-token-input">
+  <button onclick="doLogin()" style="width:100%;padding:10px" data-testid="admin-login-btn">Entrar</button>
+  <div id="err"></div>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <h1>🩺 MediCar Plus · Admin Panel</h1>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--muted)">Env: <span id="envLabel" style="color:var(--green);font-weight:700">—</span></span>
+      <button class="ghost" onclick="loadLicenses()" data-testid="btn-reload">🔄 Recarregar</button>
+      <button class="red" onclick="logout()">🚪 Sortir</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="stats" id="stats"></div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input id="filterSearch" placeholder="🔎 Buscar (nom, install_id, email)..." style="width:280px" oninput="applyFilters()">
+          <select id="filterStatus" onchange="applyFilters()">
+            <option value="">Tots els estats</option>
+            <option value="active">Actives</option>
+            <option value="revoked">Revocades</option>
+          </select>
+          <select id="filterPlan" onchange="applyFilters()">
+            <option value="">Tots els plans</option>
+            <option value="TRIAL">TRIAL</option>
+            <option value="STD">STANDARD</option>
+            <option value="PREMIUM">PREMIUM</option>
+            <option value="MASTER">MASTER</option>
+          </select>
+          <select id="filterSmsMode" onchange="applyFilters()">
+            <option value="">Tots modes SMS</option>
+            <option value="medicar">Mode MediCar</option>
+            <option value="byoa">Mode BYOA</option>
+            <option value="none">Sense SMS</option>
+          </select>
+        </div>
+        <div style="font-size:11px;color:var(--muted)"><span id="resultCount">0</span> resultats</div>
+      </div>
+      <div style="overflow-x:auto;max-height:70vh">
+        <table id="tbl">
+          <thead><tr>
+            <th>Install ID</th>
+            <th>Centre / Email</th>
+            <th>Pla</th>
+            <th>Estat</th>
+            <th>Expira</th>
+            <th>Dies restants</th>
+            <th>Mode SMS</th>
+            <th>Consum mes</th>
+            <th>Accions</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let ADMIN_TOKEN = '';
+let ALL_LICS = [];
+let ENRICHED_CACHE = {};
+
+const API_BASE = window.location.origin;
+
+async function doLogin(){
+  const tok = document.getElementById('tokenInput').value.trim();
+  if(!tok){document.getElementById('err').textContent='Cal introduir el token';return}
+  try{
+    const r = await fetch(API_BASE+'/api/licenses?limit=1',{headers:{'X-Admin-Token':tok}});
+    if(!r.ok){
+      document.getElementById('err').textContent = 'Token invàlid (HTTP '+r.status+')';
+      return;
+    }
+    ADMIN_TOKEN = tok;
+    try{sessionStorage.setItem('mcp.admin.token', tok)}catch(e){}
+    document.getElementById('login').style.display='none';
+    document.getElementById('app').style.display='block';
+    document.getElementById('envLabel').textContent = API_BASE;
+    loadLicenses();
+  }catch(e){document.getElementById('err').textContent='Error xarxa: '+e.message}
+}
+function logout(){
+  ADMIN_TOKEN='';try{sessionStorage.removeItem('mcp.admin.token')}catch(e){}
+  document.getElementById('login').style.display='block';
+  document.getElementById('app').style.display='none';
+  document.getElementById('tokenInput').value='';
+}
+
+async function loadLicenses(){
+  try{
+    const r = await fetch(API_BASE+'/api/licenses?limit=1000',{headers:{'X-Admin-Token':ADMIN_TOKEN}});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const data = await r.json();
+    ALL_LICS = data.items || [];
+    // Precarrega enriched per tots (paral·lel, en background)
+    ENRICHED_CACHE = {};
+    for(const lic of ALL_LICS){
+      fetchEnriched(lic.install_id).then(e=>{ENRICHED_CACHE[lic.install_id]=e;renderStats();applyFilters()});
+    }
+    renderStats();
+    applyFilters();
+  }catch(e){alert('Error carregant llicències: '+e.message)}
+}
+
+async function fetchEnriched(install_id){
+  try{
+    const r = await fetch(API_BASE+'/api/licenses/'+encodeURIComponent(install_id)+'/enriched',{headers:{'X-Admin-Token':ADMIN_TOKEN}});
+    if(r.ok) return await r.json();
+  }catch(e){}
+  return null;
+}
+
+function renderStats(){
+  const total = ALL_LICS.length;
+  const active = ALL_LICS.filter(l=>l.status==='active').length;
+  let trial=0,std=0,prem=0,master=0;
+  ALL_LICS.forEach(l=>{
+    const p = (l.plan_family||l.plan||'').toUpperCase();
+    if(p==='TRIAL')trial++;
+    else if(p==='STD'||p==='STANDARD')std++;
+    else if(p==='PREMIUM'||p==='PRM')prem++;
+    else if(p==='MASTER')master++;
+  });
+  let medUsers=0, byoaUsers=0, totalSMSMes=0, totalEURMes=0;
+  Object.values(ENRICHED_CACHE).forEach(e=>{
+    if(!e)return;
+    const mode = e.sms && e.sms.mode_used;
+    if(mode==='medicar')medUsers++;
+    else if(mode==='byoa')byoaUsers++;
+    const cur = e.sms && e.sms.current_month;
+    if(cur){
+      totalSMSMes += (cur.sent_count||0);
+      totalEURMes += (cur.cost_eur||0);
+    }
+  });
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="stat-lbl">Total llicències</div><div class="stat-val">${total}</div></div>
+    <div class="stat"><div class="stat-lbl">Actives</div><div class="stat-val" style="color:var(--green)">${active}</div></div>
+    <div class="stat"><div class="stat-lbl">Trials · Std · Prem</div><div class="stat-val" style="font-size:16px">🎁${trial} · 💼${std} · ⭐${prem}${master?' · 👑'+master:''}</div></div>
+    <div class="stat"><div class="stat-lbl">Usuaris MediCar Cloud</div><div class="stat-val" style="color:var(--purple)">${medUsers}</div></div>
+    <div class="stat"><div class="stat-lbl">Usuaris BYOA</div><div class="stat-val" style="color:var(--green)">${byoaUsers}</div></div>
+    <div class="stat"><div class="stat-lbl">SMS aquest mes (MediCar)</div><div class="stat-val" style="color:var(--gold)">${totalSMSMes} <span style="font-size:14px;color:#a5b4fc"> · ${totalEURMes.toFixed(2)}€</span></div></div>
+  `;
+}
+
+function daysLeft(iso){
+  if(!iso)return null;
+  const d=new Date(iso);
+  const now=new Date();
+  return Math.round((d-now)/(1000*60*60*24));
+}
+
+function applyFilters(){
+  const q = document.getElementById('filterSearch').value.toLowerCase().trim();
+  const stFilt = document.getElementById('filterStatus').value;
+  const plFilt = document.getElementById('filterPlan').value.toUpperCase();
+  const smsFilt = document.getElementById('filterSmsMode').value;
+  const items = ALL_LICS.filter(l=>{
+    if(q){
+      const s = (l.install_id+' '+(l.client_name||'')+' '+(l.client_email||'')+' '+(l.company_name||'')).toLowerCase();
+      if(!s.includes(q)) return false;
+    }
+    if(stFilt && l.status!==stFilt) return false;
+    const p = (l.plan_family||l.plan||'').toUpperCase();
+    if(plFilt){
+      if(plFilt==='PREMIUM' && !(p==='PREMIUM'||p==='PRM')) return false;
+      else if(plFilt==='STD' && !(p==='STD'||p==='STANDARD')) return false;
+      else if(plFilt!=='PREMIUM' && plFilt!=='STD' && p!==plFilt) return false;
+    }
+    if(smsFilt){
+      const e = ENRICHED_CACHE[l.install_id];
+      if(!e || !e.sms) return smsFilt==='none';
+      if(smsFilt!==e.sms.mode_used) return false;
+    }
+    return true;
+  });
+  document.getElementById('resultCount').textContent = items.length;
+  const rows = items.map(l=>{
+    const p = (l.plan_family||l.plan||'').toUpperCase();
+    const pillCls = p==='MASTER'?'pill-master':(p==='PREMIUM'||p==='PRM')?'pill-premium':p==='TRIAL'?'pill-trial':'pill-std';
+    const stCls = l.status==='active'?'pill-active':'pill-revoked';
+    const dl = daysLeft(l.expires_at);
+    const dlStr = dl===null ? '<span class="mono" style="color:var(--muted)">—</span>' :
+      dl<0 ? `<span class="mono" style="color:var(--red)">${dl}d (expirat)</span>` :
+      dl<=7 ? `<span class="mono" style="color:var(--red);font-weight:800">${dl}d</span>` :
+      dl<=30 ? `<span class="mono" style="color:#f59e0b">${dl}d</span>` :
+      `<span class="mono" style="color:var(--green)">${dl}d</span>`;
+    const en = ENRICHED_CACHE[l.install_id];
+    let smsMode = '<span class="mono" style="color:var(--muted)">—</span>';
+    let smsUsage = '<span class="mono" style="color:var(--muted)">—</span>';
+    if(en && en.sms){
+      const m = en.sms.mode_used;
+      if(m==='medicar') smsMode = `<span class="badge badge-medicar">⭐ Cloud</span>`+(en.sms.current_month.medicar_sender?`<span class="mono" style="margin-left:4px;color:#e879f9">"${en.sms.current_month.medicar_sender}"</span>`:'');
+      else if(m==='byoa') smsMode = `<span class="badge badge-byoa">🔧 BYOA</span>`;
+      else smsMode = `<span class="mono" style="color:var(--muted)">—</span>`;
+      const cm = en.sms.current_month;
+      if(cm && cm.sent_count>0){
+        smsUsage = `<span class="mono">${cm.sent_count} SMS<br><span style="color:var(--gold);font-weight:700">${(cm.cost_eur||0).toFixed(2)}€</span> ${cm.billed?'<span class="badge" style="background:#052e16;color:var(--green)">✓ facturat</span>':'<span class="badge" style="background:#78350f;color:#fbbf24">pendent</span>'}</span>`;
+      }
+    }
+    const isTrial = p==='TRIAL';
+    return `<tr>
+      <td><span class="mono">${(l.install_id||'').slice(0,18)}${(l.install_id||'').length>18?'…':''}</span></td>
+      <td><b>${(l.client_name||l.company_name||'—').replace(/</g,'&lt;')}</b><br><span class="mono" style="color:var(--muted)">${(l.client_email||'—').replace(/</g,'&lt;')}</span></td>
+      <td><span class="pill ${pillCls}">${p||'—'}</span></td>
+      <td><span class="pill ${stCls}">${l.status||'—'}</span></td>
+      <td class="mono">${l.expires_at?new Date(l.expires_at).toLocaleDateString('ca-ES'):'—'}</td>
+      <td>${dlStr}</td>
+      <td>${smsMode}</td>
+      <td>${smsUsage}</td>
+      <td>
+        <button class="ghost" onclick="openDetail('${l.install_id}')" data-testid="btn-detail-${l.install_id}">👁 Detall</button>
+        ${isTrial && l.status==='active' ? `<button class="gold" style="margin-top:4px" onclick="adjustTrial('${l.install_id}', 7)">+7d</button> <button class="ghost" style="margin-top:4px" onclick="adjustTrialCustom('${l.install_id}')">±</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tbody').innerHTML = rows || '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">Cap resultat</td></tr>';
+}
+
+async function adjustTrial(install_id, days){
+  if(!confirm(`Ampliar la Trial ${days>0?'+':''}${days} dies?`)) return;
+  try{
+    const r = await fetch(API_BASE+'/api/licenses/'+encodeURIComponent(install_id)+'/adjust-trial',{
+      method:'POST',
+      headers:{'X-Admin-Token':ADMIN_TOKEN,'Content-Type':'application/json'},
+      body:JSON.stringify({days:days})
+    });
+    const d = await r.json();
+    if(d.ok){
+      alert(`✅ Trial ajustat ${days>0?'+':''}${days} dies. Nova data: ${new Date(d.new_expires_at).toLocaleDateString('ca-ES')}`);
+      loadLicenses();
+    } else alert('Error: '+(d.detail||JSON.stringify(d)));
+  }catch(e){alert('Error xarxa: '+e.message)}
+}
+
+function adjustTrialCustom(install_id){
+  const val = prompt('Quants dies vols ajustar? (positiu = ampliar, negatiu = reduir)\nExemple: 15 o -5', '7');
+  if(val===null) return;
+  const n = parseInt(val,10);
+  if(isNaN(n)||n===0){alert('Valor invàlid');return}
+  adjustTrial(install_id, n);
+}
+
+async function openDetail(install_id){
+  const enP = ENRICHED_CACHE[install_id] || await fetchEnriched(install_id);
+  if(!enP){alert('Error obtenint dades');return}
+  const l = enP.license;
+  const sms = enP.sms;
+  const p = (l.plan_family||l.plan||'').toUpperCase();
+  const dl = daysLeft(l.expires_at);
+  const back = document.createElement('div');
+  back.className='modal-back';
+  back.innerHTML = `<div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h3 style="margin:0;color:var(--gold);font-family:Georgia,serif">👁 Detall Llicència</h3>
+      <button class="ghost" onclick="this.closest('.modal-back').remove()">✕</button>
+    </div>
+    <div class="kv">
+      <b>Install ID</b><span class="mono">${l.install_id||'—'}</span>
+      <b>Centre</b><span>${(l.client_name||l.company_name||'—').replace(/</g,'&lt;')}</span>
+      <b>Email</b><span class="mono">${(l.client_email||'—').replace(/</g,'&lt;')}</span>
+      <b>Pla</b><span>${p}</span>
+      <b>Estat</b><span>${l.status||'—'}</span>
+      <b>Creada</b><span class="mono">${l.created_at?new Date(l.created_at).toLocaleString('ca-ES'):'—'}</span>
+      <b>Expira</b><span class="mono">${l.expires_at?new Date(l.expires_at).toLocaleString('ca-ES'):'—'} ${dl!==null?'('+dl+' dies)':''}</span>
+      <b>Stripe Sub ID</b><span class="mono">${l.stripe_subscription_id||'—'}</span>
+      <b>Stripe Customer</b><span class="mono">${l.stripe_customer_id||'—'}</span>
+      <b>Referred by</b><span class="mono">${l.referred_by||'—'}</span>
+      <b>Codi de referit</b><span class="mono">${l.referral_code||'—'}</span>
+    </div>
+    <hr style="border-color:#1e293b;margin:12px 0">
+    <h4 style="color:var(--purple);margin:8px 0">📱 SMS</h4>
+    <div class="kv">
+      <b>Mode principal</b><span>${sms.mode_used||'—'} ${sms.mode_used==='medicar'?'<span class="badge badge-medicar">⭐ Cloud</span>':(sms.mode_used==='byoa'?'<span class="badge badge-byoa">🔧 BYOA</span>':'')}</span>
+      <b>Campanyes BYOA</b><span>${sms.byoa_campaigns||0}</span>
+      <b>Campanyes MediCar</b><span>${sms.medicar_campaigns||0}</span>
+      <b>SMS mes actual (${sms.current_month.period})</b><span><b style="color:var(--gold)">${sms.current_month.sent_count}</b> SMS · ${sms.current_month.cost_eur.toFixed(2)}€ ${sms.current_month.billed?'✅ facturat':'⏳ pendent'}</span>
+      <b>Sender (si MediCar)</b><span class="mono">${sms.current_month.medicar_sender||'—'}</span>
+      <b>Total històric</b><span>${sms.total_historic.sent_count} SMS · ${sms.total_historic.months} mesos</span>
+      <b>Preu per SMS</b><span>${sms.price_per_sms_eur.toFixed(2)}€</span>
+    </div>
+    ${p==='TRIAL' && l.status==='active' ? `
+      <hr style="border-color:#1e293b;margin:12px 0">
+      <h4 style="color:var(--gold);margin:8px 0">⚙️ Ajustar dies Trial</h4>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="green" onclick="adjustTrial('${l.install_id}',7).then(()=>this.closest('.modal-back').remove())">+7d</button>
+        <button class="green" onclick="adjustTrial('${l.install_id}',15).then(()=>this.closest('.modal-back').remove())">+15d</button>
+        <button class="green" onclick="adjustTrial('${l.install_id}',30).then(()=>this.closest('.modal-back').remove())">+30d</button>
+        <button class="red" onclick="adjustTrial('${l.install_id}',-7).then(()=>this.closest('.modal-back').remove())">-7d</button>
+        <button class="ghost" onclick="adjustTrialCustom('${l.install_id}');this.closest('.modal-back').remove()">± Custom</button>
+      </div>
+    `:''}
+  </div>`;
+  document.body.appendChild(back);
+  back.addEventListener('click',e=>{if(e.target===back)back.remove()});
+}
+
+// Auto-login si token guardat
+window.addEventListener('DOMContentLoaded',()=>{
+  try{
+    const t = sessionStorage.getItem('mcp.admin.token');
+    if(t){document.getElementById('tokenInput').value=t; doLogin();}
+  }catch(e){}
+});
+</script>
+</body>
+</html>
