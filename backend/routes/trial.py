@@ -81,18 +81,44 @@ def build_trial_router(db: AsyncIOMotorDatabase) -> APIRouter:
             raise HTTPException(status_code=400, detail="consent_required")
 
         email_norm = str(body.email).strip().lower()
+        client_ip = request.client.host if request.client else ""
 
-        # 3) Anti-abús: 1 trial per email (històric complet)
-        existing = await db.licenses.find_one({
-            "client_email": email_norm,
-            "plan": TRIAL_PLAN,
-        })
-        if existing:
-            raise HTTPException(
-                status_code=409,
-                detail="Ya has solicitado una prueba gratuita con este email. "
-                       "Revisa tu bandeja de entrada (incluye spam) o contacta con info@medicarplus.es.",
-            )
+        # 🔎 Anti-abús SOFT (només detecta + notifica Discord · no bloqueja)
+        # Finestra: últims 90 dies. Comprova mateix email, IP i nom d'empresa.
+        from datetime import timedelta as _td
+        threshold = _now() - _td(days=90)
+        threshold_iso = threshold.isoformat()
+        flags = []
+        try:
+            # Mateix email exacte
+            same_email = await db.licenses.find_one({
+                "client_email": email_norm,
+                "plan": TRIAL_PLAN,
+                "created_at": {"$gte": threshold_iso},
+            })
+            if same_email:
+                flags.append(f"email idèntic ({email_norm})")
+            # Mateixa IP en 90 dies
+            if client_ip:
+                same_ip_cnt = await db.licenses.count_documents({
+                    "created_ip": client_ip,
+                    "plan": TRIAL_PLAN,
+                    "created_at": {"$gte": threshold_iso},
+                })
+                if same_ip_cnt > 0:
+                    flags.append(f"mateixa IP {client_ip} ({same_ip_cnt} trials previs)")
+            # Mateix nom empresa (case-insensitive)
+            company_norm = (body.company or "").strip().lower()
+            if company_norm and len(company_norm) >= 3:
+                same_comp = await db.licenses.count_documents({
+                    "company_name_norm": company_norm,
+                    "plan": TRIAL_PLAN,
+                    "created_at": {"$gte": threshold_iso},
+                })
+                if same_comp > 0:
+                    flags.append(f"mateixa empresa '{body.company}' ({same_comp} trials previs)")
+        except Exception:
+            pass  # no bloquegis mai el trial per un error de check
 
         # 4) Genera llicència TRIAL
         # install_id: placeholder inicial fins que l'app client s'activi i registri el seu HWID/local install_id.
@@ -112,6 +138,7 @@ def build_trial_router(db: AsyncIOMotorDatabase) -> APIRouter:
             "client_name": body.name.strip(),
             "client_email": email_norm,
             "company_name": (body.company or "").strip() or None,
+            "company_name_norm": (body.company or "").strip().lower() or None,
             "phone": (body.phone or "").strip() or None,
             "plan": TRIAL_PLAN,
             "status": "active",
@@ -125,15 +152,41 @@ def build_trial_router(db: AsyncIOMotorDatabase) -> APIRouter:
             "verify_count": 0,
             "license_key": jwt_key,
             "source": "trial_auto",
-            "ip": request.client.host if request and request.client else "-",
+            "ip": client_ip or "-",
+            "created_ip": client_ip or None,
+            # Anti-abús: flags de detecció sospitosa (no bloqueja, només marca)
+            "abuse_flags": flags if flags else None,
             # Tracking del programa de referits (Trial NO desencadena recompensa,
             # només queda registrat. Quan el trial paga i passa a Std/Prm,
             # el webhook recupera aquest referred_by i aplica la recompensa).
             "referred_by": (body.referred_by or "").upper().strip() or None,
         }
         await db.licenses.insert_one(doc)
-        logger.info("Auto-trial created for %s (install_id=%s, referred_by=%s)",
-                    email_norm, install_id, doc.get("referred_by") or "-")
+        logger.info("Auto-trial created for %s (install_id=%s, referred_by=%s, flags=%s)",
+                    email_norm, install_id, doc.get("referred_by") or "-", flags or "clean")
+
+        # 🚨 Notificació Discord si hi ha senyals sospitoses (mai bloqueja el trial)
+        if flags:
+            try:
+                from services.discord_notify import send_discord_notification, is_configured as _dc_ok
+                if _dc_ok():
+                    background_tasks.add_task(
+                        send_discord_notification,
+                        title="⚠️ Trial sospitós · possible abús detectat",
+                        description=f"S'ha creat un trial nou però amb senyals de possible duplicat.\n**Flags:**\n" + "\n".join(f"• {f}" for f in flags),
+                        color=0xf59e0b,
+                        fields=[
+                            {"name":"Email","value":email_norm,"inline":True},
+                            {"name":"Nom","value":body.name.strip(),"inline":True},
+                            {"name":"Empresa","value":(body.company or "—"),"inline":True},
+                            {"name":"Telèfon","value":(body.phone or "—"),"inline":True},
+                            {"name":"IP","value":client_ip or "—","inline":True},
+                            {"name":"Trial ID","value":license_id[:8],"inline":True},
+                        ],
+                        footer_text="Truca al sol·licitant si vols verificar",
+                    )
+            except Exception:
+                pass  # mai bloquejar el trial per un error de notificació
 
         # 5) Envia email en BACKGROUND (no bloqueja la resposta HTTP).
         # L'usuari rep la clau al moment i l'email arriba als 5-15s per correu.
