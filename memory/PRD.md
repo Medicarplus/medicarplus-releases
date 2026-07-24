@@ -267,3 +267,39 @@ User's preferred language: **Catalan** (UI/code strings in **Spanish**).
 - `acorn.parse` sobre el `<script>` extret → `PARSE OK`.
 - Playwright: navegació a `/admin.html` + fill token + click → `typeof doLogin === 'function'`, `login.display === 'none'`, `app.display === 'block'`, 11 files a `#tbody`, 0 page errors.
 - Screenshot del panell mostra estadístiques i taula de llicències renderitzades correctament.
+
+
+## Session Feb 24, 2026 (P1 · Adaptive Driving School Extraction + P2 · Manual button in Support Hub)
+
+### P1 · Adaptive Driving School Extraction
+Objectiu: quan un client nou importa el seu CSV, l'app ha d'auto-detectar les seves autoescoles, extreure la llista única, normalitzar-la i presentar-la en una UI d'onboarding.
+
+**Canvis** (`/app/frontend/public/v2.html`):
+1. Nou store client-side d'aliases: `STATS_ALIAS_KEY='caja.stats.aliases.v1'` + helpers `loadStatsAliases()` / `saveStatsAliases()` mantenen el mapa `{RAW_CODE_UPPER: 'Nom canònic'}` a `localStorage`.
+2. `canonicalName(raw)` ara consulta primer el mapa del client i després `STAT_ALIAS` (l'històric hardcoded del propietari Marc Brugulat).
+3. `$('#stFile').onchange` refactoritzat:
+   - Parseja el CSV mantenint `rawCounts[RAW_UPPER]=total` (abans es col·lapsava directament a canonical).
+   - Detecta `newRaws`: codis del CSV que NO són al `STAT_ALIAS`, NO són al mapa de client, i el seu canònic no és a `st.autoescoles`.
+   - Si `newRaws.length > 0` → obre modal de revisió `openAutoescoleReview()`.
+   - Si `newRaws.length === 0` → aplica import directament (comportament previ).
+4. `openAutoescoleReview(newRaws, rawCounts, existingList, onDone)`:
+   - Renderitza una taula amb 4 columnes: `Codi CSV` · `Certificats` · `Nom a mostrar` (input editable) · `O fusionar amb…` (dropdown de les autoescoles existents).
+   - Copy diferent per primer import (0 autoescoles → "Configura les teves autoescoles") vs imports subseqüents ("Noves autoescoles detectades").
+   - Al confirmar, guarda els aliases a `localStorage['caja.stats.aliases.v1']` (persistents entre imports) i executa `onDone()` que reagrupa `sums` pel canònic final i llança el `confirmModal` "Importar {mes} {any}".
+5. Sort dels rows per volum descendent (certificats↓) perquè el client vegi primer les autoescoles importants.
+
+**Data-testids afegits**: `ae-review-row-{i}`, `ae-review-name-{i}`, `ae-review-merge-{i}`, `ae-review-cancel`, `ae-review-apply`.
+
+**Verificació E2E** (Playwright):
+- CSV amb 3 codis (`AUTOESCOLA_ONE` x2, `AUTOESCOLA_TWO`, `DAINA`) → modal detecta exactament 2 codis nous, `DAINA` filtrat correctament pel `STAT_ALIAS` predefinit.
+- Agregació de duplicats OK: `AUTOESCOLA_ONE` = 12+3 = 15.
+- Després de renombrar → aliases guardats correctament: `{"AUTOESCOLA_ONE":"Autoescola U","AUTOESCOLA_TWO":"Autoescola Dos"}`.
+- Autoescoles afegides i totals correctes al mes: `{"2026-06":{"Autoescola U":15,"Autoescola Dos":8,"A.E.DAINA":5}}`.
+- 0 errors JS · `acorn.parse` del `<script>` inline: PARSE OK.
+
+### P2 · Botó Manual al Support Hub
+**Canvi**: grid del hub passat de `repeat(3,1fr)` a `repeat(4,1fr)` amb un nou botó `supTabManual` (gradient daurat) que fa `window.open(LIC.MANUAL_URL, '_blank')` per obrir la guia interactiva al navegador per defecte.
+
+**Data-testid afegit**: `sup-tab-manual`.
+
+**Verificació**: Playwright detecta els 4 botons (`sup-tab-manual/bug/remote/phone`); interceptant `window.open` durant el clic al Manual retorna la URL esperada `https://<host>/manual-usuari.html`.

@@ -1039,6 +1039,9 @@ $('#cCempla').onclick=()=>switchCompany('cempla');
 
 // ============ ESTADÍSTIQUES AUTOESCOLES CEMPLA CB ============
 const STATS_KEY='caja.stats.v1';
+const STATS_ALIAS_KEY='caja.stats.aliases.v1'; // {RAW_CODE_UPPER: 'Nom canònic client'}
+function loadStatsAliases(){try{return JSON.parse(localStorage.getItem(STATS_ALIAS_KEY)||'{}')||{}}catch(e){return{}}}
+function saveStatsAliases(m){try{localStorage.setItem(STATS_ALIAS_KEY,JSON.stringify(m||{}))}catch(e){}}
 // Auto-seed one-time: dades estadístiques Gener–Maig 2026 (importació automàtica única)
 (function seedStats2026(){
   try{
@@ -1352,7 +1355,7 @@ function openStats(initialSection){
     'TERCOL':'TERÇOL','TERÇOL':'TERÇOL',
     'A.E.TONA':'A.E.TONA','TONA':'A.E.TONA'
   };
-  const canonicalName=raw=>{const s=String(raw||'').trim().toUpperCase().replace(/\s+/g,' ');if(STAT_ALIAS[s])return STAT_ALIAS[s];return s};
+  const canonicalName=raw=>{const s=String(raw||'').trim().toUpperCase().replace(/\s+/g,' ');const clientMap=loadStatsAliases();if(clientMap[s])return clientMap[s];if(STAT_ALIAS[s])return STAT_ALIAS[s];return s};
   back.querySelector('#stImport').onclick=()=>$('#stFile').click();
   $('#stFile').onchange=async ev=>{
     const f=ev.target.files[0];if(!f)return;ev.target.value='';
@@ -1364,28 +1367,114 @@ function openStats(initialSection){
     const buf=await f.arrayBuffer();
     let txt;try{txt=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){txt=new TextDecoder('windows-1252').decode(buf)}
     if(/�/.test(txt))txt=new TextDecoder('windows-1252').decode(buf);
-    // Parse CSV (semicolon)
+    // Parse CSV (semicolon). Track BOTH raw codes and canonical names.
     const lines=txt.split(/\r?\n/).filter(l=>l.trim());
-    const sums={};
-    let ignored=[];
+    const rawCounts={}; // {RAW_UPPER: total}  · útil per l'onboarding
     for(let i=1;i<lines.length;i++){
       const parts=lines[i].split(';').map(x=>x.replace(/^"|"$/g,'').trim());
       if(parts.length<2)continue;
       const code=parts[0];const n=parseInt(parts[1])||0;if(!code||!n)continue;
-      const canon=canonicalName(code);
-      sums[canon]=(sums[canon]||0)+n;
+      const rawU=String(code).trim().toUpperCase().replace(/\s+/g,' ');
+      rawCounts[rawU]=(rawCounts[rawU]||0)+n;
     }
-    const year=$('#stYear').value;const key=`${year}-${String(mi).padStart(2,'0')}`;
+    if(!Object.keys(rawCounts).length){toast('El CSV no conté cap fila vàlida');return}
     const st=loadStats();
-    // Add missing autoescoles
-    for(const k of Object.keys(sums)){if(!st.autoescoles.includes(k))st.autoescoles.push(k)}
-    // Confirm before overwriting
-    const existing=st.data[key];const hasExisting=existing&&Object.keys(existing).length>0;
-    const total=Object.values(sums).reduce((a,b)=>a+b,0);
-    const detail=Object.entries(sums).sort((a,b)=>b[1]-a[1]).slice(0,15).map(([k,v])=>`${k}: ${v}`).join(' · ');
-    const doApply=()=>{st.data[key]=sums;saveStats(st);renderTable();toast(`✅ Importat ${MESOS[mi-1]} ${year}: ${total} certificats`,3500)};
-    confirmModal(`📥 Importar ${MESOS[mi-1]} ${year}`,`<b>Total ${total} certificats</b> · ${Object.keys(sums).length} autoescoles<br><br><span class="small">${detail}</span>${hasExisting?'<br><br>⚠️ <b>Ja hi ha dades per aquest mes.</b> Es sobreescriuran.':''}`,doApply,'Importar',false);
+    // Detectar codis "nous" (adaptatius): raw no mapejat per STAT_ALIAS ni per aliases del client, i el seu canònic no és a la llista de l'usuari.
+    const clientMap=loadStatsAliases();
+    const newRaws=Object.keys(rawCounts).filter(rawU=>{
+      if(STAT_ALIAS[rawU])return false;
+      if(clientMap[rawU])return false;
+      // El nom canònic tal com quedaria (raw normalitzat) no és present a la llista actual
+      const canon=canonicalName(rawU);
+      return !st.autoescoles.includes(canon);
+    });
+    const applyImport=()=>{
+      // Reagrupar per canonical després que l'usuari hagi confirmat mappings
+      const cm=loadStatsAliases();
+      const sums={};
+      for(const [rawU,n] of Object.entries(rawCounts)){
+        const canon=(cm[rawU]||STAT_ALIAS[rawU]||rawU);
+        sums[canon]=(sums[canon]||0)+n;
+      }
+      // Afegir autoescoles que encara no siguin a la llista
+      for(const k of Object.keys(sums)){if(!st.autoescoles.includes(k))st.autoescoles.push(k)}
+      const year=$('#stYear').value;const key=`${year}-${String(mi).padStart(2,'0')}`;
+      const existing=st.data[key];const hasExisting=existing&&Object.keys(existing).length>0;
+      const total=Object.values(sums).reduce((a,b)=>a+b,0);
+      const detail=Object.entries(sums).sort((a,b)=>b[1]-a[1]).slice(0,15).map(([k,v])=>`${k}: ${v}`).join(' · ');
+      const doApply=()=>{st.data[key]=sums;saveStats(st);renderTable();toast(`✅ Importat ${MESOS[mi-1]} ${year}: ${total} certificats`,3500)};
+      confirmModal(`📥 Importar ${MESOS[mi-1]} ${year}`,`<b>Total ${total} certificats</b> · ${Object.keys(sums).length} autoescoles<br><br><span class="small">${detail}</span>${hasExisting?'<br><br>⚠️ <b>Ja hi ha dades per aquest mes.</b> Es sobreescriuran.':''}`,doApply,'Importar',false);
+    };
+    if(newRaws.length===0){applyImport();return}
+    // Onboarding · revisió i normalització de codis nous
+    openAutoescoleReview(newRaws,rawCounts,st.autoescoles.slice(),applyImport);
   };
+  // Onboarding · Adaptive Driving School Extraction
+  function openAutoescoleReview(newRaws, rawCounts, existingList, onDone){
+    const back=document.createElement('div');back.className='modal-back';
+    const isFirstImport=existingList.length===0;
+    const rowsHtml=newRaws.sort((a,b)=>(rawCounts[b]||0)-(rawCounts[a]||0)).map((rawU,idx)=>{
+      const cnt=rawCounts[rawU]||0;
+      const defaultName=rawU; // Nom canònic proposat = raw normalitzat
+      const opts=['<option value="">— Nova autoescola —</option>']
+        .concat(existingList.map(a=>`<option value="${a.replace(/"/g,'&quot;')}">↪ Fusionar amb: ${a}</option>`))
+        .join('');
+      return `<tr data-testid="ae-review-row-${idx}" style="border-bottom:1px solid #1e293b">
+        <td style="padding:8px;font-family:'Consolas','Menlo',monospace;color:#94a3b8;white-space:nowrap"><b style="color:#e2e8f0">${rawU}</b></td>
+        <td style="padding:8px;text-align:center;color:#f5b301;font-weight:700">${cnt}</td>
+        <td style="padding:8px"><input type="text" data-ae-name value="${defaultName.replace(/"/g,'&quot;')}" data-testid="ae-review-name-${idx}" style="width:100%;background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 8px;font-size:12px" /></td>
+        <td style="padding:8px"><select data-ae-merge data-testid="ae-review-merge-${idx}" style="width:100%;background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 8px;font-size:12px">${opts}</select></td>
+      </tr>`;
+    }).join('');
+    back.innerHTML=`<div class="modal" style="max-width:820px;width:calc(100vw - 40px)">
+      <h3 style="color:#f5b301;font-family:Georgia,serif;margin-top:0">🚗 ${isFirstImport?'Configura les teves autoescoles':'Noves autoescoles detectades'}</h3>
+      <p style="color:#94a3b8;font-size:13px;line-height:1.5">
+        ${isFirstImport
+          ?'Hem detectat aquests codis al teu CSV. Revisa i personalitza el nom com vols que aparegui a les estadístiques. Si dues línies són en realitat la mateixa autoescola, pots <b>fusionar-les</b>.'
+          :'Aquests codis del CSV no coincideixen amb cap autoescola coneguda. Anomena\'ls o fusiona\'ls amb una existent perquè els futurs imports siguin automàtics.'}
+      </p>
+      <div style="max-height:50vh;overflow:auto;border:1px solid #1e293b;border-radius:8px;margin:12px 0">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="background:#1a1e26;position:sticky;top:0;z-index:2">
+            <th style="padding:10px;text-align:left;color:#94a3b8;font-weight:700">Codi CSV</th>
+            <th style="padding:10px;text-align:center;color:#94a3b8;font-weight:700;width:100px">Certificats</th>
+            <th style="padding:10px;text-align:left;color:#94a3b8;font-weight:700">Nom a mostrar</th>
+            <th style="padding:10px;text-align:left;color:#94a3b8;font-weight:700;width:220px">O fusionar amb…</th>
+          </tr></thead>
+          <tbody id="aeReviewBody">${rowsHtml}</tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <div style="font-size:11px;color:#64748b">💡 El mapping es guarda al teu ordinador. Els propers imports amb els mateixos codis s\'aplicaran automàticament.</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" data-testid="ae-review-cancel" data-no>Cancel·lar</button>
+          <button class="btn btn-primary" data-testid="ae-review-apply" data-yes>Aplicar i importar</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.appendChild(back);
+    back.addEventListener('click',ev=>{
+      if(ev.target===back||ev.target.matches('[data-no]')){back.remove();return}
+      if(ev.target.matches('[data-yes]')){
+        // Recollir mappings
+        const cm=loadStatsAliases();
+        const rows=back.querySelectorAll('#aeReviewBody tr');
+        rows.forEach((tr,idx)=>{
+          const rawU=newRaws.sort((a,b)=>(rawCounts[b]||0)-(rawCounts[a]||0))[idx];
+          const nameInput=tr.querySelector('[data-ae-name]');
+          const mergeSel=tr.querySelector('[data-ae-merge]');
+          const mergeVal=mergeSel && mergeSel.value ? mergeSel.value.trim() : '';
+          const nameVal=nameInput && nameInput.value ? nameInput.value.trim() : rawU;
+          const finalName=mergeVal || nameVal || rawU;
+          cm[rawU]=finalName;
+        });
+        saveStatsAliases(cm);
+        back.remove();
+        onDone();
+      }
+    });
+    document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){back.remove();document.removeEventListener('keydown',esc)}});
+  }
   back.querySelector('#stPrint').onclick=()=>{
     if(currentSection === 'traffic'){ printTrafficReport(); return; }
     // WYSIWYG: imprimeix el contingut visible del modal
@@ -4261,7 +4350,8 @@ function openSettingsModal(){
         <div class="settings-section" style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px" data-testid="section-support-hub">
           <div style="font-size:13px;font-weight:700;color:#f5b301;letter-spacing:.5px;margin-bottom:4px">🆘 ${isCA?'Assistència i Suport':'Asistencia y Soporte'}</div>
           <div style="font-size:12px;color:#94a3b8;margin-bottom:12px">${isCA?'Tria com vols contactar-nos':'Elige cómo quieres contactarnos'}</div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:0">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:0">
+            <button type="button" id="supTabManual" data-testid="sup-tab-manual" style="background:linear-gradient(135deg,#3a2a15,#f5b301);color:#0f172a;border:none;padding:14px 8px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:800;text-align:center;line-height:1.35;transition:.2s;box-shadow:0 3px 8px rgba(245,179,1,.25)">📖<br>${isCA?'Manual d\'usuari':'Manual de usuario'}<div style="font-size:9px;opacity:.85;font-weight:400;margin-top:2px">${isCA?'Guia interactiva':'Guía interactiva'}</div></button>
             <button type="button" id="supTabBug" data-testid="sup-tab-bug" style="background:linear-gradient(135deg,#7f1d1d,#dc2626);color:#fff;border:none;padding:14px 8px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:800;text-align:center;line-height:1.35;transition:.2s;box-shadow:0 3px 8px rgba(220,38,38,.25)">🐛<br>${isCA?'Notificar bug':'Notificar bug'}<div style="font-size:9px;opacity:.85;font-weight:400;margin-top:2px">${isCA?'per email':'por email'}</div></button>
             <button type="button" id="supTabRemote" data-testid="sup-tab-remote" style="background:linear-gradient(135deg,#1e3a8a,#3b82f6);color:#fff;border:none;padding:14px 8px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:800;text-align:center;line-height:1.35;transition:.2s;box-shadow:0 3px 8px rgba(59,130,246,.25)">🖥️<br>${isCA?'Assistència remota':'Asistencia remota'}<div style="font-size:9px;opacity:.85;font-weight:400;margin-top:2px">${isCA?'HopToDesk + Discord':'HopToDesk + Discord'}</div></button>
             <button type="button" id="supTabPhone" data-testid="sup-tab-phone" style="background:linear-gradient(135deg,#065f46,#22c55e);color:#fff;border:none;padding:14px 8px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:800;text-align:center;line-height:1.35;transition:.2s;box-shadow:0 3px 8px rgba(34,197,94,.25)">📞<br>${isCA?'Trucar':'Llamar'}<div style="font-size:9px;opacity:.85;font-weight:400;margin-top:2px">${SUPPORT_HOURS_ES}</div></button>
@@ -4415,9 +4505,13 @@ function openSettingsModal(){
   const btnTabBug = document.getElementById('supTabBug');
   const btnTabRemote = document.getElementById('supTabRemote');
   const btnTabPhone = document.getElementById('supTabPhone');
+  const btnTabManual = document.getElementById('supTabManual');
   if(btnTabBug) btnTabBug.onclick = () => supShowOne('supPanelBug');
   if(btnTabRemote) btnTabRemote.onclick = () => supShowOne('supPanelRemote');
   if(btnTabPhone) btnTabPhone.onclick = () => supShowOne('supPanelPhone');
+  if(btnTabManual) btnTabManual.onclick = () => {
+    try{ window.open(LIC.MANUAL_URL, '_blank', 'noopener'); }catch(e){ toast('No s\'ha pogut obrir el manual: '+e.message); }
+  };
   // Botons de tancar (✕) dins de cada panel
   document.querySelectorAll('.sup-close').forEach(btn => {
     btn.onclick = () => supHideAllPanels();
