@@ -4257,9 +4257,23 @@ function openSettingsModal(){
           <button id="setOpenWizard" class="btn" style="width:100%;background:#1e293b;color:#e2e8f0;border-color:#475569;font-weight:600;padding:8px">${T.openWizard}</button>
         </div>
 
-        <!-- Contactar suport -->
-        <div class="settings-section" style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px">
-          <div style="font-size:13px;font-weight:700;color:#f5b301;letter-spacing:.5px;margin-bottom:4px">${T.supportSec}</div>
+        <!-- 🆘 Suport centralitzat (3 opcions a triar) -->
+        <div class="settings-section" style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px" data-testid="section-support-hub">
+          <div style="font-size:13px;font-weight:700;color:#f5b301;letter-spacing:.5px;margin-bottom:4px">🆘 ${isCA?'Assistència i Suport':'Asistencia y Soporte'}</div>
+          <div style="font-size:12px;color:#94a3b8;margin-bottom:12px">${isCA?'Tria com vols contactar-nos':'Elige cómo quieres contactarnos'}</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:0">
+            <button type="button" id="supTabBug" data-testid="sup-tab-bug" style="background:linear-gradient(135deg,#7f1d1d,#dc2626);color:#fff;border:none;padding:14px 8px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:800;text-align:center;line-height:1.35;transition:.2s;box-shadow:0 3px 8px rgba(220,38,38,.25)">🐛<br>${isCA?'Notificar bug':'Notificar bug'}<div style="font-size:9px;opacity:.85;font-weight:400;margin-top:2px">${isCA?'per email':'por email'}</div></button>
+            <button type="button" id="supTabRemote" data-testid="sup-tab-remote" style="background:linear-gradient(135deg,#1e3a8a,#3b82f6);color:#fff;border:none;padding:14px 8px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:800;text-align:center;line-height:1.35;transition:.2s;box-shadow:0 3px 8px rgba(59,130,246,.25)">🖥️<br>${isCA?'Assistència remota':'Asistencia remota'}<div style="font-size:9px;opacity:.85;font-weight:400;margin-top:2px">${isCA?'HopToDesk + Discord':'HopToDesk + Discord'}</div></button>
+            <button type="button" id="supTabPhone" data-testid="sup-tab-phone" style="background:linear-gradient(135deg,#065f46,#22c55e);color:#fff;border:none;padding:14px 8px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:800;text-align:center;line-height:1.35;transition:.2s;box-shadow:0 3px 8px rgba(34,197,94,.25)">📞<br>${isCA?'Trucar':'Llamar'}<div style="font-size:9px;opacity:.85;font-weight:400;margin-top:2px">${SUPPORT_HOURS_ES}</div></button>
+          </div>
+        </div>
+
+        <!-- PANEL Bug (ocult per defecte) -->
+        <div id="supPanelBug" class="settings-section sup-panel" style="display:none;background:linear-gradient(135deg,#0f172a 0%,#450a0a 60%,#0f172a 100%);border:1px solid #dc2626;border-radius:10px;padding:14px" data-testid="sup-panel-bug">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-size:13px;font-weight:700;color:#fca5a5;letter-spacing:.5px">🐛 ${T.supportSec}</div>
+            <button type="button" class="sup-close" data-testid="sup-close-bug" style="background:transparent;border:1px solid #475569;color:#cbd5e1;padding:2px 10px;border-radius:5px;cursor:pointer;font-size:12px">✕</button>
+          </div>
           <div style="font-size:12px;color:#94a3b8;margin-bottom:10px">${T.supportDesc}</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
             <input type="text" id="supName" placeholder="${T.fName}" value="${(lic.client_name||'').replace(/"/g,'&quot;')}" style="background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:12px" data-testid="support-name" />
@@ -4276,13 +4290,16 @@ function openSettingsModal(){
             <input type="text" id="supSubject" placeholder="${T.fSubject}" style="background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:12px" data-testid="support-subject" />
           </div>
           <textarea id="supMessage" placeholder="${T.fMessage}" rows="4" style="width:100%;background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:12px;font-family:inherit;resize:vertical;box-sizing:border-box" data-testid="support-message"></textarea>
-          <button id="setSendSupport" class="btn" style="width:100%;margin-top:8px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;border-color:transparent;font-weight:700;padding:10px" data-testid="btn-send-support">${T.send}</button>
+          <button id="setSendSupport" class="btn" style="width:100%;margin-top:8px;background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;border-color:transparent;font-weight:700;padding:10px" data-testid="btn-send-support">${T.send}</button>
           <div id="setSupportStatus" style="margin-top:8px;font-size:12px;text-align:center;min-height:16px"></div>
         </div>
 
-        <!-- 🖥️ Assistència remota via HopToDesk -->
-        <div class="settings-section" style="background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 60%,#0f172a 100%);border:1px solid #3b82f6;border-radius:10px;padding:14px" data-testid="section-remote-assist">
-          <div style="font-size:13px;font-weight:700;color:#93c5fd;letter-spacing:.5px;margin-bottom:4px">${T.remoteSec}</div>
+        <!-- PANEL Assistència remota (ocult per defecte) -->
+        <div id="supPanelRemote" class="settings-section sup-panel" style="display:none;background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 60%,#0f172a 100%);border:1px solid #3b82f6;border-radius:10px;padding:14px" data-testid="section-remote-assist">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-size:13px;font-weight:700;color:#93c5fd;letter-spacing:.5px">${T.remoteSec}</div>
+            <button type="button" class="sup-close" data-testid="sup-close-remote" style="background:transparent;border:1px solid #475569;color:#cbd5e1;padding:2px 10px;border-radius:5px;cursor:pointer;font-size:12px">✕</button>
+          </div>
           <div style="font-size:12px;color:#bfdbfe;opacity:.9;line-height:1.5;margin-bottom:10px">${T.remoteDesc}</div>
           <div style="background:#0b1121;border:1px dashed #3b82f6;border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px;color:#dbeafe;line-height:1.7">
             <div style="margin-bottom:6px">${T.remoteStep1}</div>
@@ -4300,9 +4317,12 @@ function openSettingsModal(){
           <div id="setRemoteStatus" style="margin-top:8px;font-size:12px;text-align:center;min-height:16px"></div>
         </div>
 
-        <!-- 📞 Telèfon de suport -->
-        <div class="settings-section" style="background:linear-gradient(135deg,#052e16 0%,#064e3b 100%);border:1px solid #22c55e;border-radius:10px;padding:14px" data-testid="section-support-phone">
-          <div style="font-size:13px;font-weight:700;color:#86efac;letter-spacing:.5px;margin-bottom:4px">${T.phoneSec}</div>
+        <!-- PANEL Trucar (ocult per defecte) -->
+        <div id="supPanelPhone" class="settings-section sup-panel" style="display:none;background:linear-gradient(135deg,#052e16 0%,#064e3b 100%);border:1px solid #22c55e;border-radius:10px;padding:14px" data-testid="section-support-phone">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-size:13px;font-weight:700;color:#86efac;letter-spacing:.5px">${T.phoneSec}</div>
+            <button type="button" class="sup-close" data-testid="sup-close-phone" style="background:transparent;border:1px solid #475569;color:#cbd5e1;padding:2px 10px;border-radius:5px;cursor:pointer;font-size:12px">✕</button>
+          </div>
           <div style="font-size:12px;color:#bbf7d0;opacity:.9;line-height:1.5;margin-bottom:10px">${T.phoneDesc}</div>
           <a href="tel:${SUPPORT_PHONE_TEL}" style="display:block;text-align:center;background:#22c55e;color:#0b1121;text-decoration:none;padding:14px;border-radius:8px;font-size:19px;font-weight:800;letter-spacing:.5px;font-family:'Courier New',monospace" data-testid="btn-call-support">📞 ${SUPPORT_PHONE_DISPLAY}</a>
           <div style="text-align:center;font-size:11px;color:#86efac;margin-top:8px;font-weight:600">${isCA ? SUPPORT_HOURS_CA : SUPPORT_HOURS_ES}</div>
@@ -4380,6 +4400,29 @@ function openSettingsModal(){
   document.getElementById('setOpenWizard').onclick=()=>{back.remove();if(typeof showConfigWizard==='function')showConfigWizard(false)};
 
   // Enviar suport
+  // 🆘 Assistència i Suport · handlers dels 3 botons (obren només 1 panel)
+  const supHideAllPanels = () => {
+    document.querySelectorAll('.sup-panel').forEach(p => p.style.display = 'none');
+  };
+  const supShowOne = (panelId, scrollTo = true) => {
+    supHideAllPanels();
+    const p = document.getElementById(panelId);
+    if(p){
+      p.style.display = 'block';
+      if(scrollTo) setTimeout(()=>p.scrollIntoView({behavior:'smooth',block:'start'}), 60);
+    }
+  };
+  const btnTabBug = document.getElementById('supTabBug');
+  const btnTabRemote = document.getElementById('supTabRemote');
+  const btnTabPhone = document.getElementById('supTabPhone');
+  if(btnTabBug) btnTabBug.onclick = () => supShowOne('supPanelBug');
+  if(btnTabRemote) btnTabRemote.onclick = () => supShowOne('supPanelRemote');
+  if(btnTabPhone) btnTabPhone.onclick = () => supShowOne('supPanelPhone');
+  // Botons de tancar (✕) dins de cada panel
+  document.querySelectorAll('.sup-close').forEach(btn => {
+    btn.onclick = () => supHideAllPanels();
+  });
+
   document.getElementById('setSendSupport').onclick=async()=>{
     const name=document.getElementById('supName').value.trim();
     const email=document.getElementById('supEmail').value.trim();
