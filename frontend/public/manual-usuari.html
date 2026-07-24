@@ -318,6 +318,25 @@
 
   <div class="callout callout-blue"><b>Modo actual: PRUEBA (Mock)</b>. Los SMS no se envían de verdad — se guardan en el histórico como si se hubieran enviado. Para envío real, hay que activar Twilio (ver con tu proveedor).</div>
 
+  <h2>🖨️ Exportar el listado desde el programa GIC</h2>
+  <div class="step">
+    <p>Para generar el CSV con los clientes que les toca renovar, hay que aplicar una <b>plantilla especial</b> en el GIC (Clientes a Revisar):</p>
+    <ol>
+      <li>Abre el GIC → pantalla <b>Clientes a Revisar</b>.</li>
+      <li>Introduce <b>Fecha Inicial</b> y <b>Fecha Final</b> del rango de revisiones a avisar (ej: renovaciones del próximo mes).</li>
+      <li>En <b>"Selección de Ficheros"</b> marca <b>Conducción</b> (y cualquier otro que quieras: Armas, Náutica, Seguridad, etc.).</li>
+      <li>En <b>"Salida"</b> elige <b>Listados</b>.</li>
+      <li>Haz clic en el <b>botón de la carpeta 📂</b> (a la derecha de "Salida") y carga la plantilla <code>F_revision_con_telefono_y_movil.lst</code>.
+        <br><a href="downloads/gic-templates/F_revision_con_telefono_y_movil.lst" download="F_revision_con_telefono_y_movil.lst" style="display:inline-block;margin-top:6px;background:#f5b301;color:#0a0f1a;padding:6px 14px;border-radius:6px;font-weight:800;text-decoration:none">📥 Descargar plantilla GIC</a>
+      </li>
+      <li>El campo de al lado debe mostrar <code>ListadoPorDefecto</code> (o el nombre del archivo cargado). Pulsa <b>FICHERO</b> y guarda el CSV en tu ordenador.</li>
+      <li>Vuelve a MediCar Plus, abre <b>📱 Avisos SMS</b> y sube el CSV. La plantilla genera exactamente las 7 columnas que MediCar Plus espera:
+        <br><code style="color:#334155;background:#f8fafc;padding:4px 8px;border-radius:4px;font-size:12px">Numero · Nombre · Apellido1 · Apellido2 · Movil · Telefono · FechaRevision</code>
+      </li>
+    </ol>
+    <div class="tip">La plantilla es un fichero <code>.lst</code> propio del programa GIC. Solo hay que cargarla <b>una vez</b>: el GIC la recordará para futuras exportaciones.</div>
+  </div>
+
   <h2>📤 Crear una campaña</h2>
   <div class="step">
     <ol>

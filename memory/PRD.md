@@ -303,3 +303,42 @@ Objectiu: quan un client nou importa el seu CSV, l'app ha d'auto-detectar les se
 **Data-testid afegit**: `sup-tab-manual`.
 
 **Verificació**: Playwright detecta els 4 botons (`sup-tab-manual/bug/remote/phone`); interceptant `window.open` durant el clic al Manual retorna la URL esperada `https://<host>/manual-usuari.html`.
+
+
+## Session Feb 24, 2026 (Follow-up · STAT_ALIAS gating + GIC template)
+
+### Fix crític · STAT_ALIAS només per al Master Owner
+Feedback del propietari: "cada usuari li variaran les autoescoles, ho ha de detectar sol". El mapa hardcoded `STAT_ALIAS` (autoescoles del centre CEMPLA CB de Marc: DAINA, MABEL, M-2, MOLIST, TRÀFIC…) contaminaria les detecions d'altres clients comercials.
+
+**Canvi** (`/app/frontend/public/v2.html`):
+- `canonicalName(raw)` ara detecta si l'usuari és MASTER via `lic.type==='MASTER'` o `lic.license_key===LIC.MASTER_KEY`; només aplica `STAT_ALIAS` en aquest cas.
+- La detecció de `newRaws` també respecta aquest gate (per clients no-master, un codi que coincideixi amb `STAT_ALIAS` es marca com nou i entra al modal d'onboarding).
+- `applyImport` reagrupa `sums` amb la mateixa lògica: aliases del client > STAT_ALIAS (només master) > raw.
+
+**Verificació E2E**:
+- Client comercial (`type:'PREMIUM'`, licensa no-master): CSV amb `DAINA;5 · MABEL;8 · TRAFIC;12 · AUTOESCOLA_NOVA;3` → modal mostra els 4 codis (STAT_ALIAS ignorat). ✅
+- Master (`type:'MASTER'`, licensa `MB-MASTER-...`): mateix CSV → modal mostra només `AUTOESCOLA_NOVA` (els altres resolts per STAT_ALIAS). ✅
+
+### Plantilla GIC · Descàrrega + guia d'exportació SMS
+El programa GIC exporta el llistat de renovacions via <b>Clientes a Revisar</b> aplicant una plantilla `.lst` que defineix les 7 columnes que MediCar Plus espera: `Numero · Nombre · Apellido1 · Apellido2 · Movil · Telefono · FechaRevision`. Fitxer proveït per l'usuari: `F_revision_con_telefono_y_movil.lst` (4898 bytes).
+
+**Canvis**:
+1. Plantilla guardada a `/app/frontend/public/downloads/gic-templates/F_revision_con_telefono_y_movil.lst` (accessible via GET `/downloads/gic-templates/F_revision_con_telefono_y_movil.lst`).
+2. `v2.html · renderSmsNew()`: afegida secció col·lapsable `<details data-testid="sms-gic-help">` amb els 7 passos numerats (obrir GIC → Clientes a Revisar → dates → Selección → Salida=Listados → carpeta 📂 → carrega plantilla → FICHERO) i botó daurat de descàrrega `data-testid="sms-gic-tpl-download"`.
+3. `manual-usuari.html`: nova secció `🖨️ Exportar el listado desde el programa GIC` dins la pestanya SMS amb els mateixos passos i el mateix botó de descàrrega.
+4. `guia-client-installacio.html · Pas 7`: callout groc destacat "🖨️ Pas previ · Exportar el llistat des del programa GIC" com a introducció del mòdul SMS.
+
+**Verificació backend** (POST `/api/sms/preview` amb el CSV real de l'usuari `SMS CLIENTS JUNY.csv`, 285 files):
+- ✅ 248 vàlids (mòbils normalitzats: espais, punts i guions es netegen bé — `"686 03 95 86"` → `686039586`, `"93-8889301"` → correctament rebutjat com a fix).
+- ✅ 31 invàlids (fixes que comencen per 9 correctament detectats).
+- ✅ 6 duplicats identificats (per `mobile` normalitzat, no per `name`).
+- ✅ UTF-8-sig BOM manejat correctament (`errors='replace'`).
+- ✅ Delimitador `;` auto-detectat via `csv.Sniffer`.
+
+**Data-testids afegits**: `sms-gic-help`, `sms-gic-tpl-download`.
+
+**Fitxers modificats**:
+- `/app/frontend/public/v2.html` (canonicalName gate, applyImport gate, renderSmsNew ampliat)
+- `/app/frontend/public/manual-usuari.html` (secció exportació GIC dins SMS)
+- `/app/frontend/public/guia-client-installacio.html` (callout Pas 7)
+- `/app/frontend/public/downloads/gic-templates/F_revision_con_telefono_y_movil.lst` (nou fitxer)

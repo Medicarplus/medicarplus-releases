@@ -1355,7 +1355,19 @@ function openStats(initialSection){
     'TERCOL':'TERÇOL','TERÇOL':'TERÇOL',
     'A.E.TONA':'A.E.TONA','TONA':'A.E.TONA'
   };
-  const canonicalName=raw=>{const s=String(raw||'').trim().toUpperCase().replace(/\s+/g,' ');const clientMap=loadStatsAliases();if(clientMap[s])return clientMap[s];if(STAT_ALIAS[s])return STAT_ALIAS[s];return s};
+  const canonicalName=raw=>{
+    const s=String(raw||'').trim().toUpperCase().replace(/\s+/g,' ');
+    const clientMap=loadStatsAliases();
+    if(clientMap[s])return clientMap[s];
+    // STAT_ALIAS (Marc Brugulat · CEMPLA CB) només s'aplica al propietari MASTER.
+    // Per a qualsevol altre client comercial, la detecció és 100% adaptativa via clientMap.
+    try{
+      const lic=JSON.parse(localStorage.getItem('caja.license.v3')||'{}');
+      const isMasterOwner=((lic.type||'').toUpperCase()==='MASTER') || ((lic.license_key||'').toUpperCase()===(LIC&&LIC.MASTER_KEY||'').toUpperCase());
+      if(isMasterOwner && STAT_ALIAS[s])return STAT_ALIAS[s];
+    }catch(e){}
+    return s;
+  };
   back.querySelector('#stImport').onclick=()=>$('#stFile').click();
   $('#stFile').onchange=async ev=>{
     const f=ev.target.files[0];if(!f)return;ev.target.value='';
@@ -1379,11 +1391,16 @@ function openStats(initialSection){
     }
     if(!Object.keys(rawCounts).length){toast('El CSV no conté cap fila vàlida');return}
     const st=loadStats();
-    // Detectar codis "nous" (adaptatius): raw no mapejat per STAT_ALIAS ni per aliases del client, i el seu canònic no és a la llista de l'usuari.
+    // Detectar codis "nous" (adaptatius): raw no mapejat per aliases del client (i, si és Master, tampoc per STAT_ALIAS), i el seu canònic no és a la llista de l'usuari.
     const clientMap=loadStatsAliases();
+    let isMasterOwner=false;
+    try{
+      const lic=JSON.parse(localStorage.getItem('caja.license.v3')||'{}');
+      isMasterOwner=((lic.type||'').toUpperCase()==='MASTER') || ((lic.license_key||'').toUpperCase()===(LIC&&LIC.MASTER_KEY||'').toUpperCase());
+    }catch(e){}
     const newRaws=Object.keys(rawCounts).filter(rawU=>{
-      if(STAT_ALIAS[rawU])return false;
       if(clientMap[rawU])return false;
+      if(isMasterOwner && STAT_ALIAS[rawU])return false;
       // El nom canònic tal com quedaria (raw normalitzat) no és present a la llista actual
       const canon=canonicalName(rawU);
       return !st.autoescoles.includes(canon);
@@ -1393,7 +1410,10 @@ function openStats(initialSection){
       const cm=loadStatsAliases();
       const sums={};
       for(const [rawU,n] of Object.entries(rawCounts)){
-        const canon=(cm[rawU]||STAT_ALIAS[rawU]||rawU);
+        let canon;
+        if(cm[rawU]) canon=cm[rawU];
+        else if(isMasterOwner && STAT_ALIAS[rawU]) canon=STAT_ALIAS[rawU];
+        else canon=rawU;
         sums[canon]=(sums[canon]||0)+n;
       }
       // Afegir autoescoles que encara no siguin a la llista
@@ -5340,8 +5360,26 @@ function openSmsModal(){
 
   function renderSmsNew(){
     const body=document.getElementById('smsBody');
+    const backendUrl=(typeof getApiBase==='function')?getApiBase():'';
+    const tplUrl=backendUrl+'/downloads/gic-templates/F_revision_con_telefono_y_movil.lst';
     body.innerHTML=`
       <div style="background:#0e1a2e;padding:24px;border-radius:12px;border:1px solid #1e293b">
+        <details style="background:#0b1220;border:1px solid #1e40af;border-radius:10px;padding:12px 14px;margin-bottom:16px" data-testid="sms-gic-help">
+          <summary style="cursor:pointer;font-weight:800;color:#93c5fd;font-size:13px;letter-spacing:.3px">🖨️ ${isCA?'Com exportar el CSV des del GIC (Clientes a Revisar)':'Cómo exportar el CSV desde el GIC (Clientes a Revisar)'}</summary>
+          <ol style="margin:12px 0 4px 20px;padding:0;color:#cbd5e1;font-size:12.5px;line-height:1.7">
+            <li>${isCA?'Al programa GIC obre la pantalla':'En el programa GIC abre la pantalla'} <b>Clientes a Revisar</b>.</li>
+            <li>${isCA?'Introdueix':'Introduce'} <b>Fecha Inicial</b> ${isCA?'i':'y'} <b>Fecha Final</b> ${isCA?'del rang de revisions que vols enviar':'del rango de revisiones a enviar'}.</li>
+            <li>${isCA?'A "Selección de Ficheros" marca':'En "Selección de Ficheros" marca'} <b>Conducción</b>${isCA?' (i qualsevol altre que necessitis)':' (y cualquier otro que necesites)'}.</li>
+            <li>${isCA?'A "Salida" tria':'En "Salida" elige'} <b>Listados</b>.</li>
+            <li>${isCA?'Fes clic al botó de la <b>carpeta 📂</b> (a la dreta de "Salida") i carrega la plantilla':'Haz clic en el botón de la <b>carpeta 📂</b> (a la derecha de "Salida") y carga la plantilla'} <code style="background:#0f172a;color:#f5b301;padding:2px 6px;border-radius:4px">F_revision_con_telefono_y_movil.lst</code>.<br>
+              <a href="${tplUrl}" download="F_revision_con_telefono_y_movil.lst" style="display:inline-block;margin-top:6px;background:#f5b301;color:#0a0f1a;padding:5px 12px;border-radius:6px;font-weight:800;text-decoration:none;font-size:12px" data-testid="sms-gic-tpl-download">📥 ${isCA?'Descarregar plantilla GIC':'Descargar plantilla GIC'}</a>
+            </li>
+            <li>${isCA?'El nom del camp al costat mostrarà':'El nombre del campo al lado mostrará'} <code>ListadoPorDefecto</code> ${isCA?'o el nom del fitxer que carreguis. Prem':'o el nombre del fichero que cargues. Pulsa'} <b>FICHERO</b> ${isCA?'i desa el CSV a l\'ordinador':'y guarda el CSV en el ordenador'}.</li>
+            <li>${isCA?'Torna aquí i puja el CSV al camp de sota. La plantilla exporta exactament les 7 columnes que MediCar Plus espera:':'Vuelve aquí y sube el CSV al campo de abajo. La plantilla exporta exactamente las 7 columnas que MediCar Plus espera:'}<br>
+              <code style="color:#a5b4fc">Numero · Nombre · Apellido1 · Apellido2 · Movil · Telefono · FechaRevision</code>
+            </li>
+          </ol>
+        </details>
         <div style="font-size:14px;color:#22c55e;text-transform:uppercase;letter-spacing:.5px;font-weight:800;margin-bottom:6px">📥 ${isCA?'Pas 1 · Puja el CSV de GIC':'Paso 1 · Sube el CSV de GIC'}</div>
         <div style="color:#94a3b8;font-size:13px;margin-bottom:16px">${isCA?'El CSV ha de tenir les columnes: Nombre, Apellido1, Apellido2, Movil, Telefono, FechaRevision':'El CSV debe tener las columnas: Nombre, Apellido1, Apellido2, Movil, Telefono, FechaRevision'}</div>
         <input type="file" id="smsCsvFile" accept=".csv" style="background:#0f172a;color:#e2e8f0;border:1px dashed #475569;border-radius:8px;padding:16px;width:100%;font-family:inherit;cursor:pointer" data-testid="sms-csv-file">
