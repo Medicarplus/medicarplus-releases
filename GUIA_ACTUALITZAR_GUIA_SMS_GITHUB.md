@@ -1,75 +1,114 @@
-# 📤 Actualitzar la Guia SMS a GitHub Pages · 3 minuts
+# 📤 Pujar la guia amb selector d'idioma al GitHub Pages · 4 minuts
 
-**Situació:** Has actualitzat el Pas 7 SMS amb la nova plantilla GIC (`F_revision_con_telefono_y_movil.lst`) + captura del programa GIC. Ara cal pujar-ho a `medicarplus.es/guia-client-installacio.html`.
+**Situació actual**: Has actualitzat la guia d'instal·lació del client amb:
+- Traducció al **castellà** (idioma per defecte)
+- Selector d'idioma amb bandera d'Espanya 🇪🇸 i **senyera catalana**
+- Pas 7 SMS amb la plantilla GIC (`.lst`) i botó de descàrrega
 
-**Bona notícia:** només cal pujar **1 sol fitxer HTML**. Els assets (plantilla `.lst` i captura PNG) es serveixen ja des d'Emergent amb URLs absolutes, així que **no** cal pujar cap carpeta `downloads/gic-templates/` al GitHub.
+Ara cal reflectir això al teu domini `medicarplus.es` (hostat a GitHub Pages).
 
 ---
 
-## 🔹 PAS 1 · Descarregar la guia actualitzada (30 s)
+## ❓ Cal esborrar alguna cosa de GitHub?
 
-1. Obre aquesta URL al navegador:  
-   **https://project-helper-47.emergent.host/guia-client-installacio.html**
+**NO cal esborrar res**. Al repo `Medicarplus/medicarplus.es` ja hi ha un fitxer `guia-client-installacio.html` de la versió anterior — quan pugis el nou amb el **mateix nom**, GitHub el **sobreescriu automàticament**.
 
-2. Prem `Ctrl + F5` (força recàrrega sense cache — MOLT important).
+El que sí és nou: `guia-client-installacio-ca.html` (la versió catalana) — aquest fitxer no existeix encara al repo, així que s'afegirà.
 
-3. Prem `Ctrl + S` per guardar.
+**Resum**: només has de **PUJAR 2 fitxers**. Cap acció de esborrat.
 
-4. Al diàleg "Guardar como":
+---
+
+## 🔹 PAS 1 · Descarregar els 2 fitxers al PC (1 minut)
+
+Obre aquestes 2 URLs al navegador, una per una:
+
+### Fitxer 1 · Guia en castellà (per defecte)
+
+**URL:** https://project-helper-47.emergent.host/guia-client-installacio.html
+
+1. Prem `Ctrl + F5` (força recàrrega sense cache).
+2. Prem `Ctrl + S` (guardar).
+3. Al diàleg "Guardar como":
    - **Nom del fitxer**: `guia-client-installacio.html` (deixa'l com està).
-   - **Tipus**: "Página web, sólo HTML" (o "Webpage, HTML Only") — ⚠️ NO triïs "Página web, completa".
+   - **Tipus**: **"Página web, sólo HTML"** ⚠️ (NO triïs "Página web, completa").
    - **Ubicació**: Escritori.
 
-5. Es guardarà 1 sol fitxer `guia-client-installacio.html` (~30 KB).
+### Fitxer 2 · Guia en català (nou)
+
+**URL:** https://project-helper-47.emergent.host/guia-client-installacio-ca.html
+
+1. Prem `Ctrl + F5`.
+2. Prem `Ctrl + S`.
+3. Al diàleg "Guardar como":
+   - **Nom del fitxer**: `guia-client-installacio-ca.html` (deixa'l com està).
+   - **Tipus**: **"Página web, sólo HTML"**.
+   - **Ubicació**: Escritori.
+
+Ara has de tenir a l'Escritori:
+- ✅ `guia-client-installacio.html` (~30 KB)
+- ✅ `guia-client-installacio-ca.html` (~30 KB)
 
 ---
 
-## 🔹 PAS 2 · Pujar-lo al repositori GitHub Pages (2 min)
+## 🔹 PAS 2 · Pujar-los al GitHub (2 minuts)
 
 1. Vés a: **https://github.com/Medicarplus/medicarplus.es**
 
-2. Busca el fitxer `guia-client-installacio.html` al llistat de fitxers del repo.
+2. Clica el botó **"Add file"** (a dalt a la dreta, al costat verd de "Code") → **"Upload files"**.
 
-3. Clica-hi a sobre → et surt la vista prèvia del contingut.
+3. Arrossega els **2 fitxers de l'Escritori** al requadre "Drag files here" (pots pujar-los alhora, GitHub accepta múltiples).
 
-4. Al capdamunt de la vista prèvia, clica la icona **✏️ Edit** (llapis) o **⋯ → Delete this file**.
-   
-   > **Recomanat:** No et compliquis, esborra i puja de nou.
-   > 
-   > 4a. Clica **⋯** (tres punts, dalt a la dreta) → **Delete file**.  
-   > 4b. Confirma amb "Commit changes" (missatge: `Delete old guide`).
-   > 4c. Torna a l'arrel del repositori.
-   > 4d. Clica **Add file → Upload files**.  
-   > 4e. Arrossega el `guia-client-installacio.html` de l'Escritori.  
-   > 4f. Al camp "Commit changes", posa: `Update guia: nou pas 7 SMS amb plantilla GIC`.  
-   > 4g. Clica **Commit changes**.
+4. Al camp inferior "**Commit changes**":
+   - Missatge suggerit: `Actualitzar guia + selector idioma castellà/català`.
+   - Deixa marcat "Commit directly to the main branch".
 
-5. Espera 1-2 minuts perquè GitHub Pages processi el desplegament.
+5. Clica el botó verd **"Commit changes"**.
+
+6. Espera 1-2 minuts perquè GitHub Pages processi el desplegament.
+
+> 💡 **Nota**: Com que `guia-client-installacio.html` ja existia al repo, GitHub l'has substituït automàticament amb la versió nova. `guia-client-installacio-ca.html` s'ha afegit com a fitxer nou.
 
 ---
 
-## 🔹 PAS 3 · Verificar (30 s)
+## 🔹 PAS 3 · Verificar (30 segons)
 
-1. Obre en incògnit (`Ctrl+Shift+N` a Chrome): **https://medicarplus.es/guia-client-installacio.html**
+Obre en pestanya d'incògnit (`Ctrl+Shift+N` a Chrome) aquestes 2 URLs:
 
-2. Cerca el "Pas 7 · Avisos SMS" i comprova que hi apareixi el callout groc:
-   
-   > 🖨️ **Pas previ · Exportar el llistat des del programa GIC**  
-   > [passos numerats + botó groc "📥 Descarregar plantilla GIC"]
+### ✅ Verificació 1 · Castellà per defecte
+**URL:** https://medicarplus.es/guia-client-installacio.html
 
-3. Clica el botó **📥 Descarregar plantilla GIC** i verifica que descarrega el fitxer `.lst` de ~5 KB.
+Comprova:
+- El títol diu **"Cómo instalar MediCar Plus"** (en castellà).
+- A dalt a la dreta apareix el selector: pill daurada 🇪🇸 **Castellano** i botó blanc [senyera] **Català**.
+- El Pas 7 té el callout groc "🖨️ Paso previo · Exportar el listado desde el programa GIC" amb el botó 📥 Descargar plantilla GIC.
 
-Si tot va bé: ✅ **Fet!** Els teus clients ja veuran la nova guia amb la plantilla GIC.
+### ✅ Verificació 2 · Català
+**URL:** https://medicarplus.es/guia-client-installacio-ca.html
+
+Comprova:
+- El títol diu **"Com instal·lar MediCar Plus"** (en català).
+- A dalt a la dreta: botó blanc 🇪🇸 **Castellano** i pill daurada [senyera] **Català**.
+
+### ✅ Verificació 3 · El botó del selector porta a l'altra versió
+
+- A la pàgina castellana, clica **[senyera] Català** → ha de portar a `/guia-client-installacio-ca.html`.
+- A la pàgina catalana, clica **🇪🇸 Castellano** → ha de portar a `/guia-client-installacio.html`.
+
+Si tots 3 punts passen: 🎉 **Fet!** Els teus clients ja poden triar l'idioma.
 
 ---
 
 ## ⚠️ Problemes comuns
 
 **"No apareixen els canvis a medicarplus.es"**  
-GitHub Pages triga 1-2 min a processar. Espera i torna a provar en incògnit.
+GitHub Pages triga 1-2 minuts a desplegar. Espera i torna a provar en incògnit (les vegades sortiran del cache).
 
-**"El botó de descàrrega no funciona"**  
-Comprova que la URL del botó apunti a `https://project-helper-47.emergent.host/downloads/gic-templates/F_revision_con_telefono_y_movil.lst`. Si diu `downloads/gic-templates/...` (sense el domini d'Emergent), tornes a descarregar el fitxer del preview i el pugues altra vegada.
+**"Em surt la versió antiga sense selector"**  
+Prem `Ctrl+Shift+R` a la pàgina per forçar recàrrega sense cache. Si continua igual, potser has guardat "Página web, completa" en lloc de "sólo HTML" — repeteix el PAS 1.
 
-**"El fitxer descarregat és molt gran"**  
-Vas triar "Página web, completa" en lloc de "sólo HTML". Repeteix el PAS 1 assegurant-te de triar només HTML.
+**"El botó de descàrrega de la plantilla GIC no funciona"**  
+Verifica que la URL apunti a `https://project-helper-47.emergent.host/...` (no relativa). Si no, tornes a descarregar del preview i puja de nou.
+
+**"Quan clico Català em surt 404"**  
+No has pujat el fitxer `guia-client-installacio-ca.html` (fitxer 2 del PAS 1). Torna-hi.
