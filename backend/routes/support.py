@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from email.message import EmailMessage
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Header, Request, BackgroundTasks
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, field_validator
 
 from services.discord_notify import (
     send_discord_notification,
@@ -54,6 +54,18 @@ class RemoteAssistPayload(BaseModel):
     app_version: Optional[str] = ""
     license_key: Optional[str] = ""
     install_id: Optional[str] = ""
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def _empty_email_to_none(cls, v):
+        # El frontend envia "email":"" quan el client no vol donar email.
+        # Pydantic EmailStr rebutja cadena buida ("no @-sign"), així que la
+        # convertim a None per acceptar el camp com a opcional real.
+        if v is None:
+            return None
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
 
 
 def _send_email_smtp(payload: ContactPayload, ticket_id: str) -> tuple[bool, Optional[str]]:

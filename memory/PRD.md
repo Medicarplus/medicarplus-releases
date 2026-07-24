@@ -443,3 +443,18 @@ El programa GIC exporta el llistat de renovacions via <b>Clientes a Revisar</b> 
 - URL absoluta al fitxer HTML apunta a producció (`project-helper-47.emergent.host/downloads/gic-templates/F_revision_con_telefono_y_movil.lst`) → HTTP 200 · 4898 bytes. ✅
 - Callout groc del Pas 7 renderitza correctament amb els 6 passos i el botó daurat "📥 Descarregar plantilla GIC".
 - El botó funcionarà idènticament des de `medicarplus.es/guia-client-installacio.html` (GitHub Pages) i des de `project-helper-47.emergent.host/guia-client-installacio.html`.
+
+
+## Session Feb 24, 2026 (Bug fix P0 · "Asistencia remota" · Error enviando per email buit)
+
+**Bug reportat**: Al Support Hub → "Asistencia remota", omplir només telèfon + descripció (sense email) mostrava "⚠️ Error enviando" i no arribava res a Discord. Present tant a preview com a **producció**.
+
+**RCA**: `RemoteAssistPayload.email: Optional[EmailStr] = None` — Pydantic v2 rebutja `""` (cadena buida) enviada pel frontend amb "value is not a valid email address: An email address must have an @-sign" → retornava 422 → el frontend mostrava toast d'error genèric.
+
+**Fix** (`/app/backend/routes/support.py`): afegit `@field_validator("email", mode="before")` que converteix `""` o whitespace-only a `None` abans que Pydantic validi el format. Emails vàlids no s'alteren.
+
+**Verificat**: 
+- Payload amb `email:""` → `{ok:true, discord_sent:true}` ✅
+- Payload amb email vàlid → continua funcionant ✅
+
+**⚠️ IMPORTANT**: Bug present a producció. Cal **redesplegar** perquè els clients puguin sol·licitar assistència remota sense email.
