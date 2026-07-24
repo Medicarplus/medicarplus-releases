@@ -429,3 +429,17 @@ El programa GIC exporta el llistat de renovacions via <b>Clientes a Revisar</b> 
 **Fix** (`/app/frontend/public/v2.html · openGicHelpModal`): sobreescrit `back.style.zIndex='100000'` (10× per sobre del SMS modal). Verificat via `elementFromPoint()` — el punt central de la captura ara pertany al modal d'ajuda. ✅
 
 **Verifactu ajornat**: El propietari ha demanat deixar la configuració Verifactu pel futur (no sap encara si obrirà empresa o farà autònom). Reverits els canvis a `/app/backend/routes/payments.py` — es manté només el `tax_id_collection={"enabled": True}` que ja hi era abans (permet als clients introduir el seu NIF/CIF al checkout, apareix a les factures Stripe generades).
+
+
+## Session Feb 24, 2026 (Follow-up · Guia GitHub Pages actualitzada · només 1 fitxer)
+
+**Petició del propietari**: Actualitzar la guia de client al GitHub Pages (`medicarplus.es/guia-client-installacio.html`) perquè inclogui el nou pas 7 SMS amb la plantilla GIC.
+
+**Canvis**:
+1. `/app/frontend/public/guia-client-installacio.html · L196`: rutes de descàrrega canviades a URLs **absolutes** (`https://project-helper-47.emergent.host/downloads/gic-templates/F_revision_con_telefono_y_movil.lst`) → així només cal pujar 1 fitxer HTML al GitHub, sense necessitat de replicar la carpeta `downloads/gic-templates/`.
+2. Creat `/app/GUIA_ACTUALITZAR_GUIA_SMS_GITHUB.md` amb passos pas-a-pas (3 min): descarregar del preview → pujar al repo `Medicarplus/medicarplus.es` → verificar a `medicarplus.es/guia-client-installacio.html`. Inclou troubleshooting per problemes comuns (cache, ruta absoluta, tipus de guardat HTML).
+
+**Verificació**:
+- URL absoluta al fitxer HTML apunta a producció (`project-helper-47.emergent.host/downloads/gic-templates/F_revision_con_telefono_y_movil.lst`) → HTTP 200 · 4898 bytes. ✅
+- Callout groc del Pas 7 renderitza correctament amb els 6 passos i el botó daurat "📥 Descarregar plantilla GIC".
+- El botó funcionarà idènticament des de `medicarplus.es/guia-client-installacio.html` (GitHub Pages) i des de `project-helper-47.emergent.host/guia-client-installacio.html`.
