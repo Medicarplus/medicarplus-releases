@@ -342,3 +342,57 @@ El programa GIC exporta el llistat de renovacions via <b>Clientes a Revisar</b> 
 - `/app/frontend/public/manual-usuari.html` (secció exportació GIC dins SMS)
 - `/app/frontend/public/guia-client-installacio.html` (callout Pas 7)
 - `/app/frontend/public/downloads/gic-templates/F_revision_con_telefono_y_movil.lst` (nou fitxer)
+
+
+## Session Feb 24, 2026 (Follow-up 2 · GIC help card visibility + program pill)
+
+**Feedback del propietari**: (1) "on troben la plantilla que han d'afegir aquí?" — l'ajuda GIC quedava amagada dins un `<details>` col·lapsat; (2) volia que la captura de la pantalla "Clientes a Revisar" fos visible directament dins l'app perquè el client sàpiga on carregar la plantilla; (3) "de moment només GIC, però podríem afegir més programes en el futur i que el client escollís".
+
+**Canvis** (`/app/frontend/public/v2.html · renderSmsNew`):
+1. Ajuda GIC ja **no és col·lapsable** — apareix sempre visible amb marc daurat destacat (`border:2px solid #f5b301`, gradient de fons daurat-marronós, ombra), com a primer element del pas de pujar CSV.
+2. **Captura del GIC incrustada**: `gic-clientes-a-revisar.png` (58 KB) guardada a `/downloads/gic-templates/` i mostrada dins la targeta amb `cursor:zoom-in` (clic → obre en pestanya nova). El cercle vermell del propietari senyala exactament on carregar el fitxer `.lst`.
+3. **Botó de descàrrega prominent**: `📥 Descargar plantilla` en groc gran (13px, padding 10×18, ombra) al capçal de la targeta.
+4. **Guia de 5 passos** al costat de la captura (grid 2 columnes) amb els codes `ListadoPorDefecto` i `F_revision_con_telefono_y_movil.lst` destacats.
+5. **Callout verd inferior**: "💡 Només cal fer-ho una vegada" + les 7 columnes exportades (`Numero · Nombre · Apellido1 · Apellido2 · Movil · Telefono · FechaRevision`).
+6. **Etiqueta d'extensibilitat**: pill `🖥️ Programa usado: GIC` amb text italic petit `(pronto: más programas)` al capçal — deixa el punt d'ancoratge visual per convertir-ho en un `<select>` desplegable quan es donin d'alta més programes (Dr. Sanitas, etc.).
+
+**Canvis** (`/app/frontend/public/manual-usuari.html · pestanya SMS`):
+- Mateixa captura `gic-clientes-a-revisar.png` incrustada abans de la llista numerada de 7 passos.
+- Botó de descàrrega en callout groc destacat.
+
+**Verificació** (Playwright):
+- `data-testid="sms-gic-program-pill"` mostra "🖥️ Programa usado: GIC". ✅
+- `data-testid="sms-gic-tpl-download"` href = `/downloads/gic-templates/F_revision_con_telefono_y_movil.lst`. ✅
+- `data-testid="sms-gic-screenshot-link"` embedded img src = `/downloads/gic-templates/gic-clientes-a-revisar.png` (HTTP 200 · 58329 bytes). ✅
+- `data-testid="sms-gic-help"` bordat daurat (`rgb(245,179,1)`) present. ✅
+- Acorn parse: OK · 0 errors JS.
+
+**Backlog futur** (quan calgui):
+- Convertir el pill `Programa: GIC` en `<select>` amb opcions: `GIC` (actual), `Dr.Sanitas`, `Clíni-K`, `Altres`. Cada opció renderitza el seu propi bloc d'ajuda + plantilla + captura. Estructura de dades suggerida: `{ gic: { name, tpl_url, screenshot_url, steps: [...] }, ... }` a `LIC.RENEWAL_PROGRAMS`.
+- Detecció automàtica al primer CSV import (matching de columnes conegudes) per pre-seleccionar el programa.
+
+
+## Session Feb 24, 2026 (Follow-up 3 · UI compacta + modal d'ajuda GIC · TOT en castellà)
+
+**Feedback del propietari**: "Fes un interrogant dins per explicar què s'ha de fer amb aquesta plantilla i on copiar-la mostrant la foto — pel client ha de ser fàcil, no vull trucades cada 2×3. I tot en castellà."
+
+**Canvis** (`/app/frontend/public/v2.html · renderSmsNew` + nova `openGicHelpModal`):
+1. **Ajuda GIC compactada en una barra horitzontal** amb 3 elements: pill `🖥️ Programa: GIC` + botó rodó `❓` (daurat, 38×38) + botó `📥 Descargar plantilla` (groc gran). Ja no ocupa mig modal.
+2. **Nou modal d'ajuda** `openGicHelpModal(tplUrl, imgUrl)`:
+   - Capçalera: `🖨️ Cómo aplicar la plantilla en el programa GIC` + subtítol descriptiu + botó `✕`.
+   - **Captura del GIC amb fons blanc** (`gic-clientes-a-revisar.png`), cursor:zoom-in per obrir-la en pestanya nova. Caption: "👆 El círculo rojo marca **exactamente** dónde tienes que cargar la plantilla".
+   - **Instruccions numerades de 8 passos** (descarregar → obrir GIC → dates → Selección de Ficheros → Salida → carpeta 📂 → FICHERO → pujar CSV).
+   - Callout verd: "💡 Solo hay que hacerlo una vez — cada mes solo cambiar fechas y pulsar FICHERO".
+   - Footer: botó `Cerrar` + botó `📥 Descargar plantilla` gran.
+3. **Localització forçada a castellà**: eliminades totes les cadenes `${isCA ? '...' : '...'}` de la secció GIC. Ara és 100% castellà independentment de l'idioma d'app.
+
+**Data-testids nous**: `sms-gic-help-btn`, `gic-help-close`, `gic-help-screenshot`, `gic-help-cancel`, `gic-help-download`.
+
+**Verificació E2E** (Playwright):
+- Barra compacta: pill = `🖥️ Programa: GIC`, botó `❓` present, botó `📥 Descargar plantilla` present. ✅
+- Clic al `❓` → modal obre correctament amb captura (`imgSrc` correcte, HTTP 200) i botó de descàrrega (`downloadHref` correcte). ✅
+- Clic al `✕` → modal es tanca. ✅
+- Acorn parse: OK · 0 errors JS.
+
+**Fitxers modificats**:
+- `/app/frontend/public/v2.html` (funció `openGicHelpModal` afegida + `renderSmsNew` refactoritzat compacte)

@@ -321,20 +321,26 @@
   <h2>🖨️ Exportar el listado desde el programa GIC</h2>
   <div class="step">
     <p>Para generar el CSV con los clientes que les toca renovar, hay que aplicar una <b>plantilla especial</b> en el GIC (Clientes a Revisar):</p>
+    <div style="background:#fef3c7;border:2px solid #f5b301;border-radius:10px;padding:14px;margin:12px 0;text-align:center">
+      <a href="downloads/gic-templates/F_revision_con_telefono_y_movil.lst" download="F_revision_con_telefono_y_movil.lst" style="display:inline-block;background:#f5b301;color:#0a0f1a;padding:10px 22px;border-radius:8px;font-weight:800;text-decoration:none;font-size:14px;box-shadow:0 3px 8px rgba(245,179,1,.35)">📥 Descargar plantilla GIC (F_revision_con_telefono_y_movil.lst)</a>
+    </div>
+    <p style="margin-top:14px"><b style="color:#0369a1">¿Dónde cargar esta plantilla en el GIC?</b> — En la pantalla <b>Clientes a Revisar</b>, en la zona marcada en rojo de la captura, junto al selector "Salida":</p>
+    <div style="text-align:center;margin:10px 0">
+      <a href="downloads/gic-templates/gic-clientes-a-revisar.png" target="_blank" rel="noopener" title="Clic para ampliar">
+        <img src="downloads/gic-templates/gic-clientes-a-revisar.png" alt="Captura GIC · Clientes a Revisar · Zona plantilla" style="max-width:520px;width:100%;height:auto;border:2px solid #f5b301;border-radius:8px;cursor:zoom-in;background:#fff" />
+      </a>
+      <div style="font-size:11px;color:#64748b;margin-top:4px">🔍 Clic para ampliar</div>
+    </div>
     <ol>
       <li>Abre el GIC → pantalla <b>Clientes a Revisar</b>.</li>
-      <li>Introduce <b>Fecha Inicial</b> y <b>Fecha Final</b> del rango de revisiones a avisar (ej: renovaciones del próximo mes).</li>
-      <li>En <b>"Selección de Ficheros"</b> marca <b>Conducción</b> (y cualquier otro que quieras: Armas, Náutica, Seguridad, etc.).</li>
+      <li>Introduce <b>Fecha Inicial</b> y <b>Fecha Final</b> del rango de revisiones a avisar.</li>
+      <li>En <b>"Selección de Ficheros"</b> marca <b>Conducción</b> (y cualquier otro que quieras).</li>
       <li>En <b>"Salida"</b> elige <b>Listados</b>.</li>
-      <li>Haz clic en el <b>botón de la carpeta 📂</b> (a la derecha de "Salida") y carga la plantilla <code>F_revision_con_telefono_y_movil.lst</code>.
-        <br><a href="downloads/gic-templates/F_revision_con_telefono_y_movil.lst" download="F_revision_con_telefono_y_movil.lst" style="display:inline-block;margin-top:6px;background:#f5b301;color:#0a0f1a;padding:6px 14px;border-radius:6px;font-weight:800;text-decoration:none">📥 Descargar plantilla GIC</a>
-      </li>
-      <li>El campo de al lado debe mostrar <code>ListadoPorDefecto</code> (o el nombre del archivo cargado). Pulsa <b>FICHERO</b> y guarda el CSV en tu ordenador.</li>
-      <li>Vuelve a MediCar Plus, abre <b>📱 Avisos SMS</b> y sube el CSV. La plantilla genera exactamente las 7 columnas que MediCar Plus espera:
-        <br><code style="color:#334155;background:#f8fafc;padding:4px 8px;border-radius:4px;font-size:12px">Numero · Nombre · Apellido1 · Apellido2 · Movil · Telefono · FechaRevision</code>
-      </li>
+      <li>Haz clic en el <b>botón de la carpeta 📂</b> (marcado en rojo arriba) y carga <code>F_revision_con_telefono_y_movil.lst</code>.</li>
+      <li>El campo al lado debe mostrar <code>ListadoPorDefecto</code>. Pulsa <b>FICHERO</b> y guarda el CSV.</li>
+      <li>Vuelve a MediCar Plus → <b>📱 Avisos SMS</b> → sube el CSV. Genera exactamente 7 columnas: <code>Numero · Nombre · Apellido1 · Apellido2 · Movil · Telefono · FechaRevision</code>.</li>
     </ol>
-    <div class="tip">La plantilla es un fichero <code>.lst</code> propio del programa GIC. Solo hay que cargarla <b>una vez</b>: el GIC la recordará para futuras exportaciones.</div>
+    <div class="tip">La plantilla es un fichero <code>.lst</code> propio del GIC. Solo hay que cargarla <b>una vez</b> — el GIC la recordará para futuras exportaciones.</div>
   </div>
 
   <h2>📤 Crear una campaña</h2>
