@@ -94,9 +94,8 @@
           </select>
           <select id="filterActivity" onchange="applyFilters()">
             <option value="">Tota activitat</option>
-            <option value="active">🟢 Actiu (≤3d)</option>
-            <option value="warning">🟡 Poc actiu (4-14d)</option>
-            <option value="inactive">🔴 Inactiu (>14d)</option>
+            <option value="active">🟢 Actiu (≤72h)</option>
+            <option value="inactive">🔴 Inactiu (>72h)</option>
             <option value="never">⚪ Sense connexions</option>
           </select>
         </div>
@@ -190,6 +189,7 @@ function renderStats(){
     else if(p==='MASTER')master++;
   });
   let medUsers=0, byoaUsers=0, totalSMSMes=0, totalEURMes=0;
+  let inactive72h=0, active72h=0;
   Object.values(ENRICHED_CACHE).forEach(e=>{
     if(!e)return;
     const mode = e.sms && e.sms.mode_used;
@@ -200,13 +200,19 @@ function renderStats(){
       totalSMSMes += (cur.sent_count||0);
       totalEURMes += (cur.cost_eur||0);
     }
+    // Activitat (llindar 72h)
+    const dslv = e.activity ? e.activity.days_since_last_verify : null;
+    if(dslv !== null && dslv !== undefined){
+      if(dslv <= 3) active72h++;
+      else inactive72h++;
+    }
   });
   document.getElementById('stats').innerHTML = `
     <div class="stat"><div class="stat-lbl">Total llicències</div><div class="stat-val">${total}</div></div>
     <div class="stat"><div class="stat-lbl">Actives</div><div class="stat-val" style="color:var(--green)">${active}</div></div>
+    <div class="stat"><div class="stat-lbl">🟢 Actius ≤72h · 🔴 Inactius</div><div class="stat-val" style="font-size:18px"><span style="color:var(--green)">${active72h}</span> · <span style="color:var(--red)">${inactive72h}</span></div></div>
     <div class="stat"><div class="stat-lbl">Trials · Std · Prem</div><div class="stat-val" style="font-size:16px">🎁${trial} · 💼${std} · ⭐${prem}${master?' · 👑'+master:''}</div></div>
-    <div class="stat"><div class="stat-lbl">Usuaris MediCar Cloud</div><div class="stat-val" style="color:var(--purple)">${medUsers}</div></div>
-    <div class="stat"><div class="stat-lbl">Usuaris BYOA</div><div class="stat-val" style="color:var(--green)">${byoaUsers}</div></div>
+    <div class="stat"><div class="stat-lbl">Usuaris MediCar · BYOA</div><div class="stat-val" style="font-size:18px"><span style="color:var(--purple)">${medUsers}</span> · <span style="color:var(--green)">${byoaUsers}</span></div></div>
     <div class="stat"><div class="stat-lbl">SMS aquest mes (MediCar)</div><div class="stat-val" style="color:var(--gold)">${totalSMSMes} <span style="font-size:14px;color:#a5b4fc"> · ${totalEURMes.toFixed(2)}€</span></div></div>
   `;
 }
@@ -240,6 +246,15 @@ function applyFilters(){
       if(!e || !e.sms) return smsFilt==='none';
       if(smsFilt!==e.sms.mode_used) return false;
     }
+    // Filtre activitat (llindar 72h = 3 dies)
+    const actFilt = document.getElementById('filterActivity').value;
+    if(actFilt){
+      const en = ENRICHED_CACHE[l.install_id];
+      const dslv = en && en.activity ? en.activity.days_since_last_verify : null;
+      if(actFilt==='never'){ if(dslv !== null && dslv !== undefined) return false; }
+      else if(actFilt==='active'){ if(dslv === null || dslv === undefined || dslv > 3) return false; }
+      else if(actFilt==='inactive'){ if(dslv === null || dslv === undefined || dslv <= 3) return false; }
+    }
     return true;
   });
   document.getElementById('resultCount').textContent = items.length;
@@ -254,19 +269,17 @@ function applyFilters(){
       dl<=30 ? `<span class="mono" style="color:#f59e0b">${dl}d</span>` :
       `<span class="mono" style="color:var(--green)">${dl}d</span>`;
     const en = ENRICHED_CACHE[l.install_id];
-    // 🔥 Activitat recent (última verificació de llicència)
+    // 🔥 Activitat recent (última verificació de llicència) · llindar 72h
     let activityCell = '<span class="mono" style="color:var(--muted)">—</span>';
     if(en && en.activity){
       const dslv = en.activity.days_since_last_verify;
       const cnt = en.activity.verify_count || 0;
       if(dslv === null || dslv === undefined){
-        activityCell = `<span class="mono" style="color:var(--muted)">Sense connexions${cnt?' · '+cnt+'×':''}</span>`;
+        activityCell = `<span class="mono" style="color:var(--muted)">⚪ Sense connexions</span>`;
       } else if(dslv <= 3){
         activityCell = `<span class="mono" style="color:var(--green);font-weight:700">🟢 Fa ${dslv}d${cnt?' · '+cnt+'×':''}</span>`;
-      } else if(dslv <= 14){
-        activityCell = `<span class="mono" style="color:#f59e0b">🟡 Fa ${dslv}d${cnt?' · '+cnt+'×':''}</span>`;
       } else {
-        activityCell = `<span class="mono" style="color:var(--red);font-weight:700">🔴 Fa ${dslv}d · inactiu</span>`;
+        activityCell = `<span class="mono" style="color:var(--red);font-weight:700">🔴 Inactiu · fa ${dslv}d</span>`;
       }
     }
     let smsMode = '<span class="mono" style="color:var(--muted)">—</span>';
