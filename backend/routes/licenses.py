@@ -322,6 +322,18 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
                 plan=doc.get("plan"), expires_at=expires_at,
             )
 
+        # 💡 Retention: registrem l'última vegada que el client va verificar
+        # la seva llicència (= última vegada que va obrir l'app). Útil per
+        # veure clients inactius i contactar-los proactivament.
+        try:
+            await coll.update_one(
+                {"_id": doc["_id"]},
+                {"$set": {"last_verify_at": _now().isoformat()},
+                 "$inc": {"verify_count": 1}},
+            )
+        except Exception:
+            pass  # no bloquejar mai el verify per un error de tracking
+
         # 3.5) HWID lock multi-dispositiu:
         # · Standard/Trial: 1 HWID (hwid_lock)
         # · Premium: fins a 2 HWIDs (hwid_lock + linked_hwids)
@@ -797,9 +809,19 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             sms_mode = "byoa"
         else:
             sms_mode = "none"
-        price = float(os.environ.get("MEDICAR_SMS_PRICE_EUR","0.10")) if "MEDICAR_SMS_PRICE_EUR" in __import__("os").environ else 0.10
+        price = float(os.environ.get("MEDICAR_SMS_TWILIO_COST_EUR", "0") or 0) + float(os.environ.get("MEDICAR_SMS_MARGIN_EUR", "0") or 0)
+        if price <= 0:
+            price = float(os.environ.get("MEDICAR_SMS_PRICE_EUR", "0.10"))
         return {
             "license": lic,
+            "activity": {
+                "last_verify_at": lic.get("last_verify_at"),
+                "verify_count": int(lic.get("verify_count", 0) or 0),
+                "days_since_last_verify": (
+                    (now_dt - _dt.fromisoformat(lic["last_verify_at"].replace("Z","+00:00"))).days
+                    if lic.get("last_verify_at") else None
+                ),
+            },
             "sms": {
                 "mode_used": sms_mode,
                 "byoa_campaigns": byoa_camps,

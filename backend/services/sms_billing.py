@@ -28,8 +28,18 @@ logger = logging.getLogger(__name__)
 
 
 def _price_cents() -> int:
-    """Preu per SMS en cèntims d'euro (Stripe usa cèntims)."""
+    """Preu per SMS en cèntims d'euro.
+    Preu = cost Twilio + marge fix.
+    Fórmula: MEDICAR_SMS_TWILIO_COST_EUR + MEDICAR_SMS_MARGIN_EUR
+    Si canvia el preu de Twilio, actualitza MEDICAR_SMS_TWILIO_COST_EUR i el
+    marge (0,03€ per defecte) s'aplica automàticament.
+    Fallback a MEDICAR_SMS_PRICE_EUR (legacy) si les 2 noves no existeixen."""
     try:
+        cost_eur = float(os.environ.get("MEDICAR_SMS_TWILIO_COST_EUR", "").strip() or "0")
+        margin_eur = float(os.environ.get("MEDICAR_SMS_MARGIN_EUR", "").strip() or "0")
+        if cost_eur > 0 or margin_eur > 0:
+            return int(round((cost_eur + margin_eur) * 100))
+        # Fallback legacy
         return int(round(float(os.environ.get("MEDICAR_SMS_PRICE_EUR", "0.10")) * 100))
     except Exception:
         return 10

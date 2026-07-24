@@ -123,6 +123,19 @@ def _extract_creds(creds: Optional[dict]) -> Optional[tuple]:
     return None
 
 
+def _get_sms_price_eur() -> float:
+    """Preu per SMS a facturar al client = cost Twilio + marge.
+    Vars: MEDICAR_SMS_TWILIO_COST_EUR + MEDICAR_SMS_MARGIN_EUR (fallback: MEDICAR_SMS_PRICE_EUR)"""
+    try:
+        cost = float(os.environ.get("MEDICAR_SMS_TWILIO_COST_EUR", "").strip() or "0")
+        margin = float(os.environ.get("MEDICAR_SMS_MARGIN_EUR", "").strip() or "0")
+        if cost > 0 or margin > 0:
+            return round(cost + margin, 4)
+        return _get_sms_price_eur()
+    except Exception:
+        return 0.10
+
+
 def _sanitize_alpha_sender(s: str) -> str:
     """Twilio Alphanumeric Sender ID: màxim 11 caràcters, alfanumèric,
     admet lletres i dígits. Espais/accents fora."""
@@ -350,12 +363,12 @@ def build_router(db):
         el seu propi consum SMS mode 'medicar' del mes actual + estimació de cost.
         NO revela dades d'altres clients."""
         if not install_id:
-            return {"install_id":"","period":"","sent_count":0,"cost_eur":0.0,"price_per_sms_eur":float(os.environ.get("MEDICAR_SMS_PRICE_EUR","0.10"))}
+            return {"install_id":"","period":"","sent_count":0,"cost_eur":0.0,"price_per_sms_eur":_get_sms_price_eur()}
         now_dt = datetime.now(timezone.utc)
         period = f"{now_dt.year:04d}-{now_dt.month:02d}"
         doc = await db.sms_usage_medicar.find_one({"install_id": install_id, "period": period})
         sent = int((doc or {}).get("sent_count", 0) or 0)
-        price = float(os.environ.get("MEDICAR_SMS_PRICE_EUR","0.10"))
+        price = _get_sms_price_eur()
         return {
             "install_id": install_id,
             "period": period,
@@ -373,7 +386,7 @@ def build_router(db):
         """
         return {
             "available": _has_twilio(),
-            "price_per_sms_eur": float(os.environ.get("MEDICAR_SMS_PRICE_EUR", "0.10")),
+            "price_per_sms_eur": _get_sms_price_eur(),
         }
 
     @router.get("/medicar-usage")
@@ -393,7 +406,7 @@ def build_router(db):
             query["period"] = period
         cursor = db.sms_usage_medicar.find(query).sort("period", -1)
         items = [doc async for doc in cursor]
-        price = float(os.environ.get("MEDICAR_SMS_PRICE_EUR", "0.10"))
+        price = _get_sms_price_eur()
         for it in items:
             it["_id"] = str(it.get("_id", ""))
             it["cost_estimated_eur"] = round(it.get("sent_count", 0) * price, 2)
