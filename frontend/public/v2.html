@@ -1042,9 +1042,37 @@ const STATS_KEY='caja.stats.v1';
 const STATS_ALIAS_KEY='caja.stats.aliases.v1'; // {RAW_CODE_UPPER: 'Nom canònic client'}
 function loadStatsAliases(){try{return JSON.parse(localStorage.getItem(STATS_ALIAS_KEY)||'{}')||{}}catch(e){return{}}}
 function saveStatsAliases(m){try{localStorage.setItem(STATS_ALIAS_KEY,JSON.stringify(m||{}))}catch(e){}}
-// Auto-seed one-time: dades estadístiques Gener–Maig 2026 (importació automàtica única)
+// Auto-seed one-time: dades estadístiques Gener–Maig 2026 · NOMÉS pel Master Owner (Marc Brugulat)
+// 🚨 IMPORTANT: aquesta data és privada del propietari. Els clients comercials mai
+// han de rebre autoescoles ni volums d'un altre centre. La detecció es fa via
+// license.type==='MASTER' o license_key===LIC.MASTER_KEY (mateix patró que STAT_ALIAS).
 (function seedStats2026(){
   try{
+    // Detecta si l'usuari actual és Master. Sense llicència Master → sortim (no injecta res).
+    // NOTA: aquest IIFE s'executa abans que la constant LIC estigui definida (línia ~7178).
+    // Per això hardcodejem el master key. Ha de coincidir amb LIC.MASTER_KEY.
+    const MASTER_KEY_SEED='MB-MASTER-BRUGULAT-2026-OWNER';
+    let isMasterOwner=false;
+    try{
+      const lic=JSON.parse(localStorage.getItem('caja.license.v3')||'{}');
+      isMasterOwner=((lic.type||'').toUpperCase()==='MASTER') || ((lic.license_key||'').toUpperCase()===MASTER_KEY_SEED);
+    }catch(e){}
+    // 🧹 Cleanup one-shot: si l'usuari NO és Master però ja té injectat el seed antic
+    // (bug fins febrer 2026), i encara conserva EXACTAMENT les dades del Marc sense
+    // afegir res propi, netegem el seu localStorage perquè comenci de zero.
+    if(!isMasterOwner && localStorage.getItem('caja.stats.seed.2026.jan-may')==='1' && localStorage.getItem('caja.stats.pollution.cleaned.v1')!=='1'){
+      try{
+        const cur=JSON.parse(localStorage.getItem(STATS_KEY)||'{}');
+        const d=cur&&cur.data&&cur.data['2026-01'];
+        // Fingerprint de les dades del Marc (valors exactes que no poden coincidir per atzar)
+        if(d && d['A.E.DAINA']===2 && d['TRÀFIC']===278 && d['A.E.MABEL']===14){
+          localStorage.setItem(STATS_KEY, JSON.stringify({autoescoles:[],data:{}}));
+        }
+        localStorage.setItem('caja.stats.pollution.cleaned.v1','1');
+      }catch(e){}
+      return; // en qualsevol cas, no re-injectem res al no-Master
+    }
+    if(!isMasterOwner) return; // no és Master → no injectar seed
     if(localStorage.getItem('caja.stats.seed.2026.jan-may')==='1')return;
     const cur=JSON.parse(localStorage.getItem(STATS_KEY)||'{"autoescoles":[],"data":{}}');
     if(!cur.autoescoles||!cur.autoescoles.length)cur.autoescoles=['A.E.DAINA','A.E.M-2 (CENTELLES)','A.E.MABEL','ROSSELL/VIC','CARRERA','CLAPERA','FERRER','CONNECT','MOLIST CALLDETENES','MOLIST','MONTSENY','OSONA','PARTICULAR','ROSANAS','A.E.TONA','SARRIÓ','TARADELL','TRÀFIC','TUNEU','CANJE','LLUÇANÈS','HOY-VOY','MANLLEU','MUNELL','RECUPERACIÓ','AVANÇA','TERÇOL'];
