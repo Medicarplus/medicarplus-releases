@@ -1091,7 +1091,10 @@ function saveStatsAliases(m){try{localStorage.setItem(STATS_ALIAS_KEY,JSON.strin
   }catch(e){console.warn('seedStats2026',e)}
 })();
 const DEFAULT_AUTOS=[]; // Comercial: llista buida, cada client afegeix les seves autoescoles amb el botó "+ Autoescola"
-const MESOS=['Gener','Febrer','Març','Abril','Maig','Juny','Juliol','Agost','Setembre','Octubre','Novembre','Desembre'];
+const MESOS_CA=['Gener','Febrer','Març','Abril','Maig','Juny','Juliol','Agost','Setembre','Octubre','Novembre','Desembre'];
+const MESOS_ES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+// Alias dinàmic segons idioma actiu de la UI · isCA es defineix més amunt al fitxer
+const MESOS = (typeof isCA!=='undefined' && isCA) ? MESOS_CA : MESOS_ES;
 function loadStats(){try{const s=JSON.parse(localStorage.getItem(STATS_KEY)||'{}');if(!s.autoescoles)s.autoescoles=DEFAULT_AUTOS.slice();if(!s.data)s.data={};return s}catch(e){return{autoescoles:DEFAULT_AUTOS.slice(),data:{}}}}
 function saveStats(s){localStorage.setItem(STATS_KEY,JSON.stringify(s));pushSnapshot('auto');scheduleFileAutoSave()}
 // ============================================================================
@@ -1245,38 +1248,44 @@ function openLibroRegistro(){
 }
 function openStats(initialSection){
   const s=loadStats();
+  // isCA local perquè les cadenes internacionalitzades tinguin scope aquí
+  const isCA = (typeof currentLang!=='undefined' && currentLang==='ca');
+  // MESOS local segons idioma actual
+  const MESOS = isCA ? MESOS_CA : MESOS_ES;
   const back=document.createElement('div');back.className='modal-back stats-modal';back.style.zIndex='500';
   // Títol dinàmic segons secció d'obertura
-  const titleMap = { autos:'🚗 Autoescolas', traffic:'🚦 Tráfico', sms:'📱 SMS', cites:'📅 Citas' };
+  const titleMap = isCA
+    ? { autos:'🚗 Autoescoles', traffic:'🚦 Trànsit', sms:'📱 SMS', cites:'📅 Cites' }
+    : { autos:'🚗 Autoescuelas', traffic:'🚦 Tráfico', sms:'📱 SMS', cites:'📅 Citas' };
   const initSec = initialSection && titleMap[initialSection] ? initialSection : 'autos';
-  const dynTitle = titleMap[initSec] || 'Estadísticas';
+  const dynTitle = titleMap[initSec] || (isCA?'Estadístiques':'Estadísticas');
   back.innerHTML=`<div class="modal" style="max-width:1400px;width:97%;max-height:95vh;display:flex;flex-direction:column;padding:16px">
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
-      <h3 style="margin:0;color:#f5b301">📊 Estadístiques · ${(window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1'}</h3>
+      <h3 style="margin:0;color:#f5b301">📊 ${isCA?'Estadístiques':'Estadísticas'} · ${(window.CFG&&CFG.company1&&CFG.company1.name)||(isCA?'Empresa 1':'Empresa 1')}</h3>
       <div id="stSectionSwitch" data-testid="st-section-switch" style="display:inline-flex;gap:0;margin-left:12px;background:#0e1117;border:1px solid #2a3040;border-radius:8px;padding:3px">
-        <button class="btn" data-section="autos" data-testid="st-section-autos" style="background:#3a2a15;border-color:#f5b301;color:#f5b301;font-weight:700;padding:6px 12px;font-size:12px;border-radius:6px">🚗 Autoescolas</button>
-        <button class="btn" data-section="traffic" data-testid="st-section-traffic" style="background:transparent;border-color:transparent;color:#94a3b8;font-weight:600;padding:6px 12px;font-size:12px;border-radius:6px">🚦 Tráfico</button>
-        <button class="btn" data-section="sms" data-testid="st-section-sms" style="background:transparent;border-color:transparent;color:#94a3b8;font-weight:600;padding:6px 12px;font-size:12px;border-radius:6px">🔔 Avisos SMS</button>
+        <button class="btn" data-section="autos" data-testid="st-section-autos" style="background:#3a2a15;border-color:#f5b301;color:#f5b301;font-weight:700;padding:6px 12px;font-size:12px;border-radius:6px">🚗 ${titleMap.autos.replace('🚗 ','')}</button>
+        <button class="btn" data-section="traffic" data-testid="st-section-traffic" style="background:transparent;border-color:transparent;color:#94a3b8;font-weight:600;padding:6px 12px;font-size:12px;border-radius:6px">🚦 ${titleMap.traffic.replace('🚦 ','')}</button>
+        <button class="btn" data-section="sms" data-testid="st-section-sms" style="background:transparent;border-color:transparent;color:#94a3b8;font-weight:600;padding:6px 12px;font-size:12px;border-radius:6px">🔔 ${isCA?'Avisos SMS':'Avisos SMS'}</button>
         <button class="btn" data-section="cites" data-testid="st-section-cites" style="background:transparent;border-color:transparent;color:#94a3b8;font-weight:600;padding:6px 12px;font-size:12px;border-radius:6px">📅 Cites</button>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-      <label class="small" style="margin:0">ANY:</label>
+      <label class="small" style="margin:0">${isCA?'ANY':'AÑO'}:</label>
       <input type="number" id="stYear" value="${new Date().getFullYear()}" min="2020" max="2099" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;width:100px" />
-      <select id="stMode" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px"><option value="year">📅 Vista anual (12 mesos)</option><option value="month">📆 Vista mensual</option></select>
-      <select id="stMonth" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:none"><option value="1">Gener</option><option value="2">Febrer</option><option value="3">Març</option><option value="4">Abril</option><option value="5">Maig</option><option value="6">Juny</option><option value="7">Juliol</option><option value="8">Agost</option><option value="9">Setembre</option><option value="10">Octubre</option><option value="11">Novembre</option><option value="12">Desembre</option></select>
-      <button class="btn" id="stPrev">← Any ant.</button>
-      <button class="btn" id="stNext">Any seg. →</button>
+      <select id="stMode" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px"><option value="year">📅 ${isCA?'Vista anual (12 mesos)':'Vista anual (12 meses)'}</option><option value="month">📆 ${isCA?'Vista mensual':'Vista mensual'}</option></select>
+      <select id="stMonth" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:none">${MESOS.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('')}</select>
+      <button class="btn" id="stPrev">← ${isCA?'Any ant.':'Año ant.'}</button>
+      <button class="btn" id="stNext">${isCA?'Any seg.':'Año sig.'} →</button>
       <div style="flex:1"></div>
-      <button class="btn btn-primary st-autos-only" id="stImport">📥 Importar CSV</button>
+      <button class="btn btn-primary st-autos-only" id="stImport">📥 ${isCA?'Importar CSV':'Importar CSV'}</button>
       <input type="file" id="stFile" accept=".csv,.txt" style="display:none" />
-      <button class="btn st-autos-only" id="stAdd">+ Autoescola</button>
-      <button class="btn st-autos-only" id="stClearAll" style="background:#7f1d1d;color:#fecaca;border-color:#b91c1c" title="Elimina totes les autoescoles i les seves dades">🗑 Buidar tot</button>
-      <button class="btn btn-primary" id="stPrint">📥 Descargar PDF</button>
-      <button class="btn" data-no>✕ Tancar</button>
+      <button class="btn st-autos-only" id="stAdd">+ ${isCA?'Autoescola':'Autoescuela'}</button>
+      <button class="btn st-autos-only" id="stClearAll" style="background:#7f1d1d;color:#fecaca;border-color:#b91c1c" title="${isCA?'Elimina totes les autoescoles i les seves dades':'Elimina todas las autoescuelas y sus datos'}">🗑 ${isCA?'Buidar tot':'Vaciar todo'}</button>
+      <button class="btn btn-primary" id="stPrint">📥 ${isCA?'Descarregar PDF':'Descargar PDF'}</button>
+      <button class="btn" data-no>✕ ${isCA?'Tancar':'Cerrar'}</button>
     </div>
     <div id="stBody" style="flex:1;overflow:auto" data-testid="st-body"></div>
-    <div id="stFooterHint" class="small" style="margin-top:8px;color:var(--muted)">💡 Fes clic en qualsevol casella per editar. Els totals es calculen automàticament.</div>
+    <div id="stFooterHint" class="small" style="margin-top:8px;color:var(--muted)">💡 ${isCA?'Fes clic en qualsevol casella per editar. Els totals es calculen automàticament.':'Haz clic en cualquier casilla para editar. Los totales se calculan automáticamente.'}</div>
   </div>`;
   document.body.appendChild(back);
   back.querySelector('[data-no]').onclick=()=>back.remove();
@@ -1359,15 +1368,15 @@ function openStats(initialSection){
       if(n)st.data[key][name]=n;else delete st.data[key][name];
       saveStats(st);renderTable();
     }});
-    body.querySelectorAll('[data-del]').forEach(b=>{b.onclick=(ev)=>{ev.stopPropagation();const ri=+b.dataset.del;const name=st.autoescoles[ri];confirmModal('Eliminar autoescola',`¿Eliminar <b>${name}</b> i totes les seves dades?`,()=>{st.autoescoles.splice(ri,1);for(const k in st.data)delete st.data[k][name];saveStats(st);renderTable()},'Eliminar')}});
+    body.querySelectorAll('[data-del]').forEach(b=>{b.onclick=(ev)=>{ev.stopPropagation();const ri=+b.dataset.del;const name=st.autoescoles[ri];confirmModal(isCA?'Eliminar autoescola':'Eliminar autoescuela',isCA?`Vols eliminar <b>${name}</b> i totes les seves dades?`:`¿Eliminar <b>${name}</b> y todos sus datos?`,()=>{st.autoescoles.splice(ri,1);for(const k in st.data)delete st.data[k][name];saveStats(st);renderTable()},isCA?'Eliminar':'Eliminar')}});
   };
   back.querySelector('#stYear').onchange=renderTable;
   back.querySelector('#stMode').onchange=renderTable;
   back.querySelector('#stMonth').onchange=renderTable;
   back.querySelector('#stPrev').onclick=()=>{const y=$('#stYear');y.value=+y.value-1;renderTable()};
   back.querySelector('#stNext').onclick=()=>{const y=$('#stYear');y.value=+y.value+1;renderTable()};
-  back.querySelector('#stAdd').onclick=()=>{const n=prompt('Nom de la nova autoescola:');if(!n)return;const st=loadStats();if(st.autoescoles.includes(n.trim())){toast('Ja existeix');return}st.autoescoles.push(n.trim());saveStats(st);renderTable()};
-  back.querySelector('#stClearAll').onclick=()=>{if(!confirm('⚠️ Esborrar TOTES les autoescoles i les seves dades?\n\nAquesta acció NO es pot desfer. Es recomana només al primer arrencament o si vols començar de zero.'))return;saveStats({autoescoles:[],data:{}});renderTable();toast('🗑 Autoescoles esborrades')};
+  back.querySelector('#stAdd').onclick=()=>{const n=prompt(isCA?'Nom de la nova autoescola:':'Nombre de la nueva autoescuela:');if(!n)return;const st=loadStats();if(st.autoescoles.includes(n.trim())){toast(isCA?'Ja existeix':'Ya existe');return}st.autoescoles.push(n.trim());saveStats(st);renderTable()};
+  back.querySelector('#stClearAll').onclick=()=>{if(!confirm(isCA?'⚠️ Esborrar TOTES les autoescoles i les seves dades?\n\nAquesta acció NO es pot desfer. Es recomana només al primer arrencament o si vols començar de zero.':'⚠️ ¿Borrar TODAS las autoescuelas y sus datos?\n\nEsta acción NO se puede deshacer. Recomendado solo en la primera puesta en marcha o si quieres empezar de cero.'))return;saveStats({autoescoles:[],data:{}});renderTable();toast(isCA?'🗑 Autoescoles esborrades':'🗑 Autoescuelas borradas')};
   // Alias mapping CSV → canonical name
   const STAT_ALIAS={
     'TRAFIC':'TRÀFIC','TRÀFIC':'TRÀFIC',
@@ -1400,9 +1409,9 @@ function openStats(initialSection){
   $('#stFile').onchange=async ev=>{
     const f=ev.target.files[0];if(!f)return;ev.target.value='';
     // Ask month
-    const monthInput=prompt(`Import CSV per a l'any ${$('#stYear').value}.\nQuin mes? (1-12, per exemple 6 per Juny)`);
+    const monthInput=prompt(isCA?`Import CSV per a l'any ${$('#stYear').value}.\nQuin mes? (1-12, per exemple 6 per Juny)`:`Importar CSV para el año ${$('#stYear').value}.\n¿Qué mes? (1-12, por ejemplo 6 para Junio)`);
     if(!monthInput)return;
-    const mi=parseInt(monthInput);if(!mi||mi<1||mi>12){toast('Mes no vàlid');return}
+    const mi=parseInt(monthInput);if(!mi||mi<1||mi>12){toast(isCA?'Mes no vàlid':'Mes no válido');return}
     // Read file with encoding detection
     const buf=await f.arrayBuffer();
     let txt;try{txt=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){txt=new TextDecoder('windows-1252').decode(buf)}
@@ -1417,7 +1426,7 @@ function openStats(initialSection){
       const rawU=String(code).trim().toUpperCase().replace(/\s+/g,' ');
       rawCounts[rawU]=(rawCounts[rawU]||0)+n;
     }
-    if(!Object.keys(rawCounts).length){toast('El CSV no conté cap fila vàlida');return}
+    if(!Object.keys(rawCounts).length){toast(isCA?'El CSV no conté cap fila vàlida':'El CSV no contiene ninguna fila válida');return}
     const st=loadStats();
     // Detectar codis "nous" (adaptatius): raw no mapejat per aliases del client (i, si és Master, tampoc per STAT_ALIAS), i el seu canònic no és a la llista de l'usuari.
     const clientMap=loadStatsAliases();
@@ -1450,8 +1459,8 @@ function openStats(initialSection){
       const existing=st.data[key];const hasExisting=existing&&Object.keys(existing).length>0;
       const total=Object.values(sums).reduce((a,b)=>a+b,0);
       const detail=Object.entries(sums).sort((a,b)=>b[1]-a[1]).slice(0,15).map(([k,v])=>`${k}: ${v}`).join(' · ');
-      const doApply=()=>{st.data[key]=sums;saveStats(st);renderTable();toast(`✅ Importat ${MESOS[mi-1]} ${year}: ${total} certificats`,3500)};
-      confirmModal(`📥 Importar ${MESOS[mi-1]} ${year}`,`<b>Total ${total} certificats</b> · ${Object.keys(sums).length} autoescoles<br><br><span class="small">${detail}</span>${hasExisting?'<br><br>⚠️ <b>Ja hi ha dades per aquest mes.</b> Es sobreescriuran.':''}`,doApply,'Importar',false);
+      const doApply=()=>{st.data[key]=sums;saveStats(st);renderTable();toast(isCA?`✅ Importat ${MESOS[mi-1]} ${year}: ${total} certificats`:`✅ Importado ${MESOS[mi-1]} ${year}: ${total} certificados`,3500)};
+      confirmModal(`📥 ${isCA?'Importar':'Importar'} ${MESOS[mi-1]} ${year}`,isCA?`<b>Total ${total} certificats</b> · ${Object.keys(sums).length} autoescoles<br><br><span class="small">${detail}</span>${hasExisting?'<br><br>⚠️ <b>Ja hi ha dades per aquest mes.</b> Es sobreescriuran.':''}`:`<b>Total ${total} certificados</b> · ${Object.keys(sums).length} autoescuelas<br><br><span class="small">${detail}</span>${hasExisting?'<br><br>⚠️ <b>Ya hay datos para este mes.</b> Se sobrescribirán.':''}`,doApply,'Importar',false);
     };
     if(newRaws.length===0){applyImport();return}
     // Onboarding · revisió i normalització de codis nous
@@ -1464,8 +1473,8 @@ function openStats(initialSection){
     const rowsHtml=newRaws.sort((a,b)=>(rawCounts[b]||0)-(rawCounts[a]||0)).map((rawU,idx)=>{
       const cnt=rawCounts[rawU]||0;
       const defaultName=rawU; // Nom canònic proposat = raw normalitzat
-      const opts=['<option value="">— Nova autoescola —</option>']
-        .concat(existingList.map(a=>`<option value="${a.replace(/"/g,'&quot;')}">↪ Fusionar amb: ${a}</option>`))
+      const opts=[`<option value="">— ${isCA?'Nova autoescola':'Nueva autoescuela'} —</option>`]
+        .concat(existingList.map(a=>`<option value="${a.replace(/"/g,'&quot;')}">↪ ${isCA?'Fusionar amb':'Fusionar con'}: ${a}</option>`))
         .join('');
       return `<tr data-testid="ae-review-row-${idx}" style="border-bottom:1px solid #1e293b">
         <td style="padding:8px;font-family:'Consolas','Menlo',monospace;color:#94a3b8;white-space:nowrap"><b style="color:#e2e8f0">${rawU}</b></td>
@@ -1475,28 +1484,28 @@ function openStats(initialSection){
       </tr>`;
     }).join('');
     back.innerHTML=`<div class="modal" style="max-width:820px;width:calc(100vw - 40px)">
-      <h3 style="color:#f5b301;font-family:Georgia,serif;margin-top:0">🚗 ${isFirstImport?'Configura les teves autoescoles':'Noves autoescoles detectades'}</h3>
+      <h3 style="color:#f5b301;font-family:Georgia,serif;margin-top:0">🚗 ${isFirstImport?(isCA?'Configura les teves autoescoles':'Configura tus autoescuelas'):(isCA?'Noves autoescoles detectades':'Nuevas autoescuelas detectadas')}</h3>
       <p style="color:#94a3b8;font-size:13px;line-height:1.5">
         ${isFirstImport
-          ?'Hem detectat aquests codis al teu CSV. Revisa i personalitza el nom com vols que aparegui a les estadístiques. Si dues línies són en realitat la mateixa autoescola, pots <b>fusionar-les</b>.'
-          :'Aquests codis del CSV no coincideixen amb cap autoescola coneguda. Anomena\'ls o fusiona\'ls amb una existent perquè els futurs imports siguin automàtics.'}
+          ?(isCA?'Hem detectat aquests codis al teu CSV. Revisa i personalitza el nom com vols que aparegui a les estadístiques. Si dues línies són en realitat la mateixa autoescola, pots <b>fusionar-les</b>.':'Hemos detectado estos códigos en tu CSV. Revisa y personaliza el nombre con el que quieres que aparezcan en las estadísticas. Si dos líneas son en realidad la misma autoescuela, puedes <b>fusionarlas</b>.')
+          :(isCA?'Aquests codis del CSV no coincideixen amb cap autoescola coneguda. Anomena\'ls o fusiona\'ls amb una existent perquè els futurs imports siguin automàtics.':'Estos códigos del CSV no coinciden con ninguna autoescuela conocida. Nómbralos o fusiónalos con una existente para que las próximas importaciones sean automáticas.')}
       </p>
       <div style="max-height:50vh;overflow:auto;border:1px solid #1e293b;border-radius:8px;margin:12px 0">
         <table style="width:100%;border-collapse:collapse;font-size:12px">
           <thead><tr style="background:#1a1e26;position:sticky;top:0;z-index:2">
-            <th style="padding:10px;text-align:left;color:#94a3b8;font-weight:700">Codi CSV</th>
-            <th style="padding:10px;text-align:center;color:#94a3b8;font-weight:700;width:100px">Certificats</th>
-            <th style="padding:10px;text-align:left;color:#94a3b8;font-weight:700">Nom a mostrar</th>
-            <th style="padding:10px;text-align:left;color:#94a3b8;font-weight:700;width:220px">O fusionar amb…</th>
+            <th style="padding:10px;text-align:left;color:#94a3b8;font-weight:700">${isCA?'Codi CSV':'Código CSV'}</th>
+            <th style="padding:10px;text-align:center;color:#94a3b8;font-weight:700;width:100px">${isCA?'Certificats':'Certificados'}</th>
+            <th style="padding:10px;text-align:left;color:#94a3b8;font-weight:700">${isCA?'Nom a mostrar':'Nombre a mostrar'}</th>
+            <th style="padding:10px;text-align:left;color:#94a3b8;font-weight:700;width:220px">${isCA?'O fusionar amb…':'O fusionar con…'}</th>
           </tr></thead>
           <tbody id="aeReviewBody">${rowsHtml}</tbody>
         </table>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-        <div style="font-size:11px;color:#64748b">💡 El mapping es guarda al teu ordinador. Els propers imports amb els mateixos codis s\'aplicaran automàticament.</div>
+        <div style="font-size:11px;color:#64748b">💡 ${isCA?'El mapping es guarda al teu ordinador. Els propers imports amb els mateixos codis s\'aplicaran automàticament.':'El mapeo se guarda en tu ordenador. Las próximas importaciones con los mismos códigos se aplicarán automáticamente.'}</div>
         <div style="display:flex;gap:8px">
-          <button class="btn" data-testid="ae-review-cancel" data-no>Cancel·lar</button>
-          <button class="btn btn-primary" data-testid="ae-review-apply" data-yes>Aplicar i importar</button>
+          <button class="btn" data-testid="ae-review-cancel" data-no>${isCA?'Cancel·lar':'Cancelar'}</button>
+          <button class="btn btn-primary" data-testid="ae-review-apply" data-yes>${isCA?'Aplicar i importar':'Aplicar e importar'}</button>
         </div>
       </div>
     </div>`;
@@ -7399,7 +7408,7 @@ function showLicenseInfo(){
     +'<div id="referralBlock" style="display:none;background:linear-gradient(135deg,rgba(168,85,247,.12),rgba(34,197,94,.04));border:1.5px dashed #a855f7;border-radius:8px;padding:14px;margin-bottom:12px">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;font-weight:800;color:#e9d5ff;font-size:12px;letter-spacing:.5px;margin-bottom:8px">'
     +'<span>🎁 Programa de referidos</span>'
-    +'<span class="ref-info-toggle" tabindex="0" title="¿Cómo funciona? · TÚ ganas 2 MESES GRATIS de tu plan actual cada vez que un cliente al que refieres PAGA su primera suscripción. · EL REFERIDO gana 1 MES GRATIS de su primera factura. · Trial no cuenta. · Comparte tu enlace y multiplica las ventajas." style="cursor:help;background:#a855f7;color:#fff;width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;user-select:none">?</span>'
+    +'<span id="refInfoBtn" data-testid="ref-info-btn" tabindex="0" title="Cómo funciona · clic para ver detalles" style="cursor:pointer;background:#a855f7;color:#fff;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;user-select:none;transition:transform .15s">?</span>'
     +'</div>'
     +'<div style="font-size:11.5px;color:#c4b5fd;line-height:1.5;margin-bottom:10px"><b>Tú ganas 2 meses gratis</b> · <b>El referido gana 1 mes gratis</b> (trial no cuenta).</div>'
     +'<div id="refCodeDisplay" style="font-family:\'Courier New\',monospace;font-size:16px;font-weight:800;color:#f5b301;background:#0b1121;padding:10px;border-radius:6px;text-align:center;letter-spacing:2px;margin-bottom:8px" data-testid="referral-code-display">Cargando...</div>'
@@ -7530,8 +7539,88 @@ function showLicenseInfo(){
       };
       back.querySelector('#btnCopyRefCode').onclick = ()=>copy(data.referral_code, 'Código');
       back.querySelector('#btnCopyRefUrl').onclick = ()=>copy(data.share_url, 'Enlace de referido');
+      // Modal explicatiu del programa de referidos (accessible des del botó ❓)
+      const infoBtn = back.querySelector('#refInfoBtn');
+      if(infoBtn){
+        infoBtn.onmouseover = () => infoBtn.style.transform = 'scale(1.15)';
+        infoBtn.onmouseout = () => infoBtn.style.transform = 'scale(1)';
+        infoBtn.onclick = () => openReferralHelpModal(data.referral_code || '—', data.share_url || '');
+      }
     }catch(_){ /* no bloquegem si falla */ }
   })();
+}
+
+// Modal d'ajuda del programa de referidos · s'obre des del "?" 
+function openReferralHelpModal(code, shareUrl){
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  back.style.zIndex = '100000';
+  back.innerHTML = `<div class="modal" style="max-width:640px;width:calc(100vw - 40px);max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:12px">
+      <div>
+        <h3 style="margin:0;color:#a855f7;font-family:Georgia,serif">🎁 Programa de referidos · Cómo funciona</h3>
+        <div style="font-size:12px;color:#94a3b8;margin-top:4px">Gana meses gratis compartiendo MediCar Plus con otros centros</div>
+      </div>
+      <button type="button" data-no data-testid="ref-help-close" style="background:transparent;border:1px solid #475569;color:#cbd5e1;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:14px">✕</button>
+    </div>
+
+    <div style="background:linear-gradient(135deg,rgba(168,85,247,.15),rgba(34,197,94,.08));border:1.5px solid #a855f7;border-radius:10px;padding:14px;margin-bottom:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;text-align:center">
+        <div style="background:#0e1a2e;border-radius:8px;padding:12px">
+          <div style="font-size:11px;color:#c4b5fd;font-weight:700;letter-spacing:.5px;margin-bottom:4px">TÚ RECIBES</div>
+          <div style="font-size:22px;font-weight:800;color:#3ddc97">2 meses gratis</div>
+          <div style="font-size:10px;color:#64748b;margin-top:2px">de tu plan actual</div>
+        </div>
+        <div style="background:#0e1a2e;border-radius:8px;padding:12px">
+          <div style="font-size:11px;color:#c4b5fd;font-weight:700;letter-spacing:.5px;margin-bottom:4px">TU REFERIDO RECIBE</div>
+          <div style="font-size:22px;font-weight:800;color:#3ddc97">1 mes gratis</div>
+          <div style="font-size:10px;color:#64748b;margin-top:2px">en su primera factura</div>
+        </div>
+      </div>
+    </div>
+
+    <h4 style="color:#f5b301;margin:14px 0 8px 0">📋 Cómo darlo a un cliente</h4>
+    <ol style="color:#cbd5e1;font-size:13px;line-height:1.75;padding-left:22px;margin:0">
+      <li>Copia tu <b>código</b> o tu <b>enlace de referido</b> con los botones de abajo (los verás al cerrar este mensaje).</li>
+      <li>Compártelo con el cliente potencial: WhatsApp, email, boca-oreja, redes sociales.</li>
+      <li>El cliente entra en <b>medicarplus.es</b>, solicita su prueba gratuita, y al momento de suscribirse introduce tu código en el campo "Código de referido".</li>
+      <li>Cuando el cliente <b>pague su primera suscripción</b> (Standard o Premium), automáticamente:
+        <ul style="margin:6px 0">
+          <li>A él se le aplica <b>1 mes gratis</b> en la primera factura Stripe.</li>
+          <li>A ti se te suman <b>2 meses gratis</b> en tu próxima renovación.</li>
+        </ul>
+      </li>
+    </ol>
+
+    <h4 style="color:#f5b301;margin:16px 0 8px 0">💰 Cómo se canjean los meses ganados</h4>
+    <div style="background:#0e1a2e;border:1px solid #1e293b;border-radius:8px;padding:12px;font-size:13px;color:#cbd5e1;line-height:1.7">
+      <b style="color:#3ddc97">Automáticamente</b>. No tienes que hacer nada:
+      <ul style="margin:6px 0 0 0;padding-left:20px">
+        <li>Cada vez que un referido paga, Stripe añade un <b>crédito</b> a tu suscripción.</li>
+        <li>En tu próxima renovación mensual, el crédito se descuenta y no se te cobra hasta consumirlo.</li>
+        <li>Si tienes 2 meses acumulados, no pagarás durante 2 meses (o el equivalente al plan que tengas).</li>
+        <li>Puedes ver el saldo restante en tu <b>Portal de Cliente Stripe</b> (⚙️ Configuración → 🧾 Gestionar suscripción).</li>
+      </ul>
+    </div>
+
+    <div style="background:#052e16;border-left:3px solid #22c55e;border-radius:4px;padding:10px 14px;margin-top:14px;font-size:12px;color:#a7f3d0">
+      💡 <b>Sin límite de referidos.</b> Puedes referir a tantos clientes como quieras. Los meses se acumulan sin caducidad.
+    </div>
+
+    <div style="background:#78350f;border-left:3px solid #f59e0b;border-radius:4px;padding:10px 14px;margin-top:10px;font-size:12px;color:#fbbf24">
+      ⚠️ Las cuentas Trial (prueba gratuita) <b>no cuentan</b>. La recompensa se activa solo cuando el referido paga su primera suscripción real.
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap">
+      <div style="font-size:11px;color:#64748b">Tu código: <b style="color:#f5b301;font-family:'Courier New',monospace">${String(code||'—')}</b></div>
+      <button class="btn" data-no data-testid="ref-help-ok" style="background:#a855f7;color:#fff;border-color:#a855f7;font-weight:700;padding:8px 20px">Entendido</button>
+    </div>
+  </div>`;
+  document.body.appendChild(back);
+  back.addEventListener('click', ev => {
+    if(ev.target === back || (ev.target.hasAttribute && ev.target.hasAttribute('data-no'))) back.remove();
+  });
+  document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ back.remove(); document.removeEventListener('keydown', esc);} });
 }
 // ============================================================================
 // CONFIGURACIÓ DEL CLIENT · noms de les 2 empreses
