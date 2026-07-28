@@ -523,3 +523,18 @@ El programa GIC exporta el llistat de renovacions via <b>Clientes a Revisar</b> 
 - Búsqueda automatizada de 27 palabras catalanas en `document.body.innerText` con modal IRPF abierto → **0 coincidencias**.
 
 **Recordatorio para el usuario**: Ejecutar **Redeploy a producción** para que estos cambios (más los anti-abuse, backups V4, traducciones previas de "Libreta"/"Estadísticas"/"Programa Referidos") lleguen a `project-helper-47.emergent.host`.
+
+
+### [28-Feb-2026] · Extensión P2 · CHANGELOG + Cuentas contables al Español
+
+**Cambios**:
+1. **CHANGELOG interno de Novedades**: versiones 2.1.0, 2.1.1, 2.1.2 y 2.1.3 traducidas del catalán al español (todos los highlights). Las versiones 2.0.25-2.0.69 ya estaban en español desde antes.
+2. **Cuentas contables del Libro Diario** (`v2.html` líneas 2469-2572):
+   - `570 Caixa` → `570 Caja`
+   - `572 Banc / Banc (Bizum) / Banc (Transf)` → `572 Banco / Banco (Bizum) / Banco (Transf)`
+   - `705 Ingressos serveis / serveis mèdics / tasas` → `705 Ingresos servicios / servicios médicos / tasas`
+   - `629 Despeses` → `629 Otros servicios` (nomenclatura PGC estándar España)
+   - Conceptos autogenerados: `Ingrés manual → Ingreso manual`, `Despesa → Gasto`, `Servei - X → Servicio - X`, `Reclassificació · Efectiu ↔ Datàfon manual → Reclasificación · Efectivo ↔ Datáfono manual`.
+   - Todas las referencias de bucketing (`bucket['570 Caja']` etc.) actualizadas consistentemente para evitar KeyError en las agregaciones diarias.
+
+**Verificación**: JS parse OK, screenshot Playwright del modal "¿Qué hay de nuevo?" muestra texto 100% español, auditoría automatizada de 45+ palabras catalanas devuelve **0 coincidencias**.

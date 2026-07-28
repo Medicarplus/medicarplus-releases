@@ -2466,9 +2466,9 @@ function generateLedgerEntries(dateFrom,dateTo,company){
   // per UNA sola línia agregada del dia amb l'import manual (DEBE 572 Banc / HABER 705).
   // Així no es duplica mai i el que compta és el manual, tal com l'usuari l'ha entrat.
   let dfMap={};try{dfMap=JSON.parse(localStorage.getItem(comp==='cempla'?'caja.cempla.datafono':'caja.datafono')||'{}')}catch(e){dfMap={}}
-  const fpToAccount={'E':'570 Caixa','T':'572 Banc','B':'572 Banc (Bizum)','X':'572 Banc (Transf)'};
+  const fpToAccount={'E':'570 Caja','T':'572 Banco','B':'572 Banco (Bizum)','X':'572 Banco (Transf)'};
   const isCempla=comp==='cempla';
-  const acct705=isCempla?'705 Ingressos serveis mèdics':'705 Ingressos serveis';
+  const acct705=isCempla?'705 Ingresos servicios médicos':'705 Ingresos servicios';
   // Ambdues empreses (C.B i Esport) agrupen per DIA (totals) — no client a client.
   const aggregate=true;
   Object.entries(src).sort(([a],[b])=>a.localeCompare(b)).forEach(([date,arr])=>{
@@ -2491,14 +2491,14 @@ function generateLedgerEntries(dateFrom,dateTo,company){
       arr.forEach(e=>{if(e.retorno||e.kind==='DH')return;if(e.fp==='T')autoT+=(e.importe-(e.descuento||0));if((e.fpTasa||e.fp)==='T')autoT+=(e.tasa||0)});
       arr.forEach(e=>{
         if(e.retorno)return;
-        const acct=fpToAccount[e.fp]||'570 Caixa';
+        const acct=fpToAccount[e.fp]||'570 Caja';
         const acctT=fpToAccount[e.fpTasa||e.fp]||acct;
         if(e.kind==='DH'){
           // Els DEBE/HABER manuals apareixen com a LÍNIES SEPARADES (no s'agrupen amb els ingressos del programa DGT)
           if(e.tipo==='HABER'){
-            expenseRows.push({date,concepto:`Ingrés manual: ${e.nombre||'—'}`,debeAcct:acct,debeAmt:e.importe,haberAcct:'705 Ingressos serveis',haberAmt:e.importe});
+            expenseRows.push({date,concepto:`Ingreso manual: ${e.nombre||'—'}`,debeAcct:acct,debeAmt:e.importe,haberAcct:'705 Ingresos servicios',haberAmt:e.importe});
           }else{
-            expenseRows.push({date,concepto:`Despesa: ${e.nombre||'—'}`,debeAcct:'629 Despeses',debeAmt:e.importe,haberAcct:acct,haberAmt:e.importe});
+            expenseRows.push({date,concepto:`Gasto: ${e.nombre||'—'}`,debeAcct:'629 Otros servicios',debeAmt:e.importe,haberAcct:acct,haberAmt:e.importe});
           }
         }else{
           // Ingressos del programa Trànsit: s'agreguen en 2 línies (Caixa / Banc) al final.
@@ -2510,11 +2510,11 @@ function generateLedgerEntries(dateFrom,dateTo,company){
       // Datàfon manual: mou 'delta' del compte 570 Caixa al 572 Banc (o viceversa).
       if(useDf){
         let delta=dfDay-autoT;
-        if(delta>0&&bucket['570 Caixa']){
-          const move=Math.min(bucket['570 Caixa'].debe,delta);
-          bucket['570 Caixa'].debe-=move;bucket['570 Caixa'].haber-=move;
-          if(!bucket['572 Banc'])bucket['572 Banc']={debe:0,haber:0};
-          bucket['572 Banc'].debe+=move;bucket['572 Banc'].haber+=move;
+        if(delta>0&&bucket['570 Caja']){
+          const move=Math.min(bucket['570 Caja'].debe,delta);
+          bucket['570 Caja'].debe-=move;bucket['570 Caja'].haber-=move;
+          if(!bucket['572 Banco'])bucket['572 Banco']={debe:0,haber:0};
+          bucket['572 Banco'].debe+=move;bucket['572 Banco'].haber+=move;
         }else if(delta<0){
           let need=-delta;
           for(const k of Object.keys(bucket)){
@@ -2522,8 +2522,8 @@ function generateLedgerEntries(dateFrom,dateTo,company){
             if(k.startsWith('572')&&bucket[k].debe>0){
               const move=Math.min(bucket[k].debe,need);
               bucket[k].debe-=move;bucket[k].haber-=move;need-=move;
-              if(!bucket['570 Caixa'])bucket['570 Caixa']={debe:0,haber:0};
-              bucket['570 Caixa'].debe+=move;bucket['570 Caixa'].haber+=move;
+              if(!bucket['570 Caja'])bucket['570 Caja']={debe:0,haber:0};
+              bucket['570 Caja'].debe+=move;bucket['570 Caja'].haber+=move;
             }
           }
         }
@@ -2531,7 +2531,7 @@ function generateLedgerEntries(dateFrom,dateTo,company){
       }
       // Emet les línies agregades: DEBE = compte físic (Caixa/Banc), HABER = 705 Ingressos consolidat.
       const labelFor=(debeAcct)=>{
-        if(debeAcct==='570 Caixa')return currentLang==='ca'?'Total en Caixa (efectiu)':'Total en Caja (efectivo)';
+        if(debeAcct==='570 Caja')return currentLang==='ca'?'Total en Caixa (efectiu)':'Total en Caja (efectivo)';
         if(debeAcct.startsWith('572'))return currentLang==='ca'?`Total en ${debeAcct.replace('572 ','')}`:`Total en ${debeAcct.replace('572 ','')}`;
         return currentLang==='ca'?`Assentament del dia (${debeAcct})`:`Asiento del día (${debeAcct})`;
       };
@@ -2544,18 +2544,18 @@ function generateLedgerEntries(dateFrom,dateTo,company){
       // ESPORT: detall per entrada (revisió/certificat) — manté totes les entrades tal com són.
       arr.forEach(e=>{
         if(e.retorno)return;
-        const acct=fpToAccount[e.fp]||'570 Caixa';
+        const acct=fpToAccount[e.fp]||'570 Caja';
         const acctT=fpToAccount[e.fpTasa||e.fp]||acct;
         if(e.kind==='DH'){
           if(e.tipo==='HABER'){
-            rows.push({date,concepto:e.nombre||'Ingrés',debeAcct:acct,debeAmt:e.importe,haberAcct:'705 Ingressos serveis',haberAmt:e.importe});
+            rows.push({date,concepto:e.nombre||'Ingreso',debeAcct:acct,debeAmt:e.importe,haberAcct:'705 Ingresos servicios',haberAmt:e.importe});
           }else{
-            rows.push({date,concepto:e.nombre||'Gasto',debeAcct:'629 Despeses',debeAmt:e.importe,haberAcct:acct,haberAmt:e.importe});
+            rows.push({date,concepto:e.nombre||'Gasto',debeAcct:'629 Otros servicios',debeAmt:e.importe,haberAcct:acct,haberAmt:e.importe});
           }
         }else{
           const importeNeto=e.importe-(e.descuento||0);
-          if(importeNeto>0)rows.push({date,concepto:`${e.tipo||'Servei'} - ${e.nombre||''}`,debeAcct:acct,debeAmt:importeNeto,haberAcct:acct705,haberAmt:importeNeto});
-          if(e.tasa>0)rows.push({date,concepto:`Tasa DGT - ${e.nombre||''}`,debeAcct:acctT,debeAmt:e.tasa,haberAcct:'705 Ingressos tasas',haberAmt:e.tasa});
+          if(importeNeto>0)rows.push({date,concepto:`${e.tipo||'Servicio'} - ${e.nombre||''}`,debeAcct:acct,debeAmt:importeNeto,haberAcct:acct705,haberAmt:importeNeto});
+          if(e.tasa>0)rows.push({date,concepto:`Tasa DGT - ${e.nombre||''}`,debeAcct:acctT,debeAmt:e.tasa,haberAcct:'705 Ingresos tasas',haberAmt:e.tasa});
         }
       });
       // autoT per la reclassificació datàfon (ESPORT també)
@@ -2567,9 +2567,9 @@ function generateLedgerEntries(dateFrom,dateTo,company){
         const delta=dfDay-autoTe;
         if(Math.abs(delta)>0.005){
           if(delta>0){
-            rows.push({date,concepto:'Reclassificació · Efectiu → Datàfon manual',debeAcct:'572 Banc',debeAmt:delta,haberAcct:'570 Caixa',haberAmt:delta});
+            rows.push({date,concepto:'Reclasificación · Efectivo → Datáfono manual',debeAcct:'572 Banco',debeAmt:delta,haberAcct:'570 Caja',haberAmt:delta});
           }else{
-            rows.push({date,concepto:'Reclassificació · Datàfon manual → Efectiu',debeAcct:'570 Caixa',debeAmt:-delta,haberAcct:'572 Banc',haberAmt:-delta});
+            rows.push({date,concepto:'Reclasificación · Datáfono manual → Efectivo',debeAcct:'570 Caja',debeAmt:-delta,haberAcct:'572 Banco',haberAmt:-delta});
           }
         }
       }
@@ -6911,35 +6911,35 @@ const CHANGELOG = [
     '🔒 Privacidad por defecto (superado por v2.0.65).',
   ]},
   { version:'2.1.3', date:'14/07/2026', highlights:[
-    '🌐 <b>FIX · IRPF ara respecta l\'idioma seleccionat</b> · abans hi havia textos en català que no es traduïen al castellà (títol "Retencions trimestrals", placeholders, tooltips, confirmació d\'eliminar). Ara tot es tradueix correctament segons l\'idioma configurat.',
-    '💰 Preu per certificat (€/CERT) per metge · BRUT auto-calculat',
-    '🖨️ Vista prèvia d\'impressió amb botó "Imprimir ara" abans del diàleg del sistema',
+    '🌐 <b>FIX · IRPF ahora respeta el idioma seleccionado</b> · antes había textos en catalán que no se traducían al castellano (título "Retenciones trimestrales", placeholders, tooltips, confirmación de eliminar). Ahora todo se traduce correctamente según el idioma configurado.',
+    '💰 Precio por certificado (€/CERT) por médico · BRUT auto-calculado',
+    '🖨️ Vista previa de impresión con botón "Imprimir ahora" antes del diálogo del sistema',
   ]},
   { version:'2.1.2', date:'14/07/2026', highlights:[
-    '💰 <b>NOU · Preu per certificat (€/CERT)</b> per metge · afegeix una tarifa personalitzada per cada doctor i el BRUT es calcula automàticament (CERT × €/CERT). Els metges amb tarifa fixa ja no cal calcular-los a mà.',
-    '🖨️ <b>Vista prèvia d\'impressió</b> · abans d\'imprimir surt una previsualització a pantalla completa amb botó "🖨️ Imprimir ara" i "Tancar" · pots verificar el document abans d\'imprimir o guardar-lo com PDF.',
-    '🐛 FIX crític IRPF · entrades amb nom "JOSEP BRUGULAT" ja no s\'esborren automàticament al escriure-hi.',
-    '📄 Impressió IRPF en orientació apaisada amb colors i KPIs · llegible al 100%.',
+    '💰 <b>NUEVO · Precio por certificado (€/CERT)</b> por médico · añade una tarifa personalizada para cada doctor y el BRUT se calcula automáticamente (CERT × €/CERT). Los médicos con tarifa fija ya no hay que calcularlos a mano.',
+    '🖨️ <b>Vista previa de impresión</b> · antes de imprimir aparece una previsualización a pantalla completa con botón "🖨️ Imprimir ahora" y "Cerrar" · puedes verificar el documento antes de imprimir o guardarlo como PDF.',
+    '🐛 FIX crítico IRPF · entradas con nombre "JOSEP BRUGULAT" ya no se borran automáticamente al escribir.',
+    '📄 Impresión IRPF en orientación apaisada con colores y KPIs · legible al 100%.',
   ]},
   { version:'2.1.1', date:'14/07/2026', highlights:[
-    '🐛 <b>FIX CRÍTIC IRPF · Persones que "no sumen"</b> · un bug rar eliminava entrades amb noms com "JOSEP BRUGULAT" quan encara no tenien valors. Els noms de doctor ja no es filtren mai més.',
-    '📄 <b>Impressió IRPF apaisada</b> · l\'informe surt automàticament en orientació apaisada (A4 landscape) amb tots els colors, KPIs i totals ben clars.',
-    '🖨️ <b>Impressió Estadístiques i Llibreta també apaisades</b> · les taules amb moltes columnes ja no queden aixafades.',
-    '⚠️ <b>Avís abans d\'imprimir buit</b> · si obres IRPF d\'una empresa sense persones, el programa avisa enlloc d\'imprimir un PDF buit.',
+    '🐛 <b>FIX CRÍTICO IRPF · Personas que "no suman"</b> · un bug raro eliminaba entradas con nombres como "JOSEP BRUGULAT" cuando aún no tenían valores. Los nombres de doctor ya no se filtran nunca más.',
+    '📄 <b>Impresión IRPF apaisada</b> · el informe sale automáticamente en orientación apaisada (A4 landscape) con todos los colores, KPIs y totales bien claros.',
+    '🖨️ <b>Impresión Estadísticas y Libreta también apaisadas</b> · las tablas con muchas columnas ya no quedan aplastadas.',
+    '⚠️ <b>Aviso antes de imprimir vacío</b> · si abres IRPF de una empresa sin personas, el programa avisa en lugar de imprimir un PDF vacío.',
   ]},
   { version:'2.1.0', date:'14/07/2026', highlights:[
-    '📅 <b>NOU · Cites del dia</b> (Premium): connecta el programa amb <b>Google Calendar</b>, <b>Doctoralia</b>, Calendly, Doctolib, Timify, iCloud o qualsevol calendari amb URL iCal.',
-    '⚡ <b>Un cop enganxada la URL, no cal reintroduir-la</b> · el programa la recorda i sincronitza automàticament cada 15 min.',
-    '📌 Marcatge d\'estat per cita: <b>Presentat</b> · <b>No presentat</b> · <b>Realitzat</b> · el vinculem al llibre de caixa.',
-    '🔔 <b>Badge de notificació</b> vermell amb comptador sobre 📅 Cites · toast automàtic quan arriben cites noves.',
-    '📊 <b>Estadístiques de cites</b> a <i>Estadísticas ▸ 📅 Cites</i>: KPIs (Total · Presentats · No presentats · Realitzats), gràfic mensual, cercador global per nom.',
-    '🔎 <b>Cercador per nom</b> tant al modal Cites com a Estadísticas · útil per consultar "¿aquest client va venir aquell dia?"',
-    '🐛 <b>FIX CRÍTIC · Imprimir mes IRPF ara funciona</b> · problema d\'Electron amb <code>window.open</code> · reemplaçat per iframe amagat (mètode universal compatible amb Electron + navegadors).',
-    '🖨️ <b>TOTS els botons d\'imprimir</b> revisats i millorats: IRPF · Libro de Registro · Estadísticas Autoescoles · Estadísticas Tráfico · Llibreta · Campanya SMS · funcionen tots.',
-    '📋 <b>IRPF · Interfície millorada</b>: camps ara amb fons blanc llegible (adéu al bug dels quadres negres).',
-    '⌨️ <b>Escriu amb coma o punt</b> indistintament (ex: <code>1500,50</code> o <code>1500.50</code>) · càlculs actualitzats en viu mentre escrius.',
-    '🎯 <b>Auto-focus</b> al nou nom quan afegeixes una persona · confirmació abans d\'eliminar (evita pèrdues accidentals).',
-    '🌐 Landing <i>medicarplus.es</i>: banderes España + Catalunya en SVG, captures reals del programa al clicar cada característica.',
+    '📅 <b>NUEVO · Citas del día</b> (Premium): conecta el programa con <b>Google Calendar</b>, <b>Doctoralia</b>, Calendly, Doctolib, Timify, iCloud o cualquier calendario con URL iCal.',
+    '⚡ <b>Una vez pegada la URL, no hace falta reintroducirla</b> · el programa la recuerda y sincroniza automáticamente cada 15 min.',
+    '📌 Marcado de estado por cita: <b>Presentado</b> · <b>No presentado</b> · <b>Realizado</b> · lo vinculamos al libro de caja.',
+    '🔔 <b>Badge de notificación</b> rojo con contador sobre 📅 Citas · toast automático cuando llegan citas nuevas.',
+    '📊 <b>Estadísticas de citas</b> en <i>Estadísticas ▸ 📅 Citas</i>: KPIs (Total · Presentados · No presentados · Realizados), gráfico mensual, buscador global por nombre.',
+    '🔎 <b>Buscador por nombre</b> tanto en el modal Citas como en Estadísticas · útil para consultar "¿este cliente vino aquel día?"',
+    '🐛 <b>FIX CRÍTICO · Imprimir mes IRPF ahora funciona</b> · problema de Electron con <code>window.open</code> · reemplazado por iframe oculto (método universal compatible con Electron + navegadores).',
+    '🖨️ <b>TODOS los botones de imprimir</b> revisados y mejorados: IRPF · Libro de Registro · Estadísticas Autoescuelas · Estadísticas Tráfico · Libreta · Campaña SMS · funcionan todos.',
+    '📋 <b>IRPF · Interfaz mejorada</b>: campos ahora con fondo blanco legible (adiós al bug de los cuadros negros).',
+    '⌨️ <b>Escribe con coma o punto</b> indistintamente (ej: <code>1500,50</code> o <code>1500.50</code>) · cálculos actualizados en vivo mientras escribes.',
+    '🎯 <b>Auto-focus</b> en el nuevo nombre cuando añades una persona · confirmación antes de eliminar (evita pérdidas accidentales).',
+    '🌐 Landing <i>medicarplus.es</i>: banderas España + Cataluña en SVG, capturas reales del programa al clicar cada característica.',
   ]},
   { version:'2.0.27', date:'11/07/2026', highlights:[
     '📊 <b>Estadísticas · Sección Tráfico</b>: nueva vista con gráfico y tabla mensual/anual de todas las entradas de Tráfico (importes, tasas y desglose por tipo).',
