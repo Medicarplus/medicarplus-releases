@@ -1057,10 +1057,19 @@ function saveStatsAliases(m){try{localStorage.setItem(STATS_ALIAS_KEY,JSON.strin
       const lic=JSON.parse(localStorage.getItem('caja.license.v3')||'{}');
       isMasterOwner=((lic.type||'').toUpperCase()==='MASTER') || ((lic.license_key||'').toUpperCase()===MASTER_KEY_SEED);
     }catch(e){}
-    // 🧹 Cleanup one-shot: si l'usuari NO és Master però ja té injectat el seed antic
-    // (bug fins febrer 2026), i encara conserva EXACTAMENT les dades del Marc sense
-    // afegir res propi, netegem el seu localStorage perquè comenci de zero.
-    if(!isMasterOwner && localStorage.getItem('caja.stats.seed.2026.jan-may')==='1' && localStorage.getItem('caja.stats.pollution.cleaned.v1')!=='1'){
+    // 🔒 Recorda si aquest navegador ha vist Master alguna vegada. S'usa a sota per
+    // NO esborrar les dades personals del Marc si canvia temporalment a una llicència
+    // de proves (Trial/STD/PRM). Persistent i només s'activa, mai s'esborra.
+    if(isMasterOwner){
+      try{ localStorage.setItem('caja.master.ever.v1','1'); }catch(e){}
+    }
+    const hasBeenMasterEver = localStorage.getItem('caja.master.ever.v1')==='1';
+    // 🧹 Cleanup one-shot: si l'usuari NO és Master, mai ha estat Master en aquest
+    // navegador, però ja té injectat el seed antic (bug fins febrer 2026), i encara
+    // conserva EXACTAMENT les dades del Marc sense afegir res propi, netegem el seu
+    // localStorage perquè comenci de zero. Si "hasBeenMasterEver" és true, mai netegem
+    // (podria ser el Marc fent proves amb un altre login al mateix navegador).
+    if(!isMasterOwner && !hasBeenMasterEver && localStorage.getItem('caja.stats.seed.2026.jan-may')==='1' && localStorage.getItem('caja.stats.pollution.cleaned.v1')!=='1'){
       try{
         const cur=JSON.parse(localStorage.getItem(STATS_KEY)||'{}');
         const d=cur&&cur.data&&cur.data['2026-01'];
