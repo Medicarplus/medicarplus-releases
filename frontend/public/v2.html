@@ -3849,12 +3849,49 @@ async function getStoredHandle(){return _idb({mode:'readonly',fn:s=>s.get('backu
 async function saveStoredHandle(h){return _idb({mode:'readwrite',fn:s=>s.put(h,'backupHandle')})}
 async function clearStoredHandle(){return _idb({mode:'readwrite',fn:s=>s.delete('backupHandle')})}
 $('#btnExport').onclick=async ev=>{
-  const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),datafonoCempla:JSON.parse(localStorage.getItem('caja.cempla.datafono')||'{}'),stats:JSON.parse(localStorage.getItem('caja.stats.v1')||'null'),irpf:JSON.parse(localStorage.getItem('caja.irpf.v1')||'{"months":{},"quarters":{}}'),_v:4};
+  const isCA=(typeof currentLang!=='undefined' && currentLang==='ca');
+  const all={
+    _signature:'MEDICAR-PLUS-BACKUP-V4', // 🔒 firma per validar restauracions · evita restaurar JSON aliens
+    _createdAt:new Date().toISOString(),
+    _appVersion:(window.appInfo&&window.appInfo.version)||'web',
+    cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),
+    cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),
+    datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),
+    datafonoCempla:JSON.parse(localStorage.getItem('caja.cempla.datafono')||'{}'),
+    stats:JSON.parse(localStorage.getItem('caja.stats.v1')||'null'),
+    irpf:JSON.parse(localStorage.getItem('caja.irpf.v1')||'{"months":{},"quarters":{}}'),
+    _v:4
+  };
   const contents=JSON.stringify(all,null,2);
   // SAFETY checks
-  if(!contents||contents.length<40){toast('❌ ERROR: contenido vacío, no se guarda',5000);return}
-  try{JSON.parse(contents)}catch(e){toast('❌ ERROR: JSON inválido, no se guarda',5000);return}
+  if(!contents||contents.length<40){toast(isCA?'❌ ERROR: contingut buit, no es desa':'❌ ERROR: contenido vacío, no se guarda',5000);return}
+  try{JSON.parse(contents)}catch(e){toast(isCA?'❌ ERROR: JSON invàlid, no es desa':'❌ ERROR: JSON inválido, no se guarda',5000);return}
+  // Missatge post-guardar clar (explica la creueta vermella de Windows i com restaurar)
+  const showPostSaveInfo=(filename)=>{
+    const back=document.createElement('div');back.className='modal-back';back.style.zIndex='100001';
+    back.innerHTML=`<div class="modal" style="max-width:520px;padding:22px">
+      <h3 style="color:#3ddc97;margin-top:0">💾 ${isCA?'Còpia desada correctament':'Copia guardada correctamente'}</h3>
+      <div style="background:#0e1a2e;border:1px solid #1e293b;border-radius:8px;padding:12px;margin:12px 0;font-size:13px;color:#cbd5e1;line-height:1.6">
+        <b style="color:#f5b301">📄 ${isCA?'Nom del fitxer':'Nombre del archivo'}:</b><br>
+        <code style="color:#a5b4fc;font-size:12px">${filename}</code>
+      </div>
+      <div style="background:#3a2a15;border-left:3px solid #f5b301;border-radius:4px;padding:10px 14px;margin:10px 0;font-size:12.5px;color:#fde68a;line-height:1.65">
+        ⚠️ <b>${isCA?"Si Windows mostra el fitxer amb una creueta vermella o diu 'No s'ha trobat programa per obrir aquest fitxer'":"Si Windows muestra el archivo con una crucecita roja o dice 'No se ha encontrado software para abrir este archivo'"}</b> — ${isCA?"és <b>NORMAL</b>. És només l'associació de fitxers de Windows, <b>no un fallo de la còpia</b>. El fitxer és 100% correcte i està signat internament. NO cal obrir-lo a mà.":"es <b>NORMAL</b>. Es solo la asociación de archivos de Windows, <b>no un fallo de la copia</b>. El archivo es 100% correcto y está firmado internamente. NO hay que abrirlo a mano."}
+      </div>
+      <div style="background:#052e16;border-left:3px solid #22c55e;border-radius:4px;padding:10px 14px;font-size:12.5px;color:#a7f3d0;line-height:1.65">
+        ✅ <b>${isCA?'Guarda-la en un lloc segur':'Guárdala en un lugar seguro'}</b><br>
+        ${isCA?"Copia'l a un pen drive, un altre ordinador o un núvol (Google Drive, Dropbox, OneDrive).<br><br>Per <b>recuperar-la</b> més endavant, obre MediCar Plus i clica <b>📂 Restaurar còpia</b>.":"Cópialo a un pen drive, otro ordenador o una nube (Google Drive, Dropbox, OneDrive).<br><br>Para <b>recuperarla</b> más adelante, abre MediCar Plus y pulsa <b>📂 Restaurar copia</b>."}
+      </div>
+      <div style="text-align:right;margin-top:14px">
+        <button class="btn btn-primary" data-no data-testid="backup-info-ok" style="padding:10px 24px;font-weight:700">${isCA?'Entès':'Entendido'}</button>
+      </div>
+    </div>`;
+    document.body.appendChild(back);
+    back.addEventListener('click',ev=>{if(ev.target===back||(ev.target.hasAttribute&&ev.target.hasAttribute('data-no')))back.remove();});
+    document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){back.remove();document.removeEventListener('keydown',esc);}});
+  };
   const forceChoose=ev.shiftKey||ev.altKey;
+  const filename=`medicar_copia_${isoToday()}.json`;
   if(window.showSaveFilePicker){
     try{
       let handle=forceChoose?null:await getStoredHandle();
@@ -3864,7 +3901,7 @@ $('#btnExport').onclick=async ev=>{
         if(perm!=='granted')handle=null;
       }
       if(!handle){
-        handle=await window.showSaveFilePicker({suggestedName:`COPIA-CAJA-${isoToday()}.json`,types:[{description:'Còpia de seguretat',accept:{'application/json':['.json']}}]});
+        handle=await window.showSaveFilePicker({suggestedName:filename,types:[{description:isCA?'Còpia de seguretat MediCar Plus':'Copia de seguridad MediCar Plus',accept:{'application/json':['.json']}}]});
         await saveStoredHandle(handle);
       }
       const w=await handle.createWritable();
@@ -3872,15 +3909,15 @@ $('#btnExport').onclick=async ev=>{
       await w.close();
       // Verify file was written correctly
       try{const f=await handle.getFile();const check=await f.text();JSON.parse(check);if(check.length!==contents.length)throw new Error('tamaño no coincide')}
-      catch(e){toast('❌ AVISO: el archivo guardado NO VERIFICA. Prueba de nuevo o guarda en otro sitio.',7000);return}
-      toast(`💾 Guardado y verificado en ${handle.name} ✅`,3000);
+      catch(e){toast(isCA?'❌ AVÍS: el fitxer desat NO VERIFICA. Prova de nou o desa en un altre lloc.':'❌ AVISO: el archivo guardado NO VERIFICA. Prueba de nuevo o guarda en otro sitio.',7000);return}
+      showPostSaveInfo(handle.name||filename);
       return;
     }catch(e){if(e.name==='AbortError')return;toast('❌ Error: '+e.message,5000)}
   }
   // Fallback (Firefox/Safari o error)
   const blob=new Blob([contents],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`COPIA-CAJA-${isoToday()}.json`;a.click();
-  toast('💾 Copia descargada (para elegir carpeta usa Chrome/Edge)',3500);
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();
+  showPostSaveInfo(filename);
 };
 // Mostrar tooltip con destino actual
 (async()=>{const h=await getStoredHandle();if(h)$('#btnExport').title=`Guardar en ${h.name} · Shift+Click para cambiar carpeta`})();
@@ -4210,18 +4247,25 @@ $('#btnAiAsk').onclick=()=>{
 };
 $('#btnImportJson').onclick=()=>$('#jsonInput').click();
 $('#jsonInput').onchange=async ev=>{
+  const isCA=(typeof currentLang!=='undefined' && currentLang==='ca');
   const f=ev.target.files[0];if(!f)return;
   let txt='',obj=null;
-  try{txt=await f.text()}catch(e){toast('❌ No se puede leer el archivo: '+e.message,5000);ev.target.value='';return}
-  try{obj=JSON.parse(txt)}catch(e){toast('❌ El archivo no es un JSON válido. Errror: '+e.message,7000);console.error('Restore parse error',e,txt.slice(0,500));ev.target.value='';return}
+  try{txt=await f.text()}catch(e){toast((isCA?'❌ No es pot llegir el fitxer: ':'❌ No se puede leer el archivo: ')+e.message,5000);ev.target.value='';return}
+  try{obj=JSON.parse(txt)}catch(e){toast((isCA?'❌ El fitxer no és un JSON vàlid. Error: ':'❌ El archivo no es un JSON válido. Error: ')+e.message,7000);console.error('Restore parse error',e,txt.slice(0,500));ev.target.value='';return}
+  // 🔒 Validació de signatura · només accepta backups reals de MediCar Plus
+  // Els backups antics (pre-firma) es reconeixen per la seva estructura (cbTrafic + byDate).
+  const isSigned = obj && obj._signature === 'MEDICAR-PLUS-BACKUP-V4';
   const hasDual=obj&&typeof obj==='object'&&obj.cbTrafic&&obj.cempla&&(obj.cbTrafic.byDate||obj.cempla.byDate);
   const hasSingle=obj&&typeof obj==='object'&&obj.byDate&&typeof obj.byDate==='object';
   const hasOnlyCB=obj&&typeof obj==='object'&&obj.cbTrafic&&obj.cbTrafic.byDate&&!obj.cempla;
   const hasOnlyCempla=obj&&typeof obj==='object'&&obj.cempla&&obj.cempla.byDate&&!obj.cbTrafic;
-  if(!hasDual&&!hasSingle&&!hasOnlyCB&&!hasOnlyCempla){
+  const isValidLegacy = hasDual||hasSingle||hasOnlyCB||hasOnlyCempla;
+  if(!isSigned && !isValidLegacy){
     const keys=obj&&typeof obj==='object'?Object.keys(obj).slice(0,8).join(', '):'(no es objeto)';
-    toast(`❌ Archivo no reconocido. Contenido: {${keys}}. Debe tener "cbTrafic"/"cempla" o "byDate".`,8000);
-    console.error('Restore: unknown format',obj);
+    toast(isCA
+      ?`❌ Fitxer no reconegut com a còpia de MediCar Plus. No es tocarà cap dada.`
+      :`❌ Archivo no reconocido como copia de MediCar Plus. No se tocará ningún dato.`,8000);
+    console.error('Restore: unknown format',obj,'keys:',keys);
     ev.target.value='';return;
   }
   const cntCB=hasDual||hasOnlyCB?Object.values(obj.cbTrafic.byDate||{}).reduce((s,a)=>s+(a?.length||0),0):0;
@@ -4252,50 +4296,55 @@ $('#jsonInput').onchange=async ev=>{
     if(obj.datafonoCempla){
       if(replace)localStorage.setItem('caja.cempla.datafono',JSON.stringify(obj.datafonoCempla));
       else{const curDf=JSON.parse(localStorage.getItem('caja.cempla.datafono')||'{}');Object.assign(curDf,obj.datafonoCempla);localStorage.setItem('caja.cempla.datafono',JSON.stringify(curDf))}
-      log.push(`Datàfon Esport (${Object.keys(obj.datafonoCempla).length} dies)`);
+      log.push(isCA?`Datàfon Esport (${Object.keys(obj.datafonoCempla).length} dies)`:`Datáfono Empresa 2 (${Object.keys(obj.datafonoCempla).length} días)`);
     }
     if(obj.stats){
       if(replace)localStorage.setItem('caja.stats.v1',JSON.stringify(obj.stats));
       else{
         const cur=JSON.parse(localStorage.getItem('caja.stats.v1')||'{"autoescoles":[],"data":{}}');
-        // Merge autoescoles (union)
         for(const a of (obj.stats.autoescoles||[])){if(!cur.autoescoles.includes(a))cur.autoescoles.push(a)}
-        // Merge data (sobreescribir por mes)
         for(const[k,v]of Object.entries(obj.stats.data||{})){cur.data[k]=Object.assign({},cur.data[k]||{},v)}
         localStorage.setItem('caja.stats.v1',JSON.stringify(cur));
       }
-      log.push(`Estadístiques (${cntStats} mesos, ${cntStatsAutos} autoescoles)`);
+      log.push(isCA?`Estadístiques (${cntStats} mesos, ${cntStatsAutos} autoescoles)`:`Estadísticas (${cntStats} meses, ${cntStatsAutos} autoescuelas)`);
     }
     if(obj.irpf){
       if(replace)localStorage.setItem('caja.irpf.v1',JSON.stringify(obj.irpf));
       else{
         const cur=JSON.parse(localStorage.getItem('caja.irpf.v1')||'{"months":{},"quarters":{}}');
-        // Merge mesos (sobreescriu si ja existeix el mes)
         for(const[k,v]of Object.entries(obj.irpf.months||{})){cur.months[k]=v}
-        // Merge trimestres (sobreescriu — inclou sobre i estat de pagament)
         for(const[k,v]of Object.entries(obj.irpf.quarters||{})){cur.quarters[k]=v}
         localStorage.setItem('caja.irpf.v1',JSON.stringify(cur));
       }
       const nMesos=Object.keys(obj.irpf.months||{}).length;
       const nTrim=Object.keys(obj.irpf.quarters||{}).length;
-      log.push(`IRPF (${nMesos} mesos, ${nTrim} trimestres)`);
+      log.push(isCA?`IRPF (${nMesos} mesos, ${nTrim} trimestres)`:`IRPF (${nMesos} meses, ${nTrim} trimestres)`);
     }
     if(hasSingle){
       if(replace)localStorage.setItem(KEYS[currentCompany],JSON.stringify(obj));
       else{for(const[d,arr]of Object.entries(obj.byDate)){const list=entriesOf(d);for(const e of arr){if(!list.some(x=>x.id===e.id))list.push(e)}}saveState()}
-      log.push(`${cntSingle} fitxes (formato antiguo)`);
+      log.push(isCA?`${cntSingle} fitxes (format antic)`:`${cntSingle} fichas (formato antiguo)`);
     }
     state=loadState();render();
-    toast(`✅ ${replace?'Restaurat':'Fusionat'}: ${log.join(' · ')}`,5000);
+    toast((isCA?`✅ ${replace?'Restaurat':'Fusionat'}: `:`✅ ${replace?'Restaurado':'Fusionado'}: `)+log.join(' · '),5000);
   };
   const info=[];
-  if(cntCB)info.push(`<b>${cntCB}</b> fitxes Tràfic`);
-  if(cntCempla)info.push(`<b>${cntCempla}</b> fitxes ${(window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2'}`);
-  if(cntSingle)info.push(`<b>${cntSingle}</b> fitxes (individual)`);
-  if(cntDatafono)info.push(`<b>${cntDatafono}</b> dies de datàfon`);
-  if(cntStats)info.push(`<b>${cntStats}</b> mesos d'estadístiques`);
+  if(cntCB)info.push(isCA?`<b>${cntCB}</b> fitxes Tràfic`:`<b>${cntCB}</b> fichas Tráfico`);
+  if(cntCempla)info.push(isCA?`<b>${cntCempla}</b> fitxes ${(window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2'}`:`<b>${cntCempla}</b> fichas ${(window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2'}`);
+  if(cntSingle)info.push(isCA?`<b>${cntSingle}</b> fitxes (individual)`:`<b>${cntSingle}</b> fichas (individual)`);
+  if(cntDatafono)info.push(isCA?`<b>${cntDatafono}</b> dies de datàfon`:`<b>${cntDatafono}</b> días de datáfono`);
+  if(cntStats)info.push(isCA?`<b>${cntStats}</b> mesos d'estadístiques`:`<b>${cntStats}</b> meses de estadísticas`);
   const infoText=info.join(' · ');
-  confirmModal('📂 Restaurar còpia completa',`El fitxer conté:<br><br>${infoText}<br><br><b>Substituir tot</b> = esborra els actuals i posa els del fitxer.<br><b>Fusionar</b> = afegeix només el que falta sense esborrar.<br><br>⚠️ En els 2 casos es crea automàticament una còpia de seguretat prèvia al 🛡️ Historial.`,()=>restoreAll(true),'Substituir tot',true,{label:'Fusionar',onClick:()=>restoreAll(false)});
+  confirmModal(
+    isCA?'📂 Restaurar còpia completa':'📂 Restaurar copia completa',
+    isCA
+      ?`El fitxer conté:<br><br>${infoText}<br><br><b>Substituir tot</b> = esborra els actuals i posa els del fitxer.<br><b>Fusionar</b> = afegeix només el que falta sense esborrar.<br><br>⚠️ En els 2 casos es crea automàticament una còpia de seguretat prèvia al 🛡️ Historial (pots desfer-ho).`
+      :`El archivo contiene:<br><br>${infoText}<br><br><b>Reemplazar todo</b> = borra los datos actuales y pone los del archivo.<br><b>Fusionar</b> = añade solo lo que falta sin borrar.<br><br>⚠️ En los 2 casos se crea automáticamente una copia de seguridad previa en el 🛡️ Historial (puedes deshacer).`,
+    ()=>restoreAll(true),
+    isCA?'Substituir tot':'Reemplazar todo',
+    true,
+    {label:isCA?'Fusionar':'Fusionar',onClick:()=>restoreAll(false)}
+  );
   ev.target.value='';
 };
 setDate(currentDate);// init done via applyCompanyUI above
