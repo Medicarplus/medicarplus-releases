@@ -1,0 +1,98 @@
+{
+  "_signature": "MEDICAR-PLUS-BACKUP-V4",
+  "_createdAt": "2026-07-28T10:00:00.000Z",
+  "_appVersion": "qa-test",
+  "cbTrafic": {
+    "byDate": {
+      "2026-07-15": [
+        {
+          "id": "traf-001",
+          "kind": "TRAF",
+          "tipo": "B",
+          "grupo": "AUTO TEST",
+          "nombre": "Cliente Tráfico Original",
+          "importe": 42.5,
+          "descuento": 0,
+          "tasa": 24.58,
+          "fp": "E",
+          "fpTasa": "T",
+          "retorno": false
+        },
+        {
+          "id": "traf-002",
+          "kind": "PRIV",
+          "tipo": "Psicotécnico",
+          "grupo": "-",
+          "nombre": "Cliente Privado Original",
+          "importe": 55,
+          "descuento": 5,
+          "tasa": 0,
+          "fp": "B",
+          "fpTasa": "B",
+          "retorno": false
+        }
+      ]
+    }
+  },
+  "cempla": {
+    "byDate": {
+      "2026-07-16": [
+        {
+          "id": "cem-001",
+          "kind": "PRIV",
+          "tipo": "Revisión deportiva",
+          "grupo": "-",
+          "nombre": "Deportista Original",
+          "importe": 35,
+          "descuento": 0,
+          "tasa": 0,
+          "fp": "T",
+          "fpTasa": "T",
+          "split": "45-45-10",
+          "retorno": false
+        }
+      ]
+    }
+  },
+  "datafono": {
+    "2026-07-15": 91.08
+  },
+  "datafonoCempla": {
+    "2026-07-16": 35
+  },
+  "stats": {
+    "autoescoles": [
+      "Autoescuela Norte",
+      "Autoescuela Sur"
+    ],
+    "data": {
+      "2026-07": {
+        "Autoescuela Norte": {
+          "certificados": 11,
+          "importe": 330
+        },
+        "Autoescuela Sur": {
+          "certificados": 7,
+          "importe": 210
+        }
+      }
+    }
+  },
+  "irpf": {
+    "months": {
+      "2026-07": {
+        "personas": 3,
+        "bruto": 3000,
+        "retencion": 450,
+        "empresa": "Empresa Test"
+      }
+    },
+    "quarters": {
+      "2026-Q3": {
+        "amount": 450,
+        "paid": false
+      }
+    }
+  },
+  "_v": 4
+}
