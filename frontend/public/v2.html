@@ -3101,7 +3101,7 @@ function openIRPF(){
     back.querySelector('#irpfTC').oninput=(ev)=>{const d2=loadIrpf();if(!d2[irpfComp].months[m])d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);d2[irpfComp].months[m].totalCertificats=parseInt(String(ev.target.value).replace(/[^0-9-]/g,''))||0;saveIrpf(d2)};
     back.querySelector('#irpfTCB').oninput=(ev)=>{const d2=loadIrpf();if(!d2[irpfComp].months[m])d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);d2[irpfComp].months[m].totalCertfBombers=parseInt(String(ev.target.value).replace(/[^0-9-]/g,''))||0;saveIrpf(d2)};
     const payBtn=back.querySelector('#irpfPay');if(payBtn)payBtn.onclick=()=>{
-      confirmModal('Marcar '+q+' com a ingressat',`S'ha d'ingressar <b>${fmt(pendentIRPF)}€</b> a Hisenda pel trimestre <b>${q}</b> · <b>${compName(irpfComp)}</b>.<br><br>Confirmes que ja s'ha ingressat en metàl·lic al banc?`,()=>{
+      confirmModal(L('Marcar '+q+' com a ingressat','Marcar '+q+' como ingresado'),L(`S'ha d'ingressar <b>${fmt(pendentIRPF)}€</b> a Hisenda pel trimestre <b>${q}</b> · <b>${compName(irpfComp)}</b>.<br><br>Confirmes que ja s'ha ingressat en metàl·lic al banc?`,`Se deben ingresar <b>${fmt(pendentIRPF)}€</b> a Hacienda por el trimestre <b>${q}</b> · <b>${compName(irpfComp)}</b>.<br><br>¿Confirmas que ya se han ingresado en metálico en el banco?`),()=>{
         const d2=loadIrpf();const existing=d2[irpfComp].quarters[q]||{};d2[irpfComp].quarters[q]={...existing,paid:true,paidDate:isoToday(),paidAmount:pendentIRPF};saveIrpf(d2);
         toast(`✓ ${q} · ${compName(irpfComp)} marcat com a ingressat (${fmt(pendentIRPF)}€)`,3500);render();
       },'Sí, confirmar ingrés',false);
