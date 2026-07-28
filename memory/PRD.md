@@ -499,3 +499,27 @@ El programa GIC exporta el llistat de renovacions via <b>Clientes a Revisar</b> 
 **⚠️ IMPORTANT**: Cal **redesplegar producció** i **pujar 2 fitxers a GitHub Pages** (castellà i català):
 1. `guia-client-installacio.html` (castellà, per defecte, ja pujat un cop però ara amb selector)
 2. `guia-client-installacio-ca.html` (nou fitxer català)
+
+
+---
+
+## 🔤 [28-Feb-2026] Traducción total al Español del módulo IRPF + auditoría global (v2.html)
+
+**Problem**: El usuario reportó ("eres idiota de campeonato") que el módulo IRPF seguía apareciendo en catalán aunque el resto de la aplicación ya se había traducido al español. Todo el `Sobre IRPF`, el `Resumen trimestral`, y los diálogos de confirmación/toasts estaban con cadenas catalanas hardcodeadas.
+
+**Fix aplicado** (`/app/frontend/public/v2.html`):
+- IRPF modal (líneas 2762-3180): traducidos botón `Tancar → Cerrar`, `Resum trimestral → Resumen trimestral`, `Ingressat el/Import → Ingresado el/Importe`, `SOBRE IRPF` completo (título, subtítulo, párrafo, cabeceras DATA/IMPORT/NOTA → FECHA/IMPORTE/NOTA, `Cap retirada encara → Ninguna retirada todavía`, `TOTAL AL SOBRE → TOTAL EN EL SOBRE`, `Ja tens prou / Encara falta → Ya tienes bastante / Aún falta`, `Pendent Hisenda/Diferència → Pendiente Hacienda/Diferencia`).
+- Confirmodals y toasts internos IRPF: `Marcar q com a ingressat`, `Segur que vols revertir`, `Esborrar retirada`, `Sí, esborrar`, `Import ha de ser > 0`, `Afegit al sobre` → todos con versión española directa (con branch `currentLang==='ca'` fallback preservada).
+- `monthLabel` IRPF: nombres de meses ahora usan `['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']` cuando lang=es.
+- Print header IRPF: `Retenció → Retención`.
+- Libro Diario (accounting rows generation, líneas 2469-2578): `Assentament del dia → Asiento del día`, `Total en Caixa → Total en Caja`, `QUADRA/NO QUADRA → CUADRA/NO CUADRA`, `Diferència → Diferencia`, `Balanç per comptes → Balance por cuentas`, `Compte → Cuenta`.
+- Chip HABER (línea 431): `Ingresso en metàl·lic → Ingreso en metálico`.
+- Buscador (línea 6406): `Cap resultat per → Ningún resultado para`, `RESULTAT(S) → RESULTADO(S)`.
+- Validación del wizard `showConfigWizard` (línea 7757): `Has d'omplir el nom de l'Empresa 1 → Debes rellenar el nombre de la Empresa 1`, y validación de socios `La suma dels % dels socis és ... → La suma de los % de los socios es ...`.
+
+**Verificación**: 
+- Sintaxis JS: `node -e` sobre todos los `<script>` → `ALL SCRIPTS PARSE OK`.
+- Screenshot Playwright del modal IRPF con datos de prueba: renderiza 100% en Español (Cerrar, Resumen trimestral, Sobre IRPF, Añadir persona, Marcar como ingresado a Hacienda, etc).
+- Búsqueda automatizada de 27 palabras catalanas en `document.body.innerText` con modal IRPF abierto → **0 coincidencias**.
+
+**Recordatorio para el usuario**: Ejecutar **Redeploy a producción** para que estos cambios (más los anti-abuse, backups V4, traducciones previas de "Libreta"/"Estadísticas"/"Programa Referidos") lleguen a `project-helper-47.emergent.host`.

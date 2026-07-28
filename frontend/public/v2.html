@@ -428,7 +428,7 @@
               <span class="chip" data-t="DEBE" data-c="IRPF" style="border-color:#ff5d6c;color:#ff8a93">IRPF</span>
               <span class="chip" data-t="DEBE" data-c="Mercadona / material" style="border-color:#ff5d6c;color:#ff8a93">Mercadona / material</span>
               <span class="chip" data-t="DEBE" data-c="Devolució tasa DGT" style="border-color:#ff5d6c;color:#ff8a93">Devolució tasa DGT</span>
-              <span class="chip" data-t="HABER" data-c="Ingresso en metàl·lic" style="border-color:#3ddc97;color:#3ddc97">Ingresso en metàl·lic</span>
+              <span class="chip" data-t="HABER" data-c="Ingreso en metálico" style="border-color:#3ddc97;color:#3ddc97">Ingreso en metálico</span>
               <span class="chip" data-t="HABER" data-c="Honoraris" style="border-color:#3ddc97;color:#3ddc97">Honoraris</span>
               <span class="chip" data-t="HABER" data-c="Foto" style="border-color:#3ddc97;color:#3ddc97">Foto</span>
               <span class="chip" data-t="HABER" data-c="Ciclista" style="border-color:#3ddc97;color:#3ddc97">Ciclista</span>
@@ -2531,9 +2531,9 @@ function generateLedgerEntries(dateFrom,dateTo,company){
       }
       // Emet les línies agregades: DEBE = compte físic (Caixa/Banc), HABER = 705 Ingressos consolidat.
       const labelFor=(debeAcct)=>{
-        if(debeAcct==='570 Caixa')return 'Total en Caixa (efectiu)';
-        if(debeAcct.startsWith('572'))return `Total en ${debeAcct.replace('572 ','')}`;
-        return `Assentament del dia (${debeAcct})`;
+        if(debeAcct==='570 Caixa')return currentLang==='ca'?'Total en Caixa (efectiu)':'Total en Caja (efectivo)';
+        if(debeAcct.startsWith('572'))return currentLang==='ca'?`Total en ${debeAcct.replace('572 ','')}`:`Total en ${debeAcct.replace('572 ','')}`;
+        return currentLang==='ca'?`Assentament del dia (${debeAcct})`:`Asiento del día (${debeAcct})`;
       };
       Object.entries(bucket).forEach(([debeAcct,v])=>{
         rows.push({date,concepto:labelFor(debeAcct),debeAcct,debeAmt:v.debe,haberAcct:acct705,haberAmt:v.haber});
@@ -2587,37 +2587,37 @@ function openLedger(){
   const compName=(c)=>c==='cempla'?((window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2'):((window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1');
   back.innerHTML=`<div class="modal" style="max-width:1300px;width:97%;max-height:94vh;display:flex;flex-direction:column;padding:16px;background:#f5efdc;color:#1a1a1a">
     <div id="ldTitleBar" style="padding:10px 14px;margin:-16px -16px 12px -16px;border-radius:12px 12px 0 0;background:${headerBg(ledgerComp)};border-bottom:3px solid ${headerColor(ledgerComp)};display:flex;align-items:center;gap:14px">
-      <h3 id="ldTitle" style="margin:0;color:${headerColor(ledgerComp)};font-family:Georgia,serif;flex:1">📖 Llibreta · <span id="ldCompName">${compName(ledgerComp)}</span></h3>
+      <h3 id="ldTitle" style="margin:0;color:${headerColor(ledgerComp)};font-family:Georgia,serif;flex:1">📖 ${L('Llibreta','Libreta')} · <span id="ldCompName">${compName(ledgerComp)}</span></h3>
       <div style="display:flex;gap:6px;background:#fff;padding:4px;border-radius:8px;border:1px solid #999">
         <button class="btn" data-comp="trafic" style="padding:6px 14px;font-size:12px;font-weight:700;background:${ledgerComp==='trafic'?'#166534':'transparent'};color:${ledgerComp==='trafic'?'#fff':'#166534'};border:none;border-radius:6px">${compName('trafic')}</button>
         <button class="btn" data-comp="cempla" style="padding:6px 14px;font-size:12px;font-weight:700;background:${ledgerComp==='cempla'?'#1e5aa8':'transparent'};color:${ledgerComp==='cempla'?'#fff':'#1e5aa8'};border:none;border-radius:6px">${compName('cempla')}</button>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;padding-bottom:10px;border-bottom:2px solid #8b6f47">
-      <label class="small" style="margin:0;color:#5a3a1a">DES DE:</label>
+      <label class="small" style="margin:0;color:#5a3a1a">${L('DES DE','DESDE')}:</label>
       <input type="date" id="ldFrom" value="${dFrom}" style="background:#fff;color:#1a1a1a;border:1px solid #8b6f47;border-radius:4px;padding:6px 10px" />
-      <label class="small" style="margin:0;color:#5a3a1a">FINS:</label>
+      <label class="small" style="margin:0;color:#5a3a1a">${L('FINS','HASTA')}:</label>
       <input type="date" id="ldTo" value="${dTo}" style="background:#fff;color:#1a1a1a;border:1px solid #8b6f47;border-radius:4px;padding:6px 10px" />
-      <button class="btn" id="ldReload" style="background:#8b6f47;color:#fff;border-color:#5a3a1a" title="Recarregar">🔄</button>
+      <button class="btn" id="ldReload" style="background:#8b6f47;color:#fff;border-color:#5a3a1a" title="${L('Recarregar','Recargar')}">🔄</button>
       <div style="display:flex;gap:2px;align-items:center;margin-left:6px">
-        <button class="btn" id="ldPrev" title="Dia anterior" style="background:#5a3a1a;color:#fff;border-color:#5a3a1a;padding:6px 10px;font-size:14px">◀</button>
-        <button class="btn" id="ldNext" title="Dia següent" style="background:#5a3a1a;color:#fff;border-color:#5a3a1a;padding:6px 10px;font-size:14px">▶</button>
+        <button class="btn" id="ldPrev" title="${L('Dia anterior','Día anterior')}" style="background:#5a3a1a;color:#fff;border-color:#5a3a1a;padding:6px 10px;font-size:14px">◀</button>
+        <button class="btn" id="ldNext" title="${L('Dia següent','Día siguiente')}" style="background:#5a3a1a;color:#fff;border-color:#5a3a1a;padding:6px 10px;font-size:14px">▶</button>
       </div>
       <div style="display:flex;gap:4px;flex-wrap:wrap">
-        <button class="btn" data-p="today" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">Avui</button>
-        <button class="btn" data-p="7d" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">7 dies</button>
-        <button class="btn" data-p="thisMonth" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">Aquest mes</button>
-        <button class="btn" data-p="lastMonth" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">Mes anterior</button>
-        <button class="btn" data-p="thisYear" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">Aquest any</button>
-        <button class="btn" data-p="lastYear" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">Any anterior</button>
-        <button class="btn" data-p="all" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">Tot</button>
+        <button class="btn" data-p="today" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">${L('Avui','Hoy')}</button>
+        <button class="btn" data-p="7d" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">${L('7 dies','7 días')}</button>
+        <button class="btn" data-p="thisMonth" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">${L('Aquest mes','Este mes')}</button>
+        <button class="btn" data-p="lastMonth" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">${L('Mes anterior','Mes anterior')}</button>
+        <button class="btn" data-p="thisYear" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">${L('Aquest any','Este año')}</button>
+        <button class="btn" data-p="lastYear" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">${L('Any anterior','Año anterior')}</button>
+        <button class="btn" data-p="all" style="padding:6px 10px;font-size:11px;background:#e8dfc4;color:#5a3a1a;border-color:#8b6f47">${L('Tot','Todo')}</button>
       </div>
       <div style="flex:1"></div>
-      <button class="btn btn-primary" id="ldPrint" style="background:#5a3a1a;color:#fff;border-color:#5a3a1a">📥 Descargar PDF</button>
-      <button class="btn" data-no style="background:#8b6f47;color:#fff;border-color:#5a3a1a">✕ Tancar</button>
+      <button class="btn btn-primary" id="ldPrint" style="background:#5a3a1a;color:#fff;border-color:#5a3a1a">📥 ${L('Descarregar PDF','Descargar PDF')}</button>
+      <button class="btn" data-no style="background:#8b6f47;color:#fff;border-color:#5a3a1a">✕ ${L('Tancar','Cerrar')}</button>
     </div>
     <div id="ldBody" style="flex:1;overflow:auto;font-family:Georgia,'Times New Roman',serif;background:#faf6e8"></div>
-    <div class="small" style="margin-top:8px;color:#5a3a1a;font-style:italic;text-align:center">La llibreta de tota la vida — DEBE (esquerra) i HABER (dreta). Cada empresa té la seva pròpia llibreta independent.</div>
+    <div class="small" style="margin-top:8px;color:#5a3a1a;font-style:italic;text-align:center">${L('La llibreta de tota la vida — DEBE (esquerra) i HABER (dreta). Cada empresa té la seva pròpia llibreta independent.','La libreta de toda la vida — DEBE (izquierda) y HABER (derecha). Cada empresa tiene su propia libreta independiente.')}</div>
   </div>`;
   document.body.appendChild(back);
   back.querySelector('[data-no]').onclick=()=>back.remove();
@@ -2706,13 +2706,13 @@ function openLedger(){
           </tr>
         </tfoot>
       </table>
-      <div style="background:${cuadra?'#1a5a2a':'#8b1a1a'};color:#fff;padding:10px 14px;text-align:center;font-weight:700;font-family:Georgia,serif;font-size:14px">${cuadra?`✓ QUADRA · ${rows.length} assentaments · Saldo net: ${fmt(totD-totH)}`:`⚠ NO QUADRA · Diferència: ${fmt(Math.abs(totD-totH))}`}</div>
+      <div style="background:${cuadra?'#1a5a2a':'#8b1a1a'};color:#fff;padding:10px 14px;text-align:center;font-weight:700;font-family:Georgia,serif;font-size:14px">${cuadra?(currentLang==='ca'?`✓ QUADRA · ${rows.length} assentaments · Saldo net: ${fmt(totD-totH)}`:`✓ CUADRA · ${rows.length} asientos · Saldo neto: ${fmt(totD-totH)}`):(currentLang==='ca'?`⚠ NO QUADRA · Diferència: ${fmt(Math.abs(totD-totH))}`:`⚠ NO CUADRA · Diferencia: ${fmt(Math.abs(totD-totH))}`)}</div>
       <div style="background:#e8dfc4;padding:0;border-top:2px solid #8b6f47">
-        <div style="background:#5a3a1a;color:#fff;padding:10px 14px;text-align:center;font-weight:700;letter-spacing:4px;font-family:Georgia,serif;font-size:14px">B A L A N Ç · P E R · C O M P T E S</div>
+        <div style="background:#5a3a1a;color:#fff;padding:10px 14px;text-align:center;font-weight:700;letter-spacing:4px;font-family:Georgia,serif;font-size:14px">${currentLang==='ca'?'B A L A N Ç · P E R · C O M P T E S':'B A L A N C E · P O R · C U E N T A S'}</div>
         <table style="width:100%;border-collapse:collapse;background:#faf6e8">
           <thead style="background:#e8dfc4">
             <tr>
-              <th style="padding:8px 10px;text-align:left;font-size:11px;color:#5a3a1a;border-bottom:1px solid #8b6f47">Compte</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:#5a3a1a;border-bottom:1px solid #8b6f47">${currentLang==='ca'?'Compte':'Cuenta'}</th>
               <th style="padding:8px 10px;text-align:right;font-size:11px;color:#8b1a1a;border-bottom:1px solid #8b6f47">DEBE</th>
               <th style="padding:8px 10px;text-align:right;font-size:11px;color:#1a5a2a;border-bottom:1px solid #8b6f47">HABER</th>
               <th style="padding:8px 10px;text-align:right;font-size:11px;color:#5a3a1a;border-bottom:1px solid #8b6f47">SALDO</th>
@@ -2806,7 +2806,7 @@ function openIRPF(){
   const compName=(c)=>c==='cempla'?((window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2'):((window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1');
   const compColor=(c)=>c==='cempla'?'#1e5aa8':'#166534';
   const compBg=(c)=>c==='cempla'?'#dbeafe':'#dcfce7';
-  const monthLabel=ym=>{const [y,m]=ym.split('-');const names=['gen','feb','març','abr','maig','juny','jul','ago','set','oct','nov','des'];return `${names[parseInt(m)-1]}-${y.slice(2)}`};
+  const monthLabel=ym=>{const [y,m]=ym.split('-');const names=currentLang==='ca'?['gen','feb','març','abr','maig','juny','jul','ago','set','oct','nov','des']:['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];return `${names[parseInt(m)-1]}-${y.slice(2)}`};
   back.innerHTML=`<div class="modal irpf-modal" style="max-width:1400px;width:98%;max-height:96vh;display:flex;flex-direction:column;padding:16px;background:#faf6e8;color:#1a1a1a">
     <div id="irpfTitleBar" style="padding:10px 14px;margin:-16px -16px 12px -16px;border-radius:12px 12px 0 0;background:${compBg(irpfComp)};border-bottom:3px solid ${compColor(irpfComp)};display:flex;align-items:center;gap:14px">
       <h3 style="margin:0;color:${compColor(irpfComp)};font-family:Georgia,serif;flex:1">📋 IRPF · ${L('Retencions trimestrals','Retenciones trimestrales')} · <span id="irpfCompName">${compName(irpfComp)}</span></h3>
@@ -2814,19 +2814,19 @@ function openIRPF(){
         <button class="btn" data-icomp="trafic" style="padding:6px 14px;font-size:12px;font-weight:700;border:none;border-radius:6px">${compName('trafic')}</button>
         <button class="btn" data-icomp="cempla" style="padding:6px 14px;font-size:12px;font-weight:700;border:none;border-radius:6px">${compName('cempla')}</button>
       </div>
-      <button class="btn" data-no style="background:#b45309;color:#fff;border-color:#78350f">✕ Tancar</button>
+      <button class="btn" data-no style="background:#b45309;color:#fff;border-color:#78350f">✕ Cerrar</button>
     </div>
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;padding-bottom:10px;border-bottom:2px solid #b45309">
       <label class="small" style="margin:0;color:#78350f;font-weight:700">MES:</label>
       <button class="btn" id="irpfPrev" style="background:#78350f;color:#fff;border-color:#78350f;padding:6px 12px">◀</button>
       <input type="month" id="irpfMonth" value="${currentMonth}" style="background:#fff;color:#1a1a1a;border:1px solid #b45309;border-radius:4px;padding:6px 10px" />
       <button class="btn" id="irpfNext" style="background:#78350f;color:#fff;border-color:#78350f;padding:6px 12px">▶</button>
-      <div style="margin-left:20px;display:flex;align-items:center;gap:6px;padding:4px 10px;background:#fef3c7;border:2px solid #b45309;border-radius:6px" title="Escull el % IRPF que t'aplica Hisenda. Cada empresa pot tenir un % diferent (típic: 7% autònoms nous, 15% general, 19% altres).">
+      <div style="margin-left:20px;display:flex;align-items:center;gap:6px;padding:4px 10px;background:#fef3c7;border:2px solid #b45309;border-radius:6px" title="Elige el % IRPF que te aplica Hacienda. Cada empresa puede tener un % distinto (típico: 7% autónomos nuevos, 15% general, 19% otros).">
         <label class="small" style="margin:0;color:#78350f;font-weight:700">IRPF:</label>
         <input type="number" id="irpfPctInp" min="0" max="100" step="0.01" value="${irpfPct(irpfComp)}" data-testid="irpf-pct-input" style="width:70px;background:#fff;color:#78350f;border:1px solid #b45309;border-radius:4px;padding:5px 6px;font-family:'Courier New',monospace;font-weight:700;text-align:right" />
         <span style="color:#78350f;font-weight:700">%</span>
         <div style="display:flex;gap:3px;margin-left:6px">
-          <button class="btn" data-pct="7" style="padding:3px 8px;background:#fff;color:#78350f;border:1px solid #b45309;font-size:11px;font-weight:700" title="Autònoms nous (2 primers anys)">7%</button>
+          <button class="btn" data-pct="7" style="padding:3px 8px;background:#fff;color:#78350f;border:1px solid #b45309;font-size:11px;font-weight:700" title="Autónomos nuevos (2 primeros años)">7%</button>
           <button class="btn" data-pct="15" style="padding:3px 8px;background:#fff;color:#78350f;border:1px solid #b45309;font-size:11px;font-weight:700" title="Tipus general professional">15%</button>
           <button class="btn" data-pct="19" style="padding:3px 8px;background:#fff;color:#78350f;border:1px solid #b45309;font-size:11px;font-weight:700" title="Rendiments capital">19%</button>
         </div>
@@ -2910,7 +2910,7 @@ function openIRPF(){
     const totals=(md.entries||[]).reduce((a,e)=>{const c=irpfCalc(e,pct);a.brut+=Number(e.brut)||0;a.ss+=Number(e.ss)||0;if(c.hasSs){a.total+=c.total;a.netSS+=c.netSS;a.totalFinal+=c.totalFinal;a.net+=c.net;}else{a.net+=c.net;}a.irpf+=c.irpf;return a},{brut:0,ss:0,total:0,irpf:0,net:0,netSS:0,totalFinal:0});
     back.querySelector('#irpfBody').innerHTML=`
       <div style="display:flex;gap:20px;margin-bottom:14px;padding:12px;background:#fff8e6;border:2px solid #b45309;border-radius:8px">
-        <div style="flex:1"><label style="font-weight:700;color:#78350f;display:block;margin-bottom:4px">TOTAL CERTIFICATS del mes</label><input id="irpfTC" type="text" inputmode="numeric" value="${md.totalCertificats||''}" placeholder="0" style="width:100%;padding:10px 12px;border:1px solid #b45309;border-radius:6px;font-size:14px;font-family:'Courier New',monospace;background:#fff;color:#1a1a1a;font-weight:700" /></div>
+        <div style="flex:1"><label style="font-weight:700;color:#78350f;display:block;margin-bottom:4px">TOTAL CERTIFICADOS del mes</label><input id="irpfTC" type="text" inputmode="numeric" value="${md.totalCertificats||''}" placeholder="0" style="width:100%;padding:10px 12px;border:1px solid #b45309;border-radius:6px;font-size:14px;font-family:'Courier New',monospace;background:#fff;color:#1a1a1a;font-weight:700" /></div>
         <div style="flex:1"><label style="font-weight:700;color:#78350f;display:block;margin-bottom:4px">TOTAL CERTF. BOMBERS</label><input id="irpfTCB" type="text" inputmode="numeric" value="${md.totalCertfBombers||''}" placeholder="0" style="width:100%;padding:10px 12px;border:1px solid #b45309;border-radius:6px;font-size:14px;font-family:'Courier New',monospace;background:#fff;color:#1a1a1a;font-weight:700" /></div>
         <div style="flex:1;display:flex;align-items:end;justify-content:flex-end"><span style="font-family:Georgia,serif;font-size:18px;color:#78350f;font-weight:700">${monthLabel(m).toUpperCase()}</span></div>
       </div>
@@ -2930,9 +2930,9 @@ function openIRPF(){
             <th style="padding:8px;border:1px solid #78350f;width:50px"></th>
           </tr>
         </thead>
-        <tbody>${entriesHTML||'<tr><td colspan="10" style="padding:20px;text-align:center;color:#78350f;font-style:italic">Cap persona afegida encara. Fes clic a "+ Afegir persona" per començar.</td></tr>'}
+        <tbody>${entriesHTML||'<tr><td colspan="10" style="padding:20px;text-align:center;color:#78350f;font-style:italic">Ninguna persona añadida todavía. Haz clic en &quot;+ Añadir persona&quot; para empezar.</td></tr>'}
         <tr style="background:#fef3c7;font-weight:700;border-top:3px double #78350f">
-          <td colspan="3" style="padding:8px;border:1px solid #b45309;text-align:right;color:#78350f">TOTALS MES:</td>
+          <td colspan="3" style="padding:8px;border:1px solid #b45309;text-align:right;color:#78350f">TOTALES MES:</td>
           <td style="padding:8px;border:1px solid #b45309;text-align:right;font-family:'Courier New',monospace">${fmt(totals.brut)}</td>
           <td style="padding:8px;border:1px solid #b45309;text-align:right;font-family:'Courier New',monospace">${fmt(totals.ss)}</td>
           <td style="padding:8px;border:1px solid #b45309;text-align:right;font-family:'Courier New',monospace">${fmt(totals.total)}</td>
@@ -2949,33 +2949,33 @@ function openIRPF(){
         <span style="color:#78350f;font-size:12px;font-style:italic">💡 ${L('Consell: prem','Consejo: pulsa')} <b>Tab</b> ${L('per saltar al següent camp','para saltar al siguiente campo')} · ${L("Escriu amb",'Escribe con')} <b>${L('coma','coma')}</b> ${L('o','o')} <b>${L('punt','punto')}</b> (ex: 1500,50)</span>
       </div>
       <div style="background:#fff8e6;border:2px solid #b45309;border-radius:8px;padding:14px;margin-top:16px">
-        <h3 style="margin:0 0 12px 0;color:#78350f;font-family:Georgia,serif">🗓️ Resum trimestral · ${q} ${qData.paid?'<span style="background:#166534;color:#fff;padding:3px 10px;border-radius:4px;font-size:12px;margin-left:8px">✓ INGRESSAT A HISENDA</span>':'<span style="background:#b45309;color:#fff;padding:3px 10px;border-radius:4px;font-size:12px;margin-left:8px">⏳ PENDENT</span>'}</h3>
+        <h3 style="margin:0 0 12px 0;color:#78350f;font-family:Georgia,serif">🗓️ Resumen trimestral · ${q} ${qData.paid?'<span style="background:#166534;color:#fff;padding:3px 10px;border-radius:4px;font-size:12px;margin-left:8px">✓ INGRESADO A HACIENDA</span>':'<span style="background:#b45309;color:#fff;padding:3px 10px;border-radius:4px;font-size:12px;margin-left:8px">⏳ PENDIENTE</span>'}</h3>
         <table style="width:100%;border-collapse:collapse">
-          <thead><tr style="background:#78350f;color:#fff"><th style="padding:6px">Mes</th><th style="padding:6px">Persones</th><th style="padding:6px;text-align:right">BRUT</th><th style="padding:6px;text-align:right">IRPF a retenir</th></tr></thead>
+          <thead><tr style="background:#78350f;color:#fff"><th style="padding:6px">Mes</th><th style="padding:6px">Personas</th><th style="padding:6px;text-align:right">BRUT</th><th style="padding:6px;text-align:right">IRPF a retener</th></tr></thead>
           <tbody>${monthsQ.map(ym=>{const pm=perMonth.find(x=>x.ym===ym);return `<tr style="border-bottom:1px solid #d4a373"><td style="padding:6px 10px">${monthLabel(ym)} ${ym===m?'<b style="color:#166534">(actual)</b>':''}</td><td style="padding:6px 10px;text-align:center">${pm?pm.entries:0}</td><td style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace">${pm?fmt(pm.brut):'—'}</td><td style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace;color:#b45309;font-weight:700">${pm?fmt(pm.irpf):'—'}</td></tr>`}).join('')}
-          <tr style="background:${qData.paid?'#dcfce7':'#fef3c7'};font-weight:700"><td colspan="3" style="padding:10px;text-align:right;color:#78350f">${qData.paid?'INGRESSAT A HISENDA:':'PENDENT INGRÉS HISENDA:'}</td><td style="padding:10px;text-align:right;font-family:'Courier New',monospace;font-size:16px;color:${qData.paid?'#166534':'#b91c1c'}">${fmt(qData.paid?(qData.paidAmount||0):pendentIRPF)}</td></tr></tbody>
+          <tr style="background:${qData.paid?'#dcfce7':'#fef3c7'};font-weight:700"><td colspan="3" style="padding:10px;text-align:right;color:#78350f">${qData.paid?'INGRESADO A HACIENDA:':'PENDIENTE INGRESO HACIENDA:'}</td><td style="padding:10px;text-align:right;font-family:'Courier New',monospace;font-size:16px;color:${qData.paid?'#166534':'#b91c1c'}">${fmt(qData.paid?(qData.paidAmount||0):pendentIRPF)}</td></tr></tbody>
         </table>
         <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          ${qData.paid?`<span style="color:#166534;font-weight:700">✓ Ingressat el ${qData.paidDate?qData.paidDate.split('-').reverse().join('/'):'?'} · Import: ${fmt(qData.paidAmount||0)}</span><button class="btn" id="irpfUndo" style="background:#b91c1c;color:#fff;border-color:#b91c1c">↺ Revertir</button>`:`<button class="btn" id="irpfPay" style="background:#166534;color:#fff;border-color:#166534;padding:10px 20px;font-weight:700;font-size:14px">✓ Marcar com a ingressat a Hisenda</button><span style="color:#78350f;font-style:italic">Al marcar-ho, es generarà l'assentament comptable a la caixa (opcional).</span>`}
+          ${qData.paid?`<span style="color:#166534;font-weight:700">✓ Ingresado el ${qData.paidDate?qData.paidDate.split('-').reverse().join('/'):'?'} · Importe: ${fmt(qData.paidAmount||0)}</span><button class="btn" id="irpfUndo" style="background:#b91c1c;color:#fff;border-color:#b91c1c">↺ Revertir</button>`:`<button class="btn" id="irpfPay" style="background:#166534;color:#fff;border-color:#166534;padding:10px 20px;font-weight:700;font-size:14px">✓ Marcar como ingresado a Hacienda</button><span style="color:#78350f;font-style:italic">Al marcarlo, se generará el asiento contable en la caja (opcional).</span>`}
         </div>
       </div>
-      <!-- SOBRE IRPF: llista personal de retirades d'efectiu (només visual, no afecta comptabilitat) -->
+      <!-- SOBRE IRPF: lista personal de retiradas de efectivo (solo visual, no afecta a la contabilidad) -->
       <div style="background:#f0f9ff;border:2px solid #0369a1;border-radius:8px;padding:14px;margin-top:16px">
-        <h3 style="margin:0 0 6px 0;color:#0369a1;font-family:Georgia,serif">💰 Sobre IRPF · ${q} <span style="font-size:12px;color:#64748b;font-weight:400;font-style:italic">(només per tu · no afecta la comptabilitat)</span></h3>
-        <p style="margin:0 0 12px 0;color:#475569;font-size:12px;font-style:italic">Anota aquí els diners que vas traient de la caixa d'efectiu setmanalment per anar-los guardant al sobre per pagar Hisenda. Quan pagues el trimestre, marca'l com a "ingressat" i podràs començar amb el sobre nou del pròxim trimestre.</p>
+        <h3 style="margin:0 0 6px 0;color:#0369a1;font-family:Georgia,serif">💰 Sobre IRPF · ${q} <span style="font-size:12px;color:#64748b;font-weight:400;font-style:italic">(solo para ti · no afecta a la contabilidad)</span></h3>
+        <p style="margin:0 0 12px 0;color:#475569;font-size:12px;font-style:italic">Anota aquí el dinero que vas retirando de la caja de efectivo semanalmente para irlo guardando en el sobre para pagar a Hacienda. Cuando pagues el trimestre, márcalo como "ingresado" y podrás empezar con el sobre nuevo del próximo trimestre.</p>
         <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:end">
-          <div><label style="font-size:11px;color:#0369a1;font-weight:700;display:block;margin-bottom:4px">DATA</label><input id="sobreDate" type="date" value="${isoToday()}" style="padding:8px 10px;border:1px solid #0369a1;border-radius:6px;background:#fff;color:#1a1a1a;font-size:13px" /></div>
-          <div><label style="font-size:11px;color:#0369a1;font-weight:700;display:block;margin-bottom:4px">IMPORT (€)</label><input id="sobreAmt" type="text" inputmode="decimal" placeholder="0,00" style="padding:8px 10px;border:1px solid #0369a1;border-radius:6px;background:#fff;color:#1a1a1a;width:120px;text-align:right;font-family:'Courier New',monospace;font-size:13px;font-weight:700" /></div>
-          <div style="flex:1;min-width:180px"><label style="font-size:11px;color:#0369a1;font-weight:700;display:block;margin-bottom:4px">NOTA (opcional)</label><input id="sobreNote" type="text" placeholder="p.ex. Setmana 27" style="padding:8px 10px;border:1px solid #0369a1;border-radius:6px;background:#fff;color:#1a1a1a;width:100%;font-size:13px" /></div>
-          <button class="btn" id="sobreAdd" style="background:#0369a1;color:#fff;border-color:#0369a1;padding:9px 18px;font-weight:700;font-size:13px">+ Afegir</button>
+          <div><label style="font-size:11px;color:#0369a1;font-weight:700;display:block;margin-bottom:4px">FECHA</label><input id="sobreDate" type="date" value="${isoToday()}" style="padding:8px 10px;border:1px solid #0369a1;border-radius:6px;background:#fff;color:#1a1a1a;font-size:13px" /></div>
+          <div><label style="font-size:11px;color:#0369a1;font-weight:700;display:block;margin-bottom:4px">IMPORTE (€)</label><input id="sobreAmt" type="text" inputmode="decimal" placeholder="0,00" style="padding:8px 10px;border:1px solid #0369a1;border-radius:6px;background:#fff;color:#1a1a1a;width:120px;text-align:right;font-family:'Courier New',monospace;font-size:13px;font-weight:700" /></div>
+          <div style="flex:1;min-width:180px"><label style="font-size:11px;color:#0369a1;font-weight:700;display:block;margin-bottom:4px">NOTA (opcional)</label><input id="sobreNote" type="text" placeholder="p.ej. Semana 27" style="padding:8px 10px;border:1px solid #0369a1;border-radius:6px;background:#fff;color:#1a1a1a;width:100%;font-size:13px" /></div>
+          <button class="btn" id="sobreAdd" style="background:#0369a1;color:#fff;border-color:#0369a1;padding:9px 18px;font-weight:700;font-size:13px">+ Añadir</button>
         </div>
         <table style="width:100%;border-collapse:collapse;background:#fff">
-          <thead><tr style="background:#0369a1;color:#fff"><th style="padding:6px 10px;text-align:left">Data</th><th style="padding:6px 10px;text-align:right">Import</th><th style="padding:6px 10px">Nota</th><th style="padding:6px 10px;width:50px"></th></tr></thead>
-          <tbody>${(qData.sobre||[]).length?(qData.sobre||[]).slice().sort((a,b)=>a.date.localeCompare(b.date)).map((w,i)=>`<tr style="border-bottom:1px solid #cbd5e1"><td style="padding:6px 10px">${(w.date||'').split('-').reverse().join('/')}</td><td style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#0369a1">${fmt(Number(w.amount)||0)}</td><td style="padding:6px 10px;color:#475569;font-style:italic">${escapeHtml(w.note||'')}</td><td style="padding:6px 10px;text-align:center"><button class="btn" data-sobredel="${w._id||i}" style="padding:2px 8px;background:#b91c1c;color:#fff;border:none;border-radius:3px;font-size:11px">🗑️</button></td></tr>`).join(''):'<tr><td colspan="4" style="padding:20px;text-align:center;color:#64748b;font-style:italic">Cap retirada encara. Afegeix la primera quan treguis efectiu de la caixa per al sobre IRPF.</td></tr>'}
-          <tr style="background:#e0f2fe;font-weight:700;border-top:2px solid #0369a1"><td style="padding:8px 10px;color:#0369a1">TOTAL AL SOBRE:</td><td style="padding:8px 10px;text-align:right;font-family:'Courier New',monospace;color:#0369a1;font-size:14px">${fmt(sobreTotal)}</td><td colspan="2"></td></tr>
+          <thead><tr style="background:#0369a1;color:#fff"><th style="padding:6px 10px;text-align:left">Fecha</th><th style="padding:6px 10px;text-align:right">Importe</th><th style="padding:6px 10px">Nota</th><th style="padding:6px 10px;width:50px"></th></tr></thead>
+          <tbody>${(qData.sobre||[]).length?(qData.sobre||[]).slice().sort((a,b)=>a.date.localeCompare(b.date)).map((w,i)=>`<tr style="border-bottom:1px solid #cbd5e1"><td style="padding:6px 10px">${(w.date||'').split('-').reverse().join('/')}</td><td style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#0369a1">${fmt(Number(w.amount)||0)}</td><td style="padding:6px 10px;color:#475569;font-style:italic">${escapeHtml(w.note||'')}</td><td style="padding:6px 10px;text-align:center"><button class="btn" data-sobredel="${w._id||i}" style="padding:2px 8px;background:#b91c1c;color:#fff;border:none;border-radius:3px;font-size:11px">🗑️</button></td></tr>`).join(''):'<tr><td colspan="4" style="padding:20px;text-align:center;color:#64748b;font-style:italic">Ninguna retirada todavía. Añade la primera cuando saques efectivo de la caja para el sobre IRPF.</td></tr>'}
+          <tr style="background:#e0f2fe;font-weight:700;border-top:2px solid #0369a1"><td style="padding:8px 10px;color:#0369a1">TOTAL EN EL SOBRE:</td><td style="padding:8px 10px;text-align:right;font-family:'Courier New',monospace;color:#0369a1;font-size:14px">${fmt(sobreTotal)}</td><td colspan="2"></td></tr>
           </tbody>
         </table>
-        ${!qData.paid?`<div style="margin-top:12px;padding:10px;background:${diff>=0?'#dcfce7':'#fef2f2'};border-left:4px solid ${diff>=0?'#166534':'#b91c1c'};border-radius:4px;font-family:Georgia,serif"><b style="color:${diff>=0?'#166534':'#b91c1c'}">${diff>=0?'✓ Ja tens prou al sobre':'⚠ Encara falta al sobre'}</b> · Sobre: <b>${fmt(sobreTotal)}</b> · Pendent Hisenda: <b>${fmt(pendentIRPF)}</b> · Diferència: <b style="color:${diff>=0?'#166534':'#b91c1c'}">${diff>=0?'+':''}${fmt(diff)}</b></div>`:''}
+        ${!qData.paid?`<div style="margin-top:12px;padding:10px;background:${diff>=0?'#dcfce7':'#fef2f2'};border-left:4px solid ${diff>=0?'#166534':'#b91c1c'};border-radius:4px;font-family:Georgia,serif"><b style="color:${diff>=0?'#166534':'#b91c1c'}">${diff>=0?'✓ Ya tienes bastante en el sobre':'⚠ Aún falta en el sobre'}</b> · Sobre: <b>${fmt(sobreTotal)}</b> · Pendiente Hacienda: <b>${fmt(pendentIRPF)}</b> · Diferencia: <b style="color:${diff>=0?'#166534':'#b91c1c'}">${diff>=0?'+':''}${fmt(diff)}</b></div>`:''}
       </div>`;
     // Handlers — tots operen sobre l'empresa activa (irpfComp)
     // Sincronitzar input % IRPF (està a la barra fixa, fora d'#irpfBody, però l'actualitzem a cada render)
@@ -3101,32 +3101,32 @@ function openIRPF(){
     back.querySelector('#irpfTC').oninput=(ev)=>{const d2=loadIrpf();if(!d2[irpfComp].months[m])d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);d2[irpfComp].months[m].totalCertificats=parseInt(String(ev.target.value).replace(/[^0-9-]/g,''))||0;saveIrpf(d2)};
     back.querySelector('#irpfTCB').oninput=(ev)=>{const d2=loadIrpf();if(!d2[irpfComp].months[m])d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);d2[irpfComp].months[m].totalCertfBombers=parseInt(String(ev.target.value).replace(/[^0-9-]/g,''))||0;saveIrpf(d2)};
     const payBtn=back.querySelector('#irpfPay');if(payBtn)payBtn.onclick=()=>{
-      confirmModal(L('Marcar '+q+' com a ingressat','Marcar '+q+' como ingresado'),L(`S'ha d'ingressar <b>${fmt(pendentIRPF)}€</b> a Hisenda pel trimestre <b>${q}</b> · <b>${compName(irpfComp)}</b>.<br><br>Confirmes que ja s'ha ingressat en metàl·lic al banc?`,`Se deben ingresar <b>${fmt(pendentIRPF)}€</b> a Hacienda por el trimestre <b>${q}</b> · <b>${compName(irpfComp)}</b>.<br><br>¿Confirmas que ya se han ingresado en metálico en el banco?`),()=>{
+      confirmModal(L('Marcar '+q+' como ingresado','Marcar '+q+' como ingresado'),L(`Se deben ingresar <b>${fmt(pendentIRPF)}€</b> a Hacienda por el trimestre <b>${q}</b> · <b>${compName(irpfComp)}</b>.<br><br>¿Confirmas que ya se han ingresado en metálico en el banco?`,`Se deben ingresar <b>${fmt(pendentIRPF)}€</b> a Hacienda por el trimestre <b>${q}</b> · <b>${compName(irpfComp)}</b>.<br><br>¿Confirmas que ya se han ingresado en metálico en el banco?`),()=>{
         const d2=loadIrpf();const existing=d2[irpfComp].quarters[q]||{};d2[irpfComp].quarters[q]={...existing,paid:true,paidDate:isoToday(),paidAmount:pendentIRPF};saveIrpf(d2);
-        toast(`✓ ${q} · ${compName(irpfComp)} marcat com a ingressat (${fmt(pendentIRPF)}€)`,3500);render();
-      },'Sí, confirmar ingrés',false);
+        toast(`✓ ${q} · ${compName(irpfComp)} marcado como ingresado (${fmt(pendentIRPF)}€)`,3500);render();
+      },'Sí, confirmar ingreso',false);
     };
     const undoBtn=back.querySelector('#irpfUndo');if(undoBtn)undoBtn.onclick=()=>{
-      confirmModal('Revertir '+q,'Segur que vols revertir el pagament?',()=>{const d2=loadIrpf();if(d2[irpfComp].quarters[q]){delete d2[irpfComp].quarters[q].paid;delete d2[irpfComp].quarters[q].paidDate;delete d2[irpfComp].quarters[q].paidAmount}saveIrpf(d2);toast('Revertit',2500);render()},'Sí, revertir');
+      confirmModal('Revertir '+q,'¿Seguro que quieres revertir el pago?',()=>{const d2=loadIrpf();if(d2[irpfComp].quarters[q]){delete d2[irpfComp].quarters[q].paid;delete d2[irpfComp].quarters[q].paidDate;delete d2[irpfComp].quarters[q].paidAmount}saveIrpf(d2);toast('Revertido',2500);render()},'Sí, revertir');
     };
-    // SOBRE IRPF: afegir/esborrar retirades manuals d'efectiu (per empresa i trimestre)
+    // SOBRE IRPF: añadir/borrar retiradas manuales de efectivo (por empresa y trimestre)
     const sobreAddBtn=back.querySelector('#sobreAdd');
     if(sobreAddBtn)sobreAddBtn.onclick=()=>{
       const date=back.querySelector('#sobreDate').value||isoToday();
       const amt=num(back.querySelector('#sobreAmt').value);
       const note=back.querySelector('#sobreNote').value||'';
-      if(amt<=0){toast('Import ha de ser > 0',2500);return}
+      if(amt<=0){toast('El importe debe ser > 0',2500);return}
       const d2=loadIrpf();if(!d2[irpfComp].quarters[q])d2[irpfComp].quarters[q]={paid:false};if(!d2[irpfComp].quarters[q].sobre)d2[irpfComp].quarters[q].sobre=[];
       d2[irpfComp].quarters[q].sobre.push({_id:Date.now()+'-'+Math.random().toString(36).slice(2,6),date,amount:amt,note});
-      saveIrpf(d2);toast(`✓ Afegit ${fmt(amt)} al sobre ${q} · ${compName(irpfComp)}`,2500);render();
+      saveIrpf(d2);toast(`✓ Añadido ${fmt(amt)} al sobre ${q} · ${compName(irpfComp)}`,2500);render();
     };
     back.querySelectorAll('[data-sobredel]').forEach(b=>b.onclick=()=>{
       const id=b.dataset.sobredel;
-      confirmModal('Esborrar retirada','Segur que vols esborrar aquesta retirada del sobre?',()=>{
+      confirmModal('Borrar retirada','¿Seguro que quieres borrar esta retirada del sobre?',()=>{
         const d2=loadIrpf();if(!d2[irpfComp].quarters[q]||!d2[irpfComp].quarters[q].sobre)return;
         d2[irpfComp].quarters[q].sobre=d2[irpfComp].quarters[q].sobre.filter((w,i)=>String(w._id||i)!==String(id));
         saveIrpf(d2);render();
-      },'Sí, esborrar');
+      },'Sí, borrar');
     });
   };
 
@@ -3153,7 +3153,7 @@ function openIRPF(){
     // Injectem una capçalera contextual abans del clone
     const dateStr=new Date().toLocaleDateString(currentLang==='ca'?'ca-ES':'es-ES',{day:'2-digit',month:'long',year:'numeric'});
     const pctVal=irpfPct(irpfComp);
-    const header=`<div style="text-align:center;padding:8px 0 12px 0;border-bottom:2px solid #78350f;margin-bottom:12px"><h1 style="margin:0;color:#78350f;font-family:Georgia,serif;font-size:22px">IRPF · ${escapeHtml(compName(irpfComp))} · ${monthLabel(currentMonth).toUpperCase()}</h1><div style="font-size:11px;color:#666;margin-top:4px">${dateStr} · Retenció ${pctVal}% · ${entries.length} persona${entries.length===1?'':'s'}</div></div>`;
+    const header=`<div style="text-align:center;padding:8px 0 12px 0;border-bottom:2px solid #78350f;margin-bottom:12px"><h1 style="margin:0;color:#78350f;font-family:Georgia,serif;font-size:22px">IRPF · ${escapeHtml(compName(irpfComp))} · ${monthLabel(currentMonth).toUpperCase()}</h1><div style="font-size:11px;color:#666;margin-top:4px">${dateStr} · ${currentLang==='ca'?'Retenció':'Retención'} ${pctVal}% · ${entries.length} persona${entries.length===1?'':'s'}</div></div>`;
     // Wrap modal content in a container to attach the header
     const wrapper=document.createElement('div');
     wrapper.innerHTML=header;
@@ -6403,12 +6403,12 @@ if(isPremiumLicense() && loadCalUrls().filter(u=>u.enabled).length>0){
     });
     results.sort((a,b)=>(b.strong-a.strong)||(a.date<b.date?1:-1));
     if(!results.length){
-      box.innerHTML='<div style="padding:14px;color:#94a3b8;font-size:12px;text-align:center;font-style:italic">Cap resultat per <b>"'+escHtml(q)+'"</b></div>';
+      box.innerHTML='<div style="padding:14px;color:#94a3b8;font-size:12px;text-align:center;font-style:italic">'+(currentLang==='ca'?'Cap resultat per':'Ningún resultado para')+' <b>"'+escHtml(q)+'"</b></div>';
       box.style.display='block';return;
     }
     const top=results.slice(0,30);
     const fpLabels={E:'💵',T:'💳',B:'📱',X:'🏦'};
-    box.innerHTML='<div style="padding:8px 12px;font-size:10px;color:#7a8394;letter-spacing:1.5px;border-bottom:1px solid #2a3040;background:#0e1117">'+results.length+' RESULTAT(S)'+(results.length>30?' · mostrant els 30 més recents':'')+'</div>'
+    box.innerHTML='<div style="padding:8px 12px;font-size:10px;color:#7a8394;letter-spacing:1.5px;border-bottom:1px solid #2a3040;background:#0e1117">'+results.length+' '+(currentLang==='ca'?'RESULTAT(S)':'RESULTADO(S)')+(results.length>30?(currentLang==='ca'?' · mostrant els 30 més recents':' · mostrando los 30 más recientes'):'')+'</div>'
       +top.map(r=>{
         const imp=(r.e.importe||0)-(r.e.descuento||0)+(r.e.tasa||0);
         const isDh=r.e.kind==='DH';
@@ -7754,12 +7754,12 @@ function showConfigWizard(isFirstRun){
   const save=()=>{
     const n1=back.querySelector('#cfgC1').value.trim();
     const n2=back.querySelector('#cfgC2').value.trim();
-    if(!n1){err.textContent='✗ Has d\'omplir el nom de l\'Empresa 1.';err.style.display='block';return}
+    if(!n1){err.textContent=currentLang==='ca'?'✗ Has d\'omplir el nom de l\'Empresa 1.':'✗ Debes rellenar el nombre de la Empresa 1.';err.style.display='block';return}
     // Validació socis: si n'hi ha, tots han de tenir nom i la suma dels % ha de ser 100
     const partners=workingPartners.filter(p=>p.name.trim()!==''||p.pct>0).map(p=>({name:p.name.trim()||'Soci',pct:p.pct||0}));
     if(partners.length){
       const totalPct=partners.reduce((s,p)=>s+p.pct,0);
-      if(Math.abs(totalPct-100)>0.01){err.textContent='✗ La suma dels % dels socis és '+totalPct+' i ha de ser 100. Ajusta els valors o elimina els socis si no vols usar aquest sistema.';err.style.display='block';return}
+      if(Math.abs(totalPct-100)>0.01){err.textContent=currentLang==='ca'?('✗ La suma dels % dels socis és '+totalPct+' i ha de ser 100. Ajusta els valors o elimina els socis si no vols usar aquest sistema.'):('✗ La suma de los % de los socios es '+totalPct+' y debe ser 100. Ajusta los valores o elimina los socios si no quieres usar este sistema.');err.style.display='block';return}
     }
     // Empresa 2 és opcional. Si l'usuari la deixa buida, la guardem com null i s'amaga a la UI.
     const company2Value=n2?{name:n2}:null;
