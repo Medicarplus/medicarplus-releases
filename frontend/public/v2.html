@@ -7390,6 +7390,18 @@ function showActivationModal(){
     +'<div id="licStatus" style="color:#38bdf8;font-size:12px;margin-top:8px;display:none"></div>'
     +'</div>'
     +'<button id="licBtn" style="width:100%;padding:14px;background:linear-gradient(135deg,#f5b301,#d97706);color:#0f172a;border:none;border-radius:10px;font-family:Georgia,serif;font-size:16px;font-weight:700;letter-spacing:2px;cursor:pointer;text-transform:uppercase">'+L('✓ Activar Llicència','✓ Activar Licencia')+'</button>'
+    +'<div style="text-align:center;margin-top:14px">'
+    +'<a href="#" id="showAdminLogin" data-testid="admin-login-toggle" style="color:#a855f7;font-size:12px;text-decoration:underline;cursor:pointer">🔐 ¿Eres administrador?</a>'
+    +'</div>'
+    +'<div id="adminLoginBox" data-testid="admin-login-box" style="display:none;margin-top:14px;padding:16px;background:#0b1121;border:1px dashed #a855f7;border-radius:10px">'
+    +'<div style="font-size:11px;color:#c4b5fd;letter-spacing:1.5px;font-weight:800;margin-bottom:10px">👑 ACCESO ADMINISTRADOR (MASTER)</div>'
+    +'<label style="display:block;font-size:11px;color:#a855f7;font-weight:700;margin-bottom:4px">USUARIO</label>'
+    +'<input id="admUser" data-testid="admin-user-input" type="text" placeholder="ADMINISTRADOR" autocomplete="username" style="width:100%;padding:10px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:13px;box-sizing:border-box;margin-bottom:10px" />'
+    +'<label style="display:block;font-size:11px;color:#a855f7;font-weight:700;margin-bottom:4px">CONTRASEÑA</label>'
+    +'<input id="admPass" data-testid="admin-pass-input" type="password" placeholder="••••••••" autocomplete="current-password" style="width:100%;padding:10px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:13px;box-sizing:border-box;margin-bottom:12px" />'
+    +'<button id="admLoginBtn" data-testid="admin-login-btn" style="width:100%;padding:12px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border:none;border-radius:8px;font-family:Georgia,serif;font-size:14px;font-weight:800;letter-spacing:1px;cursor:pointer">ENTRAR COMO ADMINISTRADOR</button>'
+    +'<div id="admErr" data-testid="admin-login-error" style="color:#ef4444;font-size:12px;margin-top:8px;display:none"></div>'
+    +'</div>'
     +'<div style="text-align:center;margin-top:24px;padding-top:20px;border-top:1px solid #334155">'
     +'<p style="color:#64748b;font-size:11px;margin:0;line-height:1.6">'+L('No tens llicència? ','¿No tienes licencia? ')+'<a href="'+LIC.REQUEST_URL+'" target="_blank" style="color:#f5b301;text-decoration:underline">'+L('Demana-la aquí','Solicítala aquí')+'</a><br>'+L('o contacta amb ','o contacta con ')+'<b style="color:#f5b301">MediCar Plus</b> · <a href="mailto:'+LIC.SUPPORT_EMAIL+'" style="color:#f5b301;text-decoration:underline">'+LIC.SUPPORT_EMAIL+'</a> · <a href="'+LIC.WEBSITE_URL+'" target="_blank" style="color:#f5b301;text-decoration:underline">medicarplus.es</a><br>'+L('Instal·lació: ','Instalación: ')+new Date(installDate).toLocaleDateString(currentLang==='es'?'es-ES':'ca-ES')+'</p>'
     +'</div>'
@@ -7426,6 +7438,59 @@ function showActivationModal(){
   };
   btn.onclick=tryActivate;
   inp.onkeydown=(e)=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();tryActivate()}};
+  // 🔐 Admin login (usuario + contraseña) — segunda vía para entrar como MASTER
+  const admToggle=back.querySelector('#showAdminLogin');
+  const admBox=back.querySelector('#adminLoginBox');
+  const admUser=back.querySelector('#admUser');
+  const admPass=back.querySelector('#admPass');
+  const admBtn=back.querySelector('#admLoginBtn');
+  const admErr=back.querySelector('#admErr');
+  if(admToggle){
+    admToggle.onclick=(ev)=>{
+      ev.preventDefault();
+      const shown=admBox.style.display!=='none';
+      admBox.style.display=shown?'none':'block';
+      if(!shown) setTimeout(()=>admUser.focus(),50);
+    };
+  }
+  const doAdminLogin=async()=>{
+    admErr.style.display='none';
+    const username=(admUser.value||'').trim();
+    const password=admPass.value||'';
+    if(!username||!password){admErr.textContent='✗ Rellena usuario y contraseña';admErr.style.display='block';return}
+    admBtn.disabled=true;admBtn.textContent='Verificando…';
+    try{
+      // Preferimos same-origin cuando estamos en un http(s):// (preview/prod web). En Electron (file://) recurrimos a getApiBase().
+      let base = '';
+      try{
+        if(location.protocol==='http:' || location.protocol==='https:') base = location.origin.replace(/\/$/,'');
+      }catch(e){}
+      if(!base){
+        base = (typeof getApiBase==='function'?getApiBase():'').replace(/\/$/,'');
+      }
+      const url = base ? base+'/api/auth/admin-login' : '/api/auth/admin-login';
+      const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok){
+        admErr.textContent='✗ '+(data.detail||('Error '+res.status));
+        admErr.style.display='block';
+        admBtn.disabled=false;admBtn.textContent='ENTRAR COMO ADMINISTRADOR';
+        return;
+      }
+      // Éxito → activamos la licencia MASTER localmente (equivalente a introducir la MASTER_KEY manualmente).
+      saveLicense({key:LIC.MASTER_KEY,type:'MASTER',centre:'MediCar Plus (owner)',plan:'MASTER',expires:'PERMANENT',expTs:null,activated:new Date().toISOString(),installId});
+      try{if(typeof window.updateTrialBadge==='function')window.updateTrialBadge()}catch(e){}
+      back.innerHTML='<div style="text-align:center;color:#a855f7;font-family:Georgia,serif"><div style="font-size:60px;margin-bottom:12px">👑</div><h2 style="margin:0">¡Sesión de Administrador activada!</h2><p style="color:#94a3b8">Recargando la app…</p></div>';
+      setTimeout(()=>location.reload(),1200);
+    }catch(e){
+      admErr.textContent='✗ Error de red: '+(e&&e.message||e);
+      admErr.style.display='block';
+      admBtn.disabled=false;admBtn.textContent='ENTRAR COMO ADMINISTRADOR';
+    }
+  };
+  if(admBtn) admBtn.onclick=doAdminLogin;
+  if(admPass) admPass.onkeydown=(e)=>{if(e.key==='Enter'){e.preventDefault();doAdminLogin()}};
+  if(admUser) admUser.onkeydown=(e)=>{if(e.key==='Enter'){e.preventDefault();admPass.focus()}};
 }
 function showLicenseInfo(){
   const lic=loadLicense();const installId=getInstallId();

@@ -246,6 +246,10 @@ app.include_router(build_trial_router(db), prefix="/api")
 from routes.referrals import create_router as build_referrals_router
 app.include_router(build_referrals_router(db))
 
+# Admin login (username + password) — second auth path for Master session
+from routes.auth_admin import router as auth_admin_router
+app.include_router(auth_admin_router, prefix="/api")
+
 # Stripe webhook (obligatori per playbook: /api/webhook/stripe)
 # Gestiona tant one-off (via emergentintegrations) com subscriptions (via stripe SDK)
 from fastapi import Request as _FastReq

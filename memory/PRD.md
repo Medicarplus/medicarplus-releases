@@ -538,3 +538,26 @@ El programa GIC exporta el llistat de renovacions via <b>Clientes a Revisar</b> 
    - Todas las referencias de bucketing (`bucket['570 Caja']` etc.) actualizadas consistentemente para evitar KeyError en las agregaciones diarias.
 
 **Verificación**: JS parse OK, screenshot Playwright del modal "¿Qué hay de nuevo?" muestra texto 100% español, auditoría automatizada de 45+ palabras catalanas devuelve **0 coincidencias**.
+
+
+---
+
+## 🔐 [28-Feb-2026] · Login ADMINISTRADOR (second Master path) + Botón "Panel Licencias"
+
+### 1. Login `ADMINISTRADOR` + contraseña (paralelo a la MASTER key)
+- **UX**: enlace `🔐 ¿Eres administrador?` bajo el botón ACTIVAR LICENCIA en la pantalla de activación. Al hacer clic despliega campos Usuario + Contraseña.
+- **Usuario**: `ADMINISTRADOR` (case-insensitive). **Contraseña**: `Mbrugulat24` (case-sensitive).
+- **Backend**: `/app/backend/routes/auth_admin.py` · `POST /api/auth/admin-login`. Bcrypt cost 12 · comparación constante-time · brute-force 5 intentos/15min por IP (in-memory).
+- **Env vars** en `/app/backend/.env`: `ADMIN_LOGIN_USERNAME`, `ADMIN_LOGIN_PASSWORD_HASH`.
+- **Ambas vías funcionan en paralelo** (MASTER key + ADMINISTRADOR login).
+
+### 2. Botón "🎛️ Panel Licencias" en modal 🔐 Información de licencia
+- Aparece sólo cuando `lic.type === 'MASTER'`, dentro del bloque VISTA PREVIA DE PLAN.
+- Abre `/admin.html` en pestaña nueva con `#token=<ADMIN_TOKEN>` en el hash → auto-login instantáneo (`admin.html` lee y limpia el hash al DOMContentLoaded). El fragmento URL no llega al servidor.
+
+### Verificación (curl + Playwright)
+- `POST /api/auth/admin-login` responde correctamente 200/401/429.
+- Flujo E2E Playwright: rellenar `administrador` + `Mbrugulat24` → click submit → localStorage guarda la licencia MASTER → app recarga en modo owner.
+
+### Rotación futura de la contraseña
+`python -c "import bcrypt;print(bcrypt.hashpw(b'NUEVA_PASS', bcrypt.gensalt()).decode())"` → sustituir `ADMIN_LOGIN_PASSWORD_HASH` en `.env` → `sudo supervisorctl restart backend`.
