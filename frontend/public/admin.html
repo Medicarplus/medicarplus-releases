@@ -395,10 +395,17 @@ async function openDetail(install_id){
   back.addEventListener('click',e=>{if(e.target===back)back.remove()});
 }
 
-// Auto-login si token guardat
+// Auto-login si token guardat (sessionStorage) o si arriba per URL hash (#token=XXX, cas del botó "Panel Licencias" de v2.html)
 window.addEventListener('DOMContentLoaded',()=>{
   try{
-    const t = sessionStorage.getItem('mcp.admin.token');
+    // 1) Prioritat: hash de la URL (arribat des de v2.html com a Master)
+    let hashToken = '';
+    if(location.hash && location.hash.startsWith('#token=')){
+      hashToken = decodeURIComponent(location.hash.slice(7));
+      // Netegem el hash immediatament perquè no quedi visible ni al historial
+      try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){}
+    }
+    const t = hashToken || sessionStorage.getItem('mcp.admin.token');
     if(t){document.getElementById('tokenInput').value=t; doLogin();}
   }catch(e){}
 });

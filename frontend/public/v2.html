@@ -7436,13 +7436,17 @@ function showLicenseInfo(){
   const currentPreview=(localStorage.getItem('caja.plan.preview.v1')||'').toUpperCase();
   const previewBlock=isMaster?(
     '<div style="background:#0b1121;border:1px dashed #a855f7;border-radius:8px;padding:14px;margin-bottom:12px">'
-    +'<div style="font-weight:800;color:#c4b5fd;font-size:12px;letter-spacing:.5px;margin-bottom:8px">👀 VISTA PRÈVIA DE PLA (només MASTER)</div>'
-    +'<div style="font-size:12px;color:#94a3b8;margin-bottom:10px">Visualitza l\'app com si fossis un client d\'un altre pla. Útil per validar el gating (què queda bloquejat/desbloquejat).</div>'
+    +'<div style="font-weight:800;color:#c4b5fd;font-size:12px;letter-spacing:.5px;margin-bottom:8px">👀 VISTA PREVIA DE PLAN (solo MASTER)</div>'
+    +'<div style="font-size:12px;color:#94a3b8;margin-bottom:10px">Visualiza la app como si fueras un cliente de otro plan. Útil para validar el gating (qué queda bloqueado/desbloqueado).</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap" data-testid="plan-preview-buttons">'
     +'<button class="btn plan-prev-btn" data-preview="" data-testid="prev-off" style="'+(currentPreview===''?'background:#22c55e;color:#0b1121;border-color:#22c55e':'background:transparent;color:#22c55e;border-color:#22c55e')+'">Real (Master)</button>'
     +'<button class="btn plan-prev-btn" data-preview="TRIAL" data-testid="prev-trial" style="'+(currentPreview==='TRIAL'?'background:#3ddc97;color:#0b1121;border-color:#3ddc97':'background:transparent;color:#3ddc97;border-color:#3ddc97')+'">🎁 Trial (60d)</button>'
     +'<button class="btn plan-prev-btn" data-preview="STD" data-testid="prev-std" style="'+(currentPreview==='STD'?'background:#94a3b8;color:#0b1121;border-color:#94a3b8':'background:transparent;color:#94a3b8;border-color:#94a3b8')+'">Standard</button>'
     +'<button class="btn plan-prev-btn" data-preview="PRM" data-testid="prev-prm" style="'+(currentPreview==='PRM'?'background:#a855f7;color:#fff;border-color:#a855f7':'background:transparent;color:#c4b5fd;border-color:#a855f7')+'">⭐ Premium</button>'
+    +'</div>'
+    +'<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #334155">'
+    +'<button class="btn" id="btnOpenAdminPanel" data-testid="btn-open-admin-panel" style="width:100%;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border:none;font-weight:800;padding:10px 14px;font-size:13px;letter-spacing:.5px">🎛️ Panel Licencias</button>'
+    +'<div style="font-size:10.5px;color:#94a3b8;margin-top:6px;line-height:1.4">Abre el panel de administración de licencias (genera claves, revisa clientes, flags anti-abuso, Discord webhooks).</div>'
     +'</div>'
     +'<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #334155">'
     +'<button class="btn" id="btnResetPreview" data-testid="btn-reset-preview" style="width:100%;background:#f59e0b;color:#0b1121;border-color:#f59e0b;font-weight:800">🔄 Reiniciar pruebas (limpiar simulación)</button>'
@@ -7537,6 +7541,16 @@ function showLicenseInfo(){
       location.reload();
     };
   });
+  // 🎛️ Panel Licencias (solo MASTER) → abre /admin.html en pestaña nueva con el token pasado por fragmento URL (#token=…) para auto-login instantáneo.
+  const btnOpenAdmin = back.querySelector('#btnOpenAdminPanel');
+  if(btnOpenAdmin){
+    btnOpenAdmin.onclick=()=>{
+      const url = new URL('admin.html', location.href);
+      // # → nunca se envía al servidor; sólo vive en el cliente y admin.html lo limpiará tras leerlo.
+      url.hash = 'token=' + encodeURIComponent(SMS_ADMIN_TOKEN);
+      window.open(url.toString(), '_blank', 'noopener');
+    };
+  }
   // 🔄 Reiniciar pruebas: neteja TOTA la simulació del Master
   const btnResetPrev = back.querySelector('#btnResetPreview');
   if(btnResetPrev){
