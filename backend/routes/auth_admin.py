@@ -108,4 +108,45 @@ async def admin_login(body: AdminLoginIn, request: Request):
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos.")
 
     _reset_failures(ip)
-    return {"ok": True}
+    # Devolvemos también el admin token del backend para que admin.html pueda usarlo
+    # sin exponerlo en el frontend hardcodeado.
+    admin_token = os.environ.get("LICENSE_ADMIN_TOKEN", "")
+    return {"ok": True, "admin_token": admin_token or None}
+
+
+class UnifiedGateIn(BaseModel):
+    """Cualquiera de los dos vale: password (Mbrugulat24) O admin token literal."""
+    credential: str = Field(..., min_length=1, max_length=512)
+
+
+@router.post("/admin-gate")
+async def admin_unified_gate(body: UnifiedGateIn, request: Request):
+    """Puerta unificada para el panel admin.
+
+    Acepta o bien la contraseña `Mbrugulat24` (verificada con bcrypt) o bien
+    el `LICENSE_ADMIN_TOKEN` literal. Facilita al owner entrar recordando
+    cualquiera de los dos secretos. Devuelve el admin token siempre igual.
+    """
+    ip = _client_ip(request)
+    _check_lockout(ip)
+    admin_token_env = os.environ.get("LICENSE_ADMIN_TOKEN", "")
+    stored_hash = (os.environ.get("ADMIN_LOGIN_PASSWORD_HASH") or "").strip()
+    cred = body.credential.strip()
+
+    # Case 1: match directo con el token literal
+    token_ok = bool(admin_token_env) and cred == admin_token_env
+
+    # Case 2: match como password via bcrypt (comparación constante)
+    password_ok = False
+    if stored_hash:
+        try:
+            password_ok = bcrypt.checkpw(cred.encode("utf-8"), stored_hash.encode("utf-8"))
+        except Exception:
+            password_ok = False
+
+    if not (token_ok or password_ok):
+        _register_failure(ip)
+        raise HTTPException(status_code=401, detail="Credencial incorrecta")
+
+    _reset_failures(ip)
+    return {"ok": True, "admin_token": admin_token_env or None, "used": "token" if token_ok else "password"}

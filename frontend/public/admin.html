@@ -51,9 +51,10 @@
 
 <div id="login">
   <h1 style="color:var(--gold);font-family:Georgia,serif">🔐 MediCar Plus Admin</h1>
-  <p style="color:var(--muted);font-size:12px">Introdueix el token d'administrador</p>
-  <input id="tokenInput" type="password" placeholder="Admin Token" style="width:100%;padding:10px;margin:10px 0" autocomplete="off" data-testid="admin-token-input">
-  <button onclick="doLogin()" style="width:100%;padding:10px" data-testid="admin-login-btn">Entrar</button>
+  <p style="color:var(--muted);font-size:12px">Panel maestro · introduce tu <b>contraseña</b> o tu <b>admin token</b></p>
+  <input id="passInput" type="password" placeholder="Contraseña o Token" style="width:100%;padding:10px;margin:10px 0" autocomplete="current-password" data-testid="admin-pass-input">
+  <input id="tokenInput" type="hidden">
+  <button onclick="doLogin()" style="width:100%;padding:10px;background:var(--gold);color:#0f172a;border:none;border-radius:6px;font-weight:700;cursor:pointer" data-testid="admin-login-submit">Entrar</button>
   <div id="err"></div>
 </div>
 
@@ -68,6 +69,9 @@
   </header>
 
   <div class="container">
+    <!-- 🚨 Banner de alertas de pagos (Feb 2026 · God-mode financial view) -->
+    <div id="paymentsAlertBanner" style="display:none;margin-bottom:16px;padding:14px 18px;border-radius:10px;font-size:13px;font-weight:600"></div>
+
     <div class="stats" id="stats"></div>
 
     <div class="card">
@@ -152,6 +156,15 @@
         </table>
       </div>
     </div>
+    <!-- 💳 Sección Pagos & Facturación (Feb 2026 · God-mode financial view) -->
+    <div style="margin-top:32px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+        <h2 style="margin:0;color:var(--gold);font-size:18px;flex:1;min-width:200px">💳 Pagos & Facturación <span style="color:var(--muted);font-size:12px;font-weight:400">· Stripe</span></h2>
+        <button onclick="syncStripePayments()" id="btnSyncStripe" style="padding:8px 14px;background:linear-gradient(135deg,#6366f1,#4338ca);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">↻ Sincronizar con Stripe</button>
+        <button onclick="loadPaymentsSummary()" style="padding:8px 14px;background:#0369a1;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">📊 Ver resumen</button>
+      </div>
+      <div id="paymentsSummaryBox" style="color:var(--muted);font-size:13px">Pulsa <b>Sincronizar con Stripe</b> para actualizar el estado de pagos de todos los clientes.</div>
+    </div>
   </div>
 </div>
 
@@ -163,26 +176,37 @@ let ENRICHED_CACHE = {};
 const API_BASE = window.location.origin;
 
 async function doLogin(){
-  const tok = document.getElementById('tokenInput').value.trim();
-  if(!tok){document.getElementById('err').textContent='Cal introduir el token';return}
+  const credential = document.getElementById('passInput').value.trim();
+  if(!credential){document.getElementById('err').textContent='Introduce contraseña o token';return}
   try{
-    const r = await fetch(API_BASE+'/api/licenses?limit=1',{headers:{'X-Admin-Token':tok}});
+    // Puerta unificada: acepta contraseña (Mbrugulat24) o admin token literal
+    const r = await fetch(API_BASE+'/api/auth/admin-gate',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({credential})
+    });
     if(!r.ok){
-      document.getElementById('err').textContent = 'Token invàlid (HTTP '+r.status+')';
+      const d = await r.json().catch(()=>({}));
+      document.getElementById('err').textContent = d.detail || ('Credencial incorrecta (HTTP '+r.status+')');
       return;
     }
+    const data = await r.json();
+    const tok = data.admin_token;
+    if(!tok){document.getElementById('err').textContent='Server misconfigured: sin admin_token'; return}
     ADMIN_TOKEN = tok;
+    document.getElementById('tokenInput').value = tok;
     try{sessionStorage.setItem('mcp.admin.token', tok)}catch(e){}
     document.getElementById('login').style.display='none';
     document.getElementById('app').style.display='block';
     document.getElementById('envLabel').textContent = API_BASE;
     loadLicenses();
-  }catch(e){document.getElementById('err').textContent='Error xarxa: '+e.message}
+  }catch(e){document.getElementById('err').textContent='Error red: '+e.message}
 }
 function logout(){
   ADMIN_TOKEN='';try{sessionStorage.removeItem('mcp.admin.token')}catch(e){}
   document.getElementById('login').style.display='block';
   document.getElementById('app').style.display='none';
+  document.getElementById('passInput').value='';
   document.getElementById('tokenInput').value='';
 }
 
@@ -439,7 +463,11 @@ window.addEventListener('DOMContentLoaded',()=>{
       try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){}
     }
     const t = hashToken || sessionStorage.getItem('mcp.admin.token');
-    if(t){document.getElementById('tokenInput').value=t; doLogin();}
+    if(t){
+      // Auto-login: usamos el token como credencial (el endpoint /admin-gate acepta ambos)
+      document.getElementById('passInput').value = t;
+      doLogin();
+    }
   }catch(e){}
 });
 

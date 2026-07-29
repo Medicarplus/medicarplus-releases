@@ -256,6 +256,10 @@ _track_r, _admin_r = build_installations_router(db)
 app.include_router(_track_r, prefix="/api")
 app.include_router(_admin_r, prefix="/api")
 
+# Admin Stripe payments sync + summary (Feb 2026 · God-mode financial view)
+from routes.admin_payments import build_payments_router
+app.include_router(build_payments_router(db), prefix="/api")
+
 # Stripe webhook (obligatori per playbook: /api/webhook/stripe)
 # Gestiona tant one-off (via emergentintegrations) com subscriptions (via stripe SDK)
 from fastapi import Request as _FastReq
