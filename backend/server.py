@@ -584,9 +584,52 @@ async def stripe_webhook(request: _FastReq):
                                       "paid_via": "stripe_subscription",
                                       "stripe_subscription_id": sub_id}},
                         )
+            elif etype == "invoice.paid":
+                # 💰 Actualiza payment tracking en tiempo real (banner verde en el admin)
+                inv = data
+                sub_id = inv.get("subscription")
+                if sub_id:
+                    try:
+                        lic = await db.licenses.find_one({"stripe_subscription_id": sub_id, "status": "active"})
+                        amount = int(inv.get("amount_paid") or 0)
+                        paid_at_ts = inv.get("status_transitions", {}).get("paid_at")
+                        paid_at_iso = datetime.fromtimestamp(paid_at_ts, tz=timezone.utc).isoformat() if paid_at_ts else datetime.now(timezone.utc).isoformat()
+                        # Upsert en payments
+                        await db.payments.update_one(
+                            {"_id": inv.get("id")},
+                            {"$set": {
+                                "license_jti": (lic or {}).get("id"),
+                                "install_id": (lic or {}).get("install_id"),
+                                "customer_email": inv.get("customer_email") or (lic or {}).get("client_email"),
+                                "stripe_subscription_id": sub_id,
+                                "stripe_customer_id": inv.get("customer"),
+                                "amount_cents": amount,
+                                "currency": inv.get("currency", "eur"),
+                                "status": "paid",
+                                "created_at": datetime.fromtimestamp(inv.get("created"), tz=timezone.utc).isoformat() if inv.get("created") else None,
+                                "paid_at": paid_at_iso,
+                                "hosted_url": inv.get("hosted_invoice_url"),
+                                "pdf_url": inv.get("invoice_pdf"),
+                                "synced_at": datetime.now(timezone.utc).isoformat(),
+                            }},
+                            upsert=True,
+                        )
+                        # Actualiza la licencia con salud verde + total acumulado
+                        if lic:
+                            await db.licenses.update_one(
+                                {"id": lic["id"]},
+                                {"$inc": {"total_paid_cents": amount, "paid_invoices_count": 1},
+                                 "$set": {"payment_health": "green",
+                                          "last_payment_status": "paid",
+                                          "last_payment_at": paid_at_iso,
+                                          "last_payment_amount_cents": amount}},
+                            )
+                        logger.info(f"[stripe] invoice.paid tracked · sub={sub_id} · {amount/100:.2f} EUR")
+                    except Exception as ex:
+                        logger.warning(f"[stripe] invoice.paid tracking failed: {ex}")
             elif etype == "invoice.payment_failed":
                 # Cobrament fallit → NO revoquem llicència (Stripe farà retries automàtics
-                # durant ~3 setmanes). Només re-sincronitzem l'estat per si ha canviat.
+                # durant ~3 setmanes). Marquem payment_health=red y guardem el intent fallido.
                 sub_id = data.get("subscription")
                 if sub_id:
                     _stripe_sdk.api_key = api_key
@@ -600,6 +643,35 @@ async def stripe_webhook(request: _FastReq):
                         company_name=md.get("company_name"),
                         referred_by=md.get("referred_by") or md.get("referral_code"),
                     )
+                    # 🚨 Registro del intento fallido para el banner rojo del admin
+                    try:
+                        inv = data
+                        lic = await db.licenses.find_one({"stripe_subscription_id": sub_id})
+                        await db.payments.update_one(
+                            {"_id": inv.get("id")},
+                            {"$set": {
+                                "license_jti": (lic or {}).get("id"),
+                                "install_id": (lic or {}).get("install_id"),
+                                "customer_email": inv.get("customer_email") or (lic or {}).get("client_email"),
+                                "stripe_subscription_id": sub_id,
+                                "amount_cents": int(inv.get("amount_due") or 0),
+                                "currency": inv.get("currency", "eur"),
+                                "status": "open",
+                                "created_at": datetime.fromtimestamp(inv.get("created"), tz=timezone.utc).isoformat() if inv.get("created") else None,
+                                "hosted_url": inv.get("hosted_invoice_url"),
+                                "synced_at": datetime.now(timezone.utc).isoformat(),
+                            }},
+                            upsert=True,
+                        )
+                        if lic:
+                            await db.licenses.update_one(
+                                {"id": lic["id"]},
+                                {"$inc": {"failed_invoices_count": 1},
+                                 "$set": {"payment_health": "red",
+                                          "last_payment_status": "failed"}},
+                            )
+                    except Exception as ex:
+                        logger.warning(f"[stripe] invoice.payment_failed tracking failed: {ex}")
                     logger.info(f"[stripe] invoice.payment_failed for sub={sub_id} (Stripe retriarà automàticament)")
             elif etype in ("customer.subscription.updated", "customer.subscription.deleted"):
                 sub = data  # aquest event ja porta l'objecte Subscription
