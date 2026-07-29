@@ -260,6 +260,10 @@ app.include_router(_admin_r, prefix="/api")
 from routes.admin_payments import build_payments_router
 app.include_router(build_payments_router(db), prefix="/api")
 
+# Admin users management (multi-user login · Feb 2026)
+from routes.admin_users import build_users_router
+app.include_router(build_users_router(db), prefix="/api")
+
 # Stripe webhook (obligatori per playbook: /api/webhook/stripe)
 # Gestiona tant one-off (via emergentintegrations) com subscriptions (via stripe SDK)
 from fastapi import Request as _FastReq

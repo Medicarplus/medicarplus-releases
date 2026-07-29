@@ -123,30 +123,54 @@ class UnifiedGateIn(BaseModel):
 async def admin_unified_gate(body: UnifiedGateIn, request: Request):
     """Puerta unificada para el panel admin.
 
-    Acepta o bien la contraseña `Mbrugulat24` (verificada con bcrypt) o bien
-    el `LICENSE_ADMIN_TOKEN` literal. Facilita al owner entrar recordando
-    cualquiera de los dos secretos. Devuelve el admin token siempre igual.
+    Acepta cualquiera de estos:
+    - Password del owner `Mbrugulat24` (bcrypt via .env)
+    - Password de cualquier usuario adicional creado en `admin_users` collection
+    - Token literal `LICENSE_ADMIN_TOKEN` (por si el owner pierde su password)
+
+    Devuelve el admin token en todos los casos → el frontend lo usa para las
+    llamadas API subsiguientes con header `X-Admin-Token`.
     """
     ip = _client_ip(request)
     _check_lockout(ip)
     admin_token_env = os.environ.get("LICENSE_ADMIN_TOKEN", "")
-    stored_hash = (os.environ.get("ADMIN_LOGIN_PASSWORD_HASH") or "").strip()
     cred = body.credential.strip()
 
     # Case 1: match directo con el token literal
     token_ok = bool(admin_token_env) and cred == admin_token_env
+    matched_user = None
 
-    # Case 2: match como password via bcrypt (comparación constante)
-    password_ok = False
-    if stored_hash:
+    if not token_ok:
+        # Case 2: match como password contra la colección admin_users
         try:
-            password_ok = bcrypt.checkpw(cred.encode("utf-8"), stored_hash.encode("utf-8"))
+            from server import db as _srv_db
+            async for u in _srv_db.admin_users.find({}, {"password_hash": 1}):
+                stored = (u.get("password_hash") or "").strip()
+                if not stored:
+                    continue
+                try:
+                    if bcrypt.checkpw(cred.encode("utf-8"), stored.encode("utf-8")):
+                        matched_user = u.get("_id")
+                        break
+                except Exception:
+                    continue
         except Exception:
-            password_ok = False
+            pass
 
-    if not (token_ok or password_ok):
+        # Case 3: fallback contra el hash del .env directamente (backwards compat)
+        if not matched_user:
+            stored_hash = (os.environ.get("ADMIN_LOGIN_PASSWORD_HASH") or "").strip()
+            if stored_hash:
+                try:
+                    if bcrypt.checkpw(cred.encode("utf-8"), stored_hash.encode("utf-8")):
+                        matched_user = (os.environ.get("ADMIN_LOGIN_USERNAME") or "ADMINISTRADOR").upper()
+                except Exception:
+                    pass
+
+    if not (token_ok or matched_user):
         _register_failure(ip)
         raise HTTPException(status_code=401, detail="Credencial incorrecta")
 
     _reset_failures(ip)
-    return {"ok": True, "admin_token": admin_token_env or None, "used": "token" if token_ok else "password"}
+    used = "token" if token_ok else ("password:" + (matched_user or "?"))
+    return {"ok": True, "admin_token": admin_token_env or None, "used": used}

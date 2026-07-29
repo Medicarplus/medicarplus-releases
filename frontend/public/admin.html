@@ -165,6 +165,26 @@
       </div>
       <div id="paymentsSummaryBox" style="color:var(--muted);font-size:13px">Pulsa <b>Sincronizar con Stripe</b> para actualizar el estado de pagos de todos los clientes.</div>
     </div>
+
+    <!-- 👥 Sección Usuarios del Panel (multi-user login · Feb 2026) -->
+    <div style="margin-top:32px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+        <h2 style="margin:0;color:var(--gold);font-size:18px;flex:1;min-width:200px">👥 Usuarios del Panel <span style="color:var(--muted);font-size:12px;font-weight:400">· acceso multi-persona</span></h2>
+        <button onclick="createAdminUser()" style="padding:8px 14px;background:#166534;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">+ Nuevo usuario</button>
+        <button onclick="loadAdminUsers()" style="padding:8px 14px;background:#0369a1;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">↻ Cargar</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Cada persona con acceso al Panel tiene su propio usuario + contraseña. Para revocar acceso, simplemente borra su usuario.</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:#1e293b">
+          <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gold)">Usuario</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gold)">Creado</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gold)">Rol</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gold)">Notas</th>
+          <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--gold)">Acciones</th>
+        </tr></thead>
+        <tbody id="adminUsersTbody"><tr><td colspan="5" style="padding:14px;text-align:center;color:var(--muted)">Pulsa "↻ Cargar" para ver los usuarios.</td></tr></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -733,6 +753,70 @@ document.addEventListener('DOMContentLoaded', () => {
   s?.addEventListener('input', () => { clearTimeout(t); t = setTimeout(loadInstallations, 300); });
   f?.addEventListener('change', loadInstallations);
 });
+
+// ---------------- 👥 Usuarios del Panel (multi-user login) ----------------
+async function loadAdminUsers(){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok) return;
+  const tbody = document.getElementById('adminUsersTbody');
+  tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;text-align:center;color:var(--muted)">Cargando...</td></tr>';
+  try{
+    const r = await fetch('/api/admin/users', {headers:{'X-Admin-Token':tok}});
+    if(!r.ok){ tbody.innerHTML = `<tr><td colspan="5" style="color:#ef4444;padding:14px">Error ${r.status}</td></tr>`; return; }
+    const data = await r.json();
+    if(!data.items.length){ tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;text-align:center;color:var(--muted)">Sin usuarios</td></tr>'; return; }
+    const esc = s => String(s||'').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+    tbody.innerHTML = data.items.map(u => {
+      const fmt = iso => { try{ return new Date(iso).toLocaleDateString('es-ES'); }catch(e){ return iso||'—'; } };
+      const roleBadge = u.is_owner
+        ? '<span style="background:#7c3aed;color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700">👑 OWNER</span>'
+        : '<span style="background:#0369a1;color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700">USUARIO</span>';
+      const delBtn = u.is_owner
+        ? '<span style="color:var(--muted);font-size:11px;font-style:italic">— no borrable —</span>'
+        : `<button onclick="deleteAdminUser('${esc(u.username)}')" style="padding:5px 10px;background:#b91c1c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700">🗑 Borrar acceso</button>`;
+      return `<tr style="border-bottom:1px solid #1e293b">
+        <td style="padding:8px 12px;font-family:monospace;font-size:13px;font-weight:700;color:var(--gold)">${esc(u.username)}</td>
+        <td style="padding:8px 12px;font-size:12px">${fmt(u.created_at)}</td>
+        <td style="padding:8px 12px">${roleBadge}</td>
+        <td style="padding:8px 12px;font-size:12px;color:var(--muted);font-style:italic">${esc(u.notes||'—')}</td>
+        <td style="padding:8px 12px;text-align:right">${delBtn}</td>
+      </tr>`;
+    }).join('');
+  }catch(e){
+    tbody.innerHTML = `<tr><td colspan="5" style="color:#ef4444;padding:14px">Error: ${e.message}</td></tr>`;
+  }
+}
+
+async function createAdminUser(){
+  const username = prompt('👥 NUEVO USUARIO DEL PANEL\n\nNombre de usuario (solo letras, números, - _):\n(ej: TRABAJADOR1, MARTA, RECEP_1)');
+  if(!username) return;
+  const password = prompt(`Contraseña para "${username.toUpperCase()}":\n\nMínimo 8 caracteres. Recomendado: mezcla mayúsculas/minúsculas/números.`);
+  if(!password) return;
+  if(password.length < 8){ alert('❌ Mínimo 8 caracteres'); return; }
+  const notes = prompt('Notas (opcional):\n\nEj: "Trabajador recepción hasta 2027", "Marta contabilidad"…', '') || '';
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  try{
+    const r = await fetch('/api/admin/users', {
+      method:'POST', headers:{'Content-Type':'application/json','X-Admin-Token':tok},
+      body: JSON.stringify({username, password, notes})
+    });
+    const data = await r.json();
+    if(!r.ok){ alert(`❌ ${data.detail||'Error '+r.status}`); return; }
+    alert(`✅ Usuario "${data.username}" creado. Ya puede entrar al Panel con su contraseña.`);
+    loadAdminUsers();
+  }catch(e){ alert('❌ Error red: '+e.message); }
+}
+
+async function deleteAdminUser(username){
+  if(!confirm(`⚠️ REVOCAR ACCESO de "${username}"?\n\nNo podrá volver a entrar al Panel Licencias. Esta acción NO afecta a las licencias de clientes.`)) return;
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  const r = await fetch(`/api/admin/users/${encodeURIComponent(username)}`, {
+    method:'DELETE', headers:{'X-Admin-Token':tok}
+  });
+  const data = await r.json();
+  if(!r.ok){ alert(`❌ ${data.detail||'Error '+r.status}`); return; }
+  loadAdminUsers();
+}
 </script>
 </body>
 </html>
