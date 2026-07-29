@@ -615,16 +615,44 @@ async def stripe_webhook(request: _FastReq):
                             upsert=True,
                         )
                         # Actualiza la licencia con salud verde + total acumulado
+                        was_red = False
                         if lic:
+                            was_red = (lic.get("payment_health") == "red") or int(lic.get("failed_invoices_count") or 0) > 0
                             await db.licenses.update_one(
                                 {"id": lic["id"]},
                                 {"$inc": {"total_paid_cents": amount, "paid_invoices_count": 1},
                                  "$set": {"payment_health": "green",
                                           "last_payment_status": "paid",
                                           "last_payment_at": paid_at_iso,
-                                          "last_payment_amount_cents": amount}},
+                                          "last_payment_amount_cents": amount,
+                                          "failed_invoices_count": 0}},
                             )
                         logger.info(f"[stripe] invoice.paid tracked · sub={sub_id} · {amount/100:.2f} EUR")
+
+                        # 📧 Notificación recovery (solo si venía de rojo)
+                        if was_red:
+                            try:
+                                pay_doc = await db.payments.find_one({"_id": inv.get("id")}) or {}
+                                if not pay_doc.get("admin_notified_recovered"):
+                                    from services.admin_notifier import notify_payment_recovered
+                                    ok_email, _ = notify_payment_recovered(
+                                        customer_email=inv.get("customer_email") or (lic or {}).get("client_email") or "",
+                                        install_id=(lic or {}).get("install_id"),
+                                        amount_cents=amount,
+                                        currency=inv.get("currency", "eur"),
+                                        hosted_invoice_url=inv.get("hosted_invoice_url"),
+                                        stripe_subscription_id=sub_id,
+                                        paid_at_iso=paid_at_iso,
+                                        company_name=(lic or {}).get("company_name"),
+                                    )
+                                    if ok_email:
+                                        await db.payments.update_one(
+                                            {"_id": inv.get("id")},
+                                            {"$set": {"admin_notified_recovered": True,
+                                                      "admin_notified_recovered_at": datetime.now(timezone.utc).isoformat()}},
+                                        )
+                            except Exception as ex_notify:
+                                logger.warning(f"[stripe] admin notify (recovered) error: {ex_notify}")
                     except Exception as ex:
                         logger.warning(f"[stripe] invoice.paid tracking failed: {ex}")
             elif etype == "invoice.payment_failed":
@@ -647,29 +675,61 @@ async def stripe_webhook(request: _FastReq):
                     try:
                         inv = data
                         lic = await db.licenses.find_one({"stripe_subscription_id": sub_id})
+                        cust_email = inv.get("customer_email") or (lic or {}).get("client_email")
+                        amount_due = int(inv.get("amount_due") or 0)
+                        created_iso = datetime.fromtimestamp(inv.get("created"), tz=timezone.utc).isoformat() if inv.get("created") else None
                         await db.payments.update_one(
                             {"_id": inv.get("id")},
                             {"$set": {
                                 "license_jti": (lic or {}).get("id"),
                                 "install_id": (lic or {}).get("install_id"),
-                                "customer_email": inv.get("customer_email") or (lic or {}).get("client_email"),
+                                "customer_email": cust_email,
                                 "stripe_subscription_id": sub_id,
-                                "amount_cents": int(inv.get("amount_due") or 0),
+                                "amount_cents": amount_due,
                                 "currency": inv.get("currency", "eur"),
                                 "status": "open",
-                                "created_at": datetime.fromtimestamp(inv.get("created"), tz=timezone.utc).isoformat() if inv.get("created") else None,
+                                "created_at": created_iso,
                                 "hosted_url": inv.get("hosted_invoice_url"),
                                 "synced_at": datetime.now(timezone.utc).isoformat(),
                             }},
                             upsert=True,
                         )
+                        failed_count_new = 0
                         if lic:
-                            await db.licenses.update_one(
+                            upd = await db.licenses.find_one_and_update(
                                 {"id": lic["id"]},
                                 {"$inc": {"failed_invoices_count": 1},
                                  "$set": {"payment_health": "red",
                                           "last_payment_status": "failed"}},
+                                return_document=True,
                             )
+                            if upd:
+                                failed_count_new = int(upd.get("failed_invoices_count", 1))
+
+                        # 📧 Notificación al admin (idempotente por invoice)
+                        try:
+                            pay_doc = await db.payments.find_one({"_id": inv.get("id")}) or {}
+                            if not pay_doc.get("admin_notified_failed"):
+                                from services.admin_notifier import notify_payment_failed
+                                ok_email, info_email = notify_payment_failed(
+                                    customer_email=cust_email or "",
+                                    install_id=(lic or {}).get("install_id"),
+                                    amount_cents=amount_due,
+                                    currency=inv.get("currency", "eur"),
+                                    failed_count=failed_count_new or 1,
+                                    hosted_invoice_url=inv.get("hosted_invoice_url"),
+                                    stripe_subscription_id=sub_id,
+                                    invoice_created_iso=created_iso,
+                                    company_name=(lic or {}).get("company_name"),
+                                )
+                                if ok_email:
+                                    await db.payments.update_one(
+                                        {"_id": inv.get("id")},
+                                        {"$set": {"admin_notified_failed": True,
+                                                  "admin_notified_failed_at": datetime.now(timezone.utc).isoformat()}},
+                                    )
+                        except Exception as ex_notify:
+                            logger.warning(f"[stripe] admin notify (failed) error: {ex_notify}")
                     except Exception as ex:
                         logger.warning(f"[stripe] invoice.payment_failed tracking failed: {ex}")
                     logger.info(f"[stripe] invoice.payment_failed for sub={sub_id} (Stripe retriarà automàticament)")

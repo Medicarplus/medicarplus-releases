@@ -576,3 +576,28 @@ Los 4 desplegables superiores (Copias de seguridad, Contabilidad, Estadísticas,
 
 ### Verificación
 Playwright automatizado con licencia MASTER inyectada: los 4 pasos (Contabilidad → Estadísticas → Utilidades → Copias de seguridad) confirman `ACCORDION OK ✅` — al abrir uno, los otros 3 quedan `display:none`.
+
+---
+
+## 📧 [29-Jul-2026] · Notificación email al admin cuando pago Stripe falle/recupere (P1)
+
+### Objetivo
+Alertar al admin **automáticamente** por email cuando un cliente entra en rojo (pago fallido) y cuando se recupera al verde, sin necesidad de mirar el panel.
+
+### Implementación
+- **`backend/services/admin_notifier.py`** (nuevo)
+  - `notify_payment_failed(...)` → email 🚨 rojo con importe, install_id, contador intentos fallidos, enlace hosted_invoice_url y CTA al panel.
+  - `notify_payment_recovered(...)` → email ✅ verde con datos del cobro exitoso.
+  - Ambos usan `services.mailer._send_smtp` (IONOS ya configurado).
+  - Formatos en español (`29,90 €`, fechas UTC legibles).
+- **`backend/server.py`** — hooks dentro del webhook Stripe:
+  - `invoice.payment_failed` → tras `payment_health="red"`, dispara `notify_payment_failed`. Marca `payments.admin_notified_failed=true` para **idempotencia** (Stripe reintenta el webhook).
+  - `invoice.paid` → si la licencia estaba en rojo o tenía `failed_invoices_count > 0`, resetea a 0 y dispara `notify_payment_recovered`. Marca `payments.admin_notified_recovered=true`.
+- **Env** (`backend/.env`):
+  - `ADMIN_NOTIFY_EMAIL=info@medicarplus.es`
+  - `ADMIN_PANEL_URL=https://medicarplus.es/admin.html`
+
+### Verificación
+- **Unit tests** (`tests/test_admin_notifier.py`): 4/4 pasan — recipient, subject, cuerpo HTML, override de env, fallback si SMTP no configurado.
+- **E2E** (`tests/test_stripe_payment_notifications_e2e.py`): pasos A y B pasan — 1 email al fallar, idempotencia en reintentos del webhook, 1 email al recuperar, `failed_invoices_count` vuelve a 0.
+
