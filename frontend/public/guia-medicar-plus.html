@@ -288,6 +288,43 @@ Amb 2 clients pagant STD anual (299,90€×2 = 599,80€) ja tens el fix cobert 
 <b>💡 La landing pública</b> (medicarplus.es) està a GitHub Pages i funciona perfectament. El backend (API llicències, admin panel, SMS) està al sandbox Emergent. Quan facis deploy del backend, aquests links canviaran de <code>project-helper-47.preview.emergentagent.com</code> a <code>api.medicarplus.es</code> (o similar).
 </div>
 
+<h2 style="color:#7c3aed;margin-top:24px;padding:10px 14px;background:linear-gradient(90deg,#ede9fe,transparent);border-left:5px solid #a855f7">🎛️ Panel Licencias · God-mode · Instal·lacions + Transferència + Canvi email (Feb 2026)</h2>
+
+<div class="callout callout-blue" style="border-left-color:#a855f7">
+<b>Nova secció "🖥 Instalaciones" al final de <code>/admin.html</code></b> · Amb això tens control total de <u>totes</u> les instal·lacions de MediCar Plus (activades + no activades) al món.
+</div>
+
+<h3>🔹 Que fa cada cosa</h3>
+<table>
+<tr><th>Acció</th><th>Descripció</th><th>Automatitza (sense tocar tu res)</th></tr>
+<tr><td><b>📡 Heartbeat automàtic</b></td><td>Cada cop que un ordinador obre l'app envia un heartbeat al servidor amb el seu install_id + UA + plataforma + timezone. Queda registrat encara que no activi llicència.</td><td>Sí, transparent. Es fa 1×/sessió amb rate-limit 30s/IP.</td></tr>
+<tr><td><b>🔎 Cerca global</b></td><td>A la secció Instalaciones cerques per install_id, email, notes, IP. Filtres: Totes / Actives / Revocades / Sense llicència.</td><td>—</td></tr>
+<tr><td><b>🔄 Transferir</b> (dispositiu)</td><td>El client canvia de PC → pega el seu nou install_id → clic i fet. Es genera clau nova, es revoca el PC vell, s'envia mail al client. La clau es copia al teu portapapers també.</td><td>Preserva <b>stripe_subscription_id</b> + <b>stripe_customer_id</b> → autopagos Stripe segueixen sense parar. Actualitza <code>subscriptions</code> collection. Preserva dies restants de la llicència. Preserva els <code>linked_install_ids</code> Premium.</td></tr>
+<tr><td><b>📧 Cambiar email</b></td><td>El client canvia d'email → escrius el nou → fet. Actualitza en TOTES les col·leccions + Stripe Customer.</td><td>Propaga a <code>licenses.client_email</code> + <code>subscriptions.customer_email</code> + <code>installations.linked_email</code> + <b>Stripe Customer email</b> (via API). Les factures futures s'envien al mail nou automàticament.</td></tr>
+<tr><td><b>🚫 Revocar</b></td><td>Bloqueges instal·lació → el client no pot activar cap llicència des d'aquell PC.</td><td>Marca com revoked amb motiu. També revoca les llicències associades.</td></tr>
+<tr><td><b>↻ Reactivar</b></td><td>Desfás una revocació.</td><td>—</td></tr>
+<tr><td><b>🗂 Agrupar per llicència</b></td><td>Checkbox al filtre. Ordena la taula perquè els dispositius germans (Premium multi-device) apareguin junts.</td><td>—</td></tr>
+</table>
+
+<h3>🔹 Casos reals coberts (verificats amb tests E2E · 27 assercions ✅ 0 errors)</h3>
+
+<table>
+<tr><th>Cas</th><th>Nova clau?</th><th>L'altre PC s'assabenta?</th><th>Email al client</th></tr>
+<tr><td>Cliente STD/Trial migra de PC (mono-dispositivo)</td><td>✅ Sí, generada</td><td>N/A</td><td>✅ Automàtic amb clau nova</td></tr>
+<tr><td>Cliente Premium 2 PC · migra el <b>SECUNDARI</b></td><td>❌ No, MATEIXA clau</td><td>✅ No s'entera, segueix funcionant</td><td>Opcional (mateixa clau, avís)</td></tr>
+<tr><td>Cliente Premium 2 PC · migra el <b>PRINCIPAL</b></td><td>✅ Sí, nova</td><td>⚠️ L'altre haurà de re-activar amb clau nova (l'app mostra avís)</td><td>✅ Automàtic amb clau nova · linked_install_ids preservats</td></tr>
+<tr><td>Cliente canvia email</td><td>—</td><td>—</td><td>Factures futures Stripe al nou email</td></tr>
+</table>
+
+<h3>🔹 Auditoria completa</h3>
+<ul>
+<li>Cada acció admin queda a <code>audit_logs</code> collection amb timestamp, IP, target, extra data.</li>
+<li>Cada llicència revocada queda a la BD amb <code>revoked_reason</code> descriptiu (<i>transferred_to:CD-NEW-XXX:cambio PC</i>).</li>
+<li>Cada canvi d'email marca <code>email_changed_from</code> + <code>email_changed_at</code>.</li>
+<li>Cada instal·lació registra <code>first_seen_at</code>, <code>last_seen_at</code>, <code>seen_count</code>, <code>migrated_from</code>.</li>
+<li>Trazabilitat total: pots reconstruir la història completa de qualsevol client (activacions, dispositius, transferències, revocacions).</li>
+</ul>
+
 <h2 style="color:#065f46;margin-top:20px;padding:8px 14px;background:linear-gradient(90deg,#fef3c7,transparent);border-left:5px solid #f59e0b">⭐ Novetats · Notificacions Discord + Assistència remota</h2>
 
 <div class="callout callout-blue">

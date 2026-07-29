@@ -513,6 +513,10 @@ function renderInstallRow(item){
   const transferBtn = (lic && !revoked)
     ? `<button onclick="transferInstall('${esc(item.install_id)}','${esc(lic.client_email||'')}','${esc(lic.client_name||'')}','${esc(lic.plan_family||'STD')}')" style="padding:5px 10px;margin-top:4px;background:#0284c7;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700">🔄 Transferir</button>`
     : '';
+  // Botón Cambiar email: solo si tiene licencia con email
+  const changeEmailBtn = (lic && lic.client_email)
+    ? `<button onclick="changeEmail('${esc(lic.client_email)}','${esc(lic.client_name||'')}')" style="padding:5px 10px;margin-top:4px;background:#7c3aed;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700">📧 Cambiar email</button>`
+    : '';
   const notesCell = `<input type="text" placeholder="email cliente…" value="${esc(item.linked_email||'')}" onblur="updateInstallField('${esc(item.install_id)}','linked_email',this.value)" style="width:150px;padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--fg);font-size:11px;margin-bottom:4px"><br>
     <input type="text" placeholder="notas…" value="${esc(item.notes||'')}" onblur="updateInstallField('${esc(item.install_id)}','notes',this.value)" style="width:150px;padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--fg);font-size:11px">`;
   // Color de fondo si es dispositivo secundario (agrupación visual)
@@ -526,7 +530,7 @@ function renderInstallRow(item){
     <td>${licCell}</td>
     <td>${status}</td>
     <td>${notesCell}</td>
-    <td>${acciones}<br>${transferBtn}<br><button onclick="deleteInstall('${esc(item.install_id)}')" style="padding:4px 8px;margin-top:4px;background:#334155;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:10px">🗑 Borrar</button></td>
+    <td>${acciones}<br>${transferBtn}<br>${changeEmailBtn}<br><button onclick="deleteInstall('${esc(item.install_id)}')" style="padding:4px 8px;margin-top:4px;background:#334155;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:10px">🗑 Borrar</button></td>
   </tr>`;
 }
 
@@ -650,7 +654,50 @@ async function transferInstall(oldIid, clientEmail, clientName, plan){
     alert('❌ Error de red: '+e.message);
   }
 }
-// Live search
+// 📧 Cambiar email del cliente (God-mode · propaga a Licenses + Subscriptions + Installations + Stripe)
+async function changeEmail(oldEmail, clientName){
+  const newEmail = prompt(
+    `📧 CAMBIAR EMAIL DEL CLIENTE · ${clientName || '—'}\n\n` +
+    `Email VIEJO:\n  ${oldEmail}\n\n` +
+    `Escribe el nuevo email (se actualizará en licencias, Stripe, subscripciones y notas):`,
+    ''
+  );
+  if(!newEmail) return;
+  const newEmailTrim = newEmail.trim().toLowerCase();
+  if(!newEmailTrim.includes('@') || newEmailTrim.length<5){
+    alert('❌ Email inválido');
+    return;
+  }
+  if(newEmailTrim === oldEmail.toLowerCase()){
+    alert('❌ El email nuevo es igual que el viejo');
+    return;
+  }
+  if(!confirm(`Vas a cambiar TODAS las referencias del email:\n\n${oldEmail}  →  ${newEmailTrim}\n\nEsto se aplica a:\n• Todas las licencias del cliente (activas + históricas)\n• Colección subscriptions\n• linked_email de todas sus instalaciones\n• Email en Stripe Customer (facturas futuras irán ahí)\n\n¿Confirmar?`)) return;
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  try{
+    const r = await fetch('/api/licenses/change-email', {
+      method:'POST', headers:{'Content-Type':'application/json','X-Admin-Token':tok},
+      body: JSON.stringify({old_email: oldEmail, new_email: newEmailTrim})
+    });
+    const data = await r.json();
+    if(!r.ok){
+      alert(`❌ Error ${r.status}: ${data.detail || 'Error desconocido'}`);
+      return;
+    }
+    let msg = `✅ EMAIL CAMBIADO\n\n` +
+      `${data.old_email}  →  ${data.new_email}\n\n` +
+      `📋 Licencias actualizadas: ${data.licenses_updated}\n` +
+      `📋 Subscriptions actualizadas: ${data.subscriptions_updated}\n` +
+      `📋 Installations actualizadas: ${data.installations_updated}\n` +
+      `💳 Stripe Customers actualizados: ${data.stripe_customers_updated}`;
+    if(data.stripe_error) msg += `\n⚠️ Stripe error: ${data.stripe_error}`;
+    alert(msg);
+    loadInstallations();
+  }catch(e){
+    alert('❌ Error de red: '+e.message);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const s = document.getElementById('instSearch');
   const f = document.getElementById('instFilter');
