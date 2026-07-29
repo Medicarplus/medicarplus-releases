@@ -338,6 +338,14 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
                 )
             except Exception:
                 pass
+            # También actualizamos subscriptions para consistencia (Premium tiene Stripe activo)
+            try:
+                await db.subscriptions.update_many(
+                    {"install_id": old_iid},
+                    {"$set": {"install_id": new_iid, "migrated_from": old_iid, "migrated_at": _now().isoformat()}},
+                )
+            except Exception:
+                pass
             await _audit(request, "license.transfer_linked", old_iid, extra={
                 "new_install_id": new_iid, "role": "linked_secondary", "reason": reason,
             })
@@ -422,6 +430,18 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             )
         except Exception:
             pass
+
+        # 🔒 CRITICAL FIX #3 · Actualiza la colección `subscriptions` para que el botón
+        # "Gestionar Subscripción" del cliente encuentre su suscripción Stripe en el PC nuevo.
+        # (subscriptions se busca por install_id o customer_email indistintamente)
+        try:
+            await db.subscriptions.update_many(
+                {"install_id": old_iid},
+                {"$set": {"install_id": new_iid, "migrated_from": old_iid,
+                          "migrated_at": _now().isoformat()}},
+            )
+        except Exception as ex:
+            logger.warning("subscriptions update failed on transfer: %s", ex)
 
         # Email al cliente con nueva clave
         email_sent = False
