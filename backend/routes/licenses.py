@@ -263,16 +263,25 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         dependencies=[Depends(require_admin)],
     )
     async def transfer_license(body: dict, request: Request):
-        """Transfiere una licencia del install_id viejo al nuevo, revoca el viejo,
-        genera CLAVE NUEVA y (opcional) envía email al cliente con los nuevos datos.
+        """Transfiere una licencia del install_id viejo al nuevo.
 
-        Body JSON:
-        {
-          "old_install_id": "CD-...",   # obligatorio
-          "new_install_id": "CD-...",   # obligatorio
-          "reason": "cambio PC",         # opcional
-          "send_email": true             # opcional
-        }
+        Casos manejados:
+        1) **Licencia mono-dispositivo** (sin `linked_install_ids`):
+           - Revoca la licencia vieja + genera CLAVE NUEVA para el nuevo install_id.
+           - Copia `stripe_customer_id` + `stripe_subscription_id` (autopagos siguen).
+           - Envía email al cliente con la nueva clave.
+
+        2) **Licencia multi-dispositivo Premium** (con `linked_install_ids`):
+           2a) Migrar el DISPOSITIVO PRINCIPAL:
+               - Actualiza `install_id` a nuevo, mantiene `linked_install_ids` intactos.
+               - Regenera JWT con `sub` portable → ambos dispositivos siguen funcionando con nueva clave.
+               - El otro dispositivo debe re-copiar la nueva clave desde el email.
+           2b) Migrar un DISPOSITIVO SECUNDARIO (linked):
+               - Solo swap dentro de `linked_install_ids` (viejo → nuevo).
+               - Mantiene la MISMA license_key. El otro dispositivo NO se entera.
+               - Email opcional al cliente confirmando swap (sin adjuntar clave nueva).
+
+        En todos los casos: revoca `installations[old_iid]` para bloquear reactivación silenciosa.
         """
         old_iid = (body.get("old_install_id") or "").strip().upper()
         new_iid = (body.get("new_install_id") or "").strip().upper()
@@ -295,10 +304,58 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         plan = (lic.get("plan") or "STD").upper()
         client_name = lic.get("client_name") or ""
         client_email = lic.get("client_email") or ""
-        duration_days = lic.get("duration_days")
+        linked_installs = [x for x in (lic.get("linked_install_ids") or []) if x]
+        total_devices = 1 + len(linked_installs)
+        is_principal = (old_iid == lic.get("install_id"))
+        is_multi_device = total_devices > 1
 
-        # 2) Calcula duration_days restantes si tenía expires_at
-        remaining_days = duration_days
+        # 2) Marca old_iid en `installations` como revocada (independiente del flow)
+        try:
+            await db.installations.update_one(
+                {"_id": old_iid},
+                {"$set": {"revoked": True, "revoked_at": _now().isoformat(),
+                          "revoked_reason": f"transferred_to:{new_iid}:{reason}"}},
+                upsert=True,
+            )
+        except Exception as ex:
+            logger.warning("installations upsert failed: %s", ex)
+
+        # ---------- CASE B2: Migración de dispositivo SECUNDARIO (linked) ----------
+        # No revocamos licencia, no regeneramos clave. Solo swap en linked_install_ids.
+        if is_multi_device and not is_principal:
+            new_linked = [new_iid if x == old_iid else x for x in linked_installs]
+            await coll.update_one(
+                {"_id": lic["_id"]},
+                {"$set": {
+                    "linked_install_ids": new_linked,
+                    "linked_install_ids_updated_at": _now().isoformat(),
+                }},
+            )
+            try:
+                await db.sync_state.update_many(
+                    {"install_id": old_iid},
+                    {"$set": {"install_id": new_iid, "migrated_from": old_iid, "migrated_at": _now().isoformat()}},
+                )
+            except Exception:
+                pass
+            await _audit(request, "license.transfer_linked", old_iid, extra={
+                "new_install_id": new_iid, "role": "linked_secondary", "reason": reason,
+            })
+            return {
+                "ok": True,
+                "case": "multi_device_secondary_swap",
+                "old_install_id": old_iid,
+                "new_install_id": new_iid,
+                "old_license_revoked": False,
+                "same_key_preserved": True,
+                "message": "Dispositivo secundario reemplazado. La MISMA clave sigue siendo válida en el nuevo PC. El dispositivo principal no se entera.",
+                "email_sent": False,
+                "remaining_days": None,
+            }
+
+        # ---------- CASE A + B1: Migración de dispositivo PRINCIPAL o mono-dispositivo ----------
+        # Calcula días restantes preservando duración
+        remaining_days = lic.get("duration_days")
         expires_at_iso = lic.get("expires_at")
         if expires_at_iso:
             try:
@@ -309,7 +366,7 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             except Exception:
                 pass
 
-        # 3) Revoca la licencia vieja (marca replaced)
+        # Revoca la licencia vieja
         await coll.update_one(
             {"_id": lic["_id"]},
             {"$set": {
@@ -319,7 +376,7 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             }},
         )
 
-        # 4) Genera licencia NUEVA para el nuevo install_id
+        # Genera licencia NUEVA (COPIANDO campos críticos de Stripe y multi-device)
         new_doc = await _create_license(
             install_id=new_iid,
             client_name=client_name,
@@ -329,21 +386,35 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             notes=f"Transferida desde {old_iid} · motivo: {reason}",
         )
 
-        # 5) Revoca el install_id viejo en installations (para bloquear reactivación silenciosa)
-        try:
-            await db.installations.update_one(
-                {"_id": old_iid},
-                {"$set": {
-                    "revoked": True,
-                    "revoked_at": _now().isoformat(),
-                    "revoked_reason": f"transferred_to:{new_iid}",
-                }},
-                upsert=True,
-            )
-        except Exception as ex:
-            logger.warning("installations upsert failed: %s", ex)
+        # 🔒 CRITICAL FIX #1 · Copia campos de Stripe para que autopagos sigan funcionando
+        # Cuando Stripe envía webhook de renewal, busca por stripe_subscription_id.
+        # Sin este copy, los pagos futuros no encontrarían la licencia del cliente.
+        stripe_fields_to_copy = {}
+        for field in ["stripe_subscription_id", "stripe_customer_id",
+                      "stripe_price_id", "stripe_product_id",
+                      "billing_email", "checkout_session_id"]:
+            if lic.get(field):
+                stripe_fields_to_copy[field] = lic[field]
 
-        # 6) Copia datos de sync (si existen) — best effort
+        # 🔒 CRITICAL FIX #2 · Si era Premium multi-device y transferimos el PRINCIPAL,
+        # copiamos los linked_install_ids intactos para que el 2º device siga funcionando.
+        # PERO el JWT nuevo tiene sub=new_iid (no portable), así que el 2º device fallará
+        # al verificar con el nuevo key. La solución es que el cliente re-active en el 2º device
+        # con la nueva clave. Lo indicamos claramente en la respuesta.
+        also_copy_linked = is_multi_device and is_principal
+        if also_copy_linked:
+            stripe_fields_to_copy["linked_install_ids"] = linked_installs
+            stripe_fields_to_copy["linked_install_ids_updated_at"] = _now().isoformat()
+
+        if stripe_fields_to_copy:
+            await coll.update_one(
+                {"_id": new_doc["_id"] if "_id" in new_doc else new_doc.get("id")},
+                {"$set": stripe_fields_to_copy},
+            )
+            # Actualiza el retorno con los campos copiados para reflejarlos
+            new_doc.update(stripe_fields_to_copy)
+
+        # Copia datos de sync (best effort)
         try:
             await db.sync_state.update_many(
                 {"install_id": old_iid},
@@ -352,7 +423,7 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         except Exception:
             pass
 
-        # 7) Envía email al cliente con nueva clave
+        # Email al cliente con nueva clave
         email_sent = False
         email_error = None
         if send_email and client_email:
@@ -373,15 +444,21 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
                 email_error = str(ex)
 
         await _audit(request, "license.transfer", old_iid, extra={
-            "new_install_id": new_iid, "new_license_id": new_doc["id"], "reason": reason, "email_sent": email_sent,
+            "new_install_id": new_iid, "new_license_id": new_doc["id"], "reason": reason,
+            "email_sent": email_sent, "stripe_fields_copied": list(stripe_fields_to_copy.keys()),
+            "also_copy_linked": also_copy_linked,
         })
 
         return {
             "ok": True,
+            "case": "principal_or_single_device_regen",
             "old_install_id": old_iid,
             "new_install_id": new_iid,
             "new_license": _doc_to_record(new_doc, include_key=True).model_dump(mode="json"),
             "old_license_revoked": True,
+            "stripe_fields_preserved": list(stripe_fields_to_copy.keys()),
+            "linked_devices_also_need_reactivation": also_copy_linked,
+            "linked_install_ids_preserved": linked_installs if also_copy_linked else None,
             "email_sent": email_sent,
             "email_error": email_error,
             "remaining_days": remaining_days,

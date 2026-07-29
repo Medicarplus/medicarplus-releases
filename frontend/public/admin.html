@@ -608,7 +608,22 @@ async function transferInstall(oldIid, clientEmail, clientName, plan){
       alert(`❌ Error ${r.status}: ${data.detail || 'Error desconocido'}`);
       return;
     }
-    // Copiar la nueva clave al portapapeles automáticamente
+    // Copiar la nueva clave al portapapeles automáticamente (solo aplica en case A/B1)
+    const isSecondarySwap = data.case === 'multi_device_secondary_swap';
+    if(isSecondarySwap){
+      // Caso: dispositivo secundario Premium → solo swap, misma clave sigue válida
+      alert(
+        `✅ TRANSFERENCIA COMPLETADA (dispositivo secundario Premium)\n\n` +
+        `Viejo (revocado): ${data.old_install_id}\n` +
+        `Nuevo (activo):   ${data.new_install_id}\n\n` +
+        `ℹ️ La clave sigue siendo la MISMA. El dispositivo principal no se entera y sigue funcionando.\n` +
+        `El cliente solo tiene que pegar la clave existente (la de siempre) en el PC nuevo.\n\n` +
+        `El PC viejo queda bloqueado.`
+      );
+      loadInstallations();
+      return;
+    }
+    // Case A/B1: se ha regenerado la clave
     const newKey = data.new_license.license_key;
     let copied = false;
     try{
@@ -618,13 +633,17 @@ async function transferInstall(oldIid, clientEmail, clientName, plan){
     const emailStatus = data.email_sent
       ? `📧 Email enviado a ${clientEmail}`
       : (sendEmailAns ? `⚠️ Email NO enviado: ${data.email_error||'sin motivo'}` : 'ℹ️ Email no enviado (opción desactivada)');
+    const stripeInfo = (data.stripe_fields_preserved && data.stripe_fields_preserved.length)
+      ? `\n💳 Autopagos Stripe preservados: ${data.stripe_fields_preserved.join(', ')}` : '';
+    const linkedWarn = data.linked_devices_also_need_reactivation
+      ? `\n⚠️ IMPORTANTE: Este cliente tenía Premium con 2 dispositivos. El OTRO dispositivo (${data.linked_install_ids_preserved.join(', ')}) también necesitará re-activar con la nueva clave. Avísale al cliente.` : '';
     alert(
       `✅ TRANSFERENCIA COMPLETADA\n\n` +
       `Viejo (revocado): ${data.old_install_id}\n` +
       `Nuevo (activo):   ${data.new_install_id}\n` +
       `Días restantes:   ${data.remaining_days || '∞'}\n\n` +
       `Nueva clave (${copied ? 'copiada al portapapeles' : 'cópiala manualmente'}):\n\n${newKey}\n\n` +
-      `${emailStatus}`
+      emailStatus + stripeInfo + linkedWarn
     );
     loadInstallations();
   }catch(e){
