@@ -561,3 +561,18 @@ El programa GIC exporta el llistat de renovacions via <b>Clientes a Revisar</b> 
 
 ### Rotación futura de la contraseña
 `python -c "import bcrypt;print(bcrypt.hashpw(b'NUEVA_PASS', bcrypt.gensalt()).decode())"` → sustituir `ADMIN_LOGIN_PASSWORD_HASH` en `.env` → `sudo supervisorctl restart backend`.
+
+
+---
+
+## 🪗 [29-Jul-2026] · Modo acordeón en menú superior (v2.html)
+
+### Problema
+Los 4 desplegables superiores (Copias de seguridad, Contabilidad, Estadísticas, Utilidades) podían quedar abiertos simultáneamente, ensuciando la vista.
+
+### Solución
+- Añadido helper `closeTopMenus(exceptId)` en `v2.html` (~línea 2364) que cierra los 3 menús no seleccionados.
+- Los 4 handlers de toggle (`#btnBackupToggle`, `#btnAccountingToggle`, `#btnStatsToggle`, `#btnUtilitiesToggle`) llaman a `closeTopMenus()` antes de abrir el suyo → solo un menú visible a la vez.
+
+### Verificación
+Playwright automatizado con licencia MASTER inyectada: los 4 pasos (Contabilidad → Estadísticas → Utilidades → Copias de seguridad) confirman `ACCORDION OK ✅` — al abrir uno, los otros 3 quedan `display:none`.

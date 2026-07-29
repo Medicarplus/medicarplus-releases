@@ -2361,8 +2361,20 @@ function renderHistory(){const dates=Object.keys(state.byDate).filter(d=>entries
 function actEntry(act,id){const list=entriesOf(currentDate);const i=list.findIndex(x=>x.id===id);if(i<0)return;if(act==='del'){confirmModal('Eliminar entrada',`¿Eliminar <b>${escapeHtml(list[i].nombre)}</b>?`,()=>{list.splice(i,1);saveState();render()},'Eliminar');return}if(act==='ret'){list[i].retorno=!list[i].retorno;saveState();render();return}if(act==='edit'){const e=list[i];const isDh=e.kind==='DH';const nN=prompt(isDh?'Concepto:':'Nombre / concepto:',e.nombre);if(nN===null)return;const nI=prompt('Importe (€):',e.importe);if(nI===null)return;const nT=isDh?'0':prompt('Tasa DGT (€):',e.tasa);if(nT===null)return;const nF=prompt('Forma de pago (E/T/B/X):',e.fp)||e.fp;e.nombre=nN.trim()||e.nombre;e.importe=num(nI);e.tasa=num(nT);e.fp=nF.toUpperCase()[0];e.fpTasa=e.fp;saveState();render()}}
 function confirmModal(title,message,onYes,yesLabel='Sí, borrar',danger=true,extraBtn=null){const back=document.createElement('div');back.className='modal-back';let extraHTML=extraBtn?`<button class="btn btn-primary" data-extra>${extraBtn.label}</button>`:'';back.innerHTML=`<div class="modal"><h3>${title}</h3><p>${message}</p><div class="row"><button class="btn" data-no>Cancelar</button>${extraHTML}<button class="btn ${danger?'btn-danger':'btn-primary'}" data-yes>${yesLabel}</button></div></div>`;document.body.appendChild(back);back.querySelector('[data-no]').focus();back.addEventListener('click',ev=>{if(ev.target===back)back.remove();if(ev.target.matches('[data-no]'))back.remove();if(ev.target.matches('[data-yes]')){back.remove();onYes()}if(ev.target.matches('[data-extra]')&&extraBtn){back.remove();extraBtn.onClick()}});document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){back.remove();document.removeEventListener('keydown',esc)}})}
 $('#btnHistory').onclick=()=>{$('#btnBackupMenu').style.display='none';openBackupHistory()};
+// 🪗 Accordion top-menu: solo uno de los 4 desplegables superiores (Copias de seguridad,
+// Contabilidad, Estadísticas, Utilidades) puede estar abierto a la vez. Al abrir uno,
+// se cierran automáticamente los otros 3.
+const TOP_MENU_IDS=['btnBackupMenu','btnAccountingMenu','btnStatsSubmenu','utilitiesMenu'];
+function closeTopMenus(exceptId){
+  TOP_MENU_IDS.forEach(id=>{
+    if(id===exceptId) return;
+    const el=document.getElementById(id);
+    if(el) el.style.display='none';
+  });
+}
+window.closeTopMenus=closeTopMenus;
 // Copias de seguridad dropdown toggle
-$('#btnBackupToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnBackupMenu');m.style.display=(m.style.display==='none'||!m.style.display)?'flex':'none'};
+$('#btnBackupToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnBackupMenu');const willOpen=(m.style.display==='none'||!m.style.display);if(willOpen)closeTopMenus('btnBackupMenu');m.style.display=willOpen?'flex':'none'};
 document.addEventListener('click',(e)=>{const box=$('#btnBackupBox');const menu=$('#btnBackupMenu');if(menu&&box&&!box.contains(e.target))menu.style.display='none'});
 // Tanca el menú després de clicar Guardar/Restaurar (els handlers reals estan més avall)
 $('#btnExport').addEventListener('click',()=>{setTimeout(()=>{const m=$('#btnBackupMenu');if(m)m.style.display='none'},50)});
@@ -2372,7 +2384,7 @@ $('#btnIrpf').onclick=()=>{$('#btnAccountingMenu').style.display='none';openIRPF
 $('#btnCambio').onclick=()=>{$('#btnAccountingMenu').style.display='none';openCambio()};
 $('#btnLibroRegMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLibroRegistro()};
 $('#btnWhatsNewMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';showWhatsNew(true)};
-$('#btnAccountingToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnAccountingMenu');m.style.display=(m.style.display==='none'||!m.style.display)?'flex':'none'};
+$('#btnAccountingToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnAccountingMenu');const willOpen=(m.style.display==='none'||!m.style.display);if(willOpen)closeTopMenus('btnAccountingMenu');m.style.display=willOpen?'flex':'none'};
 document.addEventListener('click',(e)=>{const box=$('#btnAccounting');const menu=$('#btnAccountingMenu');if(menu&&box&&!box.contains(e.target))menu.style.display='none'});
 
 // Estadísticas dropdown toggle (Facturación · Autoescuelas · Tráfico · SMS · Cites · Comparativa)
@@ -2382,14 +2394,14 @@ $('#btnStatTrafico').onclick=()=>{$('#btnStatsSubmenu').style.display='none';ope
 $('#btnStatSms').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openStats('sms')};
 $('#btnStatCites').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openStats('cites')};
 $('#btnStatCompararAnys').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openYearComparison()};
-$('#btnStatsToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnStatsSubmenu');m.style.display=(m.style.display==='none'||!m.style.display)?'flex':'none'};
+$('#btnStatsToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnStatsSubmenu');const willOpen=(m.style.display==='none'||!m.style.display);if(willOpen)closeTopMenus('btnStatsSubmenu');m.style.display=willOpen?'flex':'none'};
 document.addEventListener('click',(e)=>{const box=$('#btnStatsBox');const menu=$('#btnStatsSubmenu');if(menu&&box&&!box.contains(e.target))menu.style.display='none'});
 
 // Utilidades dropdown toggle (Avisos, Cites, Auditoria, Asesor IA)
 const utilToggle=document.getElementById('btnUtilitiesToggle');
 const utilMenu=document.getElementById('utilitiesMenu');
 if(utilToggle && utilMenu){
-  utilToggle.onclick=(e)=>{e.stopPropagation();utilMenu.style.display=(utilMenu.style.display==='none'||!utilMenu.style.display)?'block':'none'};
+  utilToggle.onclick=(e)=>{e.stopPropagation();const willOpen=(utilMenu.style.display==='none'||!utilMenu.style.display);if(willOpen)closeTopMenus('utilitiesMenu');utilMenu.style.display=willOpen?'block':'none'};
   document.addEventListener('click',(e)=>{if(!utilToggle.contains(e.target) && !utilMenu.contains(e.target)) utilMenu.style.display='none'});
   // Close menu when a util item is clicked (només si es POT obrir la funció)
   utilMenu.querySelectorAll('.util-item').forEach(btn=>{
