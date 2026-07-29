@@ -5422,13 +5422,19 @@ function openSmsModal(){
           <table style="width:100%;border-collapse:collapse">${monthRows||'<tr><td style="padding:20px;color:#64748b;text-align:center">'+(isCA?'Encara sense dades':'Aún sin datos')+'</td></tr>'}</table>
         </div>
         <div style="background:#0e1a2e;padding:20px;border-radius:10px;border:1px solid #1e293b">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-            <div style="font-size:13px;color:#f5b301;text-transform:uppercase;letter-spacing:.5px;font-weight:700;flex:1">📋 ${isCA?'Campanyes recents':'Campañas recientes'} <span style="color:#64748b;font-size:11px;font-weight:400;margin-left:6px">${isCA?'(clica una fila per veure el detall i imprimir)':'(clic en una fila para ver el detalle e imprimir)'}</span></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+            <div style="font-size:13px;color:#f5b301;text-transform:uppercase;letter-spacing:.5px;font-weight:700;flex:1;min-width:180px">📋 ${isCA?'Campanyes recents':'Campañas recientes'} <span style="color:#64748b;font-size:11px;font-weight:400;margin-left:6px">${isCA?'(clica una fila per veure el detall i imprimir)':'(clic en una fila para ver el detalle e imprimir)'}</span></div>
             <span style="color:#64748b;font-size:11px">${campaigns.length}</span>
           </div>
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+            <input type="text" id="smsStatsSearch" data-testid="sms-stats-search" placeholder="${isCA?'🔎 Cerca per nom de campanya, o nom/mòbil de destinatari...':'🔎 Buscar por nombre de campaña, o nombre/móvil de destinatario...'}" style="flex:1;min-width:260px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 12px;font-size:13px">
+            <button id="smsStatsGlobalBtn" data-testid="sms-stats-global-btn" style="background:linear-gradient(135deg,#0369a1,#0284c7);color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">🌐 ${isCA?'Cerca global':'Buscar global'}</button>
+            <button id="smsStatsClearBtn" data-testid="sms-stats-clear-btn" style="background:#334155;color:#cbd5e1;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:12px" title="${isCA?'Netejar':'Limpiar'}">✕</button>
+          </div>
+          <div id="smsStatsGlobalResults" style="display:none;margin-bottom:12px"></div>
           <table style="width:100%;border-collapse:collapse">
             <thead><tr style="background:#1e293b"><th style="padding:9px 12px;text-align:left;font-size:11px;color:#f5b301;text-transform:uppercase">${isCA?'Campanya':'Campaña'}</th><th style="padding:9px 12px;text-align:left;font-size:11px;color:#f5b301;text-transform:uppercase">${isCA?'Data':'Fecha'}</th><th style="padding:9px 12px;text-align:right;font-size:11px;color:#22c55e;text-transform:uppercase">✓ ${isCA?'Env.':'Env.'}</th><th style="padding:9px 12px;text-align:right;font-size:11px;color:#ef4444;text-transform:uppercase">✗ ${isCA?'Err.':'Err.'}</th><th style="padding:9px 12px;text-align:right;font-size:11px;color:#cbd5e1;text-transform:uppercase">${isCA?'S/M':'S/M'}</th><th style="padding:9px 12px;text-align:right;font-size:11px;color:#f5b301;text-transform:uppercase"></th></tr></thead>
-            <tbody>${campRows||'<tr><td colspan="6" style="padding:20px;color:#64748b;text-align:center">'+(isCA?'Encara sense campanyes':'Aún sin campañas')+'</td></tr>'}</tbody>
+            <tbody id="smsStatsTbody">${campRows||'<tr><td colspan="6" style="padding:20px;color:#64748b;text-align:center">'+(isCA?'Encara sense campanyes':'Aún sin campañas')+'</td></tr>'}</tbody>
           </table>
         </div>
         <div style="text-align:center;margin-top:20px"><button onclick="document.getElementById('smsBody').innerHTML='';document.getElementById('smsClose').click();openSmsModal();" style="background:#1e293b;color:#e2e8f0;border:1px solid #475569;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">← ${isCA?'Tornar':'Volver'}</button></div>
@@ -5448,6 +5454,56 @@ function openSmsModal(){
         try{ await apiSms('/campaigns/'+encodeURIComponent(id),{method:'DELETE'}); renderSmsStats(); }
         catch(e){ alert('Error: '+e.message); }
       });
+      // 🔎 Buscador · filtro local por nombre de campaña + búsqueda global de destinatarios
+      const search=document.getElementById('smsStatsSearch');
+      const globalBtn=document.getElementById('smsStatsGlobalBtn');
+      const clearBtn=document.getElementById('smsStatsClearBtn');
+      const tbody=document.getElementById('smsStatsTbody');
+      const globalBox=document.getElementById('smsStatsGlobalResults');
+      const rows=tbody?tbody.querySelectorAll('tr[data-id]'):[];
+      const applyLocalFilter=()=>{
+        const q=(search.value||'').trim().toLowerCase();
+        globalBox.style.display='none';globalBox.innerHTML='';
+        rows.forEach(r=>{
+          const txt=r.textContent.toLowerCase();
+          r.style.display=!q||txt.includes(q)?'':'none';
+        });
+      };
+      if(search) search.oninput=applyLocalFilter;
+      if(clearBtn) clearBtn.onclick=()=>{search.value='';applyLocalFilter();};
+      if(globalBtn) globalBtn.onclick=async()=>{
+        const q=(search.value||'').trim();
+        if(q.length<2){alert(isCA?'Escriu almenys 2 caràcters per la cerca global':'Escribe al menos 2 caracteres para la búsqueda global');return}
+        globalBtn.disabled=true;globalBtn.textContent=isCA?'Cercant...':'Buscando...';
+        globalBox.style.display='block';
+        globalBox.innerHTML='<div style="padding:14px;color:#94a3b8;font-size:12px;text-align:center">'+(isCA?'Cercant destinataris a totes les campanyes...':'Buscando destinatarios en todas las campañas...')+'</div>';
+        try{
+          const r=await apiSms('/search-recipients?q='+encodeURIComponent(q)+'&limit=100');
+          const hits=r.results||[];
+          if(hits.length===0){
+            globalBox.innerHTML='<div style="padding:14px;background:#1e293b;border-radius:8px;color:#94a3b8;font-size:12px;text-align:center">'+(isCA?'Cap destinatari trobat per':'Ningún destinatario encontrado para')+' <b style="color:#e2e8f0">"'+q.replace(/</g,'&lt;')+'"</b></div>';
+          }else{
+            const trunc=r.truncated?' <span style="color:#f59e0b;font-size:10px">('+(isCA?'primers 100':'primeros 100')+')</span>':'';
+            const rowsHtml=hits.map(h=>{
+              const nom=[h.name,h.surname1,h.surname2].filter(Boolean).join(' ').replace(/</g,'&lt;')||'—';
+              const dt=h.campaign_date?new Date(h.campaign_date).toLocaleDateString(isCA?'ca-ES':'es-ES'):'-';
+              const status=String(h.status||'-').toLowerCase();
+              const statusColor=status==='sent'?'#22c55e':(status.includes('err')||status.includes('fail')?'#ef4444':'#94a3b8');
+              return '<tr style="border-bottom:1px solid #1e293b;cursor:pointer" data-camp-id="'+h.campaign_id+'" class="sms-global-hit"><td style="padding:8px 10px;font-size:12px;color:#e2e8f0">'+nom+'</td><td style="padding:8px 10px;font-size:12px;color:#cbd5e1">'+(h.phone||'—')+'</td><td style="padding:8px 10px;font-size:11px;color:#94a3b8">'+String(h.campaign_name||'—').replace(/</g,'&lt;')+' <span style="color:#64748b">· '+dt+'</span></td><td style="padding:8px 10px;text-align:right;font-size:11px;font-weight:700;color:'+statusColor+'">'+status.toUpperCase()+'</td></tr>';
+            }).join('');
+            globalBox.innerHTML='<div style="background:#0f172a;border:1px solid #0284c7;border-radius:8px;padding:14px"><div style="font-size:12px;color:#7ec8ff;margin-bottom:8px">🌐 <b>'+hits.length+' '+(isCA?'destinatari(s) trobat(s)':'destinatario(s) encontrado(s))')+trunc+'</b> '+(isCA?'per':'para')+' <span style="color:#f5b301;font-weight:700">"'+q.replace(/</g,'&lt;')+'"</span> <span style="color:#64748b;margin-left:8px">('+(isCA?'clica una fila per obrir la campanya':'clic en una fila para abrir la campaña')+')</span></div><table style="width:100%;border-collapse:collapse;background:#0e1a2e"><thead><tr style="background:#1e293b"><th style="padding:8px 10px;text-align:left;font-size:10px;color:#f5b301">'+(isCA?'Nom':'Nombre')+'</th><th style="padding:8px 10px;text-align:left;font-size:10px;color:#f5b301">'+(isCA?'Mòbil':'Móvil')+'</th><th style="padding:8px 10px;text-align:left;font-size:10px;color:#f5b301">'+(isCA?'Campanya':'Campaña')+'</th><th style="padding:8px 10px;text-align:right;font-size:10px;color:#f5b301">Status</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>';
+            globalBox.querySelectorAll('.sms-global-hit').forEach(el=>{
+              el.onmouseenter=()=>{el.style.background='#111827'};
+              el.onmouseleave=()=>{el.style.background=''};
+              el.onclick=()=>renderSmsDetail(el.dataset.campId);
+            });
+          }
+        }catch(e){
+          globalBox.innerHTML='<div style="padding:14px;color:#ef4444;font-size:12px;text-align:center">Error: '+e.message+'</div>';
+        }finally{
+          globalBtn.disabled=false;globalBtn.textContent=isCA?'🌐 Cerca global':'🌐 Buscar global';
+        }
+      };
     }catch(e){
       body.innerHTML='<div style="color:#ef4444;text-align:center;padding:40px">Error: '+e.message+'</div>';
     }
@@ -5578,8 +5634,12 @@ function openSmsModal(){
           <div style="flex:1;min-width:120px;background:#3a0606;padding:12px;border-radius:8px;text-align:center"><div style="font-size:10px;color:#fecaca;text-transform:uppercase">${isCA?'Invàlids':'Inválidos'}</div><div style="font-size:24px;font-weight:800;color:#ef4444">${d.invalid_count}</div></div>
           <div style="flex:1;min-width:120px;background:#1e293b;padding:12px;border-radius:8px;text-align:center"><div style="font-size:10px;color:#94a3b8;text-transform:uppercase">Total</div><div style="font-size:24px;font-weight:800;color:#cbd5e1">${d.total_rows}</div></div>
         </div>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+          <input type="text" id="smsPreviewSearch" data-testid="sms-preview-search" placeholder="${isCA?'🔎 Cerca per nom, cognom o mòbil...':'🔎 Buscar por nombre, apellido o móvil...'}" style="flex:1;min-width:220px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 12px;font-size:13px">
+          <span id="smsPreviewCount" style="font-size:11px;color:#94a3b8"></span>
+        </div>
         <div style="max-height:280px;overflow-y:auto;border:1px solid #1e293b;border-radius:8px">
-          <table style="width:100%;border-collapse:collapse;background:#0e1a2e"><thead><tr style="background:#1e293b;position:sticky;top:0"><th style="padding:8px 10px;text-align:left;font-size:11px;color:#f5b301;text-transform:uppercase">${isCA?'Nom':'Nombre'}</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:#f5b301;text-transform:uppercase">${isCA?'Mòbil':'Móvil'}</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:#f5b301;text-transform:uppercase">${isCA?'Data':'Fecha'}</th><th style="padding:8px 10px;text-align:right;font-size:11px;color:#f5b301;text-transform:uppercase">Status</th></tr></thead><tbody>${validRows}</tbody></table>
+          <table id="smsPreviewTable" style="width:100%;border-collapse:collapse;background:#0e1a2e"><thead><tr style="background:#1e293b;position:sticky;top:0"><th style="padding:8px 10px;text-align:left;font-size:11px;color:#f5b301;text-transform:uppercase">${isCA?'Nom':'Nombre'}</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:#f5b301;text-transform:uppercase">${isCA?'Mòbil':'Móvil'}</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:#f5b301;text-transform:uppercase">${isCA?'Data':'Fecha'}</th><th style="padding:8px 10px;text-align:right;font-size:11px;color:#f5b301;text-transform:uppercase">Status</th></tr></thead><tbody>${validRows}</tbody></table>
         </div>
       </div>
       <div style="background:#0e1a2e;padding:20px;border-radius:12px;border:1px solid #1e293b;margin-top:16px">
@@ -5600,6 +5660,24 @@ function openSmsModal(){
     const cnt=document.getElementById('smsCharCount');
     function updCount(){const l=tpl.value.length;cnt.innerHTML='<span style="color:'+(l>160?'#ef4444':'#22c55e')+';font-weight:700">'+l+' / 160</span> '+(l>160?'· '+(isCA?'excedeix, es dividirà en múltiples SMS':'excede, se dividirá en múltiples SMS'):'');}
     updCount();tpl.oninput=updCount;
+    // 🔎 Buscador local sobre la tabla de contactos válidos (filtro por nombre/móvil)
+    const prevSearch=document.getElementById('smsPreviewSearch');
+    const prevCount=document.getElementById('smsPreviewCount');
+    if(prevSearch){
+      const rows=document.querySelectorAll('#smsPreviewTable tbody tr');
+      const applyPrevFilter=()=>{
+        const q=(prevSearch.value||'').trim().toLowerCase();
+        let visible=0;
+        rows.forEach(r=>{
+          const txt=r.textContent.toLowerCase();
+          const match=!q||txt.includes(q);
+          r.style.display=match?'':'none';
+          if(match) visible++;
+        });
+        if(prevCount) prevCount.textContent=q?(visible+' / '+rows.length):'';
+      };
+      prevSearch.oninput=applyPrevFilter;
+    }
     document.getElementById('smsBtnSend').onclick=async(ev)=>{
       const btn=ev.target;
       if(!confirm(isCA?`Enviar la campanya a ${d.valid_count} contactes?`:`¿Enviar la campaña a ${d.valid_count} contactos?`))return;

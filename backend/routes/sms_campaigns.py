@@ -651,4 +651,54 @@ def build_router(db):
             "twilio_mode": "real" if _has_twilio() else "mock",
         }
 
+    @router.get("/search-recipients")
+    async def search_recipients(
+        q: str = "",
+        limit: int = 50,
+        x_admin_token: Optional[str] = Header(None),
+    ):
+        """Búsqueda global: encuentra destinatarios (por nombre/apellidos/móvil) en TODAS las campañas.
+
+        Devuelve hasta `limit` coincidencias, agrupadas por campaña, con el nombre del contacto,
+        móvil, estado del envío y campaña de origen. Útil para responder "¿A quién le mandé este SMS?".
+        """
+        _admin(x_admin_token)
+        q_lower = (q or "").strip().lower()
+        if len(q_lower) < 2:
+            return {"query": q, "results": [], "total": 0, "truncated": False}
+        cursor = db.sms_campaigns.find({}).sort("created_at", -1)
+        results = []
+        truncated = False
+        async for c in cursor:
+            if len(results) >= limit:
+                truncated = True
+                break
+            camp_id = c.get("_id")
+            camp_name = c.get("name") or "—"
+            camp_date = c.get("created_at") or ""
+            for contact in c.get("contacts", []) or []:
+                if len(results) >= limit:
+                    truncated = True
+                    break
+                haystack = " ".join([
+                    str(contact.get("name") or ""),
+                    str(contact.get("surname1") or ""),
+                    str(contact.get("surname2") or ""),
+                    str(contact.get("phone") or ""),
+                    str(contact.get("original_phone") or ""),
+                ]).lower()
+                if q_lower in haystack:
+                    results.append({
+                        "campaign_id": camp_id,
+                        "campaign_name": camp_name,
+                        "campaign_date": camp_date,
+                        "name": contact.get("name"),
+                        "surname1": contact.get("surname1"),
+                        "surname2": contact.get("surname2"),
+                        "phone": contact.get("phone") or contact.get("original_phone"),
+                        "status": contact.get("status") or "-",
+                        "revision_date": contact.get("revision_date"),
+                    })
+        return {"query": q, "results": results, "total": len(results), "truncated": truncated}
+
     return router
