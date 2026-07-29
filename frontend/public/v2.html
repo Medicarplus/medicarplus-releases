@@ -7610,10 +7610,23 @@ function showLicenseInfo(){
   const btnOpenAdmin = back.querySelector('#btnOpenAdminPanel');
   if(btnOpenAdmin){
     btnOpenAdmin.onclick=()=>{
-      const url = new URL('admin.html', location.href);
-      // # → nunca se envía al servidor; sólo vive en el cliente y admin.html lo limpiará tras leerlo.
-      url.hash = 'token=' + encodeURIComponent(SMS_ADMIN_TOKEN);
-      window.open(url.toString(), '_blank', 'noopener');
+      // En Electron (file://) location.href apunta al bootstrap local → admin.html NO existe en disco.
+      // Siempre construimos la URL absoluta al servidor: web=origen actual, desktop=API base descubierta.
+      let base = '';
+      try{
+        if(location.protocol==='http:' || location.protocol==='https:') base = location.origin.replace(/\/$/,'');
+      }catch(e){}
+      if(!base){
+        base = (typeof getApiBase==='function'?getApiBase():'').replace(/\/$/,'');
+      }
+      if(!base){
+        alert('No se ha podido determinar el servidor. Comprueba tu conexión.');
+        return;
+      }
+      const url = base + '/admin.html#token=' + encodeURIComponent(SMS_ADMIN_TOKEN);
+      // En Electron el setWindowOpenHandler intercepta esto y llama shell.openExternal(url) → abre en el navegador del sistema.
+      // En web (Chrome/Firefox) abre una pestaña nueva normal.
+      window.open(url, '_blank', 'noopener');
     };
   }
   // 🔄 Reiniciar pruebas: neteja TOTA la simulació del Master
