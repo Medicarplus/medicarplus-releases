@@ -132,6 +132,7 @@
           <option value="no_license">👤 Sin licencia</option>
         </select>
         <button onclick="loadInstallations()" style="padding:8px 14px;background:#0369a1;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">↻ Cargar</button>
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);cursor:pointer"><input type="checkbox" id="instGroupBy" onchange="loadInstallations()"> Agrupar por licencia</label>
         <span id="instCount" style="font-size:11px;color:var(--muted)"></span>
       </div>
       <div style="overflow-x:auto;max-height:60vh">
@@ -508,6 +509,10 @@ function renderInstallRow(item){
   const acciones = revoked
     ? `<button onclick="unrevokeInstall('${esc(item.install_id)}')" style="padding:5px 10px;background:#166534;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px">↻ Reactivar</button>`
     : `<button onclick="revokeInstall('${esc(item.install_id)}')" style="padding:5px 10px;background:#b91c1c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px">🚫 Revocar</button>`;
+  // Botón Transferir: solo si tiene licencia activa asociada
+  const transferBtn = (lic && !revoked)
+    ? `<button onclick="transferInstall('${esc(item.install_id)}','${esc(lic.client_email||'')}','${esc(lic.client_name||'')}','${esc(lic.plan_family||'STD')}')" style="padding:5px 10px;margin-top:4px;background:#0284c7;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700">🔄 Transferir</button>`
+    : '';
   const notesCell = `<input type="text" placeholder="email cliente…" value="${esc(item.linked_email||'')}" onblur="updateInstallField('${esc(item.install_id)}','linked_email',this.value)" style="width:150px;padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--fg);font-size:11px;margin-bottom:4px"><br>
     <input type="text" placeholder="notas…" value="${esc(item.notes||'')}" onblur="updateInstallField('${esc(item.install_id)}','notes',this.value)" style="width:150px;padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--fg);font-size:11px">`;
   // Color de fondo si es dispositivo secundario (agrupación visual)
@@ -521,7 +526,7 @@ function renderInstallRow(item){
     <td>${licCell}</td>
     <td>${status}</td>
     <td>${notesCell}</td>
-    <td>${acciones}<br><button onclick="deleteInstall('${esc(item.install_id)}')" style="padding:4px 8px;margin-top:4px;background:#334155;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:10px">🗑 Borrar</button></td>
+    <td>${acciones}<br>${transferBtn}<br><button onclick="deleteInstall('${esc(item.install_id)}')" style="padding:4px 8px;margin-top:4px;background:#334155;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:10px">🗑 Borrar</button></td>
   </tr>`;
 }
 
@@ -554,6 +559,77 @@ async function updateInstallField(iid, field, value){
     method:'PATCH', headers:{'Content-Type':'application/json','X-Admin-Token':tok},
     body: JSON.stringify(body)
   });
+}
+
+// 🔄 Transferir licencia a nuevo install_id (God-mode)
+async function transferInstall(oldIid, clientEmail, clientName, plan){
+  // Modal simple con prompts encadenados
+  const newIid = prompt(
+    `🔄 TRANSFERIR LICENCIA · ${clientName || clientEmail || '—'} (${plan})\n\n` +
+    `Del install_id VIEJO:\n  ${oldIid}\n\n` +
+    `Al install_id NUEVO (pega el que te ha enviado el cliente desde su PC nuevo):`,
+    ''
+  );
+  if(!newIid) return;
+  const newIidTrim = newIid.trim().toUpperCase();
+  if(!/^CD-[A-Z0-9-]{4,60}$/.test(newIidTrim)){
+    alert('❌ Formato inválido. Debe ser tipo CD-XXXX-XXXX-XXXX-XXXX');
+    return;
+  }
+  if(newIidTrim === oldIid.toUpperCase()){
+    alert('❌ El install_id nuevo es igual que el viejo');
+    return;
+  }
+  const reason = prompt(
+    `Motivo de la transferencia (para tu registro interno):\n\n` +
+    `Ejemplos: "cambio de PC", "PC robado", "PC roto", "portátil nuevo"…`,
+    'cambio de PC'
+  );
+  if(reason === null) return;
+  const sendEmailAns = confirm(
+    `¿Enviar email al cliente con la NUEVA clave?\n\n` +
+    `📧 ${clientEmail || '(sin email · no se puede enviar)'}\n\n` +
+    `Aceptar = Sí, enviar email  ·  Cancelar = No, solo generar (yo la enviaré manualmente)`
+  );
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  try{
+    const r = await fetch('/api/licenses/transfer', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'X-Admin-Token': tok },
+      body: JSON.stringify({
+        old_install_id: oldIid,
+        new_install_id: newIidTrim,
+        reason,
+        send_email: sendEmailAns && !!clientEmail,
+      }),
+    });
+    const data = await r.json();
+    if(!r.ok){
+      alert(`❌ Error ${r.status}: ${data.detail || 'Error desconocido'}`);
+      return;
+    }
+    // Copiar la nueva clave al portapapeles automáticamente
+    const newKey = data.new_license.license_key;
+    let copied = false;
+    try{
+      await navigator.clipboard.writeText(newKey);
+      copied = true;
+    }catch(e){}
+    const emailStatus = data.email_sent
+      ? `📧 Email enviado a ${clientEmail}`
+      : (sendEmailAns ? `⚠️ Email NO enviado: ${data.email_error||'sin motivo'}` : 'ℹ️ Email no enviado (opción desactivada)');
+    alert(
+      `✅ TRANSFERENCIA COMPLETADA\n\n` +
+      `Viejo (revocado): ${data.old_install_id}\n` +
+      `Nuevo (activo):   ${data.new_install_id}\n` +
+      `Días restantes:   ${data.remaining_days || '∞'}\n\n` +
+      `Nueva clave (${copied ? 'copiada al portapapeles' : 'cópiala manualmente'}):\n\n${newKey}\n\n` +
+      `${emailStatus}`
+    );
+    loadInstallations();
+  }catch(e){
+    alert('❌ Error de red: '+e.message);
+  }
 }
 // Live search
 document.addEventListener('DOMContentLoaded', () => {

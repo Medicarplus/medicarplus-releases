@@ -257,6 +257,136 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         await _audit(request, "license.generate", body.install_id, extra={"plan": doc["plan"]})
         return _doc_to_record(doc, include_key=True)
 
+    # ---------- Transfer to new device (Feb 2026 · God-mode) ----------
+    @router.post(
+        "/transfer",
+        dependencies=[Depends(require_admin)],
+    )
+    async def transfer_license(body: dict, request: Request):
+        """Transfiere una licencia del install_id viejo al nuevo, revoca el viejo,
+        genera CLAVE NUEVA y (opcional) envía email al cliente con los nuevos datos.
+
+        Body JSON:
+        {
+          "old_install_id": "CD-...",   # obligatorio
+          "new_install_id": "CD-...",   # obligatorio
+          "reason": "cambio PC",         # opcional
+          "send_email": true             # opcional
+        }
+        """
+        old_iid = (body.get("old_install_id") or "").strip().upper()
+        new_iid = (body.get("new_install_id") or "").strip().upper()
+        reason = (body.get("reason") or "").strip() or "device_transfer"
+        send_email = bool(body.get("send_email", True))
+
+        if not old_iid or not new_iid:
+            raise HTTPException(status_code=400, detail="old_install_id y new_install_id son obligatorios")
+        if old_iid == new_iid:
+            raise HTTPException(status_code=400, detail="old y new install_id son iguales")
+
+        # 1) Localiza la licencia asociada al viejo (como principal o linked)
+        lic = await coll.find_one({
+            "$or": [{"install_id": old_iid}, {"linked_install_ids": old_iid}],
+            "status": "active",
+        })
+        if not lic:
+            raise HTTPException(status_code=404, detail=f"No hay licencia activa vinculada a {old_iid}")
+
+        plan = (lic.get("plan") or "STD").upper()
+        client_name = lic.get("client_name") or ""
+        client_email = lic.get("client_email") or ""
+        duration_days = lic.get("duration_days")
+
+        # 2) Calcula duration_days restantes si tenía expires_at
+        remaining_days = duration_days
+        expires_at_iso = lic.get("expires_at")
+        if expires_at_iso:
+            try:
+                exp_dt = _to_dt(expires_at_iso)
+                if exp_dt:
+                    delta = (exp_dt - _now()).total_seconds() / 86400.0
+                    remaining_days = max(1, int(delta))
+            except Exception:
+                pass
+
+        # 3) Revoca la licencia vieja (marca replaced)
+        await coll.update_one(
+            {"_id": lic["_id"]},
+            {"$set": {
+                "status": "revoked",
+                "revoked_at": _now().isoformat(),
+                "revoked_reason": f"transferred_to:{new_iid}:{reason}",
+            }},
+        )
+
+        # 4) Genera licencia NUEVA para el nuevo install_id
+        new_doc = await _create_license(
+            install_id=new_iid,
+            client_name=client_name,
+            client_email=client_email,
+            duration_days=remaining_days,
+            plan=plan,
+            notes=f"Transferida desde {old_iid} · motivo: {reason}",
+        )
+
+        # 5) Revoca el install_id viejo en installations (para bloquear reactivación silenciosa)
+        try:
+            await db.installations.update_one(
+                {"_id": old_iid},
+                {"$set": {
+                    "revoked": True,
+                    "revoked_at": _now().isoformat(),
+                    "revoked_reason": f"transferred_to:{new_iid}",
+                }},
+                upsert=True,
+            )
+        except Exception as ex:
+            logger.warning("installations upsert failed: %s", ex)
+
+        # 6) Copia datos de sync (si existen) — best effort
+        try:
+            await db.sync_state.update_many(
+                {"install_id": old_iid},
+                {"$set": {"install_id": new_iid, "migrated_from": old_iid, "migrated_at": _now().isoformat()}},
+            )
+        except Exception:
+            pass
+
+        # 7) Envía email al cliente con nueva clave
+        email_sent = False
+        email_error = None
+        if send_email and client_email:
+            try:
+                exp_dt = _to_dt(new_doc.get("expires_at"))
+                ok, info = await mailer.send_license_email(
+                    to_email=client_email,
+                    client_name=client_name,
+                    install_id=new_iid,
+                    license_key=new_doc["license_key"],
+                    plan=plan,
+                    expires_at=exp_dt,
+                )
+                email_sent = ok
+                if not ok:
+                    email_error = info
+            except Exception as ex:
+                email_error = str(ex)
+
+        await _audit(request, "license.transfer", old_iid, extra={
+            "new_install_id": new_iid, "new_license_id": new_doc["id"], "reason": reason, "email_sent": email_sent,
+        })
+
+        return {
+            "ok": True,
+            "old_install_id": old_iid,
+            "new_install_id": new_iid,
+            "new_license": _doc_to_record(new_doc, include_key=True).model_dump(mode="json"),
+            "old_license_revoked": True,
+            "email_sent": email_sent,
+            "email_error": email_error,
+            "remaining_days": remaining_days,
+        }
+
     # ---------- Verify (public, rate-limited) ----------
     @router.post("/verify", response_model=LicenseVerifyResponse)
     @_rate("60/minute")
