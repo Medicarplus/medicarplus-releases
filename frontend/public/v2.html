@@ -7349,6 +7349,34 @@ function getInstallId(){
   }
   return id;
 }
+// 📡 Heartbeat: registra la instalación en el servidor (una vez por sesión) para trazabilidad total.
+// Idempotente: el backend hace upsert por install_id.
+(function trackInstall(){
+  try{
+    if(sessionStorage.getItem('caja.install.tracked.v1')) return;
+    sessionStorage.setItem('caja.install.tracked.v1','1');
+    const install_id=getInstallId();
+    const isElectron=(navigator.userAgent||'').toLowerCase().indexOf('electron')>=0 || (typeof window!=='undefined' && !!window.process && window.process.type);
+    const payload={
+      install_id,
+      user_agent:(navigator.userAgent||'').slice(0,512),
+      platform:isElectron?'electron-desktop':'web-browser',
+      timezone:(Intl.DateTimeFormat().resolvedOptions().timeZone||''),
+      screen:(screen.width+'x'+screen.height),
+      app_version:(document.getElementById('appVersion')||{}).textContent||''
+    };
+    setTimeout(()=>{
+      let base='';
+      try{ if(location.protocol==='http:'||location.protocol==='https:') base=location.origin.replace(/\/$/,''); }catch(e){}
+      if(!base && typeof getApiBase==='function') base=getApiBase().replace(/\/$/,'');
+      if(!base) return;
+      fetch(base+'/api/install/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json()).then(res=>{
+        // Si el servidor dice que esta instalación está revocada, redirigimos a un estado bloqueado.
+        // (opcional — verificable con /api/install/status/{id})
+      }).catch(()=>{/* silencioso */});
+    },1500); // Delay para no bloquear el arranque inicial
+  }catch(e){/* silencioso */}
+})();
 function loadLicense(){try{return JSON.parse(localStorage.getItem(LIC.KEY)||'null')}catch(e){return null}}
 function saveLicense(lic){localStorage.setItem(LIC.KEY,JSON.stringify(lic));localStorage.setItem(LIC.LAST_CHECK,Date.now().toString())}
 const JWT_RE=/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
