@@ -178,17 +178,47 @@ def build_router(db):
         items = []
         async for d in cursor:
             iid = d.pop("_id")
-            # Enriquecer con datos de licencia si existe
-            lic = await db.licenses.find_one({"install_id": iid}, {
+            # Enriquecer con datos de licencia si existe (bien como install_id principal, bien como linked_install_ids)
+            lic = await db.licenses.find_one({
+                "$or": [
+                    {"install_id": iid},
+                    {"linked_install_ids": iid},
+                ]
+            }, {
                 "plan_family": 1, "status": 1, "client_name": 1, "client_email": 1,
                 "expires_at": 1, "license_key": 1, "created_at": 1,
+                "install_id": 1, "linked_install_ids": 1, "id": 1,
             })
+            link_info = None
+            if lic:
+                principal = (lic.get("install_id") or "").strip()
+                linked = [x for x in (lic.get("linked_install_ids") or []) if x]
+                # ¿Este iid es el principal o un secundario?
+                if iid == principal:
+                    device_no = 1
+                elif iid in linked:
+                    device_no = 2 + linked.index(iid)  # #2, #3, …
+                else:
+                    device_no = 0
+                total_devices = 1 + len(linked)
+                link_info = {
+                    "device_no": device_no,
+                    "total_devices": total_devices,
+                    "plan_family": lic.get("plan_family"),
+                    "license_key": lic.get("license_key"),
+                    "license_jti": lic.get("id"),
+                    "principal_install_id": principal,
+                    "linked_install_ids": linked,
+                    "client_name": lic.get("client_name"),
+                    "client_email": lic.get("client_email"),
+                }
             if status == "no_license" and lic:
                 continue
             items.append({
                 "install_id": iid,
                 **d,
                 "license": (lic and {**lic, "_id": str(lic.get("_id"))}) or None,
+                "link_info": link_info,
             })
         return {"items": items, "total": len(items)}
 

@@ -448,6 +448,7 @@ async function loadInstallations(){
   if(!tok){ alert('Debes iniciar sesión primero'); return; }
   const q = document.getElementById('instSearch').value.trim();
   const status = document.getElementById('instFilter').value;
+  const groupBy = document.getElementById('instGroupBy')?.checked;
   const tbody = document.getElementById('instTbody');
   const counter = document.getElementById('instCount');
   tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--muted)">Cargando...</td></tr>';
@@ -457,9 +458,21 @@ async function loadInstallations(){
     });
     if(!r.ok){ tbody.innerHTML = `<tr><td colspan="9" style="color:#ef4444;text-align:center;padding:20px">Error ${r.status}</td></tr>`; return; }
     const data = await r.json();
-    counter.textContent = `${data.total} resultado${data.total===1?'':'s'}`;
+    // Contador enriquecido: cuántas licencias Premium tienen 2 dispositivos
+    const premiumMulti = data.items.filter(i => i.link_info && i.link_info.total_devices > 1 && i.link_info.device_no === 1).length;
+    counter.innerHTML = `<b>${data.total}</b> resultado${data.total===1?'':'s'}` + (premiumMulti>0 ? ` · <span style="color:#0ea5e9">🔗 ${premiumMulti} licencia${premiumMulti===1?'':'s'} con 2+ dispositivos</span>` : '');
     if(!data.items.length){ tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--muted)">Sin resultados</td></tr>'; return; }
-    tbody.innerHTML = data.items.map(renderInstallRow).join('');
+    let items = data.items;
+    if(groupBy){
+      // Ordenamos por license_jti para agrupar visualmente devices hermanos
+      items = [...items].sort((a,b) => {
+        const ja = a.link_info?.license_jti || 'zz-'+a.install_id;
+        const jb = b.link_info?.license_jti || 'zz-'+b.install_id;
+        if(ja !== jb) return ja.localeCompare(jb);
+        return (a.link_info?.device_no||99) - (b.link_info?.device_no||99);
+      });
+    }
+    tbody.innerHTML = items.map(renderInstallRow).join('');
   }catch(e){
     tbody.innerHTML = `<tr><td colspan="9" style="color:#ef4444;text-align:center;padding:20px">Error: ${e.message}</td></tr>`;
   }
@@ -474,16 +487,33 @@ function renderInstallRow(item){
     ? `<span style="color:#ef4444;font-weight:700">🚫 REVOCADA</span><br><span style="font-size:10px;color:var(--muted)">${esc(item.revoked_reason||'')}</span>`
     : `<span style="color:#22c55e;font-weight:700">🟢 Activa</span>`;
   const lic = item.license;
-  const licCell = lic
-    ? `<b style="color:${lic.status==='active'?'#22c55e':'#94a3b8'}">${esc(lic.plan_family||'?')}</b><br><span style="font-size:11px;color:var(--muted)">${esc(lic.client_name||lic.client_email||'—')}</span>`
-    : `<span style="color:#94a3b8;font-style:italic">— sin licencia —</span>`;
+  const link = item.link_info;
+  let licCell;
+  if(!lic){
+    licCell = `<span style="color:#94a3b8;font-style:italic">— sin licencia —</span>`;
+  } else {
+    const plan = lic.plan_family || '?';
+    const clientDisplay = esc(lic.client_name || lic.client_email || '—');
+    // Badge dispositivo (solo si Premium multi-device)
+    let deviceBadge = '';
+    if(link && link.total_devices > 1){
+      const emoji = link.device_no === 1 ? '📱' : '💻';
+      const color = link.device_no === 1 ? '#a855f7' : '#0ea5e9';
+      deviceBadge = `<span style="display:inline-block;background:${color}22;border:1px solid ${color};color:${color};padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;margin-top:3px">🔗 ${emoji} Dispositivo #${link.device_no} de ${link.total_devices} · ${esc(plan)}</span>`;
+    } else if(link && link.device_no === 1){
+      deviceBadge = `<span style="display:inline-block;color:var(--muted);font-size:10px;margin-top:3px">📱 Único dispositivo</span>`;
+    }
+    licCell = `<b style="color:${lic.status==='active'?'#22c55e':'#94a3b8'}">${esc(plan)}</b><br><span style="font-size:11px;color:var(--muted)">${clientDisplay}</span><br>${deviceBadge}`;
+  }
   const acciones = revoked
     ? `<button onclick="unrevokeInstall('${esc(item.install_id)}')" style="padding:5px 10px;background:#166534;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px">↻ Reactivar</button>`
     : `<button onclick="revokeInstall('${esc(item.install_id)}')" style="padding:5px 10px;background:#b91c1c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px">🚫 Revocar</button>`;
   const notesCell = `<input type="text" placeholder="email cliente…" value="${esc(item.linked_email||'')}" onblur="updateInstallField('${esc(item.install_id)}','linked_email',this.value)" style="width:150px;padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--fg);font-size:11px;margin-bottom:4px"><br>
     <input type="text" placeholder="notas…" value="${esc(item.notes||'')}" onblur="updateInstallField('${esc(item.install_id)}','notes',this.value)" style="width:150px;padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--fg);font-size:11px">`;
-  return `<tr>
-    <td style="font-family:monospace;font-size:11px">${esc(item.install_id)}<br><span style="color:var(--muted);font-size:10px">×${item.seen_count||0}</span></td>
+  // Color de fondo si es dispositivo secundario (agrupación visual)
+  const rowStyle = link && link.device_no >= 2 ? 'background:rgba(14,165,233,0.06)' : '';
+  return `<tr style="${rowStyle}" data-license-jti="${esc(link?.license_jti||'')}">
+    <td style="font-family:monospace;font-size:11px">${esc(item.install_id)}<br><span style="color:var(--muted);font-size:10px">×${item.seen_count||0} arranques</span></td>
     <td style="font-size:11px">${fmt(item.first_seen_at)}</td>
     <td style="font-size:11px">${fmt(item.last_seen_at)}</td>
     <td style="font-size:11px">${esc(item.platform||'—')}<br><span style="color:var(--muted);font-size:10px">${esc(uaShort)}</span></td>
