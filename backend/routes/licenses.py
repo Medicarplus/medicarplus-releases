@@ -259,6 +259,93 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
 
     # ---------- Transfer to new device (Feb 2026 · God-mode) ----------
     @router.post(
+        "/change-email",
+        dependencies=[Depends(require_admin)],
+    )
+    async def change_client_email(body: dict, request: Request):
+        """Cambia el email del cliente en TODAS las colecciones + Stripe.
+
+        Propagación automática:
+        - `licenses.client_email` (todas las licencias del cliente, incluidas históricas)
+        - `subscriptions.customer_email`
+        - `installations.linked_email` (por install_ids del cliente)
+        - Stripe Customer email (via API, para que las facturas futuras vayan al mail nuevo)
+
+        Body JSON:
+        {
+          "old_email": "viejo@example.com",   # obligatorio
+          "new_email": "nuevo@example.com",   # obligatorio
+        }
+        """
+        old_email = (body.get("old_email") or "").strip().lower()
+        new_email = (body.get("new_email") or "").strip().lower()
+        if not old_email or not new_email or "@" not in new_email:
+            raise HTTPException(status_code=400, detail="old_email y new_email válidos son obligatorios")
+        if old_email == new_email:
+            raise HTTPException(status_code=400, detail="El email nuevo es igual al viejo")
+
+        results: dict = {}
+
+        # 1) Licencias del cliente (ACTIVAS + históricas) — actualizamos todas.
+        r_lic = await coll.update_many(
+            {"client_email": old_email},
+            {"$set": {"client_email": new_email,
+                      "email_changed_from": old_email,
+                      "email_changed_at": _now().isoformat()}},
+        )
+        results["licenses_updated"] = r_lic.modified_count
+
+        # 2) Subscriptions collection
+        try:
+            r_sub = await db.subscriptions.update_many(
+                {"customer_email": old_email},
+                {"$set": {"customer_email": new_email,
+                          "email_changed_from": old_email,
+                          "email_changed_at": _now().isoformat()}},
+            )
+            results["subscriptions_updated"] = r_sub.modified_count
+        except Exception as ex:
+            results["subscriptions_error"] = str(ex)
+
+        # 3) Installations: linked_email
+        try:
+            r_ins = await db.installations.update_many(
+                {"linked_email": old_email},
+                {"$set": {"linked_email": new_email}},
+            )
+            results["installations_updated"] = r_ins.modified_count
+        except Exception as ex:
+            results["installations_error"] = str(ex)
+
+        # 4) Stripe: actualiza el email del Customer para que reciba facturas nuevas
+        results["stripe_customers_updated"] = 0
+        results["stripe_error"] = None
+        try:
+            import stripe as _stripe
+            _stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
+            if _stripe.api_key:
+                # Busca subscriptions con este email para localizar el/los customer_id
+                async for sub_doc in db.subscriptions.find({"customer_email": new_email}):
+                    cust_id = sub_doc.get("stripe_customer_id")
+                    if cust_id:
+                        try:
+                            _stripe.Customer.modify(cust_id, email=new_email)
+                            results["stripe_customers_updated"] += 1
+                        except Exception as se:
+                            results["stripe_error"] = str(se)
+        except ImportError:
+            results["stripe_error"] = "stripe SDK not installed"
+        except Exception as ex:
+            results["stripe_error"] = str(ex)
+
+        await _audit(request, "license.change_email", old_email, extra={
+            "new_email": new_email, **results,
+        })
+
+        return {"ok": True, "old_email": old_email, "new_email": new_email, **results}
+
+    # ---------- Transfer to new device (Feb 2026 · God-mode) ----------
+    @router.post(
         "/transfer",
         dependencies=[Depends(require_admin)],
     )
