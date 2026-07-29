@@ -220,6 +220,10 @@ async function doLogin(){
     document.getElementById('app').style.display='block';
     document.getElementById('envLabel').textContent = API_BASE;
     loadLicenses();
+    // Carga automática de las nuevas secciones al hacer login
+    setTimeout(() => { try{ loadPaymentAlerts(); }catch(e){} }, 500);
+    setTimeout(() => { try{ loadAdminUsers(); }catch(e){} }, 800);
+    setTimeout(() => { try{ loadInstallations(); }catch(e){} }, 1100);
   }catch(e){document.getElementById('err').textContent='Error red: '+e.message}
 }
 function logout(){
@@ -816,6 +820,109 @@ async function deleteAdminUser(username){
   const data = await r.json();
   if(!r.ok){ alert(`❌ ${data.detail||'Error '+r.status}`); return; }
   loadAdminUsers();
+}
+
+// ---------------- 💳 Pagos & Facturación (Stripe sync) ----------------
+async function syncStripePayments(){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok){ alert('Debes iniciar sesión'); return; }
+  const btn = document.getElementById('btnSyncStripe');
+  const box = document.getElementById('paymentsSummaryBox');
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Sincronizando…';
+  box.innerHTML = '<span style="color:#94a3b8;font-style:italic">⏳ Contactando con Stripe y descargando invoices…</span>';
+  try{
+    const r = await fetch('/api/admin/payments/sync', {method:'POST', headers:{'X-Admin-Token':tok}});
+    if(!r.ok){
+      const d = await r.json().catch(()=>({}));
+      box.innerHTML = `<span style="color:#ef4444">❌ Error ${r.status}: ${d.detail||'Sin detalle'}</span>`;
+      return;
+    }
+    const data = await r.json();
+    const errs = (data.errors||[]).length ? `<div style="color:#f59e0b;font-size:11px;margin-top:8px">⚠️ Errores parciales: ${data.errors.length} (${data.errors.slice(0,3).join('; ')}…)</div>` : '';
+    box.innerHTML = `<div style="padding:12px;background:#0f172a;border-radius:8px;border:1px solid #166534">
+      <b style="color:#22c55e">✅ Sincronización completada</b><br>
+      <div style="font-size:12px;color:#cbd5e1;margin-top:6px">
+        Licencias procesadas: <b>${data.licenses_processed}</b> · Invoices sincronizados: <b>${data.invoices_synced}</b><br>
+        💰 Total facturado (histórico): <b style="color:#f5b301">${data.total_paid_eur.toFixed(2)} €</b><br>
+        🟢 Salud OK: <b>${data.green}</b> · 🟡 Alerta: <b>${data.yellow}</b> · 🔴 Problema: <b>${data.red}</b> · ⚪ Sin datos: <b>${data.no_data}</b>
+      </div>${errs}
+    </div>`;
+    // Refrescar banner y recargar summary
+    loadPaymentAlerts();
+    loadPaymentsSummary();
+  }catch(e){
+    box.innerHTML = `<span style="color:#ef4444">❌ Error de red: ${e.message}</span>`;
+  }finally{
+    btn.disabled = false; btn.textContent = orig;
+  }
+}
+
+async function loadPaymentsSummary(){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok) return;
+  const box = document.getElementById('paymentsSummaryBox');
+  try{
+    const r = await fetch('/api/admin/payments/summary', {headers:{'X-Admin-Token':tok}});
+    if(!r.ok) return;
+    const d = await r.json();
+    const h = d.licenses_by_health || {};
+    const fmtEUR = c => (c/100).toFixed(2)+' €';
+    const rowsHtml = (d.latest_invoices||[]).slice(0,10).map(p => {
+      const dt = p.paid_at || p.created_at || '';
+      const dtFmt = dt ? new Date(dt).toLocaleDateString('es-ES') : '—';
+      const st = String(p.status||'').toLowerCase();
+      const color = st==='paid' ? '#22c55e' : (st==='void'?'#94a3b8' : '#ef4444');
+      return `<tr style="border-bottom:1px solid #1e293b">
+        <td style="padding:6px 10px;font-size:11px">${dtFmt}</td>
+        <td style="padding:6px 10px;font-size:11px">${(p.customer_email||'—').replace(/</g,'&lt;')}</td>
+        <td style="padding:6px 10px;text-align:right;font-family:monospace;font-weight:700">${fmtEUR(p.amount_cents||0)}</td>
+        <td style="padding:6px 10px;font-size:11px;color:${color};font-weight:700">${st.toUpperCase()}</td>
+        <td style="padding:6px 10px">${p.hosted_url?`<a href="${p.hosted_url}" target="_blank" style="color:#0284c7;font-size:11px">Ver</a>`:''}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="5" style="padding:14px;text-align:center;color:var(--muted);font-style:italic">Sin pagos todavía. Pulsa "Sincronizar con Stripe" arriba.</td></tr>';
+    document.getElementById('paymentsSummaryBox').innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px">
+        <div style="padding:12px;background:#0f172a;border-radius:8px;text-align:center"><div style="font-size:11px;color:#94a3b8">💰 TOTAL FACTURADO</div><div style="font-size:22px;font-weight:800;color:#f5b301">${d.total_paid_eur.toFixed(2)}€</div></div>
+        <div style="padding:12px;background:#0f172a;border-radius:8px;text-align:center"><div style="font-size:11px;color:#94a3b8">✅ Pagos OK</div><div style="font-size:22px;font-weight:800;color:#22c55e">${d.invoices_paid}</div></div>
+        <div style="padding:12px;background:#0f172a;border-radius:8px;text-align:center"><div style="font-size:11px;color:#94a3b8">❌ Fallidos/Abiertos</div><div style="font-size:22px;font-weight:800;color:#ef4444">${d.invoices_failed_or_open}</div></div>
+        <div style="padding:12px;background:#0f172a;border-radius:8px;text-align:center"><div style="font-size:11px;color:#94a3b8">🟢🟡🔴 SALUD</div><div style="font-size:14px;font-weight:800"><span style="color:#22c55e">${h.green||0}</span> · <span style="color:#f59e0b">${h.yellow||0}</span> · <span style="color:#ef4444">${h.red||0}</span></div></div>
+      </div>
+      <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;font-weight:700">🧾 Últimos 10 pagos</div>
+      <table style="width:100%;border-collapse:collapse;background:#0e1a2e">
+        <thead><tr style="background:#1e293b"><th style="padding:6px 10px;text-align:left;font-size:10px;color:#f5b301">Fecha</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#f5b301">Cliente</th><th style="padding:6px 10px;text-align:right;font-size:10px;color:#f5b301">Importe</th><th style="padding:6px 10px;font-size:10px;color:#f5b301">Estado</th><th style="padding:6px 10px"></th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+  }catch(e){/* silent */}
+}
+
+// 🚨 Banner de alertas (arriba del panel) — auto-carga al hacer login
+async function loadPaymentAlerts(){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok) return;
+  const banner = document.getElementById('paymentsAlertBanner');
+  if(!banner) return;
+  try{
+    const r = await fetch('/api/admin/payments/summary', {headers:{'X-Admin-Token':tok}});
+    if(!r.ok) return;
+    const d = await r.json();
+    const h = d.licenses_by_health || {};
+    const red = h.red || 0;
+    const yellow = h.yellow || 0;
+    if(red === 0 && yellow === 0){
+      banner.style.display = 'block';
+      banner.style.background = '#0f2f1a';
+      banner.style.border = '1px solid #166534';
+      banner.style.color = '#86efac';
+      banner.innerHTML = `🟢 <b>Todo OK</b> · Ningún cliente con problemas de pago · Total facturado: <b style="color:#f5b301">${d.total_paid_eur.toFixed(2)} €</b> · <span style="font-size:11px;font-weight:400">(${d.invoices_paid} pagos ok)</span>`;
+    } else {
+      banner.style.display = 'block';
+      banner.style.background = red>0 ? '#3f1010' : '#3f2a10';
+      banner.style.border = '1px solid '+(red>0 ? '#b91c1c' : '#d97706');
+      banner.style.color = red>0 ? '#fecaca' : '#fef3c7';
+      banner.innerHTML = `${red>0?'🚨':'⚠️'} <b>${red>0?'PROBLEMAS DE PAGO DETECTADOS':'Alertas de pago'}</b> · <b style="color:${red>0?'#fca5a5':'#fcd34d'}">${red}</b> cliente${red===1?'':'s'} con pago rechazado, <b>${yellow}</b> en revisión · <a href="#paymentsSummaryBox" onclick="document.getElementById('paymentsSummaryBox').scrollIntoView({behavior:'smooth'});return false;" style="color:#fca5a5;text-decoration:underline;font-weight:700">Ver detalles ↓</a>`;
+    }
+  }catch(e){/* silent */}
 }
 </script>
 </body>
