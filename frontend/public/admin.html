@@ -217,6 +217,81 @@ let ENRICHED_CACHE = {};
 
 const API_BASE = window.location.origin;
 
+// 📋 Copiar al portapapeles (helper global · admin.html) — con fallback para navegadores sin
+// navigator.clipboard (Electron file://, HTTP no seguro, etc.) y feedback visual en el botón.
+async function copyVal(btn, value){
+  if(!value){ return; }
+  const original = btn ? btn.innerHTML : '';
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext){
+      await navigator.clipboard.writeText(String(value));
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = String(value);
+      ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if(!ok) throw new Error('execCommand copy falló');
+    }
+    if(btn){
+      btn.innerHTML = '✓ Copiado!';
+      const origBg = btn.style.background;
+      btn.style.background = '#22c55e';
+      btn.style.color = '#0b1121';
+      setTimeout(()=>{ btn.innerHTML = original; btn.style.background = origBg; btn.style.color = ''; }, 1500);
+    }
+  }catch(e){
+    if(btn){
+      btn.innerHTML = '✗ Error copiar';
+      setTimeout(()=>{ btn.innerHTML = original; }, 1800);
+    }
+    // Fallback last-resort: mostrar en un prompt para que el usuario copie manual
+    try{ window.prompt('No pude copiar automáticamente. Copia manualmente:', String(value)); }catch(_){}
+  }
+}
+window.copyVal = copyVal;
+
+// 🚩 Mostrar detalle de flags al hacer clic en el badge
+function showFlagsModal(installId, flagsJson){
+  let flags = [];
+  try{ flags = JSON.parse(decodeURIComponent(flagsJson)); }catch(e){ flags = []; }
+  const explain = {
+    'multi_install_same_email': '📧 Este email ha creado licencias en varios PCs (posible intento de eludir el trial creando cuentas nuevas).',
+    'multi_email_same_install': '💻 Este PC ha creado licencias con varios emails distintos (posible farm de trials).',
+    'suspicious_email_pattern': '✉️ Email con patrón sospechoso (dominios temporales tipo mailinator, tempmail, guerrillamail…).',
+    'fast_trial_reset': '⏱️ Se ha activado un nuevo trial menos de 24h después de haberse expirado el anterior.',
+    'ip_shared_multiple_installs': '🌐 Misma IP ha registrado múltiples install_ids en poco tiempo.',
+    'vpn_detected': '🛡️ IP procede de un servicio VPN/proxy conocido.',
+    'blacklisted_email_domain': '🚫 El dominio del email está en la lista negra de MediCar Plus.',
+  };
+  const rows = flags.map(f => {
+    const key = String(f);
+    const desc = explain[key] || key;
+    return `<li style="padding:8px 0;border-bottom:1px solid #334155;line-height:1.5">
+      <div style="font-family:monospace;font-size:11px;color:#fbbf24;font-weight:700;margin-bottom:2px">${key}</div>
+      <div style="font-size:12px;color:#e2e8f0">${desc}</div>
+    </li>`;
+  }).join('');
+  const back = document.createElement('div');
+  back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:10001;padding:20px';
+  back.innerHTML = `<div style="background:var(--panel);border:2px solid #f59e0b;border-radius:12px;padding:20px;max-width:560px;width:100%;max-height:80vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0;color:#fbbf24;font-family:Georgia,serif">⚠️ Motivos del flag${flags.length>1?'s':''}</h3>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="background:#334155;color:#fff;border:none;padding:6px 12px;border-radius:5px;cursor:pointer">✕ Cerrar</button>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Install ID: <span style="font-family:monospace;color:#e2e8f0">${installId||'—'}</span> · <b>${flags.length}</b> señal(es) de posible abuso detectada(s):</div>
+    <ul style="margin:0;padding-left:0;list-style:none">${rows||'<li style="color:var(--muted);font-style:italic">Sin flags específicos</li>'}</ul>
+    <div style="font-size:11px;color:var(--muted);margin-top:14px;padding:10px;background:#0f172a;border-radius:6px;border-left:3px solid #f59e0b">
+      💡 Un flag NO bloquea automáticamente el trial. Es una alerta para que revises tú si aplica. Puedes ignorarlo si el cliente lo justifica, o revocar la licencia si confirmas abuso.
+    </div>
+  </div>`;
+  back.addEventListener('click', ev => { if(ev.target === back) back.remove(); });
+  document.body.appendChild(back);
+}
+window.showFlagsModal = showFlagsModal;
+
 async function doLogin(){
   const credential = document.getElementById('passInput').value.trim();
   if(!credential){document.getElementById('err').textContent='Introduce contraseña o token';return}
@@ -404,7 +479,7 @@ function applyFilters(){
     const isTrial = p==='TRIAL';
     return `<tr>
       <td><span class="mono">${(l.install_id||'').slice(0,18)}${(l.install_id||'').length>18?'…':''}</span></td>
-      <td><b>${(l.client_name||l.company_name||'—').replace(/</g,'&lt;')}</b>${(Array.isArray(l.abuse_flags)&&l.abuse_flags.length)?` <span data-testid="abuse-flag-badge-${l.install_id}" title="${l.abuse_flags.map(f=>String(f).replace(/"/g,'&quot;')).join(' · ')}" style="background:#78350f;color:#fbbf24;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:800;letter-spacing:.3px">⚠️ ${l.abuse_flags.length} FLAG${l.abuse_flags.length>1?'S':''}</span>`:''}<br><span class="mono" style="color:var(--muted)">${(l.client_email||'—').replace(/</g,'&lt;')}</span></td>
+      <td><b>${(l.client_name||l.company_name||'—').replace(/</g,'&lt;')}</b>${(Array.isArray(l.abuse_flags)&&l.abuse_flags.length)?` <span data-testid="abuse-flag-badge-${l.install_id}" onclick="event.stopPropagation();showFlagsModal('${(l.install_id||'').replace(/'/g,"\\\\'")}','${encodeURIComponent(JSON.stringify(l.abuse_flags))}')" title="Clic para ver el motivo del flag" style="background:#78350f;color:#fbbf24;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:800;letter-spacing:.3px;cursor:pointer">⚠️ ${l.abuse_flags.length} FLAG${l.abuse_flags.length>1?'S':''}</span>`:''}<br><span class="mono" style="color:var(--muted)">${(l.client_email||'—').replace(/</g,'&lt;')}</span></td>
       <td><span class="pill ${pillCls}">${p||'—'}</span></td>
       <td><span class="pill ${stCls}">${l.status||'—'}</span></td>
       <td class="mono">${l.expires_at?new Date(l.expires_at).toLocaleDateString('ca-ES'):'—'}</td>

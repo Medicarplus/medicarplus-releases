@@ -7785,12 +7785,15 @@ function showLicenseInfo(){
     };
   }
   // 🎁 Programa de referits: només visible per llicències PAGADES (STD/PRM), no Trial ni Master
+  // Excepción: si MASTER está en modo "Vista prèvia" simulando un plan pagado, mostramos el bloque igualmente
   (async function loadReferralBlock(){
     try{
-      const planUp = String((lic && lic.plan)||'').toUpperCase();
+      const previewPlan = (localStorage.getItem('caja.plan.preview.v1')||'').toUpperCase();
+      const planUp = previewPlan || String((lic && lic.plan)||'').toUpperCase();
       const typeUp = String((lic && lic.type)||'').toUpperCase();
       const paidPlans = ['STD','STANDARD','PRM','PREMIUM'];
-      const canRefer = paidPlans.includes(planUp) && typeUp !== 'MASTER';
+      // Si hay preview de plan pagado, permitimos ver el bloque aunque el tipo real sea MASTER
+      const canRefer = paidPlans.includes(planUp) && (typeUp !== 'MASTER' || !!previewPlan);
       if(!canRefer) return;
       // Al navegador web usem l'origin actual (preview/prod). Només a Electron usem getApiBase()
       let api = '';
@@ -7811,11 +7814,10 @@ function showLicenseInfo(){
       } else {
         stats.innerHTML = 'Aún no tienes referidos. ¡Comparte tu enlace!';
       }
-      const copy = (txt, label)=>{
-        try{ navigator.clipboard.writeText(txt); alert(label+' copiado al portapapeles.'); }catch(e){}
-      };
-      back.querySelector('#btnCopyRefCode').onclick = ()=>copy(data.referral_code, 'Código');
-      back.querySelector('#btnCopyRefUrl').onclick = ()=>copy(data.share_url, 'Enlace de referido');
+      const btnRefCode = back.querySelector('#btnCopyRefCode');
+      const btnRefUrl = back.querySelector('#btnCopyRefUrl');
+      if(btnRefCode) btnRefCode.onclick = (ev)=>{ ev.stopPropagation(); _copyToClipboard(btnRefCode, data.referral_code || ''); };
+      if(btnRefUrl) btnRefUrl.onclick = (ev)=>{ ev.stopPropagation(); _copyToClipboard(btnRefUrl, data.share_url || ''); };
       // Modal explicatiu del programa de referidos (accessible des del botó ❓)
       const infoBtn = back.querySelector('#refInfoBtn');
       if(infoBtn){
