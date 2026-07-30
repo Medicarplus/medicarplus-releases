@@ -103,6 +103,7 @@ def _render_html(
     license_key: str,
     plan: str,
     expires_at: Optional[datetime],
+    referral_code: Optional[str] = None,
 ) -> str:
     expiry_txt = (
         expires_at.strftime("%d/%m/%Y") if expires_at else "Perpetua (sin caducidad)"
@@ -111,6 +112,30 @@ def _render_html(
     manual_url = f"{public_base}/manual-usuari.html"
     guia_url = f"{public_base}/guia-client-installacio.html"
     download_url = "https://github.com/Medicarplus/medicarplus-releases/releases/latest"
+    # 🎁 Bloc referrals: només per a plans pagats (STD/PRM) — no mostrem res per a TRIAL
+    plan_up = (plan or "").upper()
+    is_paid = plan_up in ("STD", "STANDARD", "PRM", "PREMIUM") and referral_code
+    referral_block = ""
+    if is_paid:
+        share_url = f"https://medicarplus.es/?ref={referral_code}"
+        referral_block = f"""
+        <table width="100%" cellpadding="16" cellspacing="0" style="background:linear-gradient(135deg,rgba(168,85,247,.14),rgba(34,197,94,.06));border:2px dashed #a855f7;border-radius:10px;margin:22px 0">
+          <tr><td>
+            <div style="color:#e9d5ff;font-weight:800;font-size:14px;letter-spacing:.5px;margin-bottom:6px">🎁 Programa de referidos MediCar Plus</div>
+            <div style="color:#c4b5fd;font-size:12.5px;line-height:1.6;margin-bottom:12px">
+              <b>Tú ganas 2 meses gratis</b> por cada amigo o colega que se suscriba con tu código. <b>Ellos ganan 1 mes gratis</b> también.
+              (Trials no cuentan, solo suscripciones pagadas).
+            </div>
+            <div style="background:#0b1121;border:1px dashed #a855f7;border-radius:8px;padding:12px;text-align:center;font-family:'Courier New',monospace;font-size:18px;font-weight:800;color:#f5b301;letter-spacing:2px;user-select:all;margin-bottom:8px">{referral_code}</div>
+            <div style="text-align:center;margin-bottom:10px">
+              <a href="{share_url}" style="color:#a855f7;font-size:12px;text-decoration:underline;word-break:break-all">{share_url}</a>
+            </div>
+            <div style="background:#0b1e10;border:1px solid #22c55e;border-radius:6px;padding:8px 12px;text-align:center;font-size:11px;color:#86efac">
+              👆 Comparte este código o el enlace con quien creas que le puede servir MediCar Plus.
+              Podrás copiarlo también desde la propia app en <b>Información de licencia</b>.
+            </div>
+          </td></tr>
+        </table>"""
     return f"""
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 0;font-family:Georgia,serif">
   <tr><td align="center">
@@ -163,6 +188,8 @@ def _render_html(
             </td>
           </tr>
         </table>
+
+        {referral_block}
 
         <p style="color:#64748b;font-size:12px;margin-top:26px;padding-top:18px;border-top:1px solid #334155;line-height:1.5">
           Esta clave está vinculada a tu Install ID. Si cambias de ordenador, contacta con el proveedor para trasladarla.<br>
@@ -236,6 +263,7 @@ async def send_license_email(
     plan: str,
     expires_at: Optional[datetime],
     subject_prefix: Optional[str] = None,
+    referral_code: Optional[str] = None,
 ) -> tuple[bool, str]:
     """Envia l'email de llicència aprovada. Intenta Resend, fallback a SMTP.
 
@@ -252,6 +280,7 @@ async def send_license_email(
         license_key=license_key,
         plan=plan,
         expires_at=expires_at,
+        referral_code=referral_code,
     )
     attachments = await _load_attachments(
         client_name=client_name,

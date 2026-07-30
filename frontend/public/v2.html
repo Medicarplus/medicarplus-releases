@@ -7699,26 +7699,51 @@ function showLicenseInfo(){
   back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
   back.querySelector('#btnDeactivate').onclick=()=>{if(confirm('Desactivar la llicència? Hauràs de tornar-la a introduir.')){localStorage.removeItem('caja.license.v1');location.reload()}};
   // 📋 Helper reutilitzable per copiar valors al portapapers amb feedback visual
+  // Robusto: intenta navigator.clipboard (contexto seguro) y hace fallback SIEMPRE a execCommand
+  // Si ambos fallan, usa window.prompt() como último recurso para que el usuario copie a mano
   async function _copyToClipboard(btn, value){
-    if(!btn || !value) return;
+    if(!btn) return;
+    if(!value){ btn.textContent='✗ Vacío'; setTimeout(()=>btn.textContent='📋 Copiar',1500); return; }
     const originalTxt = btn.textContent;
     const originalBg = btn.style.background;
+    let copied = false;
+    // Intento 1: API moderna
     try{
-      if(navigator.clipboard && navigator.clipboard.writeText){
-        await navigator.clipboard.writeText(value);
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = value; ta.style.position='fixed'; ta.style.left='-9999px';
-        document.body.appendChild(ta); ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
+      if(navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext){
+        await navigator.clipboard.writeText(String(value));
+        copied = true;
       }
-      btn.textContent='✓ Copiada!';
+    }catch(e){ /* silenciamos y probamos fallback */ }
+    // Intento 2: execCommand (Electron file://, HTTP no seguro, webviews antiguos)
+    if(!copied){
+      try{
+        const ta = document.createElement('textarea');
+        ta.value = String(value);
+        ta.setAttribute('readonly','');
+        ta.style.position = 'fixed';
+        ta.style.top = '0';
+        ta.style.left = '-9999px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length);
+        copied = document.execCommand('copy');
+        document.body.removeChild(ta);
+      }catch(e){ copied = false; }
+    }
+    if(copied){
+      btn.textContent='✓ Copiado!';
       btn.style.background='#22c55e';
-      setTimeout(()=>{btn.textContent=originalTxt; btn.style.background=originalBg;},1800);
-    }catch(e){
-      btn.textContent='✗ Error';
-      setTimeout(()=>{btn.textContent=originalTxt;},1800);
+      btn.style.color='#0b1121';
+      setTimeout(()=>{
+        btn.textContent = originalTxt;
+        btn.style.background = originalBg;
+        btn.style.color = '';
+      }, 1600);
+    } else {
+      // Último recurso: prompt manual
+      btn.textContent='⚠ Copia manual';
+      setTimeout(()=>{ btn.textContent = originalTxt; }, 1800);
+      try{ window.prompt('Copia manualmente (Ctrl+C):', String(value)); }catch(_){}
     }
   }
   // 📋 Copiar la clau sencera al portapapers
@@ -7824,26 +7849,42 @@ function showLicenseInfo(){
       }
       const r = await fetch(api + '/api/referrals/my-code?install_id=' + encodeURIComponent(installId));
       const data = await r.json();
-      if(!data || !data.ok || !data.referral_code) return;
+      // Si MASTER está en Vista prèvia y el endpoint no devuelve código real, mostramos un DEMO
+      // para que Marc pueda visualizar cómo lo ve el cliente + probar los botones copiar.
+      const isMasterPreview = typeUp === 'MASTER' && !!previewPlan;
+      let effectiveData = data;
+      if(isMasterPreview && (!data || !data.ok || !data.referral_code)){
+        effectiveData = {
+          ok: true,
+          referral_code: 'MC-DEMO-XXXX',
+          share_url: 'https://medicarplus.es/?ref=MC-DEMO-XXXX',
+          total_referrals: 0,
+          months_earned: 0,
+          _demo: true,
+        };
+      }
+      if(!effectiveData || !effectiveData.ok || !effectiveData.referral_code) return;
       const block = back.querySelector('#referralBlock'); if(!block) return;
       block.style.display = 'block';
-      back.querySelector('#refCodeDisplay').textContent = data.referral_code;
+      back.querySelector('#refCodeDisplay').textContent = effectiveData.referral_code;
       const stats = back.querySelector('#refStats');
-      if(data.total_referrals && data.total_referrals > 0){
-        stats.innerHTML = '🎉 <b style="color:#3ddc97">'+data.total_referrals+'</b> referid'+(data.total_referrals===1?'o':'os')+' pagando · <b style="color:#3ddc97">+'+(data.months_earned||0)+'</b> meses gratis ganados';
+      if(effectiveData._demo){
+        stats.innerHTML = '<i style="color:#c4b5fd">⚡ Vista previa MASTER · así lo verá tu cliente Premium (el código real se genera al pagar).</i>';
+      } else if(effectiveData.total_referrals && effectiveData.total_referrals > 0){
+        stats.innerHTML = '🎉 <b style="color:#3ddc97">'+effectiveData.total_referrals+'</b> referid'+(effectiveData.total_referrals===1?'o':'os')+' pagando · <b style="color:#3ddc97">+'+(effectiveData.months_earned||0)+'</b> meses gratis ganados';
       } else {
         stats.innerHTML = 'Aún no tienes referidos. ¡Comparte tu enlace!';
       }
       const btnRefCode = back.querySelector('#btnCopyRefCode');
       const btnRefUrl = back.querySelector('#btnCopyRefUrl');
-      if(btnRefCode) btnRefCode.onclick = (ev)=>{ ev.stopPropagation(); _copyToClipboard(btnRefCode, data.referral_code || ''); };
-      if(btnRefUrl) btnRefUrl.onclick = (ev)=>{ ev.stopPropagation(); _copyToClipboard(btnRefUrl, data.share_url || ''); };
+      if(btnRefCode) btnRefCode.onclick = (ev)=>{ ev.stopPropagation(); _copyToClipboard(btnRefCode, effectiveData.referral_code || ''); };
+      if(btnRefUrl) btnRefUrl.onclick = (ev)=>{ ev.stopPropagation(); _copyToClipboard(btnRefUrl, effectiveData.share_url || ''); };
       // Modal explicatiu del programa de referidos (accessible des del botó ❓)
       const infoBtn = back.querySelector('#refInfoBtn');
       if(infoBtn){
         infoBtn.onmouseover = () => infoBtn.style.transform = 'scale(1.15)';
         infoBtn.onmouseout = () => infoBtn.style.transform = 'scale(1)';
-        infoBtn.onclick = () => openReferralHelpModal(data.referral_code || '—', data.share_url || '');
+        infoBtn.onclick = () => openReferralHelpModal(effectiveData.referral_code || '—', effectiveData.share_url || '');
       }
     }catch(_){ /* no bloquegem si falla */ }
   })();

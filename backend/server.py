@@ -447,6 +447,7 @@ async def _sync_license_from_subscription(sub: dict, install_id: str | None,
                             plan=plan_family,
                             expires_at=expires_at,
                             subject_prefix=f"Plan actualizado a {new_plan}",
+                            referral_code=doc.get("referral_code"),
                         )
                         logger.info("Upgrade email (%s → %s) → %s: sent=%s info=%s",
                                     prev_plan, new_plan, client_email, sent, info)
@@ -466,6 +467,7 @@ async def _sync_license_from_subscription(sub: dict, install_id: str | None,
                         plan=plan_family,
                         expires_at=expires_at,
                         subject_prefix=f"Renovación suscripción {new_plan}",
+                        referral_code=doc.get("referral_code") or (existing or {}).get("referral_code"),
                     )
                     logger.info("Stripe subscription UPDATE email → %s (plan=%s): sent=%s info=%s",
                                 client_email, new_plan, sent, info)
@@ -519,6 +521,7 @@ async def _sync_license_from_subscription(sub: dict, install_id: str | None,
                         license_key=jwt_key,
                         plan=plan_family,
                         expires_at=expires_at,
+                        referral_code=doc.get("referral_code"),
                     )
                     logger.info("Stripe subscription email → %s: sent=%s info=%s",
                                 client_email, sent, info)
