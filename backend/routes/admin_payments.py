@@ -282,11 +282,12 @@ def build_payments_router(db):
                     matched_licenses.append(lic)
                     matched_pay_jtis.add(lic.get("id"))
 
-        # 3) Enriquecer cada licencia con sus invoices
+        # 3) Enriquecer cada licencia con sus invoices (separando plan vs SMS)
         results = []
         for lic in matched_licenses:
             invoices = []
             total_paid_cents = 0
+            total_sms_cents = 0
             failed_count = 0
             async for p in db.payments.find({
                 "$or": [
@@ -295,11 +296,13 @@ def build_payments_router(db):
                     {"install_id": lic.get("install_id")} if lic.get("install_id") else {"_id": "__none__"},
                 ]
             }).sort("created_at", -1):
+                inv_kind = p.get("kind") or "subscription"
                 inv = {
                     "invoice_id": p.get("_id"),
                     "amount_cents": p.get("amount_cents"),
                     "currency": p.get("currency"),
                     "status": p.get("status"),
+                    "kind": inv_kind,  # 'subscription' | 'sms_metered'
                     "created_at": p.get("created_at"),
                     "paid_at": p.get("paid_at"),
                     "hosted_url": p.get("hosted_url"),
@@ -307,7 +310,10 @@ def build_payments_router(db):
                 }
                 invoices.append(inv)
                 if p.get("status") == "paid":
-                    total_paid_cents += int(p.get("amount_cents") or 0)
+                    if inv_kind == "sms_metered":
+                        total_sms_cents += int(p.get("amount_cents") or 0)
+                    else:
+                        total_paid_cents += int(p.get("amount_cents") or 0)
                 elif p.get("status") in ("open", "uncollectible"):
                     failed_count += 1
 
@@ -325,6 +331,8 @@ def build_payments_router(db):
                 "stripe_subscription_id": lic.get("stripe_subscription_id"),
                 "total_paid_cents": total_paid_cents,
                 "total_paid_eur": round(total_paid_cents / 100.0, 2),
+                "total_sms_cents": total_sms_cents,
+                "total_sms_eur": round(total_sms_cents / 100.0, 2),
                 "invoice_count": len(invoices),
                 "failed_count": failed_count,
                 "invoices": invoices,

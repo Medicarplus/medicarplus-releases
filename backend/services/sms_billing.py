@@ -117,22 +117,30 @@ async def bill_pending_sms_for_subscription(
 
         stripe_invoice_id = None
         if mode == "one_off":
-            # Crear factura + finalitzar + intent de cobrament immediat
+            # Crear factura + finalitzar + intent de cobrament immediat.
+            # `pending_invoice_items_behavior=include` fuerza a Stripe a incluir el
+            # InvoiceItem que acabamos de crear (si no, Stripe podría dejarlo para la
+            # próxima factura de suscripción, resultando en amount_due=0).
             inv = stripe_sdk.Invoice.create(
                 customer=customer_id,
-                auto_advance=True,  # Stripe finalitza automàticament
+                auto_advance=True,
                 collection_method="charge_automatically",
-                description=f"Facturación final · Consumo SMS antes de cancelación ({total_sms} SMS)",
-                metadata={"install_id": install_id, "kind": "sms_final"},
+                pending_invoice_items_behavior="include",
+                description=f"Facturación · Consumo SMS ({total_sms} SMS)",
+                metadata={"install_id": install_id, "kind": "sms_metered"},
             )
             inv_id = inv.get("id") if isinstance(inv, dict) else inv.id
             # Finalitzar (això la fa cobrable)
             stripe_sdk.Invoice.finalize_invoice(inv_id)
-            # Intentar pagament immediat amb el mètode guardat
+            # Al finalizar con collection_method=charge_automatically, Stripe intenta cobrar.
+            # Si ya se ha cobrado en el finalize, el pay() posterior lanza "Invoice is already paid" (esperado).
             try:
                 stripe_sdk.Invoice.pay(inv_id)
             except Exception as pay_err:
-                logger.warning(f"[sms_billing] one_off invoice pay failed: {pay_err}")
+                if "already paid" in str(pay_err).lower():
+                    logger.info(f"[sms_billing] one_off invoice {inv_id} already paid on finalize (OK)")
+                else:
+                    logger.warning(f"[sms_billing] one_off invoice pay failed: {pay_err}")
             stripe_invoice_id = inv_id
 
         # 2) Marca totes les usage docs com billed

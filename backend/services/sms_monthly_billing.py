@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -40,10 +41,10 @@ async def bill_all_pending_sms_monthly(db, stripe_sdk) -> dict:
     """
     from services.sms_billing import bill_pending_sms_for_subscription, get_pending_usage  # noqa: F401
 
-    # 1) Encontrar install_ids únicos con SMS pendientes
+    # 1) Encontrar install_ids únicos con SMS pendientes (campo real del schema: sent_count)
     pipeline = [
-        {"$match": {"billed": {"$ne": True}}},
-        {"$group": {"_id": "$install_id", "count": {"$sum": "$sms_count"}}},
+        {"$match": {"$or": [{"billed": False}, {"billed": {"$exists": False}}]}},
+        {"$group": {"_id": "$install_id", "count": {"$sum": "$sent_count"}}},
         {"$match": {"count": {"$gt": 0}}},
     ]
     install_ids_with_pending: list[str] = []
@@ -99,7 +100,7 @@ async def bill_all_pending_sms_monthly(db, stripe_sdk) -> dict:
 
     # Guarda un log en DB para auditoría
     try:
-        await db.sms_monthly_billing_runs.insert_one({**stats, "_id": f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}"})
+        await db.sms_monthly_billing_runs.insert_one({**stats, "_id": f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"})
     except Exception as ex:
         logger.warning(f"[sms_monthly] audit log write failed: {ex}")
 

@@ -595,90 +595,111 @@ async def stripe_webhook(request: _FastReq):
                 # 💰 Actualiza payment tracking en tiempo real (banner verde en el admin)
                 inv = data
                 sub_id = inv.get("subscription")
-                if sub_id:
-                    try:
+                # Para one-off invoices (SMS metered) no hay `subscription` → buscar por customer
+                inv_metadata = inv.get("metadata") or {}
+                invoice_kind = inv_metadata.get("kind")  # 'sms_metered' o None (subscription)
+                customer_id = inv.get("customer")
+                try:
+                    if sub_id:
                         lic = await db.licenses.find_one({"stripe_subscription_id": sub_id, "status": "active"})
-                        amount = int(inv.get("amount_paid") or 0)
-                        paid_at_ts = inv.get("status_transitions", {}).get("paid_at")
-                        paid_at_iso = datetime.fromtimestamp(paid_at_ts, tz=timezone.utc).isoformat() if paid_at_ts else datetime.now(timezone.utc).isoformat()
-                        # Upsert en payments
-                        await db.payments.update_one(
-                            {"_id": inv.get("id")},
-                            {"$set": {
-                                "license_jti": (lic or {}).get("id"),
-                                "install_id": (lic or {}).get("install_id"),
-                                "customer_email": inv.get("customer_email") or (lic or {}).get("client_email"),
-                                "stripe_subscription_id": sub_id,
-                                "stripe_customer_id": inv.get("customer"),
-                                "amount_cents": amount,
-                                "currency": inv.get("currency", "eur"),
-                                "status": "paid",
-                                "created_at": datetime.fromtimestamp(inv.get("created"), tz=timezone.utc).isoformat() if inv.get("created") else None,
-                                "paid_at": paid_at_iso,
-                                "hosted_url": inv.get("hosted_invoice_url"),
-                                "pdf_url": inv.get("invoice_pdf"),
-                                "synced_at": datetime.now(timezone.utc).isoformat(),
-                            }},
-                            upsert=True,
+                    else:
+                        # SMS one-off: encontrar licencia por customer_id (o install_id de metadata)
+                        install_id_md = inv_metadata.get("install_id")
+                        if install_id_md:
+                            lic = await db.licenses.find_one({"install_id": install_id_md, "status": "active"})
+                        elif customer_id:
+                            lic = await db.licenses.find_one({"stripe_customer_id": customer_id, "status": "active"})
+                        else:
+                            lic = None
+                    amount = int(inv.get("amount_paid") or 0)
+                    paid_at_ts = inv.get("status_transitions", {}).get("paid_at")
+                    paid_at_iso = datetime.fromtimestamp(paid_at_ts, tz=timezone.utc).isoformat() if paid_at_ts else datetime.now(timezone.utc).isoformat()
+                    # Upsert en payments (con `kind` para distinguir SMS vs suscripción)
+                    await db.payments.update_one(
+                        {"_id": inv.get("id")},
+                        {"$set": {
+                            "license_jti": (lic or {}).get("id"),
+                            "install_id": (lic or {}).get("install_id") or inv_metadata.get("install_id"),
+                            "customer_email": inv.get("customer_email") or (lic or {}).get("client_email"),
+                            "stripe_subscription_id": sub_id,
+                            "stripe_customer_id": customer_id,
+                            "amount_cents": amount,
+                            "currency": inv.get("currency", "eur"),
+                            "status": "paid",
+                            "kind": invoice_kind or "subscription",  # 'subscription' | 'sms_metered'
+                            "created_at": datetime.fromtimestamp(inv.get("created"), tz=timezone.utc).isoformat() if inv.get("created") else None,
+                            "paid_at": paid_at_iso,
+                            "hosted_url": inv.get("hosted_invoice_url"),
+                            "pdf_url": inv.get("invoice_pdf"),
+                            "synced_at": datetime.now(timezone.utc).isoformat(),
+                        }},
+                        upsert=True,
+                    )
+                    # Actualiza la licencia con salud verde + total acumulado (solo para SUBSCRIPTION invoices)
+                    # Los SMS invoices no cambian payment_health (no son la cuota del plan)
+                    was_red = False
+                    if lic and invoice_kind != "sms_metered":
+                        was_red = (lic.get("payment_health") == "red") or int(lic.get("failed_invoices_count") or 0) > 0
+                        await db.licenses.update_one(
+                            {"id": lic["id"]},
+                            {"$inc": {"total_paid_cents": amount, "paid_invoices_count": 1},
+                             "$set": {"payment_health": "green",
+                                      "last_payment_status": "paid",
+                                      "last_payment_at": paid_at_iso,
+                                      "last_payment_amount_cents": amount,
+                                      "failed_invoices_count": 0}},
                         )
-                        # Actualiza la licencia con salud verde + total acumulado
-                        was_red = False
-                        if lic:
-                            was_red = (lic.get("payment_health") == "red") or int(lic.get("failed_invoices_count") or 0) > 0
-                            await db.licenses.update_one(
-                                {"id": lic["id"]},
-                                {"$inc": {"total_paid_cents": amount, "paid_invoices_count": 1},
-                                 "$set": {"payment_health": "green",
-                                          "last_payment_status": "paid",
-                                          "last_payment_at": paid_at_iso,
-                                          "last_payment_amount_cents": amount,
-                                          "failed_invoices_count": 0}},
-                            )
-                        logger.info(f"[stripe] invoice.paid tracked · sub={sub_id} · {amount/100:.2f} EUR")
+                    elif lic and invoice_kind == "sms_metered":
+                        # Acumula gasto SMS separado (sin tocar payment_health)
+                        await db.licenses.update_one(
+                            {"id": lic["id"]},
+                            {"$inc": {"total_sms_paid_cents": amount}},
+                        )
+                    logger.info(f"[stripe] invoice.paid tracked · sub={sub_id} · kind={invoice_kind or 'subscription'} · {amount/100:.2f} EUR")
 
-                        # 📧 Notificación recovery (solo si venía de rojo)
-                        if was_red:
-                            try:
-                                pay_doc = await db.payments.find_one({"_id": inv.get("id")}) or {}
-                                if not pay_doc.get("admin_notified_recovered"):
-                                    from services.admin_notifier import notify_payment_recovered
-                                    ok_email, _ = notify_payment_recovered(
-                                        customer_email=inv.get("customer_email") or (lic or {}).get("client_email") or "",
-                                        install_id=(lic or {}).get("install_id"),
-                                        amount_cents=amount,
-                                        currency=inv.get("currency", "eur"),
-                                        hosted_invoice_url=inv.get("hosted_invoice_url"),
-                                        stripe_subscription_id=sub_id,
-                                        paid_at_iso=paid_at_iso,
-                                        company_name=(lic or {}).get("company_name"),
-                                    )
-                                    if ok_email:
-                                        await db.payments.update_one(
-                                            {"_id": inv.get("id")},
-                                            {"$set": {"admin_notified_recovered": True,
-                                                      "admin_notified_recovered_at": datetime.now(timezone.utc).isoformat()}},
-                                        )
-                            except Exception as ex_notify:
-                                logger.warning(f"[stripe] admin notify (recovered) error: {ex_notify}")
-
-                            # 🔔 Feed de notificaciones
-                            try:
-                                from routes.admin_notifications import create_notification, TYPE_PAYMENT_RECOVERED
-                                await create_notification(
-                                    db,
-                                    ntype=TYPE_PAYMENT_RECOVERED,
-                                    title=f"Pago recuperado · {(inv.get('customer_email') or (lic or {}).get('client_email') or 'cliente')}",
-                                    message=f"{(amount/100):.2f} €".replace(".", ",") + " cobrado. Cliente vuelve a verde.",
-                                    email=inv.get("customer_email") or (lic or {}).get("client_email"),
+                    # 📧 Notificación recovery (solo si venía de rojo · no aplica a SMS)
+                    if was_red and invoice_kind != "sms_metered":
+                        try:
+                            pay_doc = await db.payments.find_one({"_id": inv.get("id")}) or {}
+                            if not pay_doc.get("admin_notified_recovered"):
+                                from services.admin_notifier import notify_payment_recovered
+                                ok_email, _ = notify_payment_recovered(
+                                    customer_email=inv.get("customer_email") or (lic or {}).get("client_email") or "",
                                     install_id=(lic or {}).get("install_id"),
                                     amount_cents=amount,
-                                    invoice_url=inv.get("hosted_invoice_url"),
-                                    dedupe_key=f"payment_recovered:{inv.get('id')}",
+                                    currency=inv.get("currency", "eur"),
+                                    hosted_invoice_url=inv.get("hosted_invoice_url"),
+                                    stripe_subscription_id=sub_id,
+                                    paid_at_iso=paid_at_iso,
+                                    company_name=(lic or {}).get("company_name"),
                                 )
-                            except Exception as ex_notif:
-                                logger.warning(f"[stripe] admin notification feed (recovered) error: {ex_notif}")
-                    except Exception as ex:
-                        logger.warning(f"[stripe] invoice.paid tracking failed: {ex}")
+                                if ok_email:
+                                    await db.payments.update_one(
+                                        {"_id": inv.get("id")},
+                                        {"$set": {"admin_notified_recovered": True,
+                                                  "admin_notified_recovered_at": datetime.now(timezone.utc).isoformat()}},
+                                    )
+                        except Exception as ex_notify:
+                            logger.warning(f"[stripe] admin notify (recovered) error: {ex_notify}")
+
+                        # 🔔 Feed de notificaciones
+                        try:
+                            from routes.admin_notifications import create_notification, TYPE_PAYMENT_RECOVERED
+                            await create_notification(
+                                db,
+                                ntype=TYPE_PAYMENT_RECOVERED,
+                                title=f"Pago recuperado · {(inv.get('customer_email') or (lic or {}).get('client_email') or 'cliente')}",
+                                message=f"{(amount/100):.2f} €".replace(".", ",") + " cobrado. Cliente vuelve a verde.",
+                                email=inv.get("customer_email") or (lic or {}).get("client_email"),
+                                install_id=(lic or {}).get("install_id"),
+                                amount_cents=amount,
+                                invoice_url=inv.get("hosted_invoice_url"),
+                                dedupe_key=f"payment_recovered:{inv.get('id')}",
+                            )
+                        except Exception as ex_notif:
+                            logger.warning(f"[stripe] admin notification feed (recovered) error: {ex_notif}")
+                except Exception as ex:
+                    logger.warning(f"[stripe] invoice.paid tracking failed: {ex}")
             elif etype == "invoice.payment_failed":
                 # Cobrament fallit → NO revoquem llicència (Stripe farà retries automàtics
                 # durant ~3 setmanes). Marquem payment_health=red y guardem el intent fallido.

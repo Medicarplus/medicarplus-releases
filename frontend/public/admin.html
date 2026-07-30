@@ -1067,16 +1067,30 @@ function renderPaySearchCard(r){
   const healthIcon = {green:'🟢', yellow:'🟡', red:'🔴'}[r.payment_health] || '⚪';
   const invRows = (r.invoices||[]).map(p => {
     const st = String(p.status||'').toLowerCase();
+    const kind = String(p.kind||'subscription');
     const color = st==='paid' ? '#22c55e' : (st==='void'?'#94a3b8':'#ef4444');
+    // Concepto: SMS o Plan P/S según kind y plan
+    let concept, conceptColor;
+    if(kind === 'sms_metered'){
+      concept = '📱 SMS';
+      conceptColor = '#0ea5e9';
+    } else {
+      const planUp = String(r.plan||'').toUpperCase();
+      if(planUp === 'PRM' || planUp === 'PREMIUM'){ concept = '💎 Plan P'; conceptColor = '#f5b301'; }
+      else if(planUp === 'STD' || planUp === 'STANDARD'){ concept = '🔹 Plan S'; conceptColor = '#a855f7'; }
+      else { concept = planUp || '—'; conceptColor = '#64748b'; }
+    }
     return `<tr>
       <td style="padding:5px 10px;font-size:11px">${fmtDt(p.paid_at || p.created_at)}</td>
+      <td style="padding:5px 10px"><span style="background:${conceptColor}22;color:${conceptColor};padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap">${concept}</span></td>
       <td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700">${fmtEUR(p.amount_cents)}</td>
       <td style="padding:5px 10px;font-size:11px;color:${color};font-weight:700">${st.toUpperCase()}</td>
       <td style="padding:5px 10px">${p.hosted_url?`<a href="${p.hosted_url}" target="_blank" style="color:#0284c7;font-size:11px">Ver factura ↗</a>`:''}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="4" style="padding:10px;text-align:center;color:var(--muted);font-style:italic;font-size:11px">Sin facturas registradas</td></tr>';
+  }).join('') || '<tr><td colspan="5" style="padding:10px;text-align:center;color:var(--muted);font-style:italic;font-size:11px">Sin facturas registradas</td></tr>';
 
   const failedBadge = r.failed_count > 0 ? `<span style="background:#7f1d1d;color:#fca5a5;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;margin-left:6px">⚠️ ${r.failed_count} fallido${r.failed_count===1?'':'s'}</span>` : '';
+  const smsSubtotal = (r.total_sms_cents||0) > 0 ? `<div style="font-size:11px;color:#0ea5e9;margin-top:2px">📱 SMS: <b>${fmtEUR(r.total_sms_cents)}</b></div>` : '';
 
   return `<div style="background:#0f172a;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
@@ -1087,6 +1101,7 @@ function renderPaySearchCard(r){
       </div>
       <div style="text-align:right">
         <div style="font-size:18px;font-weight:800;color:#22c55e">${fmtEUR(r.total_paid_cents)}</div>
+        ${smsSubtotal}
         <div style="font-size:11px;color:#94a3b8">${r.invoice_count||0} factura${r.invoice_count===1?'':'s'} ${failedBadge}</div>
         <div style="margin-top:4px;font-size:11px;color:${healthColor};font-weight:700">${healthIcon} ${(r.payment_health||'sin datos').toUpperCase()} · Plan ${(r.plan||'?')}</div>
       </div>
@@ -1094,6 +1109,7 @@ function renderPaySearchCard(r){
     <table style="width:100%;border-collapse:collapse;background:#0e1a2e;border-radius:6px;overflow:hidden">
       <thead><tr style="background:#1e293b">
         <th style="padding:5px 10px;text-align:left;font-size:10px;color:#f5b301">Fecha</th>
+        <th style="padding:5px 10px;text-align:left;font-size:10px;color:#f5b301">Concepto</th>
         <th style="padding:5px 10px;text-align:right;font-size:10px;color:#f5b301">Importe</th>
         <th style="padding:5px 10px;font-size:10px;color:#f5b301">Estado</th>
         <th style="padding:5px 10px"></th>
