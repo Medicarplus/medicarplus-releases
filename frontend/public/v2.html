@@ -7683,8 +7683,12 @@ function showLicenseInfo(){
     +'<div style="font-size:11.5px;color:#c4b5fd;line-height:1.5;margin-bottom:10px"><b>Tú ganas 2 meses gratis</b> · <b>El referido gana 1 mes gratis</b> (trial no cuenta).</div>'
     +'<div id="refCodeDisplay" style="font-family:\'Courier New\',monospace;font-size:16px;font-weight:800;color:#f5b301;background:#0b1121;padding:10px;border-radius:6px;text-align:center;letter-spacing:2px;margin-bottom:8px" data-testid="referral-code-display">Cargando...</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-    +'<button class="btn" id="btnCopyRefCode" data-testid="btn-copy-ref-code" style="flex:1;background:#a855f7;color:#fff;border-color:#a855f7">📋 Copiar código</button>'
-    +'<button class="btn" id="btnCopyRefUrl" data-testid="btn-copy-ref-url" style="flex:1;background:#22c55e;color:#0b1121;border-color:#22c55e">🔗 Copiar enlace</button>'
+    +'<button class="btn" id="btnCopyRefCode" data-testid="btn-copy-ref-code" style="flex:1;min-width:130px;background:#a855f7;color:#fff;border-color:#a855f7">📋 Copiar código</button>'
+    +'<button class="btn" id="btnCopyRefUrl" data-testid="btn-copy-ref-url" style="flex:1;min-width:130px;background:#22c55e;color:#0b1121;border-color:#22c55e">🔗 Copiar enlace</button>'
+    +'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'
+    +'<button class="btn" id="btnShareWhatsApp" data-testid="btn-share-whatsapp" style="flex:1;min-width:130px;background:#25d366;color:#fff;border-color:#25d366;font-weight:700">📱 WhatsApp</button>'
+    +'<button class="btn" id="btnShareEmail" data-testid="btn-share-email" style="flex:1;min-width:130px;background:#0ea5e9;color:#fff;border-color:#0ea5e9;font-weight:700">✉️ Email</button>'
     +'</div>'
     +'<div id="refStats" style="margin-top:10px;font-size:11px;color:#94a3b8;text-align:center"></div>'
     +'</div>'
@@ -7879,6 +7883,22 @@ function showLicenseInfo(){
       const btnRefUrl = back.querySelector('#btnCopyRefUrl');
       if(btnRefCode) btnRefCode.onclick = (ev)=>{ ev.stopPropagation(); _copyToClipboard(btnRefCode, effectiveData.referral_code || ''); };
       if(btnRefUrl) btnRefUrl.onclick = (ev)=>{ ev.stopPropagation(); _copyToClipboard(btnRefUrl, effectiveData.share_url || ''); };
+      // 📱 ✉️ Compartir 1-click WhatsApp / Email con mensaje pre-hecho
+      const shareMsg = 'Hola, uso MediCar Plus para gestionar mi autoescuela y me va genial. Aquí tienes 1 mes gratis con mi código: ' + (effectiveData.referral_code||'') + ' · ' + (effectiveData.share_url||'');
+      const btnWA = back.querySelector('#btnShareWhatsApp');
+      if(btnWA) btnWA.onclick = (ev)=>{
+        ev.stopPropagation();
+        const url = 'https://wa.me/?text=' + encodeURIComponent(shareMsg);
+        try{ window.open(url, '_blank', 'noopener,noreferrer'); }catch(e){ location.href = url; }
+      };
+      const btnEmail = back.querySelector('#btnShareEmail');
+      if(btnEmail) btnEmail.onclick = (ev)=>{
+        ev.stopPropagation();
+        const subject = encodeURIComponent('MediCar Plus · 1 mes gratis con mi código de referido');
+        const body = encodeURIComponent(shareMsg + '\n\n(Software español para autoescuelas · https://medicarplus.es)');
+        const url = 'mailto:?subject=' + subject + '&body=' + body;
+        try{ window.open(url, '_blank', 'noopener,noreferrer'); }catch(e){ location.href = url; }
+      };
       // Modal explicatiu del programa de referidos (accessible des del botó ❓)
       const infoBtn = back.querySelector('#refInfoBtn');
       if(infoBtn){
