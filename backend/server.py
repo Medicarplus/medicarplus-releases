@@ -264,6 +264,10 @@ app.include_router(build_payments_router(db), prefix="/api")
 from routes.admin_users import build_users_router
 app.include_router(build_users_router(db), prefix="/api")
 
+# Admin notifications feed (Jul 2026 · God-mode alertas + fallos de pago siempre visibles)
+from routes.admin_notifications import build_notifications_router
+app.include_router(build_notifications_router(db), prefix="/api")
+
 # Stripe webhook (obligatori per playbook: /api/webhook/stripe)
 # Gestiona tant one-off (via emergentintegrations) com subscriptions (via stripe SDK)
 from fastapi import Request as _FastReq
@@ -653,6 +657,23 @@ async def stripe_webhook(request: _FastReq):
                                         )
                             except Exception as ex_notify:
                                 logger.warning(f"[stripe] admin notify (recovered) error: {ex_notify}")
+
+                            # 🔔 Feed de notificaciones
+                            try:
+                                from routes.admin_notifications import create_notification, TYPE_PAYMENT_RECOVERED
+                                await create_notification(
+                                    db,
+                                    ntype=TYPE_PAYMENT_RECOVERED,
+                                    title=f"Pago recuperado · {(inv.get('customer_email') or (lic or {}).get('client_email') or 'cliente')}",
+                                    message=f"{(amount/100):.2f} €".replace(".", ",") + " cobrado. Cliente vuelve a verde.",
+                                    email=inv.get("customer_email") or (lic or {}).get("client_email"),
+                                    install_id=(lic or {}).get("install_id"),
+                                    amount_cents=amount,
+                                    invoice_url=inv.get("hosted_invoice_url"),
+                                    dedupe_key=f"payment_recovered:{inv.get('id')}",
+                                )
+                            except Exception as ex_notif:
+                                logger.warning(f"[stripe] admin notification feed (recovered) error: {ex_notif}")
                     except Exception as ex:
                         logger.warning(f"[stripe] invoice.paid tracking failed: {ex}")
             elif etype == "invoice.payment_failed":
@@ -730,6 +751,24 @@ async def stripe_webhook(request: _FastReq):
                                     )
                         except Exception as ex_notify:
                             logger.warning(f"[stripe] admin notify (failed) error: {ex_notify}")
+
+                        # 🔔 Notificación al feed del admin (idempotente por invoice)
+                        try:
+                            from routes.admin_notifications import create_notification, TYPE_PAYMENT_FAILED
+                            await create_notification(
+                                db,
+                                ntype=TYPE_PAYMENT_FAILED,
+                                title=f"Pago fallido · {cust_email or 'cliente desconocido'}",
+                                message=f"{(amount_due/100):.2f} €".replace(".", ",") + f" · Intento #{failed_count_new or 1}. Stripe reintentará automáticamente.",
+                                email=cust_email,
+                                install_id=(lic or {}).get("install_id"),
+                                amount_cents=amount_due,
+                                invoice_url=inv.get("hosted_invoice_url"),
+                                dedupe_key=f"payment_failed:{inv.get('id')}",
+                                extra={"stripe_subscription_id": sub_id, "failed_count": failed_count_new},
+                            )
+                        except Exception as ex_notif:
+                            logger.warning(f"[stripe] admin notification feed (failed) error: {ex_notif}")
                     except Exception as ex:
                         logger.warning(f"[stripe] invoice.payment_failed tracking failed: {ex}")
                     logger.info(f"[stripe] invoice.payment_failed for sub={sub_id} (Stripe retriarà automàticament)")
@@ -764,6 +803,65 @@ async def stripe_webhook(request: _FastReq):
                             logger.info(f"[sms_billing] final invoice on cancel: {result}")
                     except Exception as bill_err:
                         logger.exception(f"[sms_billing] failed on subscription cancel: {bill_err}")
+
+                # 🔔 Notificación al feed del admin: cancelación / cambio de plan
+                try:
+                    from routes.admin_notifications import (
+                        create_notification, TYPE_SUBSCRIPTION_CANCELED,
+                        TYPE_PLAN_UPGRADE, TYPE_PLAN_DOWNGRADE,
+                    )
+                    sub_id_notif = sub.get("id")
+                    cust_email_notif = md.get("customer_email")
+                    if not cust_email_notif:
+                        lic_notif = await db.licenses.find_one({"stripe_subscription_id": sub_id_notif})
+                        cust_email_notif = (lic_notif or {}).get("client_email")
+                        install_id_notif = (lic_notif or {}).get("install_id") or install_id_from_md
+                    else:
+                        install_id_notif = install_id_from_md
+                    if etype == "customer.subscription.deleted" or sub.get("status") in ("canceled", "unpaid", "incomplete_expired"):
+                        await create_notification(
+                            db,
+                            ntype=TYPE_SUBSCRIPTION_CANCELED,
+                            title=f"Suscripción cancelada · {cust_email_notif or 'cliente'}",
+                            message=f"El cliente ha cancelado o su suscripción ha terminado (status: {sub.get('status')}).",
+                            email=cust_email_notif,
+                            install_id=install_id_notif,
+                            dedupe_key=f"subscription_canceled:{sub_id_notif}",
+                            extra={"stripe_subscription_id": sub_id_notif, "final_status": sub.get("status")},
+                        )
+                    else:
+                        # Cambio de plan: comparamos precio actual con precio anterior si lo tenemos
+                        items = (sub.get("items", {}) or {}).get("data", []) or []
+                        current_price_cents = items[0].get("price", {}).get("unit_amount") if items else None
+                        prev_price_cents = None
+                        try:
+                            prev_lic = await db.licenses.find_one({"stripe_subscription_id": sub_id_notif})
+                            prev_price_cents = (prev_lic or {}).get("last_known_price_cents")
+                        except Exception:
+                            pass
+                        if current_price_cents and prev_price_cents and current_price_cents != prev_price_cents:
+                            is_upgrade = current_price_cents > prev_price_cents
+                            ntype = TYPE_PLAN_UPGRADE if is_upgrade else TYPE_PLAN_DOWNGRADE
+                            arrow = "⬆️" if is_upgrade else "⬇️"
+                            await create_notification(
+                                db,
+                                ntype=ntype,
+                                title=f"{arrow} Cambio de plan · {cust_email_notif or 'cliente'}",
+                                message=f"De {(prev_price_cents/100):.2f} € a {(current_price_cents/100):.2f} €/mes".replace(".", ","),
+                                email=cust_email_notif,
+                                install_id=install_id_notif,
+                                amount_cents=current_price_cents,
+                                dedupe_key=f"plan_change:{sub_id_notif}:{prev_price_cents}:{current_price_cents}",
+                                extra={"from_cents": prev_price_cents, "to_cents": current_price_cents},
+                            )
+                        # Guarda el precio actual para futuras comparaciones
+                        if current_price_cents:
+                            await db.licenses.update_many(
+                                {"stripe_subscription_id": sub_id_notif},
+                                {"$set": {"last_known_price_cents": current_price_cents}},
+                            )
+                except Exception as ex_sub_notif:
+                    logger.warning(f"[stripe] subscription notif error: {ex_sub_notif}")
             elif etype == "invoice.paid":
                 # També re-sincronitza la llicència + factura SMS pendents del mes anterior
                 sub_id = data.get("subscription")

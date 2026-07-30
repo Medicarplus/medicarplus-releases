@@ -138,6 +138,22 @@ def build_router(db):
             **set_doc,
         })
         logger.info(f"[heartbeat] 🆕 NEW install_id={install_id} ip={ip} platform={body.platform or 'web'} ua={(body.user_agent or '')[:80]}")
+
+        # 🔔 Notifica al admin de la nueva instalación (idempotente por install_id)
+        try:
+            from routes.admin_notifications import create_notification, TYPE_INSTALL_NEW
+            await create_notification(
+                db,
+                ntype=TYPE_INSTALL_NEW,
+                title=f"Nueva instalación · {install_id}",
+                message=f"Plataforma: {body.platform or 'web'} · IP: {ip}",
+                install_id=install_id,
+                dedupe_key=f"install_new:{install_id}",
+                extra={"platform": body.platform, "ip": ip, "user_agent": (body.user_agent or '')[:120]},
+            )
+        except Exception as ex_notif:
+            logger.warning(f"[heartbeat] notification create failed: {ex_notif}")
+
         return {"ok": True, "new": True}
 
     @router.get("/status/{install_id}")

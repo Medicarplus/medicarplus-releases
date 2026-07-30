@@ -45,6 +45,10 @@
   .stat-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
   .stat-val{font-size:22px;font-weight:800;color:var(--gold);margin-top:4px}
   #err{color:var(--red);font-size:12px;margin-top:6px}
+  @keyframes pulse-critical {
+    0%,100% { transform: scale(1); box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px rgba(220,38,38,.6); }
+    50% { transform: scale(1.15); box-shadow: 0 0 0 2px var(--bg), 0 0 0 8px rgba(220,38,38,0); }
+  }
 </style>
 </head>
 <body>
@@ -63,10 +67,25 @@
     <h1>🩺 MediCar Plus · Admin Panel</h1>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <span style="font-size:11px;color:var(--muted)">Env: <span id="envLabel" style="color:var(--green);font-weight:700">—</span></span>
+      <button id="btnNotifs" onclick="toggleNotifPanel()" style="position:relative;padding:8px 14px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700" title="Notificaciones · pagos fallidos, cancelaciones, altas">🔔 Notificaciones <span id="notifBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:#dc2626;color:#fff;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:800;box-shadow:0 0 0 2px var(--bg)">0</span></button>
       <button class="ghost" onclick="loadLicenses()" data-testid="btn-reload">🔄 Recarregar</button>
       <button class="red" onclick="logout()">🚪 Sortir</button>
     </div>
   </header>
+
+  <!-- 🔔 Panel de notificaciones (deslizable · fixed top-right) -->
+  <div id="notifPanel" style="display:none;position:fixed;top:60px;right:16px;width:440px;max-width:calc(100vw - 32px);max-height:80vh;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.6);z-index:9999;overflow:hidden;font-family:Arial,sans-serif">
+    <div style="padding:14px 18px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:700;font-size:14px">🔔 Notificaciones</span>
+      <div style="display:flex;gap:6px">
+        <button onclick="markAllNotifsRead()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700">✔ Marcar leídas</button>
+        <button onclick="toggleNotifPanel()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700">✕</button>
+      </div>
+    </div>
+    <div id="notifList" style="max-height:calc(80vh - 60px);overflow-y:auto;padding:8px">
+      <div style="padding:20px;text-align:center;color:var(--muted);font-style:italic">Cargando…</div>
+    </div>
+  </div>
 
   <div class="container">
     <!-- 🚨 Banner de alertas de pagos (Feb 2026 · God-mode financial view) -->
@@ -226,6 +245,10 @@ async function doLogin(){
     // Carga automática de las nuevas secciones al hacer login
     setTimeout(() => { try{ loadPaymentAlerts(); }catch(e){} }, 500);
     setTimeout(() => { try{ loadAdminUsers(); }catch(e){} }, 800);
+    // 🔔 Notificaciones: badge + auto-refresh cada 60s
+    setTimeout(() => { try{ fetchNotifBadge(); }catch(e){} }, 700);
+    if(typeof _notifTimer !== 'undefined' && _notifTimer) clearInterval(_notifTimer);
+    _notifTimer = setInterval(() => { try{ fetchNotifBadge(); }catch(e){} }, 60000);
     setTimeout(() => { try{ loadInstallations(); loadInstallationsDebugSummary(); }catch(e){} }, 1100);
   }catch(e){document.getElementById('err').textContent='Error red: '+e.message}
 }
@@ -566,16 +589,15 @@ function renderInstallRow(item){
   if(!lic){
     licCell = `<span style="color:#94a3b8;font-style:italic">— sin licencia —</span>`;
   } else {
-    const plan = lic.plan_family || '?';
+    const plan = lic.plan_family || lic.plan || '?';
     const clientDisplay = esc(lic.client_name || lic.client_email || '—');
-    // Badge dispositivo (solo si Premium multi-device)
+    // Badge dispositivo (solo si Premium multi-device): muestra "N/M dispositivos" (plazas usadas)
     let deviceBadge = '';
     if(link && link.total_devices > 1){
-      const emoji = link.device_no === 1 ? '📱' : '💻';
-      const color = link.device_no === 1 ? '#a855f7' : '#0ea5e9';
-      deviceBadge = `<span style="display:inline-block;background:${color}22;border:1px solid ${color};color:${color};padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;margin-top:3px">🔗 ${emoji} Dispositivo #${link.device_no} de ${link.total_devices} · ${esc(plan)}</span>`;
+      const color = link.total_devices >= 2 ? '#0ea5e9' : '#a855f7';
+      deviceBadge = `<span style="display:inline-block;background:${color}22;border:1px solid ${color};color:${color};padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;margin-top:3px;cursor:pointer" onclick="showDevicesModal('${esc(link.license_jti||'')}')" title="Ver detalles de cada PC">🔗 ${link.total_devices}/${link.total_devices} dispositivos · ${esc(plan)}</span>`;
     } else if(link && link.device_no === 1){
-      deviceBadge = `<span style="display:inline-block;color:var(--muted);font-size:10px;margin-top:3px">📱 Único dispositivo</span>`;
+      deviceBadge = `<span style="display:inline-block;color:var(--muted);font-size:10px;margin-top:3px">📱 1/1 dispositivo · ${esc(plan)}</span>`;
     }
     licCell = `<b style="color:${lic.status==='active'?'#22c55e':'#94a3b8'}">${esc(plan)}</b><br><span style="font-size:11px;color:var(--muted)">${clientDisplay}</span><br>${deviceBadge}`;
   }
@@ -960,6 +982,159 @@ function renderPaySearchCard(r){
       <tbody>${invRows}</tbody>
     </table>
   </div>`;
+}
+
+// ---------------- 🔔 Notificaciones (admin feed) ----------------
+let _notifTimer = null;
+async function fetchNotifBadge(){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok) return;
+  try{
+    const r = await fetch('/api/admin/notifications/badge', {headers:{'X-Admin-Token':tok}});
+    if(!r.ok) return;
+    const d = await r.json();
+    const btn = document.getElementById('btnNotifs');
+    const badge = document.getElementById('notifBadge');
+    if(!btn || !badge) return;
+    if(d.unread > 0){
+      badge.style.display = 'inline-block';
+      badge.textContent = d.unread > 99 ? '99+' : String(d.unread);
+      if(d.critical_unread > 0){
+        badge.style.background = '#dc2626';
+        badge.style.animation = 'pulse-critical 1.5s ease-in-out infinite';
+        btn.title = `⚠️ ${d.critical_unread} PAGO(S) FALLIDO(S) sin resolver · ${d.last_critical_title || ''}`;
+      } else {
+        badge.style.background = '#0ea5e9';
+        badge.style.animation = 'none';
+        btn.title = `${d.unread} notificación(es) sin leer`;
+      }
+    } else {
+      badge.style.display = 'none';
+      btn.title = 'Notificaciones · sin novedades';
+    }
+  }catch(e){/* silent */}
+}
+
+async function toggleNotifPanel(){
+  const p = document.getElementById('notifPanel');
+  if(!p) return;
+  if(p.style.display === 'none' || !p.style.display){
+    p.style.display = 'block';
+    await loadNotifList();
+  } else {
+    p.style.display = 'none';
+  }
+}
+
+async function loadNotifList(){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok) return;
+  const list = document.getElementById('notifList');
+  try{
+    const r = await fetch('/api/admin/notifications?limit=100', {headers:{'X-Admin-Token':tok}});
+    if(!r.ok){ list.innerHTML = `<div style="padding:20px;color:#ef4444">Error ${r.status}</div>`; return; }
+    const d = await r.json();
+    if(!d.items.length){
+      list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-style:italic">Sin notificaciones. Aparecerán aquí cuando haya movimientos.</div>';
+      return;
+    }
+    list.innerHTML = d.items.map(renderNotifItem).join('');
+  }catch(e){
+    list.innerHTML = `<div style="padding:20px;color:#ef4444">Error: ${e.message}</div>`;
+  }
+}
+
+function renderNotifItem(n){
+  const isCritical = n.severity === 'critical';
+  const isWarning = n.severity === 'warning';
+  const unread = !n.read;
+  const bgColor = isCritical ? (unread?'#450a0a':'#1e0a0a') : (isWarning ? (unread?'#3b2b0a':'#1a1509') : (unread?'#0e1a2e':'#0b1220'));
+  const borderColor = isCritical ? '#dc2626' : (isWarning ? '#f59e0b' : '#334155');
+  const dt = n.created_at ? new Date(n.created_at).toLocaleString('es-ES', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '—';
+  const amount = n.amount_cents ? ` · <b style="color:#f5b301">${(n.amount_cents/100).toFixed(2).replace('.',',')} €</b>` : '';
+  const link = n.invoice_url ? ` · <a href="${n.invoice_url}" target="_blank" style="color:#0ea5e9;font-size:11px">Factura ↗</a>` : '';
+  const boldPrefix = isCritical && unread ? '<span style="background:#dc2626;color:#fff;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:800;margin-right:6px">URGENTE</span>' : '';
+  return `<div style="background:${bgColor};border-left:3px solid ${borderColor};padding:10px 12px;margin-bottom:6px;border-radius:6px;position:relative" data-notif-id="${n.id}">
+    <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px">
+      <div style="font-size:12px;font-weight:${unread?'700':'400'};color:${unread?'#f5f5f5':'#94a3b8'}">${boldPrefix}${n.icon||''} ${(n.title||'').replace(/</g,'&lt;')}</div>
+      <div style="font-size:10px;color:#64748b;white-space:nowrap">${dt}</div>
+    </div>
+    <div style="font-size:11px;color:${unread?'#cbd5e1':'#64748b'};line-height:1.5">${(n.message||'').replace(/</g,'&lt;')}${amount}${link}</div>
+    ${n.email ? `<div style="font-size:10px;color:#94a3b8;margin-top:4px;font-family:monospace">${n.email.replace(/</g,'&lt;')}</div>` : ''}
+    ${unread ? `<button onclick="markNotifRead('${n.id}')" style="position:absolute;top:8px;right:8px;background:transparent;border:1px solid ${borderColor};color:${borderColor};padding:2px 6px;border-radius:3px;cursor:pointer;font-size:9px;font-weight:700">Marcar leída</button>` : ''}
+  </div>`;
+}
+
+async function markNotifRead(nid){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok) return;
+  try{
+    await fetch(`/api/admin/notifications/${encodeURIComponent(nid)}/read`, {method:'POST', headers:{'X-Admin-Token':tok}});
+    fetchNotifBadge();
+    loadNotifList();
+  }catch(e){/* silent */}
+}
+
+async function markAllNotifsRead(){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok) return;
+  try{
+    await fetch('/api/admin/notifications/mark-all-read', {method:'POST', headers:{'X-Admin-Token':tok}});
+    fetchNotifBadge();
+    loadNotifList();
+  }catch(e){/* silent */}
+}
+
+// ---------------- 🖥 Modal Ver Dispositivos (por licencia) ----------------
+async function showDevicesModal(licenseJti){
+  if(!licenseJti){ alert('Falta license_jti'); return; }
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok){ alert('Inicia sesión'); return; }
+  // Fetch all installations grouped by license: buscamos por license_jti en /api/installations
+  try{
+    const r = await fetch('/api/installations?q=&limit=1000', {headers:{'X-Admin-Token':tok}});
+    if(!r.ok){ alert('Error '+r.status); return; }
+    const d = await r.json();
+    const devs = (d.items||[]).filter(x => x.link_info && x.link_info.license_jti === licenseJti);
+    if(!devs.length){ alert('Sin dispositivos para esta licencia'); return; }
+    const fmt = iso => iso ? new Date(iso).toLocaleString('es-ES') : '—';
+    const rows = devs.map(x => {
+      const role = x.link_info.device_no === 1 ? '📱 Principal' : `💻 Secundario #${x.link_info.device_no-1}`;
+      const state = x.revoked ? '🚫 Revocado' : '🟢 Activo';
+      const lastSeen = fmt(x.last_seen_at);
+      return `<tr>
+        <td style="padding:6px 8px;font-size:11px">${role}</td>
+        <td style="padding:6px 8px;font-family:monospace;font-size:11px">${x.install_id}</td>
+        <td style="padding:6px 8px;font-size:11px">${lastSeen}<br><span style="color:#64748b;font-size:10px">×${x.seen_count||0}</span></td>
+        <td style="padding:6px 8px;font-size:11px">${x.ip_last||x.ip_first||'—'}<br><span style="color:#64748b;font-size:10px">${x.platform||''}</span></td>
+        <td style="padding:6px 8px;font-size:11px">${state}</td>
+        <td style="padding:6px 8px"><button onclick="deleteInstall('${x.install_id.replace(/'/g,"\\\\'")}');this.closest('.modal-back')?.remove();" style="background:#334155;color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:10px;cursor:pointer">🗑 Borrar</button></td>
+      </tr>`;
+    }).join('');
+    const back = document.createElement('div');
+    back.className = 'modal-back';
+    back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px';
+    back.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:900px;width:100%;max-height:80vh;overflow:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="margin:0;color:var(--gold)">🖥 Dispositivos de la licencia</h3>
+        <button onclick="this.closest('.modal-back').remove()" style="background:#334155;color:#fff;border:none;padding:6px 12px;border-radius:5px;cursor:pointer">✕ Cerrar</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Licencia: <span style="font-family:monospace">${licenseJti}</span> · <b>${devs.length}</b> PC(s) registrados</div>
+      <table style="width:100%;border-collapse:collapse;background:#0e1a2e;border-radius:6px;overflow:hidden">
+        <thead><tr style="background:#1e293b">
+          <th style="padding:6px 8px;text-align:left;font-size:10px;color:#f5b301">Rol</th>
+          <th style="padding:6px 8px;text-align:left;font-size:10px;color:#f5b301">Install ID</th>
+          <th style="padding:6px 8px;text-align:left;font-size:10px;color:#f5b301">Última conexión</th>
+          <th style="padding:6px 8px;text-align:left;font-size:10px;color:#f5b301">IP / Sistema</th>
+          <th style="padding:6px 8px;text-align:left;font-size:10px;color:#f5b301">Estado</th>
+          <th style="padding:6px 8px"></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+    back.addEventListener('click', e => { if(e.target === back) back.remove(); });
+    document.body.appendChild(back);
+  }catch(e){ alert('Error: '+e.message); }
 }
 
 async function loadPaymentsSummary(){
