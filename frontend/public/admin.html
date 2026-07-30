@@ -286,11 +286,47 @@ function showFlagsModal(installId, flagsJson){
     <div style="font-size:11px;color:var(--muted);margin-top:14px;padding:10px;background:#0f172a;border-radius:6px;border-left:3px solid #f59e0b">
       💡 Un flag NO bloquea automáticamente el trial. Es una alerta para que revises tú si aplica. Puedes ignorarlo si el cliente lo justifica, o revocar la licencia si confirmas abuso.
     </div>
+    <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+      ${installId ? `<button data-testid="flag-modal-revoke-btn" onclick="revokeFromFlagModal('${installId.replace(/'/g,"\\\\'")}', this)" style="background:#dc2626;color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">🚫 Revocar licencia</button>` : ''}
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="background:#334155;color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:12px">Cerrar</button>
+    </div>
   </div>`;
   back.addEventListener('click', ev => { if(ev.target === back) back.remove(); });
   document.body.appendChild(back);
 }
 window.showFlagsModal = showFlagsModal;
+
+// 🚫 Revocar licencia directamente desde el modal de flags
+async function revokeFromFlagModal(installId, btn){
+  if(!installId){ return; }
+  const reason = prompt('Motivo de la revocación (obligatorio):', 'Abuso detectado por flags');
+  if(!reason || !reason.trim()){ return; }
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok){ alert('Token expirado, vuelve a iniciar sesión'); return; }
+  if(btn){ btn.disabled = true; btn.innerHTML = '⏳ Revocando…'; }
+  try{
+    const r = await fetch(`/api/installations/${encodeURIComponent(installId)}/revoke`, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'X-Admin-Token': tok },
+      body: JSON.stringify({ reason: reason.trim() })
+    });
+    if(!r.ok){
+      const d = await r.json().catch(()=>({}));
+      alert('Error al revocar: ' + (d.detail || r.status));
+      if(btn){ btn.disabled = false; btn.innerHTML = '🚫 Revocar licencia'; }
+      return;
+    }
+    alert('✅ Licencia revocada correctamente.\n\nMotivo: ' + reason);
+    // Cerrar modal + recargar tabla si existe
+    document.querySelectorAll('div[style*=fixed]').forEach(el => { if(el.textContent && el.textContent.includes('Motivos del flag')) el.remove(); });
+    if(typeof loadInstallations === 'function') loadInstallations();
+    if(typeof loadLicenses === 'function') loadLicenses();
+  }catch(e){
+    alert('Error de red: ' + e.message);
+    if(btn){ btn.disabled = false; btn.innerHTML = '🚫 Revocar licencia'; }
+  }
+}
+window.revokeFromFlagModal = revokeFromFlagModal;
 
 async function doLogin(){
   const credential = document.getElementById('passInput').value.trim();
@@ -801,8 +837,16 @@ async function transferInstall(oldIid, clientEmail, clientName, plan){
     const newKey = data.new_license.license_key;
     let copied = false;
     try{
-      await navigator.clipboard.writeText(newKey);
-      copied = true;
+      if(navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext){
+        await navigator.clipboard.writeText(newKey);
+        copied = true;
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = newKey; ta.style.position='fixed'; ta.style.left='-9999px';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        copied = document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
     }catch(e){}
     const emailStatus = data.email_sent
       ? `📧 Email enviado a ${clientEmail}`
