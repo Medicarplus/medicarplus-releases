@@ -641,3 +641,25 @@ Antes había que scrollear los "Últimos 10 pagos". Ahora:
 ### Verificación auto-renewal Stripe
 - **`tests/test_stripe_autorenewal_e2e.py`**: simula renovación mensual (+30d) y anual (+365d) llamando directamente a `_sync_license_from_subscription()` con dos payloads Stripe consecutivos. Confirma que `expires_at` y JWT `exp` claim se actualizan correctamente en ambos casos.
 - **📧 Facturas por email**: gestionadas 100% por Stripe Dashboard → Settings → Emails. Recordarle al usuario activar "Email customers about successful payments" y "failed payments".
+
+
+---
+
+## 🚀 [30-Jul-2026] · Guía de Migración TEST → LIVE creada
+
+Marc confirma que **seguimos en TEST** hasta tener datos fiscales completos (~Oct 2026).
+Toda la configuración actual y el paso a paso LIVE están en:
+
+📄 **`/app/memory/STRIPE_LIVE_MIGRATION_GUIDE.md`** ← consultar antes de tocar Stripe LIVE
+
+Incluye:
+- Estado actual TEST (price_ids, webhook secret, emails activados en Dashboard)
+- Precondiciones (datos fiscales, IBAN, backup DB)
+- 17 pasos ordenados: crear productos LIVE → nuevo webhook secret → actualizar `.env` prod → deploy → verificación E2E con dinero real
+- Sección Verifactu (aplicación posterior 2027)
+- Avisos críticos: NO confundir preview/prod, price_ids distintos test/live, install_ids no migrables automáticamente
+
+**Estado a día de hoy**:
+- ✅ Toggles Stripe Dashboard activados por Marc en TEST: "Pagos correctos" + "Reembolsos"
+- ⏳ Pendiente Marc en Billing → Automations: fallos de pago + Smart Retries + recordatorios
+- ✅ Nuestro backend maneja correctamente TODOS los eventos webhook (validado E2E)
