@@ -601,3 +601,25 @@ Alertar al admin **automáticamente** por email cuando un cliente entra en rojo 
 - **Unit tests** (`tests/test_admin_notifier.py`): 4/4 pasan — recipient, subject, cuerpo HTML, override de env, fallback si SMTP no configurado.
 - **E2E** (`tests/test_stripe_payment_notifications_e2e.py`): pasos A y B pasan — 1 email al fallar, idempotencia en reintentos del webhook, 1 email al recuperar, `failed_invoices_count` vuelve a 0.
 
+
+
+---
+
+## 🔎 [30-Jul-2026] · Panel Admin · Diagnóstico Instalaciones + Buscador Pagos
+
+### Instalaciones · Resumen de BD (diagnóstico)
+Cuando el admin ve pocos resultados y sospecha filtros ocultos, ahora tiene:
+- **Endpoint nuevo** `GET /api/admin/installations/debug/summary` → devuelve `total_in_db`, `active`, `revoked`, `with_linked_email`, `platforms` (electron/web), `last_24h` (nuevas + activas), y `recent_10` heartbeats.
+- **Cabecera del panel Instalaciones**: nuevo banner con `📊 Total en BD: N · 🟢 activas · 🚫 revocadas · 🖥 Electron · 🌐 Web · 🆕 24h · 👁 activas 24h`.
+- **Logging mejorado** en `POST /api/install/track`: cada heartbeat se registra con `logger.info` (NEW vs existing + IP + platform + seen_count) → visible en logs de Emergent para debug de clientes con firewall.
+
+### Pagos · Buscador global (P1 completada)
+Antes había que scrollear los "Últimos 10 pagos". Ahora:
+- **Endpoint nuevo** `GET /api/admin/payments/search?q=...` → busca por `email`, `install_id`, `client_name`, `company_name`, `license_key`, `id`, `stripe_subscription_id`, `invoice_id`. Devuelve **tarjeta enriquecida por cliente** con: totales, contador facturas, `failed_count`, salud, plan, y lista COMPLETA de invoices (paid + failed/open).
+- **Input** `🔎 Buscar por email, install_id, nombre, apellidos…` en la cabecera de Pagos. Debounced 350ms.
+- **Render** tarjeta con nombre, email, install_id, total pagado grande, badge `⚠️ N fallidos` si aplica, tabla de facturas con enlace directo a Stripe (`hosted_url`).
+
+### Verificación
+- Curl `GET /api/admin/payments/search?q=recovery` → 200, devuelve cliente con 2 invoices.
+- Curl `GET /api/admin/installations/debug/summary` → 200, devuelve totales correctos.
+- Screenshot Playwright: buscador Pagos + resumen Instalaciones renderizan correctamente en admin.html.

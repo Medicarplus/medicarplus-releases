@@ -128,6 +128,7 @@
     <div style="margin-top:32px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
         <h2 style="margin:0;color:var(--gold);font-size:18px;flex:1;min-width:200px">🖥 Instalaciones <span style="color:var(--muted);font-size:12px;font-weight:400">· TODAS (con y sin licencia)</span></h2>
+        <div id="instDbSummary" style="font-size:11px;color:var(--muted);width:100%;padding:6px 10px;background:#0b1220;border:1px solid var(--border);border-radius:6px">Cargando resumen…</div>
         <input id="instSearch" type="text" placeholder="🔎 Buscar por install_id, email, notas, IP…" style="flex:1;min-width:260px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-size:13px">
         <select id="instFilter" style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-size:12px">
           <option value="all">Todas</option>
@@ -135,7 +136,7 @@
           <option value="revoked">🚫 Revocadas</option>
           <option value="no_license">👤 Sin licencia</option>
         </select>
-        <button onclick="loadInstallations()" style="padding:8px 14px;background:#0369a1;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">↻ Cargar</button>
+        <button onclick="loadInstallations();loadInstallationsDebugSummary();" style="padding:8px 14px;background:#0369a1;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">↻ Cargar</button>
         <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);cursor:pointer"><input type="checkbox" id="instGroupBy" onchange="loadInstallations()"> Agrupar por licencia</label>
         <span id="instCount" style="font-size:11px;color:var(--muted)"></span>
       </div>
@@ -160,9 +161,11 @@
     <div style="margin-top:32px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
         <h2 style="margin:0;color:var(--gold);font-size:18px;flex:1;min-width:200px">💳 Pagos & Facturación <span style="color:var(--muted);font-size:12px;font-weight:400">· Stripe</span></h2>
+        <input id="paySearch" type="text" placeholder="🔎 Buscar por email, install_id, nombre, apellidos…" style="flex:1;min-width:280px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-size:13px" oninput="paySearchDebounced()">
         <button onclick="syncStripePayments()" id="btnSyncStripe" style="padding:8px 14px;background:linear-gradient(135deg,#6366f1,#4338ca);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">↻ Sincronizar con Stripe</button>
         <button onclick="loadPaymentsSummary()" style="padding:8px 14px;background:#0369a1;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">📊 Ver resumen</button>
       </div>
+      <div id="paySearchResults" style="display:none;margin-bottom:12px"></div>
       <div id="paymentsSummaryBox" style="color:var(--muted);font-size:13px">Pulsa <b>Sincronizar con Stripe</b> para actualizar el estado de pagos de todos los clientes.</div>
     </div>
 
@@ -223,7 +226,7 @@ async function doLogin(){
     // Carga automática de las nuevas secciones al hacer login
     setTimeout(() => { try{ loadPaymentAlerts(); }catch(e){} }, 500);
     setTimeout(() => { try{ loadAdminUsers(); }catch(e){} }, 800);
-    setTimeout(() => { try{ loadInstallations(); }catch(e){} }, 1100);
+    setTimeout(() => { try{ loadInstallations(); loadInstallationsDebugSummary(); }catch(e){} }, 1100);
   }catch(e){document.getElementById('err').textContent='Error red: '+e.message}
 }
 function logout(){
@@ -496,6 +499,24 @@ window.addEventListener('DOMContentLoaded',()=>{
 });
 
 // ---------------- 🖥 Instalaciones (God-mode) ----------------
+async function loadInstallationsDebugSummary(){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  const box = document.getElementById('instDbSummary');
+  if(!box || !tok) return;
+  try{
+    const r = await fetch('/api/installations/debug/summary', { headers: { 'X-Admin-Token': tok } });
+    if(!r.ok){ box.textContent = 'Error cargando resumen ('+r.status+')'; return; }
+    const s = await r.json();
+    box.innerHTML =
+      `<b style="color:var(--gold)">📊 Total en BD: ${s.total_in_db}</b> · ` +
+      `🟢 ${s.active} activas · 🚫 ${s.revoked} revocadas · ` +
+      `📧 ${s.with_linked_email} con email · ` +
+      `🖥 ${s.platforms.electron_desktop} Electron · 🌐 ${s.platforms.web_browser} Web · ` +
+      `<span style="color:#22c55e">🆕 ${s.last_24h.new_installs} nuevas 24h</span> · ` +
+      `<span style="color:#0ea5e9">👁 ${s.last_24h.seen_installs} activas 24h</span>`;
+  }catch(e){ box.textContent = 'Error: '+e.message; }
+}
+
 async function loadInstallations(){
   const tok = sessionStorage.getItem('mcp.admin.token');
   if(!tok){ alert('Debes iniciar sesión primero'); return; }
@@ -856,6 +877,89 @@ async function syncStripePayments(){
   }finally{
     btn.disabled = false; btn.textContent = orig;
   }
+}
+
+// 🔎 Búsqueda global de pagos por email/id/nombre
+let _paySearchTimer = null;
+function paySearchDebounced(){
+  clearTimeout(_paySearchTimer);
+  _paySearchTimer = setTimeout(runPaySearch, 350);
+}
+
+async function runPaySearch(){
+  const q = (document.getElementById('paySearch')?.value || '').trim();
+  const box = document.getElementById('paySearchResults');
+  const summaryBox = document.getElementById('paymentsSummaryBox');
+  if(!box) return;
+  if(q.length < 2){
+    box.style.display = 'none';
+    box.innerHTML = '';
+    if(summaryBox) summaryBox.style.display = '';
+    return;
+  }
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok) return;
+  box.style.display = '';
+  if(summaryBox) summaryBox.style.display = 'none';
+  box.innerHTML = '<div style="padding:12px;color:var(--muted);font-style:italic">🔎 Buscando "'+q.replace(/</g,'&lt;')+'"…</div>';
+  try{
+    const r = await fetch('/api/admin/payments/search?q='+encodeURIComponent(q)+'&limit=50', {headers:{'X-Admin-Token':tok}});
+    if(!r.ok){ box.innerHTML = '<div style="color:#ef4444;padding:12px">Error '+r.status+'</div>'; return; }
+    const data = await r.json();
+    if(!data.results.length){
+      box.innerHTML = '<div style="padding:14px;color:var(--muted);font-style:italic;background:#0f172a;border-radius:8px">Sin resultados para "<b>'+q.replace(/</g,'&lt;')+'</b>". Prueba con email completo o install_id.</div>';
+      return;
+    }
+    const cards = data.results.map(r => renderPaySearchCard(r)).join('');
+    box.innerHTML =
+      '<div style="padding:8px 12px;color:#94a3b8;font-size:12px;margin-bottom:8px">🎯 <b>'+data.total+'</b> cliente(s) encontrados para "<b>'+q.replace(/</g,'&lt;')+'</b>"</div>'+
+      cards;
+  }catch(e){
+    box.innerHTML = '<div style="color:#ef4444;padding:12px">Error: '+e.message+'</div>';
+  }
+}
+
+function renderPaySearchCard(r){
+  const fmtEUR = c => ((c||0)/100).toFixed(2).replace('.',',')+' €';
+  const fmtDt = iso => iso ? new Date(iso).toLocaleDateString('es-ES') : '—';
+  const healthColor = {green:'#22c55e', yellow:'#f59e0b', red:'#ef4444'}[r.payment_health] || '#94a3b8';
+  const healthIcon = {green:'🟢', yellow:'🟡', red:'🔴'}[r.payment_health] || '⚪';
+  const invRows = (r.invoices||[]).map(p => {
+    const st = String(p.status||'').toLowerCase();
+    const color = st==='paid' ? '#22c55e' : (st==='void'?'#94a3b8':'#ef4444');
+    return `<tr>
+      <td style="padding:5px 10px;font-size:11px">${fmtDt(p.paid_at || p.created_at)}</td>
+      <td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700">${fmtEUR(p.amount_cents)}</td>
+      <td style="padding:5px 10px;font-size:11px;color:${color};font-weight:700">${st.toUpperCase()}</td>
+      <td style="padding:5px 10px">${p.hosted_url?`<a href="${p.hosted_url}" target="_blank" style="color:#0284c7;font-size:11px">Ver factura ↗</a>`:''}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="4" style="padding:10px;text-align:center;color:var(--muted);font-style:italic;font-size:11px">Sin facturas registradas</td></tr>';
+
+  const failedBadge = r.failed_count > 0 ? `<span style="background:#7f1d1d;color:#fca5a5;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;margin-left:6px">⚠️ ${r.failed_count} fallido${r.failed_count===1?'':'s'}</span>` : '';
+
+  return `<div style="background:#0f172a;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <div style="font-size:14px;font-weight:700;color:#f5b301">${(r.client_name || r.company_name || r.client_email || '—').replace(/</g,'&lt;')}</div>
+        <div style="font-size:12px;color:#94a3b8;font-family:monospace">${(r.client_email || '—').replace(/</g,'&lt;')}</div>
+        <div style="font-size:11px;color:#64748b;font-family:monospace;margin-top:2px">${(r.install_id||'—').replace(/</g,'&lt;')}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:18px;font-weight:800;color:#22c55e">${fmtEUR(r.total_paid_cents)}</div>
+        <div style="font-size:11px;color:#94a3b8">${r.invoice_count||0} factura${r.invoice_count===1?'':'s'} ${failedBadge}</div>
+        <div style="margin-top:4px;font-size:11px;color:${healthColor};font-weight:700">${healthIcon} ${(r.payment_health||'sin datos').toUpperCase()} · Plan ${(r.plan||'?')}</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;background:#0e1a2e;border-radius:6px;overflow:hidden">
+      <thead><tr style="background:#1e293b">
+        <th style="padding:5px 10px;text-align:left;font-size:10px;color:#f5b301">Fecha</th>
+        <th style="padding:5px 10px;text-align:right;font-size:10px;color:#f5b301">Importe</th>
+        <th style="padding:5px 10px;font-size:10px;color:#f5b301">Estado</th>
+        <th style="padding:5px 10px"></th>
+      </tr></thead>
+      <tbody>${invRows}</tbody>
+    </table>
+  </div>`;
 }
 
 async function loadPaymentsSummary(){

@@ -224,4 +224,112 @@ def build_payments_router(db):
             })
         return {"invoices": rows, "total": len(rows)}
 
+    @router.get("/search")
+    async def search_payments(
+        q: str = "",
+        limit: int = 50,
+        x_admin_token: Optional[str] = Header(None),
+    ):
+        """Busca pagos por install_id, email, client_name o license_key.
+
+        Devuelve para cada match:
+        - Datos del cliente (nombre, email, plan, health, install_id)
+        - Lista COMPLETA de invoices asociados (paid + failed/open)
+        - Totales acumulados
+        """
+        _admin_ok(x_admin_token)
+        import re as _re
+        q = (q or "").strip()
+        if not q or len(q) < 2:
+            return {"results": [], "total": 0, "note": "query too short (min 2 chars)"}
+
+        rx = _re.compile(_re.escape(q), _re.IGNORECASE)
+
+        # 1) Match en licenses (por email, install_id, name, license_key)
+        lic_query = {
+            "$or": [
+                {"client_email": {"$regex": rx}},
+                {"install_id": {"$regex": rx}},
+                {"client_name": {"$regex": rx}},
+                {"company_name": {"$regex": rx}},
+                {"license_key": {"$regex": rx}},
+                {"id": {"$regex": rx}},
+            ]
+        }
+        matched_licenses = []
+        async for lic in db.licenses.find(lic_query).limit(limit):
+            matched_licenses.append(lic)
+
+        # 2) Match en payments (email/subscription_id) que no vinieron por license
+        matched_pay_jtis = {lic.get("id") for lic in matched_licenses}
+        pay_query = {
+            "$or": [
+                {"customer_email": {"$regex": rx}},
+                {"install_id": {"$regex": rx}},
+                {"stripe_subscription_id": {"$regex": rx}},
+                {"_id": {"$regex": rx}},
+            ]
+        }
+        extra_emails = set()
+        async for p in db.payments.find(pay_query).limit(limit):
+            if p.get("license_jti") not in matched_pay_jtis and p.get("customer_email"):
+                extra_emails.add(p.get("customer_email"))
+
+        # Añade licencias por email extra
+        if extra_emails:
+            async for lic in db.licenses.find({"client_email": {"$in": list(extra_emails)}}):
+                if lic.get("id") not in matched_pay_jtis:
+                    matched_licenses.append(lic)
+                    matched_pay_jtis.add(lic.get("id"))
+
+        # 3) Enriquecer cada licencia con sus invoices
+        results = []
+        for lic in matched_licenses:
+            invoices = []
+            total_paid_cents = 0
+            failed_count = 0
+            async for p in db.payments.find({
+                "$or": [
+                    {"license_jti": lic.get("id")},
+                    {"customer_email": lic.get("client_email")} if lic.get("client_email") else {"_id": "__none__"},
+                    {"install_id": lic.get("install_id")} if lic.get("install_id") else {"_id": "__none__"},
+                ]
+            }).sort("created_at", -1):
+                inv = {
+                    "invoice_id": p.get("_id"),
+                    "amount_cents": p.get("amount_cents"),
+                    "currency": p.get("currency"),
+                    "status": p.get("status"),
+                    "created_at": p.get("created_at"),
+                    "paid_at": p.get("paid_at"),
+                    "hosted_url": p.get("hosted_url"),
+                    "pdf_url": p.get("pdf_url"),
+                }
+                invoices.append(inv)
+                if p.get("status") == "paid":
+                    total_paid_cents += int(p.get("amount_cents") or 0)
+                elif p.get("status") in ("open", "uncollectible"):
+                    failed_count += 1
+
+            results.append({
+                "license_jti": lic.get("id"),
+                "install_id": lic.get("install_id"),
+                "client_email": lic.get("client_email"),
+                "client_name": lic.get("client_name"),
+                "company_name": lic.get("company_name"),
+                "plan": lic.get("plan") or lic.get("plan_family"),
+                "status": lic.get("status"),
+                "payment_health": lic.get("payment_health"),
+                "expires_at": lic.get("expires_at"),
+                "stripe_customer_id": lic.get("stripe_customer_id"),
+                "stripe_subscription_id": lic.get("stripe_subscription_id"),
+                "total_paid_cents": total_paid_cents,
+                "total_paid_eur": round(total_paid_cents / 100.0, 2),
+                "invoice_count": len(invoices),
+                "failed_count": failed_count,
+                "invoices": invoices,
+            })
+
+        return {"results": results, "total": len(results), "query": q}
+
     return router

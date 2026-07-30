@@ -28,6 +28,7 @@ upsert por install_id.
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 import time
@@ -36,6 +37,8 @@ from typing import Optional, Dict, Tuple
 
 from fastapi import APIRouter, HTTPException, Header, Request
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/install", tags=["installations"])
@@ -119,6 +122,7 @@ def build_router(db):
                 {"_id": install_id},
                 {"$set": set_doc, "$inc": {"seen_count": 1}},
             )
+            logger.info(f"[heartbeat] existing install_id={install_id} ip={ip} platform={body.platform or 'web'} seen_count={int(existing.get('seen_count', 0)) + 1}")
             return {"ok": True, "new": False}
         # Inserción nueva
         await db.installations.insert_one({
@@ -133,6 +137,7 @@ def build_router(db):
             "notes": None,
             **set_doc,
         })
+        logger.info(f"[heartbeat] 🆕 NEW install_id={install_id} ip={ip} platform={body.platform or 'web'} ua={(body.user_agent or '')[:80]}")
         return {"ok": True, "new": True}
 
     @router.get("/status/{install_id}")
@@ -149,6 +154,49 @@ def build_router(db):
         return {"found": True, "revoked": bool(doc.get("revoked")), "reason": doc.get("revoked_reason")}
 
     # ---- Admin endpoints ------------------------------------------------------
+
+    @admin_router.get("/debug/summary")
+    async def installations_debug_summary(x_admin_token: Optional[str] = Header(None)):
+        """Diagnóstico rápido: conteo real por estado + últimos 10 heartbeats.
+
+        Útil para depurar cuando la UI muestra pocos resultados y sospechamos
+        filtros o problemas de red en clientes.
+        """
+        _admin_ok(x_admin_token)
+        total = await db.installations.count_documents({})
+        active = await db.installations.count_documents({"revoked": {"$ne": True}})
+        revoked = await db.installations.count_documents({"revoked": True})
+        with_email = await db.installations.count_documents({"linked_email": {"$nin": [None, ""]}})
+        electron = await db.installations.count_documents({"platform": "electron-desktop"})
+        web = await db.installations.count_documents({"platform": "web-browser"})
+
+        # Últimos 10 arranques (por last_seen_at)
+        recent = []
+        cursor = db.installations.find({}, {
+            "_id": 1, "last_seen_at": 1, "first_seen_at": 1, "ip_last": 1,
+            "platform": 1, "seen_count": 1, "app_version": 1, "linked_email": 1,
+        }).sort("last_seen_at", -1).limit(10)
+        async for d in cursor:
+            recent.append({
+                "install_id": d.pop("_id"),
+                **d,
+            })
+
+        # Nuevos en las últimas 24h (por first_seen_at)
+        from datetime import timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        new_24h = await db.installations.count_documents({"first_seen_at": {"$gte": cutoff}})
+        seen_24h = await db.installations.count_documents({"last_seen_at": {"$gte": cutoff}})
+
+        return {
+            "total_in_db": total,
+            "active": active,
+            "revoked": revoked,
+            "with_linked_email": with_email,
+            "platforms": {"electron_desktop": electron, "web_browser": web},
+            "last_24h": {"new_installs": new_24h, "seen_installs": seen_24h},
+            "recent_10": recent,
+        }
 
     @admin_router.get("")
     async def list_installations(
