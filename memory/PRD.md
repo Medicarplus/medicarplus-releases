@@ -623,3 +623,21 @@ Antes había que scrollear los "Últimos 10 pagos". Ahora:
 - Curl `GET /api/admin/payments/search?q=recovery` → 200, devuelve cliente con 2 invoices.
 - Curl `GET /api/admin/installations/debug/summary` → 200, devuelve totales correctos.
 - Screenshot Playwright: buscador Pagos + resumen Instalaciones renderizan correctamente en admin.html.
+
+
+---
+
+## 🔔 [30-Jul-2026] · Panel Notificaciones + verificación auto-renewal Stripe
+
+### Nueva colección `notifications` + feed en admin panel
+- **Backend** `routes/admin_notifications.py`: helper `create_notification()` + endpoints `GET /api/admin/notifications`, `/badge`, `POST /{id}/read`, `/mark-all-read`, `DELETE /{id}`, `/cleanup?days=90`. Tipos: `install_new`, `payment_failed` (critical), `payment_recovered`, `subscription_canceled` (warning), `plan_upgrade`, `plan_downgrade`.
+- **Hooks automáticos** en `server.py` (webhooks Stripe) e `installations.py` (heartbeat). Idempotencia via `dedupe_key` (invoice_id / sub_id / install_id).
+- **Frontend `admin.html`**: botón `🔔 Notificaciones` en cabecera con badge rojo pulsante (`pulse-critical`) cuando hay críticas sin leer. Panel fixed top-right con auto-refresh 60s.
+- **Fixes UX de la misma iteración**:
+  - `plan_family || plan || '?'` — resuelve el "?" que aparecía en todas las filas.
+  - Badge dispositivos `N/M dispositivos` en vez de `#N de M`.
+  - Modal `showDevicesModal(license_jti)` al click en badge: tabla con rol/install_id/última conexión/IP/estado/acciones.
+
+### Verificación auto-renewal Stripe
+- **`tests/test_stripe_autorenewal_e2e.py`**: simula renovación mensual (+30d) y anual (+365d) llamando directamente a `_sync_license_from_subscription()` con dos payloads Stripe consecutivos. Confirma que `expires_at` y JWT `exp` claim se actualizan correctamente en ambos casos.
+- **📧 Facturas por email**: gestionadas 100% por Stripe Dashboard → Settings → Emails. Recordarle al usuario activar "Email customers about successful payments" y "failed payments".
