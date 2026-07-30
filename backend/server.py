@@ -881,21 +881,10 @@ async def stripe_webhook(request: _FastReq):
                         company_name=md.get("company_name"),
                         referred_by=md.get("referred_by") or md.get("referral_code"),
                     )
-                    # 💰 SMS BILLING · adjunta SMS pendents a la següent factura
-                    try:
-                        from services.sms_billing import bill_pending_sms_for_subscription
-                        if not install_id_paid:
-                            lic_doc = await db.licenses.find_one({"stripe_subscription_id": sub_id})
-                            if lic_doc:
-                                install_id_paid = lic_doc.get("install_id")
-                        if install_id_paid:
-                            result = await bill_pending_sms_for_subscription(
-                                db, _stripe_sdk, sub_id, install_id_paid, mode="attach_next"
-                            )
-                            if result.get("billed", 0) > 0:
-                                logger.info(f"[sms_billing] attached to next invoice: {result}")
-                    except Exception as bill_err:
-                        logger.exception(f"[sms_billing] failed on invoice.paid: {bill_err}")
+                    # 💰 SMS BILLING · Los SMS se facturan MENSUALMENTE vía cron
+                    # (services/sms_monthly_billing.py · día 1 de cada mes) para que los
+                    # clientes anuales no acumulen 12 meses de SMS. Aquí no adjuntamos nada.
+                    logger.info(f"[sms_billing] invoice.paid received · SMS billing handled by monthly cron, not attached to this invoice")
         except Exception as e:
             logger.exception("Error handling subscription webhook: %s", e)
         return {"received": True, "event_type": etype, "handled": "subscription"}
@@ -973,6 +962,15 @@ async def _startup():
     except Exception:
         logger.exception("Failed to schedule renewal reminder loop")
 
+    # 📱 Facturación mensual de SMS · día 1 de cada mes 03:00 UTC (aplica a todos los planes)
+    try:
+        import asyncio as _asyncio
+        from services.sms_monthly_billing import sms_monthly_billing_loop
+        _asyncio.create_task(sms_monthly_billing_loop(db, _stripe_sdk))
+        logger.info("SMS monthly billing loop scheduled (day 1 of each month · 03:00 UTC)")
+    except Exception:
+        logger.exception("Failed to schedule SMS monthly billing loop")
+
 
 @app.post("/api/admin/renewal-reminders/run")
 async def run_renewal_reminders_now(request: _FastReq):
@@ -983,6 +981,21 @@ async def run_renewal_reminders_now(request: _FastReq):
         raise _HTTPExc(status_code=401, detail="Admin token invàlid o absent")
     from services.renewal_reminders import run_renewal_reminder_sweep
     return await run_renewal_reminder_sweep(db)
+
+
+@app.post("/api/admin/sms-monthly-billing/run")
+async def run_sms_monthly_billing_now(request: _FastReq):
+    """Admin: dispara manualmente la facturación mensual de SMS (X-Admin-Token).
+
+    Útil para: (a) test antes de fin de mes, (b) recuperar un mes que falló,
+    (c) forzar el cobro tras cambiar precios.
+    """
+    from fastapi import HTTPException as _HTTPExc
+    token = request.headers.get("X-Admin-Token", "")
+    if not token or token != os.environ.get("LICENSE_ADMIN_TOKEN", ""):
+        raise _HTTPExc(status_code=401, detail="Admin token invàlid o absent")
+    from services.sms_monthly_billing import bill_all_pending_sms_monthly
+    return await bill_all_pending_sms_monthly(db, _stripe_sdk)
 
 
 @app.on_event("shutdown")
