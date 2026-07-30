@@ -7489,7 +7489,7 @@ function showActivationModal(){
   const installId=getInstallId();
   const installDate=localStorage.getItem(LIC.INSTALL_DATE)||new Date().toISOString();
   const back=document.createElement('div');
-  back.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,0.98);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(10px)';
+  back.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,0.985);z-index:99999;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto';
   back.innerHTML='<div style="background:linear-gradient(135deg,#1e293b,#0f172a);border:2px solid #f5b301;border-radius:16px;padding:40px;max-width:600px;width:100%;color:#e2e8f0;font-family:Georgia,serif;box-shadow:0 20px 60px rgba(0,0,0,0.5)">'
     +'<div style="text-align:center;margin-bottom:30px">'
     +'<div style="font-size:48px;margin-bottom:10px">🔐</div>'
@@ -7511,13 +7511,13 @@ function showActivationModal(){
     +'<div style="text-align:center;margin-top:14px">'
     +'<a href="#" id="showAdminLogin" data-testid="admin-login-toggle" style="color:#a855f7;font-size:12px;text-decoration:underline;cursor:pointer">🔐 ¿Eres administrador?</a>'
     +'</div>'
-    +'<div id="adminLoginBox" data-testid="admin-login-box" style="display:none;margin-top:14px;padding:16px;background:#0b1121;border:1px dashed #a855f7;border-radius:10px">'
+    +'<div id="adminLoginBox" data-testid="admin-login-box" style="display:none;margin-top:14px;padding:16px;background:#0b1121;border:1px dashed #a855f7;border-radius:10px;pointer-events:auto">'
     +'<div style="font-size:11px;color:#c4b5fd;letter-spacing:1.5px;font-weight:800;margin-bottom:10px">👑 ACCESO ADMINISTRADOR (MASTER)</div>'
-    +'<label style="display:block;font-size:11px;color:#a855f7;font-weight:700;margin-bottom:4px">USUARIO</label>'
-    +'<input id="admUser" data-testid="admin-user-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="width:100%;padding:10px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:13px;box-sizing:border-box;margin-bottom:10px" />'
-    +'<label style="display:block;font-size:11px;color:#a855f7;font-weight:700;margin-bottom:4px">CONTRASEÑA</label>'
-    +'<input id="admPass" data-testid="admin-pass-input" type="password" autocomplete="new-password" style="width:100%;padding:10px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:13px;box-sizing:border-box;margin-bottom:12px" />'
-    +'<button id="admLoginBtn" data-testid="admin-login-btn" style="width:100%;padding:12px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border:none;border-radius:8px;font-family:Georgia,serif;font-size:14px;font-weight:800;letter-spacing:1px;cursor:pointer">ENTRAR COMO ADMINISTRADOR</button>'
+    +'<label for="admUser" style="display:block;font-size:11px;color:#a855f7;font-weight:700;margin-bottom:4px">USUARIO</label>'
+    +'<input id="admUser" name="adminUsername" data-testid="admin-user-input" type="text" autocomplete="username" autocorrect="off" autocapitalize="off" spellcheck="false" tabindex="1" style="width:100%;padding:10px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:13px;box-sizing:border-box;margin-bottom:10px;pointer-events:auto;user-select:text;-webkit-user-select:text;caret-color:#a855f7" />'
+    +'<label for="admPass" style="display:block;font-size:11px;color:#a855f7;font-weight:700;margin-bottom:4px">CONTRASEÑA</label>'
+    +'<input id="admPass" name="adminPassword" data-testid="admin-pass-input" type="password" autocomplete="current-password" tabindex="2" style="width:100%;padding:10px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:13px;box-sizing:border-box;margin-bottom:12px;pointer-events:auto;user-select:text;-webkit-user-select:text;caret-color:#a855f7" />'
+    +'<button id="admLoginBtn" data-testid="admin-login-btn" tabindex="3" style="width:100%;padding:12px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border:none;border-radius:8px;font-family:Georgia,serif;font-size:14px;font-weight:800;letter-spacing:1px;cursor:pointer">ENTRAR COMO ADMINISTRADOR</button>'
     +'<div id="admErr" data-testid="admin-login-error" style="color:#ef4444;font-size:12px;margin-top:8px;display:none"></div>'
     +'</div>'
     +'<div style="text-align:center;margin-top:24px;padding-top:20px;border-top:1px solid #334155">'
@@ -7529,7 +7529,9 @@ function showActivationModal(){
   const err=back.querySelector('#licError');
   const info=back.querySelector('#licStatus');
   const btn=back.querySelector('#licBtn');
-  inp.focus();
+  // Focus diferido para no competir con el composite inicial (Electron/Windows tienen lag con backdrop-filter).
+  // Además, si Marc clica rápido en "¿Eres administrador?", este focus no le roba el evento.
+  setTimeout(()=>{ try{ inp.focus({preventScroll:true}); }catch(e){} }, 200);
   const showErr=(msg)=>{err.textContent='✗ '+msg;err.style.display='block';info.style.display='none';inp.style.borderColor='#ef4444';setTimeout(()=>inp.style.borderColor='#475569',2000)};
   const showInfo=(msg)=>{info.textContent=msg;info.style.display='block';err.style.display='none'};
   const tryActivate=async()=>{
@@ -7568,8 +7570,26 @@ function showActivationModal(){
       ev.preventDefault();
       const shown=admBox.style.display!=='none';
       admBox.style.display=shown?'none':'block';
-      if(!shown) setTimeout(()=>admUser.focus(),50);
+      if(!shown){
+        // Scroll into view + focus con múltiples reintentos (defensivo para Electron/webviews)
+        setTimeout(()=>{
+          try{ admBox.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){}
+        }, 30);
+        setTimeout(()=>{ try{ admUser.focus(); admUser.click(); }catch(e){} }, 100);
+        setTimeout(()=>{ try{ admUser.focus(); }catch(e){} }, 300);
+      }
     };
+  }
+  // Click-to-focus explícito en los inputs (defensivo · algunos Electron webviews requieren esto)
+  if(admUser){
+    admUser.addEventListener('click', ()=>{ try{ admUser.focus(); }catch(e){} });
+    admUser.addEventListener('focus', ()=>{ admUser.style.borderColor='#a855f7'; });
+    admUser.addEventListener('blur', ()=>{ admUser.style.borderColor='#475569'; });
+  }
+  if(admPass){
+    admPass.addEventListener('click', ()=>{ try{ admPass.focus(); }catch(e){} });
+    admPass.addEventListener('focus', ()=>{ admPass.style.borderColor='#a855f7'; });
+    admPass.addEventListener('blur', ()=>{ admPass.style.borderColor='#475569'; });
   }
   const doAdminLogin=async()=>{
     admErr.style.display='none';
