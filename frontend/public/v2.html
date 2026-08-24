@@ -1613,6 +1613,9 @@ function openStats(initialSection){
   function _trafAggregate(filterYear, filterMonth){
     let src = {};
     try{ src = (JSON.parse(localStorage.getItem(KEYS['trafic']))||{}).byDate || {} }catch(e){ src = {} }
+    // 🚫 Excluye entradas con importe=0 y tasa=0 SALVO que el usuario active "Contar 0€"
+    // (sincronizado con el toggle del panel principal y del Libro de Registro)
+    const countZero = (typeof getCountZero === 'function') ? getCountZero() : (localStorage.getItem('caja.count_zero') === '1');
     const out = { count:0, byCat:{}, importe:0, tasas:0, daily:{}, monthly:{} };
     TRAF_CATS.forEach(c => out.byCat[c] = 0);
     for(const iso of Object.keys(src)){
@@ -1624,11 +1627,14 @@ function openStats(initialSection){
       const list = src[iso] || [];
       for(const e of list){
         if(e.kind !== 'TRAF' || !e._csv) continue;
+        const imp = +e.importe || 0;
+        const ta = +e.tasa || 0;
+        const desc = +e.descuento || 0;
+        // Exclusión 0€: si subtotal (importe - descuento + tasa) es 0 → NO cuenta como certificado
+        if(!countZero && (imp - desc + ta) <= 0) continue;
         const cat = _trafBaseCat(e.tipo);
         out.count++;
         out.byCat[cat] = (out.byCat[cat] || 0) + 1;
-        const imp = +e.importe || 0;
-        const ta = +e.tasa || 0;
         out.importe += imp;
         out.tasas += ta;
         // Monthly bucket
