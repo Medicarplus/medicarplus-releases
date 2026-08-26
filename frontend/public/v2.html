@@ -439,7 +439,7 @@
             </div>
           </div>
           <button class="btn btn-primary" id="btnAddDH">+ Añadir Debe/Haber</button>
-          <div class="small" style="margin-top:8px">Sistema libre como el cuaderno: cualquier concepto, marca si es HABER (suma a caja) o DEBE (resta de caja). Útil para retornos, ajustes de tasas DGT de días anteriores, gastos, etc.</div>
+          <div class="small" style="margin-top:8px"><b style="color:#3ddc97">HABER</b> = entra dinero (ingreso: foto, ciclista, cobros manuales…) · <b style="color:#ff8a93">DEBE</b> = sale dinero (gasto: IRPF, material, honorarios/nómina/faenas externas a trabajadores, devoluciones…). Los chips de acceso rápido ya vienen configurados con el signo correcto.</div>
         </div>
       </div>
       <div class="panel">
@@ -2751,6 +2751,7 @@ function _hnCategoryColor(cat){
 function openHonorariosPanel(){
   // Recolectar todas las entradas de todas las empresas
   const allEntries = [];
+  const legacyHaberEntries = []; // Entradas honorarios/nómina/etc guardadas como HABER (contablemente mal)
   const stores = {trafic:'caja.v1', cempla:'caja.cempla.v1'};
   for(const [comp, key] of Object.entries(stores)){
     try{
@@ -2761,6 +2762,10 @@ function openHonorariosPanel(){
           if(_isHonorarioLikeEntry(e)){
             const match = _hnMatchKeyword((e.nombre||'')+' '+(e.tipo||'')+' '+(e.concepto||''));
             allEntries.push({date: iso, name: _cleanWorkerName(e.nombre), amount: +e.importe||0, company: comp, fp: e.fp||'', cat: match ? match.cat : 'HONORARIO'});
+            // Si está guardado como HABER pero es un pago a trabajador → mal contabilizado
+            if(e.tipo === 'HABER'){
+              legacyHaberEntries.push({date: iso, id: e.id, name: (e.nombre||''), amount: +e.importe||0, company: comp, key});
+            }
           }
         }
       }
@@ -2792,6 +2797,13 @@ function openHonorariosPanel(){
       </div>
     </div>
     <div class="no-print" style="background:#0b1121;border:1px solid #78350f;border-radius:8px;padding:12px;margin-bottom:14px;font-size:11px;color:#fbbf24">💡 Añade pagos desde <b>Debe/Haber</b> escribiendo en el concepto libre palabras como <b>Honoraris</b>, <b>Nómina</b>, <b>Sueldo</b>, <b>Salario</b>, <b>Jornal</b>, <b>Faena externa</b>, <b>Colaborador</b> o <b>Autónomo</b> seguido del <b>nombre del trabajador</b> (ej: <i>"Nomina Pep Brugulat"</i> o <i>"Faena externa Carlos electricista"</i>). Aparecerán aquí automáticamente.</div>
+    ${legacyHaberEntries.length ? `<div class="no-print" data-testid="honorarios-legacy-warn" style="background:#3a1c22;border:1px solid #ff5d6c;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;color:#ffb3b8">
+      ⚠️ <b>Detectados ${legacyHaberEntries.length} pagos históricos guardados como HABER (ingreso)</b>. Contablemente pagar a un trabajador es un <b>GASTO (DEBE)</b>, no un ingreso. Estas entradas suman incorrectamente en tu facturación anual.
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button id="_hn_fix_legacy" data-testid="honorarios-fix-legacy" style="background:linear-gradient(135deg,#ff5d6c,#c02b3c);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:700">🔧 Convertir a DEBE (${legacyHaberEntries.length} entradas)</button>
+        <span style="font-size:10px;color:#94a3b8">Total afectado: <b style="color:#fbbf24">${fmtEUR(legacyHaberEntries.reduce((s,x)=>s+x.amount,0))}</b> · Se creará una copia de seguridad antes de convertir.</span>
+      </div>
+    </div>` : ''}
     <div id="_hn_body"></div>
   </div>`;
   document.body.appendChild(back);
@@ -2861,6 +2873,43 @@ function openHonorariosPanel(){
   const monthSel = back.querySelector('#_hn_month');
   monthSel.addEventListener('change', () => renderBody(monthSel.value));
   back.querySelector('#_hn_close').onclick = () => back.remove();
+  // Botón de conversión legacy HABER→DEBE
+  const fixBtn = back.querySelector('#_hn_fix_legacy');
+  if(fixBtn){
+    fixBtn.onclick = () => {
+      const total = legacyHaberEntries.reduce((s,x)=>s+x.amount,0);
+      const msg = `¿Convertir ${legacyHaberEntries.length} entradas de HABER a DEBE?\n\nTotal afectado: ${fmtEUR(total)}\n\nSe hará una copia de seguridad automática antes de convertir. Esta operación:\n• Marcará los pagos como GASTO (correcto contablemente)\n• Recalculará la facturación y el neto de esos días\n• Los pagos seguirán apareciendo en este panel de Honorarios\n\n¿Continuar?`;
+      if(!confirm(msg)) return;
+      // Backup previo en localStorage
+      try{
+        const backupKey = 'caja.backup.pre-legacy-fix.' + new Date().toISOString().replace(/[:.]/g,'-');
+        const backup = {trafic: localStorage.getItem('caja.v1'), cempla: localStorage.getItem('caja.cempla.v1'), ts: Date.now()};
+        localStorage.setItem(backupKey, JSON.stringify(backup));
+      }catch(_){}
+      // Conversión
+      let converted = 0;
+      const byStoreKey = {};
+      for(const leg of legacyHaberEntries){ (byStoreKey[leg.key] = byStoreKey[leg.key] || []).push(leg); }
+      for(const [storeKey, list] of Object.entries(byStoreKey)){
+        try{
+          const raw = JSON.parse(localStorage.getItem(storeKey)||'{"byDate":{}}');
+          for(const leg of list){
+            const dayArr = raw.byDate[leg.date] || [];
+            for(const e of dayArr){
+              if(e.id === leg.id && e.tipo === 'HABER'){ e.tipo = 'DEBE'; converted++; break; }
+            }
+          }
+          localStorage.setItem(storeKey, JSON.stringify(raw));
+        }catch(_){}
+      }
+      alert(`✅ Convertidas ${converted} entradas de HABER→DEBE.\n\nBackup guardado en localStorage. Se cerrará y reabrirá el panel para reflejar los cambios.`);
+      // Reload the app state and reopen panel
+      try{ loadState && loadState(); }catch(_){}
+      try{ render && render(); }catch(_){}
+      back.remove();
+      setTimeout(()=>openHonorariosPanel(), 200);
+    };
+  }
   back.querySelector('#_hn_print').onclick = () => {
     const modal = back.querySelector('.hn-modal');
     const scope = monthSel.value === '__ALL__' ? 'Todo el histórico' : fmtMonth(monthSel.value);
@@ -3802,8 +3851,8 @@ function _buildAnnualReport(year){
         // ─────────────────────────────────────────────────────────
         //  • Servei propi (importe - descuento) = base imponible IRPF = FACTURACIÓN
         //  • Tasa DGT = SUPLIDO (paid en nom del client, NO és facturació base)
-        //  • HABER = ingrés manual (honoraris, foto...) = compta com ingrés
-        //  • DEBE  = gasto (IRPF, material, devolució tasa...) = compta com gasto
+        //  • HABER = ingrés manual (foto, ciclista, ingrés en metàl·lic…) = compta com ingrés
+        //  • DEBE  = gasto (IRPF, material, devolució tasa, honoraris a treballadors, nòmines, faenes externes…) = compta com gasto
         //  • Retorno = anul·lat (ja filtrat abans)
         // ─────────────────────────────────────────────────────────
         // DEBE (gasto) → NO suma en facturación · secció separada
