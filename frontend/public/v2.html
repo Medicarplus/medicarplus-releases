@@ -567,7 +567,26 @@ let currentCompany=localStorage.getItem('caja.company')||'trafic';
 const KEYS={trafic:'caja.v1',cempla:'caja.cempla.v1'};
 let state=loadState();let currentDate=isoToday();let privConcept='Revisión privada';let currentPreu='';let currentSplit='45-45-10';
 function loadState(){try{return JSON.parse(localStorage.getItem(KEYS[currentCompany]))||{byDate:{}}}catch(e){return{byDate:{}}}}
-function saveState(){localStorage.setItem(KEYS[currentCompany],JSON.stringify(state));pushSnapshot('auto');scheduleFileAutoSave()}
+function saveState(){
+  localStorage.setItem(KEYS[currentCompany],JSON.stringify(state));
+  pushSnapshot('auto');
+  scheduleFileAutoSave();
+  // 🔄 Auto-refresh de vistas de estadísticas si están abiertas (edición día actual + días anteriores)
+  try{
+    // Estadísticas Tráfico
+    if(document.getElementById('stBody') && typeof renderTrafficTable === 'function'){
+      renderTrafficTable();
+    }
+    // Otras estadísticas si tienen su propio render y están montadas
+    ['renderBillingStats','renderAutoescolesStats','renderSmsStats','renderCitesStats','renderYearComparativa','renderLibroTable'].forEach(fnName => {
+      try{ if(typeof window[fnName] === 'function'){
+        // Solo refresca si el DOM contiene sus contenedores (evita ejecutar en frío)
+        const marker = ({'renderBillingStats':'#facBody','renderAutoescolesStats':'#autoBody','renderSmsStats':'#smsBody','renderCitesStats':'#citesBody','renderYearComparativa':'#yearCompBody','renderLibroTable':'#libroTbody'})[fnName];
+        if(marker && document.querySelector(marker)) window[fnName]();
+      }}catch(_){}
+    });
+  }catch(_){}
+}
 
 // ============ SISTEMA ANTI-PÉRDIDA DE DATOS ============
 const SNAPS_KEY='caja.snapshots';
