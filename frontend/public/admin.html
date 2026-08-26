@@ -90,7 +90,24 @@
       </div>
     </div>
     <div id="notifList" style="max-height:calc(80vh - 60px);overflow-y:auto;padding:8px">
-      <div style="padding:20px;text-align:center;color:var(--muted);font-style:italic">Cargando…</div>
+      <div id="notifFilters" style="display:flex;gap:6px;padding:6px 4px 10px;flex-wrap:wrap;align-items:center;border-bottom:1px solid #1e293b;margin-bottom:8px">
+        <span style="font-size:10px;color:#94a3b8;letter-spacing:.5px;font-weight:700">FILTROS:</span>
+        <select id="notifCategory" data-testid="notif-filter-category" onchange="loadNotifList()" style="background:#0e1a2e;color:#e5e7eb;border:1px solid #334155;border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer">
+          <option value="">Todos los tipos</option>
+          <option value="instalaciones">🆕 Instalaciones</option>
+          <option value="pagos">💳 Pagos</option>
+          <option value="avisos">⚠️ Avisos</option>
+        </select>
+        <select id="notifReadState" data-testid="notif-filter-read" onchange="loadNotifList()" style="background:#0e1a2e;color:#e5e7eb;border:1px solid #334155;border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer">
+          <option value="">Leídas y no leídas</option>
+          <option value="unread">📬 Solo no leídas</option>
+          <option value="read">📖 Solo leídas</option>
+        </select>
+        <span id="notifResultCount" style="margin-left:auto;font-size:10px;color:#64748b;font-style:italic"></span>
+      </div>
+      <div id="notifListInner">
+        <div style="padding:20px;text-align:center;color:var(--muted);font-style:italic">Cargando…</div>
+      </div>
     </div>
   </div>
 
@@ -1555,18 +1572,27 @@ async function toggleNotifPanel(){
 async function loadNotifList(){
   const tok = sessionStorage.getItem('mcp.admin.token');
   if(!tok) return;
-  const list = document.getElementById('notifList');
+  const list = document.getElementById('notifListInner');
+  const countEl = document.getElementById('notifResultCount');
+  const cat = (document.getElementById('notifCategory')||{}).value || '';
+  const rs = (document.getElementById('notifReadState')||{}).value || '';
+  const params = new URLSearchParams({limit:'100'});
+  if(cat) params.set('category', cat);
+  if(rs) params.set('read_state', rs);
   try{
-    const r = await fetch('/api/admin/notifications?limit=100', {headers:{'X-Admin-Token':tok}});
-    if(!r.ok){ list.innerHTML = `<div style="padding:20px;color:#ef4444">Error ${r.status}</div>`; return; }
+    const r = await fetch(`/api/admin/notifications?${params.toString()}`, {headers:{'X-Admin-Token':tok}});
+    if(!r.ok){ list.innerHTML = `<div style="padding:20px;color:#ef4444">Error ${r.status}</div>`; if(countEl) countEl.textContent=''; return; }
     const d = await r.json();
+    if(countEl) countEl.textContent = `${d.items.length} resultado${d.items.length===1?'':'s'}`;
     if(!d.items.length){
-      list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-style:italic">Sin notificaciones. Aparecerán aquí cuando haya movimientos.</div>';
+      const emptyMsg = (cat||rs) ? 'Sin notificaciones con estos filtros.' : 'Sin notificaciones. Aparecerán aquí cuando haya movimientos.';
+      list.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-style:italic">${emptyMsg}</div>`;
       return;
     }
     list.innerHTML = d.items.map(renderNotifItem).join('');
   }catch(e){
     list.innerHTML = `<div style="padding:20px;color:#ef4444">Error: ${e.message}</div>`;
+    if(countEl) countEl.textContent='';
   }
 }
 

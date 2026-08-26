@@ -45,6 +45,14 @@ _TYPE_META = {
 }
 
 
+# Category groupings for UI filter (Feb 2026)
+_CATEGORY_TYPES = {
+    "instalaciones": [TYPE_INSTALL_NEW],
+    "pagos": [TYPE_PAYMENT_FAILED, TYPE_PAYMENT_RECOVERED],
+    "avisos": [TYPE_SUBSCRIPTION_CANCELED, TYPE_PLAN_UPGRADE, TYPE_PLAN_DOWNGRADE],
+}
+
+
 def _admin_ok(x_admin_token: Optional[str]) -> None:
     expected = os.environ.get("LICENSE_ADMIN_TOKEN", "")
     if not expected or x_admin_token != expected:
@@ -104,15 +112,25 @@ def build_notifications_router(db):
     async def list_notifications(
         unread_only: bool = False,
         severity: Optional[str] = None,
+        category: Optional[str] = None,
+        read_state: Optional[str] = None,
         limit: int = 100,
         x_admin_token: Optional[str] = Header(None),
     ):
         _admin_ok(x_admin_token)
         query: dict = {}
-        if unread_only:
+        # read_state has priority over legacy unread_only
+        if read_state == "unread":
+            query["read"] = False
+        elif read_state == "read":
+            query["read"] = True
+        elif unread_only:
             query["read"] = False
         if severity in (SEV_INFO, SEV_WARNING, SEV_CRITICAL):
             query["severity"] = severity
+        # Category filter groups multiple types together
+        if category and category in _CATEGORY_TYPES:
+            query["type"] = {"$in": _CATEGORY_TYPES[category]}
 
         # Critical items always sorted at top, then by date desc
         items: list[dict] = []

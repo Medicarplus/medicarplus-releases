@@ -2575,7 +2575,7 @@ async function importTrafficRows(rows){if(!rows.length){toast('Archivo vacío');
   const normFp=v=>{const s=String(v||'').trim().toUpperCase();if(!s)return 'E';if(/^TAR/.test(s)||s==='T')return 'T';if(/^BIZ/.test(s)||s==='B')return 'B';if(/^TRA/.test(s)||s==='X')return 'X';if(/^EFE/.test(s)||s==='E')return 'E';return s[0]||'E'};
   data.forEach(r=>{const fechaRaw=String(r[iFecha]||'').trim();if(!fechaRaw)return;const m=fechaRaw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);if(!m)return;let[_,d,mo,y]=m;if(y.length===2)y='20'+y;const iso=`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;const nombre=[String(r[iNombre]||'').trim(),String(r[iAp1]||'').trim(),String(r[iAp2]||'').trim()].filter(Boolean).join(' ').replace(/\s+/g,' ').trim()||'(sin nombre)';const fpVal=iFp>=0?normFp(r[iFp]):'E';const fpTasaVal=iFpTasa>=0?normFp(r[iFpTasa]):fpVal;let tipoRaw=String(r[iTipo]||'').trim()||'Otro';if(iCateg>=0){const cat=String(r[iCateg]||'').trim();if(cat&&!tipoRaw.toLowerCase().includes(cat.toLowerCase()))tipoRaw=tipoRaw+', '+cat;}const e={id:uid(),kind:'TRAF',_csv:true,tipo:tipoRaw,grupo:String(r[iGrupo]||'').trim()||'-',nombre,dni:iDni>=0?String(r[iDni]||'').trim():'',importe:num(r[iImporte]),descuento:0,tasa:iTasas.length?iTasas.reduce((s,i)=>s+num(r[i]),0):0,fp:fpVal,fpTasa:fpTasaVal,retorno:false};if(e.importe===0&&e.tasa===0&&!nombre)return;(grouped[iso]||=[]).push(e);total++;dates.add(iso)});
   if(!total){toast('No se han encontrado filas válidas');return}
-  let added=0,skipped=0;for(const[date,arr]of Object.entries(grouped)){const list=entriesOf(date);for(const e of arr){const dup=list.some(x=>x._csv&&x.nombre===e.nombre&&x.tipo===e.tipo&&x.importe===e.importe&&x.tasa===e.tasa);if(dup){skipped++;continue}list.push(e);added++}}
+  let added=0,skipped=0,backfilled=0;for(const[date,arr]of Object.entries(grouped)){const list=entriesOf(date);for(const e of arr){const dup=list.find(x=>x._csv&&x.nombre===e.nombre&&x.tipo===e.tipo&&x.importe===e.importe&&x.tasa===e.tasa);if(dup){if(e.dni&&!dup.dni){dup.dni=e.dni;backfilled++}skipped++;continue}list.push(e);added++}}
   saveState();const first=[...dates].sort()[0];if(first)setDate(first);else render();
   // 🤖 Auto-match assistència: per cada dia importat, quadra CSV amb cites del calendari
   let autoMsg='';
@@ -2585,7 +2585,7 @@ async function importTrafficRows(rows){if(!rows.length){toast('Archivo vacío');
       autoMsg = ` · 🤖 Cites auto-marcades: ${autoRes.ok} vinieron, ${autoRes.no} no vinieron`;
     }
   }catch(e){ console.warn('auto-mark failed', e); }
-  toast(`✅ Importado: ${added} entrada(s)${skipped?`, ${skipped} duplicada(s) ignorada(s)`:''}${detectMsg}${autoMsg}`,4500)
+  toast(`✅ Importado: ${added} entrada(s)${skipped?`, ${skipped} duplicada(s) ignorada(s)`:''}${backfilled?`, 🪪 ${backfilled} DNI rellenado(s) en entradas antiguas`:''}${detectMsg}${autoMsg}`,5000)
 }
 // Helper: setting global "count zero" per computar 0€ com entrada o no (default: false)
 function getCountZero(){return localStorage.getItem('caja.count_zero')==='1'}

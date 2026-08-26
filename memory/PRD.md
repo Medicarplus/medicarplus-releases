@@ -1095,3 +1095,24 @@ Crear trial → Cliente envía 2 msgs → Admin ve unread=2 → Admin responde �
    - data-testids añadidos: `btn-notif-mark-all-read`, `btn-notif-delete-read`, `btn-notif-delete-all`, `notif-item`, `btn-notif-mark-read`, `btn-notif-delete`.
 **Test Playwright**: 27 items renderizados, todos con ambos botones visibles (89×21 y 65×21). Click Marcar → badge 27→26. Click Borrar → badge 26→25. Todos los endpoints backend curl OK.
 
+
+### ✨ Filtros en Panel Notificaciones
+**Backend** `admin_notifications.py`:
+- Nuevo mapping `_CATEGORY_TYPES`: `instalaciones` → [install_new], `pagos` → [payment_failed, payment_recovered], `avisos` → [subscription_canceled, plan_upgrade, plan_downgrade].
+- `GET /admin/notifications` acepta `category` y `read_state` (`unread`|`read`|null). Compatibilidad hacia atrás con `unread_only`.
+
+**Frontend** `admin.html`:
+- Nuevos dropdowns bajo la cabecera del panel: `Todos los tipos | 🆕 Instalaciones | 💳 Pagos | ⚠️ Avisos` y `Leídas y no leídas | 📬 Solo no leídas | 📖 Solo leídas`.
+- Contador de resultados en vivo alineado a la derecha ("N resultados").
+- Empty state contextual cuando hay filtros aplicados.
+- `loadNotifList()` construye query con URLSearchParams y renderiza en `#notifListInner` (nuevo contenedor).
+- data-testids: `notif-filter-category`, `notif-filter-read`.
+
+**Test Playwright**: 22 instalaciones + 2 pagos + 2 avisos = 26 total (coincide con badge); "Solo leídas" → 1 (sin botón Marcar); "Solo no leídas" → 26 (todas con Marcar).
+
+### ✨ Backfill DNI no destructivo en re-importación CSV DGT
+Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de `list.some(...)` a `list.find(...)`. Cuando encuentra duplicado, si `!dup.dni && e.dni` → asigna solo el DNI. Nada más se modifica.
+- Contador nuevo `backfilled` mostrado en el toast final (🪪 X DNI rellenado(s) en entradas antiguas).
+- Test lógico E2E (Playwright evaluate): entrada antigua sin DNI recibe DNI ✓ · entrada que ya tenía DNI intacta ✓ · entrada manual intacta ✓ · IDs preservados ✓ · nueva entrada añadida ✓ · nada borrado.
+- Uso práctico: usuario vuelve a subir CSVs antiguos → DNIs se rellenan automáticamente, sin duplicar filas ni borrar nada.
+
