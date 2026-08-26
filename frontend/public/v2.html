@@ -1866,20 +1866,30 @@ function openStats(initialSection){
     const modal=back.querySelector('.modal')||back.firstElementChild;
     const year=$('#stYear').value;const mode=$('#stMode').value;const monthSel=+$('#stMonth').value;
     const title=mode==='month'?`Estadístiques ${MESOS[monthSel-1]} ${year}`:`Estadístiques ${year}`;
+    // Contar columnas para decidir orientación y font-size óptimos
+    const anual = mode !== 'month';
     printVisibleElement(modal, {
       title,
       landscape:true,
-      margins:'8mm',
+      margins:'6mm',
       extraCss:`
-        button, select, input, [data-no], #stSectionSwitch, .icon-btn, [data-del], #stFooterHint { display:none !important }
-        body{ background:#fff !important; color:#000 !important }
+        @page { size: A4 landscape; margin: 6mm }
+        button, select, input, [data-no], #stSectionSwitch, .icon-btn, [data-del], #stFooterHint, #stImportMonth, #stImport, #stAdd, #stClearAll, #stChart { display:none !important }
+        body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important }
         .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important }
-        h3{ color:#000 !important; font-size:16pt !important; margin:0 0 8pt 0 !important }
-        table{ border-collapse:collapse !important; width:100% !important; font-size:9pt !important }
-        thead tr, thead th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:4pt 6pt !important; font-weight:700 !important }
-        tbody td{ border:1px solid #999 !important; color:#000 !important; padding:3pt 5pt !important }
-        tfoot tr, tfoot td{ background:#ddd !important; color:#000 !important; border:1px solid #666 !important; font-weight:700 !important }
+        .modal{ padding:4mm !important; max-width:none !important; width:100% !important }
+        h3{ color:#000 !important; font-size:14pt !important; margin:0 0 4pt 0 !important }
+        .small, [class*=small]{ font-size:8pt !important; margin:2pt 0 !important }
+        table{ border-collapse:collapse !important; width:100% !important; font-size:${anual?'7pt':'9pt'} !important; table-layout:fixed !important; page-break-inside:auto }
+        thead{ display:table-header-group }
+        tr{ page-break-inside:avoid; page-break-after:auto }
+        thead tr, thead th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:${anual?'2pt 3pt':'4pt 6pt'} !important; font-weight:700 !important; font-size:${anual?'7pt':'9pt'} !important; word-wrap:break-word; overflow-wrap:break-word }
+        tbody td{ border:1px solid #999 !important; color:#000 !important; padding:${anual?'2pt 3pt':'3pt 5pt'} !important; word-wrap:break-word; overflow-wrap:break-word }
+        tfoot tr, tfoot td{ background:#ddd !important; color:#000 !important; border:1px solid #666 !important; font-weight:700 !important; padding:${anual?'2pt 3pt':'3pt 5pt'} !important }
         .st-cell{ text-align:center !important }
+        /* Columna nombre autoescuela más ancha, resto compacto */
+        table th:first-child, table td:first-child{ width:${anual?'18%':'40%'} !important; text-align:left !important }
+        table th:not(:first-child), table td:not(:first-child){ width:auto !important; text-align:center !important }
       `
     });
   };
