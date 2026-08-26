@@ -3043,10 +3043,39 @@ function openBuscadorOperaciones(){
       const e = r.entry;
       const imp = +e.importe||0; sumImporte += imp;
       const kindBadge = e.kind === 'DH' ? (e.tipo==='HABER'?'<span style="background:#065f46;color:#6ee7b7;padding:1px 6px;border-radius:3px;font-size:10px">HABER</span>':'<span style="background:#7f1d1d;color:#fecaca;padding:1px 6px;border-radius:3px;font-size:10px">DEBE</span>') : e.kind === 'PRIV' ? '<span style="background:#312e81;color:#a5b4fc;padding:1px 6px;border-radius:3px;font-size:10px">PRIV</span>' : '<span style="background:#164e63;color:#67e8f9;padding:1px 6px;border-radius:3px;font-size:10px">TRAF</span>';
-      return `<tr><td style="padding:5px 10px;font-size:12px">${fmtDate(r.date)}</td><td style="padding:5px 10px">${kindBadge}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${(e.tipo||'—').toString().replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:12px;font-weight:600">${(e.nombre||'').replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:10px;color:#64748b">${r.company==='trafic'?'Tráfico':'Cempla'}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${fpLabel(e.fp)}</td><td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700;color:#22d3ee">${fmtEUR(imp)}</td></tr>`;
+      return `<tr data-bo-date="${r.date}" data-bo-eid="${e.id||''}" data-bo-company="${r.company}" data-testid="buscador-global-row" style="cursor:pointer;transition:background .15s ease" onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background=''"><td style="padding:5px 10px;font-size:12px">${fmtDate(r.date)}</td><td style="padding:5px 10px">${kindBadge}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${(e.tipo||'—').toString().replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:12px;font-weight:600">${(e.nombre||'').replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:10px;color:#64748b">${r.company==='trafic'?'Tráfico':'Cempla'}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${fpLabel(e.fp)}</td><td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700;color:#22d3ee">${fmtEUR(imp)}</td></tr>`;
     }).join('');
-    $$('#_bo_results').innerHTML = `${dimsHtml}<div style="margin-bottom:10px;color:#e2e8f0"><b style="color:#22d3ee" data-testid="buscador-global-count">${results.length}</b> resultados · Suma importes: <b style="color:#22c55e">${fmtEUR(sumImporte)}</b> · Rango: ${fmtDate(from)} → ${fmtDate(to)}</div>
+    $$('#_bo_results').innerHTML = `${dimsHtml}<div style="margin-bottom:6px;color:#e2e8f0"><b style="color:#22d3ee" data-testid="buscador-global-count">${results.length}</b> resultados · Suma importes: <b style="color:#22c55e">${fmtEUR(sumImporte)}</b> · Rango: ${fmtDate(from)} → ${fmtDate(to)}</div>
+    <div style="font-size:10px;color:#64748b;margin-bottom:6px;font-style:italic">👆 Clica cualquier fila para ir al día y verla resaltada</div>
     <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;overflow:hidden;max-height:60vh;overflow-y:auto"><table style="width:100%;border-collapse:collapse"><thead style="position:sticky;top:0"><tr style="background:#1e293b"><th style="padding:6px 10px;text-align:left;font-size:10px;color:#94a3b8">Fecha</th><th style="padding:6px 10px;font-size:10px;color:#94a3b8">Movim.</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#94a3b8">Categoría</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#94a3b8">Nombre / Concepto</th><th style="padding:6px 10px;font-size:10px;color:#94a3b8">Empresa</th><th style="padding:6px 10px;font-size:10px;color:#94a3b8">Pago</th><th style="padding:6px 10px;text-align:right;font-size:10px;color:#94a3b8">Importe</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    // Click en fila → cierra modal, cambia empresa si toca, cambia día, resalta la entrada
+    $$('#_bo_results').querySelectorAll('[data-testid=buscador-global-row]').forEach(row => {
+      row.onclick = () => {
+        const targetDate = row.dataset.boDate;
+        const targetId = row.dataset.boEid;
+        const targetCompany = row.dataset.boCompany;
+        back.remove();
+        // Cambia empresa si es diferente a la actual
+        if(typeof currentCompany !== 'undefined' && targetCompany !== currentCompany){
+          try{ switchCompany(targetCompany); }catch(_){}
+        }
+        // Cambia fecha
+        try{ setDate(targetDate); }catch(_){}
+        // Resalta la entrada tras render
+        setTimeout(() => {
+          const tgt = document.querySelector('[data-id="'+targetId+'"]');
+          const tr = tgt ? tgt.closest('tr') : null;
+          if(tr){
+            tr.scrollIntoView({behavior:'smooth', block:'center'});
+            const orig = tr.style.background;
+            tr.style.transition = 'background .3s';
+            tr.style.background = 'rgba(245,179,1,.35)';
+            tr.style.boxShadow = 'inset 0 0 0 2px #f5b301';
+            setTimeout(() => { tr.style.background = orig; tr.style.boxShadow=''; }, 3000);
+          }
+        }, 350);
+      };
+    });
   }
   $$('#_bo_search').onclick = doSearch;
   $$('#_bo_q').onkeydown = ev => { if(ev.key === 'Enter') doSearch(); };
