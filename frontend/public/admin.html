@@ -328,6 +328,37 @@ async function revokeFromFlagModal(installId, btn){
 }
 window.revokeFromFlagModal = revokeFromFlagModal;
 
+// 📩 Reenviar el instalador de MediCar Plus al cliente
+async function resendInstaller(licenseKey, defaultEmail){
+  const targetEmail = prompt(
+    `📩 Reenviar el instalador de MediCar Plus\n\n` +
+    `Se enviará un email con el enlace de descarga y las instrucciones de reactivación.\n` +
+    `El cliente solo tendrá que instalar y volver a meter su Install ID + clave de licencia.\n\n` +
+    `Email destinatario (deja el que aparece o cambia si el cliente quiere otro):`,
+    defaultEmail || ''
+  );
+  if(!targetEmail || !targetEmail.trim()) return;
+  const clean = targetEmail.trim();
+  const tok = localStorage.getItem('adminTok') || '';
+  if(!tok){ alert('Sesión caducada, vuelve a entrar'); return; }
+  try{
+    const r = await fetch(`/api/admin/licenses/${encodeURIComponent(licenseKey)}/resend-download`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Admin-Token':tok},
+      body: JSON.stringify({ override_email: clean !== (defaultEmail||'') ? clean : null })
+    });
+    const j = await r.json();
+    if(!r.ok){
+      alert(`❌ Error: ${j.detail || 'no se pudo enviar'}`);
+      return;
+    }
+    alert(`✅ Enviado correctamente a ${j.sent_to}\n\nEl cliente recibirá el enlace de descarga en unos minutos.`);
+  }catch(e){
+    alert('Error de red: ' + e.message);
+  }
+}
+window.resendInstaller = resendInstaller;
+
 async function doLogin(){
   const credential = document.getElementById('passInput').value.trim();
   if(!credential){document.getElementById('err').textContent='Introduce contraseña o token';return}
@@ -576,7 +607,7 @@ async function openDetail(install_id){
       <b>Codi de referit propi</b><span>${l.referral_code?`<span class="mono" style="color:#3ddc97;font-weight:700;font-size:14px">${l.referral_code}</span> <button class="ghost" style="padding:2px 8px;font-size:10px" onclick="copyVal(this,'${l.referral_code}')">📋 Copiar</button>`:'<span style="color:var(--muted)">— (no generat encara)</span>'}</span>
       <b>Referred by (l'ha convidat)</b><span class="mono">${l.referred_by||'—'}</span>
       <b>Centre</b><span>${(l.client_name||l.company_name||'—').replace(/</g,'&lt;')}</span>
-      <b>Email</b><span class="mono">${(l.client_email||'—').replace(/</g,'&lt;')}</span>
+      <b>Email</b><span class="mono">${(l.client_email||'—').replace(/</g,'&lt;')} ${l.license_key?`<button class="ghost" style="padding:2px 8px;font-size:10px;background:#0c2340;border-color:#38bdf8;color:#7dd3fc" onclick="resendInstaller('${(l.license_key||'').replace(/'/g,"\\\\'")}', '${(l.client_email||'').replace(/'/g,"\\\\'")}')" data-testid="btn-resend-installer" title="Reenviar el instalador de MediCar Plus a este cliente por email">📩 Reenviar programa</button>`:''}</span>
       <b>Pla</b><span>${p}</span>
       <b>Estat</b><span>${l.status||'—'}</span>
       <b>Creada</b><span class="mono">${l.created_at?new Date(l.created_at).toLocaleString('ca-ES'):'—'}</span>

@@ -892,3 +892,31 @@ Acceso 1-clic al Asesor IA con el día actual pre-rellenado. Elimina la fricció
 - Desde/Hasta = fecha en curso ISO ✅
 - Pregunta contiene "Repasa el día DD/MM/YYYY (X entradas)" ✅
 
+
+
+## 2026-02 (d) · 3 bugs críticos del cliente arreglados (DONE)
+
+### 1. Botón "Verificar" ya no se queda pensando
+Rewrite del handler con `try/catch/finally` → el botón siempre se re-habilita.
+
+### 2. Extensión de trial se sincroniza al cliente
+- Backend `/verify`: si DB `expires_at` > JWT `exp`, re-emite JWT nuevo y lo devuelve como `new_key`
+- Modelo: `LicenseVerifyResponse.new_key: Optional[str]`
+- Frontend: detecta `new_key`, `saveLicense()` con nueva `expires`, `location.reload()`
+- Aplica también al verify silencioso en `isLicenseActive()`
+
+### 3. Modal de licencia 100% en español
+Traducidas todas las cadenas hardcoded catalanas + `toLocaleDateString('es-ES')`.
+
+### 4. Endpoint reenvío instalador (nuevo)
+- `POST /api/admin/licenses/{key}/resend-download` (con `override_email` opcional)
+- Envía HTML desde `info@medicarplus.es` con enlace + Install ID + Clave
+- Botón "📩 Reenviar programa" por licencia en `admin.html`
+
+### Validación E2E
+- Backend curl: 7/7 tests pasan
+- Frontend Playwright: modal español + verify aplica new_key (25/9→24/12/2026) ✅
+- Endpoint reenvío: 401 sin auth, 404 licencia fantasma ✅
+
+### Pendiente (usuario)
+Subir `MediCarPlus-Setup.exe` compilado a `/app/frontend/public/downloads/` para que el enlace `https://medicarplus.es/downloads/MediCarPlus-Setup.exe` funcione.

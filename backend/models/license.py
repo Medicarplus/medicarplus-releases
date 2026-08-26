@@ -123,6 +123,9 @@ class LicenseVerifyResponse(BaseModel):
     plan: Optional[str] = None
     expires_at: Optional[datetime] = None
     server_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Si el admin ha extendido/modificado la expiración desde el panel, el servidor emite
+    # un JWT nuevo aquí para que el cliente lo guarde y refleje la nueva fecha sin re-activar.
+    new_key: Optional[str] = None
 
 
 class LicenseListResponse(BaseModel):

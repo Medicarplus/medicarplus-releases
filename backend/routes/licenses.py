@@ -743,6 +743,32 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
                 "$inc": {"verify_count": 1},
             },
         )
+
+        # 4.5) Si l'admin ha extès la llicència, el JWT del client encara té l'exp antiga.
+        # Comparem el `exp` del token amb `expires_at` de la DB i re-emitim si cal.
+        new_key_out: Optional[str] = None
+        try:
+            jwt_exp_ts = int(payload.get("exp") or 0)
+            db_exp_ts = int(expires_at.timestamp()) if expires_at else 0
+            # Re-emitim si:
+            #  · La DB té data d'expiració i el JWT NO en té (permanent → limitat) o
+            #  · La DB té data d'expiració més tardana que el JWT (extensió)
+            if db_exp_ts and (jwt_exp_ts == 0 or db_exp_ts > jwt_exp_ts + 60):
+                new_key_out = _mint_jwt(
+                    install_id=payload.get("sub") or body.install_id,
+                    license_id=doc.get("id"),
+                    plan=doc.get("plan") or "",
+                    expires_at=expires_at,
+                )
+                # També actualitzem el license_key emmagatzemat a la DB perquè coincideixi
+                await coll.update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": {"license_key": new_key_out, "license_key_reissued_at": _now().isoformat()}},
+                )
+                logger.info("Re-issued JWT for %s (extension: exp %s → %s)",
+                            body.install_id, jwt_exp_ts, db_exp_ts)
+        except Exception as ex:
+            logger.warning("Could not re-issue JWT for %s: %s", body.install_id, ex)
         return LicenseVerifyResponse(
             ok=True,
             status="active",
@@ -750,6 +776,7 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             client_name=doc.get("client_name"),
             plan=doc.get("plan"),
             expires_at=expires_at,
+            new_key=new_key_out,
         )
 
     # ---------- Revoke ----------

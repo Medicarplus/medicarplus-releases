@@ -8813,6 +8813,17 @@ function isLicenseActive(){
         location.reload();
       }else if(res.ok===true){
         localStorage.setItem(LIC.LAST_CHECK,Date.now().toString());
+        // Si el admin ha extendido la licencia, aplicar el nuevo JWT silenciosamente
+        if(res.new_key && res.new_key !== lic.key){
+          try{
+            const v = validateKey(res.new_key, installId);
+            if(v.ok){
+              const newExpires = v.expires || (res.expires_at ? new Date(res.expires_at).toLocaleDateString('es-ES') : lic.expires);
+              saveLicense({key:res.new_key, type:v.type||lic.type, centre:res.client_name||lic.centre, plan:res.plan||lic.plan, expires:newExpires, expTs:v.expTs||null, activated:lic.activated, installId});
+              console.info('Licencia actualizada silenciosamente (admin extendió expiración):', newExpires);
+            }
+          }catch(er){ console.warn('No se pudo aplicar new_key en background:', er); }
+        }
       }
     }).catch((e)=>{console.warn('Verify online fallit (retry més endavant):',e&&e.message||e)});
   }
@@ -8998,14 +9009,14 @@ function showLicenseInfo(){
   ):'';
   const back=document.createElement('div');back.className='modal-back';
   back.innerHTML='<div class="modal" style="max-width:540px;padding:24px">'
-    +'<h3 style="margin:0 0 14px 0;color:#f5b301;font-family:Georgia,serif">🔐 Informació de llicència</h3>'
+    +'<h3 style="margin:0 0 14px 0;color:#f5b301;font-family:Georgia,serif">🔐 Información de licencia</h3>'
     +'<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;margin-bottom:12px;font-family:\'Courier New\',monospace;font-size:12px;color:#cbd5e1;line-height:1.8">'
-    +'<div><b style="color:#f5b301">ID '+L('Instal·lació','Instalación')+':</b> <span style="word-break:break-all">'+installId+'</span> <button id="btnCopyInstallId" data-testid="btn-copy-install-id" style="margin-left:6px;background:#f5b301;color:#0b1121;border:none;padding:2px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:800;font-family:Georgia,serif" title="'+L('Copiar l\'ID d\'instal·lació','Copiar el ID de instalación')+'">📋 Copiar</button></div>'
-    +'<div><b style="color:#f5b301">'+L('Clau','Clave')+':</b> <span style="word-break:break-all">'+keyDisplay+'</span> <button id="btnCopyLicKey" data-testid="btn-copy-lic-key" style="margin-left:6px;background:#f5b301;color:#0b1121;border:none;padding:2px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:800;font-family:Georgia,serif" title="'+L('Copiar la clau sencera','Copiar la clave entera')+'">📋 Copiar</button></div>'
-    +'<div><b style="color:#f5b301">Tipus:</b> '+((lic&&lic.type)||'—')+((lic&&lic.plan)?' · '+lic.plan:'')+'</div>'
-    +'<div><b style="color:#f5b301">Centre:</b> '+((lic&&lic.centre)||'—')+'</div>'
+    +'<div><b style="color:#f5b301">ID Instalación:</b> <span style="word-break:break-all">'+installId+'</span> <button id="btnCopyInstallId" data-testid="btn-copy-install-id" style="margin-left:6px;background:#f5b301;color:#0b1121;border:none;padding:2px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:800;font-family:Georgia,serif" title="Copiar el ID de instalación">📋 Copiar</button></div>'
+    +'<div><b style="color:#f5b301">Clave:</b> <span style="word-break:break-all">'+keyDisplay+'</span> <button id="btnCopyLicKey" data-testid="btn-copy-lic-key" style="margin-left:6px;background:#f5b301;color:#0b1121;border:none;padding:2px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:800;font-family:Georgia,serif" title="Copiar la clave entera">📋 Copiar</button></div>'
+    +'<div><b style="color:#f5b301">Tipo:</b> '+((lic&&lic.type)||'—')+((lic&&lic.plan)?' · '+lic.plan:'')+'</div>'
+    +'<div><b style="color:#f5b301">Centro:</b> '+((lic&&lic.centre)||'—')+'</div>'
     +'<div><b style="color:#f5b301">Expira:</b> '+((lic&&lic.expires)||'—')+'</div>'
-    +'<div><b style="color:#f5b301">Activada:</b> '+(lic&&lic.activated?new Date(lic.activated).toLocaleDateString('ca-ES'):'—')+'</div>'
+    +'<div><b style="color:#f5b301">Activada:</b> '+(lic&&lic.activated?new Date(lic.activated).toLocaleDateString('es-ES'):'—')+'</div>'
     +'<div><b style="color:#f5b301">Última verif.:</b> '+lastCheckLabel+'</div>'
     +'</div>'
     +previewBlock
@@ -9027,7 +9038,7 @@ function showLicenseInfo(){
     +'<div id="refStats" style="margin-top:10px;font-size:11px;color:#94a3b8;text-align:center"></div>'
     +'</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">'
-    +((lic&&lic.type==='JWT'&&LIC.VERIFY_URL)?'<button class="btn" id="btnVerifyNow" style="background:#0891b2;color:#fff;border-color:#0891b2">↻ Verificar ara</button>':'')
+    +((lic&&lic.type==='JWT'&&LIC.VERIFY_URL)?'<button class="btn" id="btnVerifyNow" data-testid="btn-verify-now" style="background:#0891b2;color:#fff;border-color:#0891b2">↻ Verificar ahora</button>':'')
     +'<button class="btn" id="btnDeactivate" style="background:#b91c1c;color:#fff;border-color:#b91c1c">↺ Desactivar</button>'
     +'<button class="btn" data-no>Cerrar</button>'
     +'</div>'
@@ -9035,7 +9046,7 @@ function showLicenseInfo(){
   document.body.appendChild(back);
   back.querySelector('[data-no]').onclick=()=>back.remove();
   back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
-  back.querySelector('#btnDeactivate').onclick=()=>{if(confirm('Desactivar la llicència? Hauràs de tornar-la a introduir.')){localStorage.removeItem('caja.license.v1');location.reload()}};
+  back.querySelector('#btnDeactivate').onclick=()=>{if(confirm('¿Desactivar la licencia? Tendrás que volver a introducirla.')){localStorage.removeItem('caja.license.v1');location.reload()}};
   // 📋 Helper reutilitzable per copiar valors al portapapers amb feedback visual
   // Robusto: intenta navigator.clipboard (contexto seguro) y hace fallback SIEMPRE a execCommand
   // Si ambos fallan, usa window.prompt() como último recurso para que el usuario copie a mano
@@ -9157,14 +9168,58 @@ function showLicenseInfo(){
   const verifyBtn=back.querySelector('#btnVerifyNow');
   if(verifyBtn){
     verifyBtn.onclick=async()=>{
-      verifyBtn.disabled=true;verifyBtn.textContent='Verificant…';
+      verifyBtn.disabled=true;verifyBtn.textContent='Verificando…';
       try{
         const res=await verifyOnline(lic.key,installId);
-        if(res.ok===false&&res.reason){alert(L('✗ El servidor ha rebutjat la llicència: ','✗ El servidor ha rechazado la licencia: ')+(res.reason||'desconegut'));localStorage.removeItem(LIC.KEY);location.reload();}
-        else if(res.ok===true){/* validada online */}
-        // Si res.ok és undefined/null o hi ha error de xarxa, no fem res — l'usuari ja ha entrat OK offline
-        else{localStorage.setItem(LIC.LAST_CHECK,Date.now().toString());alert('✓ Llicència confirmada pel servidor.');back.remove();}
-      }catch(e){alert('⚠ No s\'ha pogut contactar el servidor: '+e.message);verifyBtn.disabled=false;verifyBtn.textContent='↻ Verificar ara';}
+        // 1) Servidor rechaza explícitamente (revocada / expirada / clave inválida) → borrar y recargar
+        if(res && (res.ok===false) && res.reason){
+          alert('✗ El servidor ha rechazado la licencia: '+(res.reason||'motivo desconocido'));
+          localStorage.removeItem(LIC.KEY);
+          location.reload();
+          return;
+        }
+        // 2) Servidor confirma OK → actualizar last-check + guardar new_key si el admin extendió
+        if(res && res.ok===true){
+          localStorage.setItem(LIC.LAST_CHECK,Date.now().toString());
+          let msg='✓ Licencia confirmada por el servidor.';
+          if(res.new_key && res.new_key !== lic.key){
+            // El admin ha extendido/modificado la expiración → re-emitimos localmente
+            try{
+              const v = validateKey(res.new_key, installId);
+              if(v.ok){
+                const newExpires = v.expires || (res.expires_at ? new Date(res.expires_at).toLocaleDateString('es-ES') : lic.expires);
+                saveLicense({
+                  key: res.new_key,
+                  type: v.type || lic.type,
+                  centre: res.client_name || lic.centre,
+                  plan: res.plan || lic.plan,
+                  expires: newExpires,
+                  expTs: v.expTs || null,
+                  activated: lic.activated,
+                  installId
+                });
+                msg='✓ Licencia actualizada. Nueva expiración: '+newExpires+'.\n\nLa app se recargará para aplicar los cambios.';
+                alert(msg);
+                location.reload();
+                return;
+              }
+            }catch(er){ console.warn('No se pudo aplicar new_key:', er); }
+          }
+          alert(msg);
+          back.remove();
+          return;
+        }
+        // 3) Sin respuesta clara (timeout / red caída) → mantener estado actual, aviso suave
+        alert('⚠ El servidor no ha respondido claramente. Vuelve a intentarlo en unos minutos.');
+      }catch(e){
+        alert('⚠ No se ha podido contactar el servidor: '+(e && e.message ? e.message : e));
+      }finally{
+        // Nunca dejar el botón bloqueado (evita el "queda pensando" para siempre)
+        if(verifyBtn && verifyBtn.isConnected){
+          verifyBtn.disabled=false;
+          verifyBtn.textContent='↻ Verificar ahora';
+        }
+      }
     };
   }
   // 🎁 Programa de referits: només visible per llicències PAGADES (STD/PRM), no Trial ni Master

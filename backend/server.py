@@ -268,6 +268,10 @@ app.include_router(build_users_router(db), prefix="/api")
 from routes.admin_notifications import build_notifications_router
 app.include_router(build_notifications_router(db), prefix="/api")
 
+# Admin download resend (Feb 2026 · Reenvío del instalador al cliente)
+from routes.admin_downloads import build_downloads_router
+app.include_router(build_downloads_router(db), prefix="/api")
+
 # Stripe webhook (obligatori per playbook: /api/webhook/stripe)
 # Gestiona tant one-off (via emergentintegrations) com subscriptions (via stripe SDK)
 from fastapi import Request as _FastReq
