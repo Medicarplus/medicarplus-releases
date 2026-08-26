@@ -2364,7 +2364,24 @@ function renderSaldoAnterior(){
   $('#saldoAntNum').textContent=fmt(saCC.caja+saCC.banc+reservaCambio());
 }
 function renderHistory(){const dates=Object.keys(state.byDate).filter(d=>entriesOf(d).length).sort().reverse();$('#histCount').textContent=`${dates.length} día(s)`;$('#histList').innerHTML=dates.length?dates.map(d=>{const t=computeTotals(entriesOf(d));const cls=d===currentDate?'style="background:#1a1e27"':'';return `<div class="history-item" ${cls} data-d="${d}"><div><div class="date">${d.split('-').reverse().join('/')}</div><div class="totals">${t.cnt} entrada(s) · ${fmt(t.neto)}</div></div><button class="icon-btn" data-delday="${d}" title="Borrar día">🗑️</button></div>`}).join(''):'<div class="empty">Sin histórico todavía</div>';$$('#histList .history-item').forEach(el=>el.onclick=e=>{if(e.target.dataset.delday){const day=e.target.dataset.delday;confirmModal('Borrar día',`¿Borrar TODOS los datos del día <b>${day.split('-').reverse().join('/')}</b>?`,()=>{delete state.byDate[day];saveState();render()},'Borrar día');e.stopPropagation();return}setDate(el.dataset.d)})}
-function actEntry(act,id){const list=entriesOf(currentDate);const i=list.findIndex(x=>x.id===id);if(i<0)return;if(act==='del'){confirmModal('Eliminar entrada',`¿Eliminar <b>${escapeHtml(list[i].nombre)}</b>?`,()=>{list.splice(i,1);saveState();render()},'Eliminar');return}if(act==='ret'){list[i].retorno=!list[i].retorno;saveState();render();return}if(act==='edit'){const e=list[i];const isDh=e.kind==='DH';const nN=prompt(isDh?'Concepto:':'Nombre / concepto:',e.nombre);if(nN===null)return;const nI=prompt('Importe (€):',e.importe);if(nI===null)return;const nT=isDh?'0':prompt('Tasa DGT (€):',e.tasa);if(nT===null)return;const nF=prompt('Forma de pago (E/T/B/X):',e.fp)||e.fp;e.nombre=nN.trim()||e.nombre;e.importe=num(nI);e.tasa=num(nT);e.fp=nF.toUpperCase()[0];e.fpTasa=e.fp;saveState();render()}}
+function actEntry(act,id){
+  // Busca primero en el día actual; si no está (vista filtrada por rango con entradas de otros días),
+  // busca en TODAS las fechas del estado en memoria y usa la que contiene la entrada.
+  let list=entriesOf(currentDate); let i=list.findIndex(x=>x.id===id); let ownerDate=currentDate;
+  if(i<0){
+    try{
+      const all=(state && state.byDate) ? state.byDate : {};
+      for(const iso of Object.keys(all)){
+        const idx=(all[iso]||[]).findIndex(x=>x.id===id);
+        if(idx>=0){ list=entriesOf(iso); i=list.findIndex(x=>x.id===id); ownerDate=iso; break; }
+      }
+    }catch(e){}
+  }
+  if(i<0){ try{ toast('No se pudo encontrar la entrada. Refresca la vista.', 3500); }catch(_){} return; }
+  if(act==='del'){confirmModal('Eliminar entrada',`¿Eliminar <b>${escapeHtml(list[i].nombre)}</b>?`,()=>{list.splice(i,1);saveState();render()},'Eliminar');return}
+  if(act==='ret'){list[i].retorno=!list[i].retorno;saveState();render();return}
+  if(act==='edit'){const e=list[i];const isDh=e.kind==='DH';const nN=prompt(isDh?'Concepto:':'Nombre / concepto:',e.nombre);if(nN===null)return;const nI=prompt('Importe (€):',e.importe);if(nI===null)return;const nT=isDh?'0':prompt('Tasa DGT (€):',e.tasa);if(nT===null)return;const nF=prompt('Forma de pago (E/T/B/X):',e.fp)||e.fp;e.nombre=nN.trim()||e.nombre;e.importe=num(nI);e.tasa=num(nT);e.fp=nF.toUpperCase()[0];e.fpTasa=e.fp;saveState();render()}
+}
 function confirmModal(title,message,onYes,yesLabel='Sí, borrar',danger=true,extraBtn=null){const back=document.createElement('div');back.className='modal-back';let extraHTML=extraBtn?`<button class="btn btn-primary" data-extra>${extraBtn.label}</button>`:'';back.innerHTML=`<div class="modal"><h3>${title}</h3><p>${message}</p><div class="row"><button class="btn" data-no>Cancelar</button>${extraHTML}<button class="btn ${danger?'btn-danger':'btn-primary'}" data-yes>${yesLabel}</button></div></div>`;document.body.appendChild(back);back.querySelector('[data-no]').focus();back.addEventListener('click',ev=>{if(ev.target===back)back.remove();if(ev.target.matches('[data-no]'))back.remove();if(ev.target.matches('[data-yes]')){back.remove();onYes()}if(ev.target.matches('[data-extra]')&&extraBtn){back.remove();extraBtn.onClick()}});document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){back.remove();document.removeEventListener('keydown',esc)}})}
 $('#btnHistory').onclick=()=>{$('#btnBackupMenu').style.display='none';openBackupHistory()};
 // 🪗 Accordion top-menu: solo uno de los 4 desplegables superiores (Copias de seguridad,
