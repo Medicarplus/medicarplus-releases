@@ -2399,8 +2399,88 @@ function actEntry(act,id){
   if(i<0){ try{ toast('No se pudo encontrar la entrada. Refresca la vista.', 3500); }catch(_){} return; }
   if(act==='del'){confirmModal('Eliminar entrada',`¿Eliminar <b>${escapeHtml(list[i].nombre)}</b>?`,()=>{list.splice(i,1);saveState();render()},'Eliminar');return}
   if(act==='ret'){list[i].retorno=!list[i].retorno;saveState();render();return}
-  if(act==='edit'){const e=list[i];const isDh=e.kind==='DH';const nN=prompt(isDh?'Concepto:':'Nombre / concepto:',e.nombre);if(nN===null)return;const nI=prompt('Importe (€):',e.importe);if(nI===null)return;const nT=isDh?'0':prompt('Tasa DGT (€):',e.tasa);if(nT===null)return;const nF=prompt('Forma de pago (E/T/B/X):',e.fp)||e.fp;e.nombre=nN.trim()||e.nombre;e.importe=num(nI);e.tasa=num(nT);e.fp=nF.toUpperCase()[0];e.fpTasa=e.fp;saveState();render()}
+  if(act==='edit'){
+    const e = list[i];
+    const isDh = e.kind === 'DH';
+    // Modal único con todos los campos (mucho mejor UX que 4 prompt() consecutivos)
+    openEditEntryModal(e, ownerDate);
+    return;
+  }
 }
+
+// 🖋 Modal de edición unificado — reemplaza los 4 prompt() nativos
+function openEditEntryModal(e, ownerDate){
+  const isDh = e.kind === 'DH';
+  const isPriv = e.kind === 'PRIV';
+  const fpOpts = [
+    {k:'E', lbl:'💵 Efectivo'},
+    {k:'T', lbl:'💳 Tarjeta → Banco'},
+    {k:'B', lbl:'📱 Bizum → Banco'},
+    {k:'X', lbl:'🏦 Transferencia → Banco'},
+  ];
+  const fpSel = fpOpts.map(o => `<option value="${o.k}" ${e.fp===o.k?'selected':''}>${o.lbl}</option>`).join('');
+  const back = document.createElement('div');
+  back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px';
+  back.innerHTML = `
+    <div style="background:#111827;border:1px solid #334155;border-radius:12px;padding:22px;max-width:520px;width:100%;font-family:Arial,Helvetica,sans-serif;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="margin:0;color:#f5b301;font-family:Georgia,serif">✏️ Editar entrada</h3>
+        <button id="_ee_close" style="background:#334155;color:#fff;border:none;padding:5px 10px;border-radius:5px;cursor:pointer">✕</button>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;margin-bottom:14px">Día: <b style="color:#e2e8f0">${(ownerDate||currentDate).split('-').reverse().join('/')}</b> · Tipo: <b style="color:#e2e8f0">${e.kind}</b>${e.tipo?` · ${e.tipo}`:''}</div>
+      <label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">${isDh?'CONCEPTO':'NOMBRE / CONCEPTO'}</label>
+      <input id="_ee_nombre" type="text" value="${(e.nombre||'').replace(/"/g,'&quot;')}" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:14px;box-sizing:border-box;margin-bottom:12px" autofocus />
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>
+          <label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">IMPORTE (€)</label>
+          <input id="_ee_importe" type="number" step="0.01" value="${e.importe||0}" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:14px;box-sizing:border-box" />
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">TASA DGT (€)</label>
+          <input id="_ee_tasa" type="number" step="0.01" value="${e.tasa||0}" ${isDh?'disabled':''} style="width:100%;padding:9px 12px;background:${isDh?'#1e293b':'#0f172a'};border:1px solid #475569;border-radius:6px;color:${isDh?'#64748b':'#e2e8f0'};font-size:14px;box-sizing:border-box" />
+        </div>
+      </div>
+      ${isPriv?`<div style="margin-bottom:12px"><label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">DESCUENTO (€)</label><input id="_ee_desc" type="number" step="0.01" value="${e.descuento||0}" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:14px;box-sizing:border-box" /></div>`:''}
+      <label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">FORMA DE PAGO</label>
+      <select id="_ee_fp" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:14px;box-sizing:border-box;margin-bottom:20px">${fpSel}</select>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="_ee_cancel" style="background:#334155;color:#fff;border:none;padding:10px 18px;border-radius:6px;cursor:pointer;font-size:13px">Cancelar</button>
+        <button id="_ee_save" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#0b1121;border:none;padding:10px 22px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:800">💾 Guardar cambios</button>
+      </div>
+    </div>`;
+  document.body.appendChild(back);
+  const $$ = s => back.querySelector(s);
+  const close = () => back.remove();
+  $$('#_ee_close').onclick = close;
+  $$('#_ee_cancel').onclick = close;
+  back.addEventListener('click', ev => { if(ev.target === back) close(); });
+  // Cerrar con Escape · Guardar con Enter (sólo si focus en input, no textarea)
+  const keyHandler = ev => {
+    if(ev.key === 'Escape'){ close(); document.removeEventListener('keydown', keyHandler); }
+    if(ev.key === 'Enter' && ev.target.tagName === 'INPUT'){ ev.preventDefault(); $$('#_ee_save').click(); }
+  };
+  document.addEventListener('keydown', keyHandler);
+  // Focus + select
+  setTimeout(() => { const inp = $$('#_ee_nombre'); inp.focus(); inp.select(); }, 50);
+
+  $$('#_ee_save').onclick = () => {
+    const nombre = $$('#_ee_nombre').value.trim() || e.nombre;
+    const importe = num($$('#_ee_importe').value);
+    const tasa = isDh ? 0 : num($$('#_ee_tasa').value);
+    const fp = $$('#_ee_fp').value || e.fp;
+    const desc = isPriv ? num($$('#_ee_desc').value) : (e.descuento || 0);
+    e.nombre = nombre;
+    e.importe = importe;
+    e.tasa = tasa;
+    e.fp = fp;
+    e.fpTasa = fp;
+    if(isPriv) e.descuento = desc;
+    saveState();
+    render();
+    close();
+    document.removeEventListener('keydown', keyHandler);
+    try{ toast('✓ Entrada actualizada', 1800); }catch(_){}
+  };
 function confirmModal(title,message,onYes,yesLabel='Sí, borrar',danger=true,extraBtn=null){const back=document.createElement('div');back.className='modal-back';let extraHTML=extraBtn?`<button class="btn btn-primary" data-extra>${extraBtn.label}</button>`:'';back.innerHTML=`<div class="modal"><h3>${title}</h3><p>${message}</p><div class="row"><button class="btn" data-no>Cancelar</button>${extraHTML}<button class="btn ${danger?'btn-danger':'btn-primary'}" data-yes>${yesLabel}</button></div></div>`;document.body.appendChild(back);back.querySelector('[data-no]').focus();back.addEventListener('click',ev=>{if(ev.target===back)back.remove();if(ev.target.matches('[data-no]'))back.remove();if(ev.target.matches('[data-yes]')){back.remove();onYes()}if(ev.target.matches('[data-extra]')&&extraBtn){back.remove();extraBtn.onClick()}});document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){back.remove();document.removeEventListener('keydown',esc)}})}
 $('#btnHistory').onclick=()=>{$('#btnBackupMenu').style.display='none';openBackupHistory()};
 // 🪗 Accordion top-menu: solo uno de los 4 desplegables superiores (Copias de seguridad,
