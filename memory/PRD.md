@@ -1116,3 +1116,14 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - Test lógico E2E (Playwright evaluate): entrada antigua sin DNI recibe DNI ✓ · entrada que ya tenía DNI intacta ✓ · entrada manual intacta ✓ · IDs preservados ✓ · nueva entrada añadida ✓ · nada borrado.
 - Uso práctico: usuario vuelve a subir CSVs antiguos → DNIs se rellenan automáticamente, sin duplicar filas ni borrar nada.
 
+
+### ✨ Auto-limpieza silenciosa de notificaciones (30 días)
+**Backend** `admin_notifications.py`:
+- `_maybe_auto_cleanup()` helper: throttle 24h, elimina docs con `read:true` y `created_at < now-30d`.
+- Estado persistente en la propia collection: `{_id:"_meta", last_cleanup_at, last_cleanup_deleted}` (sobrevive reinicios del servidor).
+- Trigger: se dispara en `GET /admin/notifications/badge` (que el admin auto-refresca cada 60s). Zero-config, sin cron.
+- Excluye `_meta` de list / badge / delete-all vía `type:{$exists:true}` filter.
+- Silent-fail: si algo va mal, sólo log warning, nunca rompe la respuesta.
+
+**Test E2E**: insertados 4 docs sintéticos (2 leídas+45d, 1 no-leída+45d, 1 leída+5d), forzado `last_cleanup_at` a -48h, disparado badge → resultado: las 2 leídas viejas borradas, las otras 2 preservadas, `meta.last_cleanup_deleted=2`. Throttle validado: segundo badge no re-dispara.
+

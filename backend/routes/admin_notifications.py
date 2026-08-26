@@ -108,6 +108,36 @@ async def create_notification(
 def build_notifications_router(db):
     router = APIRouter(prefix="/admin/notifications", tags=["admin-notifications"])
 
+    # Auto-cleanup: en cada request al panel, si han pasado >24h desde la última limpieza,
+    # borra silenciosamente notificaciones leídas de más de 30 días.
+    # Estado guardado en la propia colección (doc especial _id=_meta) para persistir tras reinicios.
+    AUTO_CLEANUP_DAYS = 30
+    AUTO_CLEANUP_EVERY_HOURS = 24
+
+    async def _maybe_auto_cleanup():
+        try:
+            now = datetime.now(timezone.utc)
+            meta = await db.notifications.find_one({"_id": "_meta"})
+            last_iso = (meta or {}).get("last_cleanup_at")
+            if last_iso:
+                try:
+                    last = datetime.fromisoformat(last_iso.replace("Z", "+00:00"))
+                    if (now - last).total_seconds() < AUTO_CLEANUP_EVERY_HOURS * 3600:
+                        return
+                except Exception:
+                    pass
+            cutoff = (now - timedelta(days=AUTO_CLEANUP_DAYS)).isoformat()
+            r = await db.notifications.delete_many({"read": True, "created_at": {"$lt": cutoff}})
+            await db.notifications.update_one(
+                {"_id": "_meta"},
+                {"$set": {"last_cleanup_at": now.isoformat(), "last_cleanup_deleted": r.deleted_count}},
+                upsert=True,
+            )
+            if r.deleted_count:
+                logger.info(f"[notifications] auto-cleanup: eliminadas {r.deleted_count} leídas de >{AUTO_CLEANUP_DAYS} días")
+        except Exception as e:
+            logger.warning(f"[notifications] auto-cleanup falló: {e}")
+
     @router.get("")
     async def list_notifications(
         unread_only: bool = False,
@@ -118,7 +148,7 @@ def build_notifications_router(db):
         x_admin_token: Optional[str] = Header(None),
     ):
         _admin_ok(x_admin_token)
-        query: dict = {}
+        query: dict = {"type": {"$exists": True}}  # excluye docs internos (ej: _meta)
         # read_state has priority over legacy unread_only
         if read_state == "unread":
             query["read"] = False
@@ -151,11 +181,13 @@ def build_notifications_router(db):
     @router.get("/badge")
     async def badge_counts(x_admin_token: Optional[str] = Header(None)):
         _admin_ok(x_admin_token)
-        unread = await db.notifications.count_documents({"read": False})
-        critical = await db.notifications.count_documents({"read": False, "severity": SEV_CRITICAL})
+        # Dispara auto-cleanup silencioso (throttle 24h, borra leídas > 30 días)
+        await _maybe_auto_cleanup()
+        unread = await db.notifications.count_documents({"read": False, "type": {"$exists": True}})
+        critical = await db.notifications.count_documents({"read": False, "severity": SEV_CRITICAL, "type": {"$exists": True}})
         # Last critical (for tooltip)
         last = await db.notifications.find_one(
-            {"read": False, "severity": SEV_CRITICAL},
+            {"read": False, "severity": SEV_CRITICAL, "type": {"$exists": True}},
             sort=[("created_at", -1)],
         )
         return {
@@ -187,14 +219,14 @@ def build_notifications_router(db):
     async def delete_all_read(x_admin_token: Optional[str] = Header(None)):
         """Elimina TODAS las notificaciones marcadas como leídas."""
         _admin_ok(x_admin_token)
-        r = await db.notifications.delete_many({"read": True})
+        r = await db.notifications.delete_many({"read": True, "type": {"$exists": True}})
         return {"deleted": r.deleted_count}
 
     @router.post("/delete-all")
     async def delete_all(x_admin_token: Optional[str] = Header(None)):
         """Elimina TODAS las notificaciones (leídas y no leídas). Irreversible."""
         _admin_ok(x_admin_token)
-        r = await db.notifications.delete_many({})
+        r = await db.notifications.delete_many({"type": {"$exists": True}})
         return {"deleted": r.deleted_count}
 
     @router.post("/cleanup")
