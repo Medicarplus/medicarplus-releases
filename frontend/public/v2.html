@@ -2903,6 +2903,15 @@ function _cajaKindLabel(e){
   return '';
 }
 
+// Devuelve el nombre real configurado de la empresa (fallback a 'Empresa 1'/'Empresa 2')
+function _companyName(key){
+  try{
+    if(key === 'trafic') return (window.CFG && CFG.company1 && CFG.company1.name) || 'Empresa 1';
+    if(key === 'cempla') return (window.CFG && CFG.company2 && CFG.company2.name) || 'Empresa 2';
+  }catch(_){}
+  return key || '—';
+}
+
 // Devuelve true si la entrada satisface la categoría (por texto o semánticamente)
 // IMPORTANTE: match por PALABRA COMPLETA (word boundary), no substring, para evitar falsos positivos
 // (ej: "sou" no debe matchear "MANSOURI")
@@ -3043,7 +3052,7 @@ function openBuscadorOperaciones(){
       const e = r.entry;
       const imp = +e.importe||0; sumImporte += imp;
       const kindBadge = e.kind === 'DH' ? (e.tipo==='HABER'?'<span style="background:#065f46;color:#6ee7b7;padding:1px 6px;border-radius:3px;font-size:10px">HABER</span>':'<span style="background:#7f1d1d;color:#fecaca;padding:1px 6px;border-radius:3px;font-size:10px">DEBE</span>') : e.kind === 'PRIV' ? '<span style="background:#312e81;color:#a5b4fc;padding:1px 6px;border-radius:3px;font-size:10px">PRIV</span>' : '<span style="background:#164e63;color:#67e8f9;padding:1px 6px;border-radius:3px;font-size:10px">TRAF</span>';
-      return `<tr data-bo-date="${r.date}" data-bo-eid="${e.id||''}" data-bo-company="${r.company}" data-testid="buscador-global-row" style="cursor:pointer;transition:background .15s ease" onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background=''"><td style="padding:5px 10px;font-size:12px">${fmtDate(r.date)}</td><td style="padding:5px 10px">${kindBadge}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${(e.tipo||'—').toString().replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:12px;font-weight:600">${(e.nombre||'').replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:10px;color:#64748b">${r.company==='trafic'?'Tráfico':'Cempla'}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${fpLabel(e.fp)}</td><td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700;color:#22d3ee">${fmtEUR(imp)}</td></tr>`;
+      return `<tr data-bo-date="${r.date}" data-bo-eid="${e.id||''}" data-bo-company="${r.company}" data-testid="buscador-global-row" style="cursor:pointer;transition:background .15s ease" onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background=''"><td style="padding:5px 10px;font-size:12px">${fmtDate(r.date)}</td><td style="padding:5px 10px">${kindBadge}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${(e.tipo||'—').toString().replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:12px;font-weight:600">${(e.nombre||'').replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:10px;color:#64748b">${_companyName(r.company)}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${fpLabel(e.fp)}</td><td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700;color:#22d3ee">${fmtEUR(imp)}</td></tr>`;
     }).join('');
     $$('#_bo_results').innerHTML = `${dimsHtml}<div style="margin-bottom:6px;color:#e2e8f0"><b style="color:#22d3ee" data-testid="buscador-global-count">${results.length}</b> resultados · Suma importes: <b style="color:#22c55e">${fmtEUR(sumImporte)}</b> · Rango: ${fmtDate(from)} → ${fmtDate(to)}</div>
     <div style="font-size:10px;color:#64748b;margin-bottom:6px;font-style:italic">👆 Clica cualquier fila para ir al día y verla resaltada</div>
@@ -3264,7 +3273,7 @@ function openHonorariosPanel(){
       const monthTotal = list.reduce((s,e)=>s+e.amount, 0);
       const rows = list.map(e => {
         const fpFull = ({E:'Efectivo',T:'Banco',B:'Bizum',X:'Otros'})[e.fp] || e.fp || '—';
-        return `<tr><td style="padding:5px 10px;font-size:12px">${fmtDate(e.date)}</td><td style="padding:5px 10px"><span style="background:${_hnCategoryColor(e.cat)}22;color:${_hnCategoryColor(e.cat)};padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700">${_hnCategoryLabel(e.cat)}</span></td><td style="padding:5px 10px;font-size:12px;font-weight:600">${e.name.replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:11px;color:#64748b">${e.company==='trafic'?'Tráfico':'Cempla'}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${fpFull}</td><td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700;color:#fbbf24">${fmtEUR(e.amount)}</td></tr>`;
+        return `<tr><td style="padding:5px 10px;font-size:12px">${fmtDate(e.date)}</td><td style="padding:5px 10px"><span style="background:${_hnCategoryColor(e.cat)}22;color:${_hnCategoryColor(e.cat)};padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700">${_hnCategoryLabel(e.cat)}</span></td><td style="padding:5px 10px;font-size:12px;font-weight:600">${e.name.replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:11px;color:#64748b">${_companyName(e.company)}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${fpFull}</td><td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700;color:#fbbf24">${fmtEUR(e.amount)}</td></tr>`;
       }).join('');
       return `<div style="margin-bottom:16px;background:#0f172a;border:1px solid #334155;border-radius:8px;overflow:hidden"><div style="background:#1e293b;padding:8px 14px;display:flex;justify-content:space-between;align-items:center"><b style="color:#fbbf24">📅 ${fmtMonth(ym)}</b><span style="color:#22c55e;font-weight:700">${fmtEUR(monthTotal)}</span></div><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#111827"><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Fecha</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Categoría</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Trabajador</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Empresa</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Pago</th><th style="padding:5px 10px;text-align:right;font-size:10px;color:#94a3b8">Importe</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }).join('') : '<div style="padding:20px;text-align:center;color:#64748b;font-style:italic">Sin pagos en este período. Añade una entrada Debe/Haber con concepto "Honoraris", "Nómina", "Sueldo", "Salario", "Faena externa" o "Jornal" seguido del nombre del trabajador.</div>';
