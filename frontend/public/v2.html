@@ -1483,10 +1483,39 @@ function openStats(initialSection){
   back.querySelector('#stImport').onclick=()=>$('#stFile').click();
   $('#stFile').onchange=async ev=>{
     const f=ev.target.files[0];if(!f)return;ev.target.value='';
-    // Mes seleccionado desde el dropdown visible en la toolbar (no prompt, funciona en Electron)
-    const monthSel=back.querySelector('#stImportMonth');
-    const mi=parseInt(monthSel && monthSel.value ? monthSel.value : (new Date().getMonth()+1));
-    if(!mi||mi<1||mi>12){toast(isCA?'Mes no vàlid':'Mes no válido');return}
+    // Modal explícito para confirmar/seleccionar el mes ANTES de procesar (así el usuario no depende de la toolbar)
+    const toolbarMonth=parseInt(back.querySelector('#stImportMonth')?.value || (new Date().getMonth()+1));
+    const yearVal=$('#stYear').value;
+    const pickedMonth = await new Promise(resolve => {
+      const mm=document.createElement('div');mm.className='modal-back';mm.style.zIndex='999999';
+      mm.innerHTML=`<div class="modal" style="max-width:480px"><h3 style="color:#f5b301;margin-top:0">📅 ${isCA?'A quin mes pertany aquest CSV?':'¿A qué mes pertenece este CSV?'}</h3>
+        <p style="color:#94a3b8;font-size:13px;margin-bottom:14px">${isCA?'Confirma o canvia el mes al qual s\'aplicaran les dades del fitxer':'Confirma o cambia el mes al que se aplicarán los datos del archivo'} <b style="color:#e2e8f0">${f.name}</b></p>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">
+          <label style="font-size:11px;color:#94a3b8;font-weight:700">${isCA?'ANY':'AÑO'}:</label>
+          <input type="number" id="_mp_year" value="${yearVal}" min="2020" max="2099" style="width:100px;background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px;font-size:14px" />
+          <label style="font-size:11px;color:#94a3b8;font-weight:700;margin-left:10px">${isCA?'MES':'MES'}:</label>
+          <select id="_mp_month" data-testid="import-month-picker" style="flex:1;background:#0e1117;color:#f5b301;border:2px solid #f5b301;border-radius:6px;padding:8px 10px;font-size:14px;font-weight:700">${MESOS.map((m,i)=>`<option value="${i+1}" ${(i+1)===toolbarMonth?'selected':''}>📅 ${m}</option>`).join('')}</select>
+        </div>
+        <div class="row" style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-no data-testid="import-month-cancel">${isCA?'Cancel·lar':'Cancelar'}</button><button class="btn btn-primary" data-yes data-testid="import-month-ok">✓ ${isCA?'Continuar':'Continuar'}</button></div>
+      </div>`;
+      document.body.appendChild(mm);
+      const cleanup=(v)=>{mm.remove();resolve(v)};
+      mm.querySelector('[data-yes]').onclick=()=>{
+        const y=parseInt(mm.querySelector('#_mp_year').value);
+        const m=parseInt(mm.querySelector('#_mp_month').value);
+        if(!y||!m||m<1||m>12){toast(isCA?'Any/mes invàlid':'Año/mes inválido');return}
+        // Sincroniza toolbar con la selección
+        $('#stYear').value=y;
+        const tm=back.querySelector('#stImportMonth');if(tm)tm.value=String(m);
+        cleanup({year:y,month:m});
+      };
+      mm.querySelector('[data-no]').onclick=()=>cleanup(null);
+      mm.addEventListener('click',ev=>{if(ev.target===mm)cleanup(null)});
+      document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){cleanup(null);document.removeEventListener('keydown',esc)}});
+      setTimeout(()=>mm.querySelector('#_mp_month').focus(),80);
+    });
+    if(!pickedMonth)return;
+    const mi=pickedMonth.month;
     // Read file with encoding detection
     const buf=await f.arrayBuffer();
     let txt;try{txt=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){txt=new TextDecoder('windows-1252').decode(buf)}
