@@ -1639,30 +1639,53 @@ function openStats(initialSection){
     });
     document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){back.remove();document.removeEventListener('keydown',esc)}});
   }
-  // 📈 Gráfico de evolución mensual por autoescuela (SVG nativo, sin libs)
+  // 📈 Gráfico de evolución mensual por autoescuela (SVG nativo, sin libs) · con modo comparación anual
   function openAutoescolasChart(parentBack){
     const st=loadStats();
-    const year=$('#stYear').value;
-    // Top autoescuelas por total anual (para preseleccionar las más relevantes)
-    const totals={};
-    for(const name of st.autoescoles){
-      let t=0;
-      for(let mi=0;mi<12;mi++){const k=`${year}-${String(mi+1).padStart(2,'0')}`;t+=(st.data[k]||{})[name]||0;}
-      totals[name]=t;
+    const currentYear=$('#stYear').value;
+    // Detectar años con datos disponibles
+    const yearsWithData=Array.from(new Set(Object.keys(st.data||{}).map(k=>k.substring(0,4)))).sort();
+    if(!yearsWithData.length) yearsWithData.push(String(currentYear));
+    if(!yearsWithData.includes(String(currentYear))) yearsWithData.push(String(currentYear));
+    yearsWithData.sort();
+    const yearOptions = yearsWithData.map(y=>`<option value="${y}">${y}</option>`).join('');
+
+    // Función que calcula totales del año dado
+    function totalsFor(year){
+      const t={};
+      for(const name of st.autoescoles){
+        let s=0;
+        for(let mi=0;mi<12;mi++){const k=`${year}-${String(mi+1).padStart(2,'0')}`;s+=(st.data[k]||{})[name]||0;}
+        t[name]=s;
+      }
+      return t;
     }
+    const totals=totalsFor(currentYear);
     const sortedNames=st.autoescoles.slice().sort((a,b)=>totals[b]-totals[a]);
     const activeNames=sortedNames.filter(n=>totals[n]>0);
-    if(!activeNames.length){toast(isCA?'No hi ha dades per graficar':'No hay datos para graficar');return}
-    const preselCount=Math.min(6,activeNames.length);
+    // Si no hay datos en el año actual, buscar en cualquier año
+    let fallbackActive=activeNames;
+    if(!fallbackActive.length){
+      const all={};
+      for(const y of yearsWithData){const t=totalsFor(y);for(const [k,v] of Object.entries(t))all[k]=(all[k]||0)+v}
+      fallbackActive=st.autoescoles.filter(n=>all[n]>0).sort((a,b)=>all[b]-all[a]);
+    }
+    if(!fallbackActive.length){toast(isCA?'No hi ha dades per graficar':'No hay datos para graficar');return}
+    const preselCount=Math.min(6,fallbackActive.length);
     const PALETTE=['#22d3ee','#f5b301','#3ddc97','#c084fc','#f472b6','#7ec8ff','#fb923c','#a3e635','#e879f9','#fca5a5','#60a5fa','#facc15','#4ade80','#f87171','#818cf8','#94a3b8','#eab308','#06b6d4'];
+    const defaultBaseYear=yearsWithData.length>=2?yearsWithData[yearsWithData.length-2]:yearsWithData[0];
+    const defaultCompareYear=String(currentYear);
 
     const chartBack=document.createElement('div');
     chartBack.className='modal-back';chartBack.style.zIndex='500000';chartBack.setAttribute('data-testid','st-chart-modal');
     chartBack.innerHTML=`<div class="modal" style="max-width:1200px;width:96%;max-height:94vh;display:flex;flex-direction:column;padding:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap">
-        <h3 style="margin:0;color:#22d3ee;font-family:Georgia,serif">📈 ${isCA?'Evolució mensual':'Evolución mensual'} · ${year}</h3>
-        <div style="display:flex;gap:8px;align-items:center">
-          <label class="small" style="margin:0;color:#94a3b8">${isCA?'Mostrar Top':'Mostrar Top'}:</label>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap">
+        <h3 style="margin:0;color:#22d3ee;font-family:Georgia,serif" id="_ch_title">📈 ${isCA?'Evolució mensual':'Evolución mensual'}</h3>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <div style="display:flex;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:2px;gap:2px">
+            <button data-mode="single" class="_ch_mode" data-testid="chart-mode-single" style="background:#22d3ee;color:#0b1121;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px">📅 1 ${isCA?'Any':'Año'}</button>
+            <button data-mode="compare" class="_ch_mode" data-testid="chart-mode-compare" style="background:transparent;color:#94a3b8;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px">⚖️ ${isCA?'Comparar 2 anys':'Comparar 2 años'}</button>
+          </div>
           <select id="_ch_top" data-testid="chart-top" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12px">
             <option value="3">Top 3</option>
             <option value="6" selected>Top 6</option>
@@ -1674,95 +1697,164 @@ function openStats(initialSection){
           <button class="btn" data-no data-testid="chart-close">✕ ${isCA?'Tancar':'Cerrar'}</button>
         </div>
       </div>
+      <div id="_ch_yearpick" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;padding:10px 14px;background:#0f172a;border:1px solid #1e293b;border-radius:8px;flex-wrap:wrap">
+        <div style="display:flex;gap:6px;align-items:center"><span style="font-size:11px;color:#94a3b8;font-weight:700">${isCA?'ANY':'AÑO'}:</span>
+          <select id="_ch_year_single" data-testid="chart-year-single" style="background:#141821;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:5px 10px;font-size:13px;font-weight:700">${yearOptions}</select>
+        </div>
+        <div id="_ch_compare_wrap" style="display:none;gap:12px;align-items:center;flex-wrap:wrap">
+          <div style="display:flex;gap:6px;align-items:center"><span style="font-size:11px;color:#94a3b8;font-weight:700">${isCA?'ANY BASE':'AÑO BASE'}:</span>
+            <select id="_ch_year_a" data-testid="chart-year-a" style="background:#141821;color:#94a3b8;border:1px solid #94a3b8;border-radius:6px;padding:5px 10px;font-size:13px;font-weight:700">${yearOptions}</select>
+            <span style="font-size:9px;color:#64748b">(${isCA?'línia contínua':'línea continua'})</span>
+          </div>
+          <div style="color:#64748b">vs</div>
+          <div style="display:flex;gap:6px;align-items:center"><span style="font-size:11px;color:#22d3ee;font-weight:700">${isCA?'ANY COMPARAR':'AÑO COMPARAR'}:</span>
+            <select id="_ch_year_b" data-testid="chart-year-b" style="background:#141821;color:#22d3ee;border:1px solid #22d3ee;border-radius:6px;padding:5px 10px;font-size:13px;font-weight:700">${yearOptions}</select>
+            <span style="font-size:9px;color:#64748b">(${isCA?'línia discontínua':'línea discontinua'})</span>
+          </div>
+        </div>
+      </div>
       <div style="display:flex;gap:14px;flex:1;overflow:hidden">
         <div id="_ch_svg" style="flex:1;background:#0b1121;border:1px solid #1e293b;border-radius:8px;padding:14px;overflow:auto;min-width:0"></div>
-        <div style="width:240px;background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px;overflow-y:auto">
+        <div style="width:260px;background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px;overflow-y:auto">
           <div style="font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:8px;letter-spacing:.5px">${isCA?'AUTOESCOLES':'AUTOESCUELAS'}</div>
           <div id="_ch_legend" data-testid="chart-legend"></div>
         </div>
       </div>
-      <div class="small" style="margin-top:10px;color:#64748b">💡 ${isCA?'Clica una autoescola per activar/desactivar la seva línia. La casella pintada mostra el color assignat.':'Haz clic en una autoescuela para activar/desactivar su línea. La casilla pintada muestra el color asignado.'}</div>
+      <div class="small" style="margin-top:10px;color:#64748b" id="_ch_tip">💡 ${isCA?'Clica una autoescola per activar/desactivar la seva línia.':'Haz clic en una autoescuela para activar/desactivar su línea.'}</div>
     </div>`;
     document.body.appendChild(chartBack);
+    // Set defaults
+    chartBack.querySelector('#_ch_year_single').value=currentYear;
+    chartBack.querySelector('#_ch_year_a').value=defaultBaseYear;
+    chartBack.querySelector('#_ch_year_b').value=defaultCompareYear;
     chartBack.querySelector('[data-no]').onclick=()=>chartBack.remove();
     chartBack.addEventListener('click',ev=>{if(ev.target===chartBack)chartBack.remove()});
     document.addEventListener('keydown',function esc(ev){if(ev.key==='Escape'){chartBack.remove();document.removeEventListener('keydown',esc)}});
 
-    const state={topN:preselCount, enabled:new Set(sortedNames.slice(0,preselCount))};
+    const state={
+      mode:'single',
+      topN:preselCount,
+      enabled:new Set(fallbackActive.slice(0,preselCount)),
+      yearSingle:String(currentYear),
+      yearA:defaultBaseYear,
+      yearB:defaultCompareYear
+    };
 
     function drawChart(){
-      const chosen=state.topN==='all'?activeNames:activeNames.slice(0,+state.topN);
-      // Solo dibujar las que están enabled Y en el subconjunto elegido
+      const chosen=state.topN==='all'?fallbackActive:fallbackActive.slice(0,+state.topN);
       const drawNames=chosen.filter(n=>state.enabled.has(n));
-      // Preparar datos [{name, color, values:[12]}]
-      const series=drawNames.map((name,idx)=>{
-        const globalIdx=sortedNames.indexOf(name);
-        const values=MESOS.map((_,mi)=>{const k=`${year}-${String(mi+1).padStart(2,'0')}`;return (st.data[k]||{})[name]||0});
-        return {name, color:PALETTE[globalIdx%PALETTE.length], values, total:totals[name]};
-      });
-      // Y-axis max
+      const series=[];
+      if(state.mode==='single'){
+        for(const name of drawNames){
+          const globalIdx=sortedNames.indexOf(name);
+          const values=MESOS.map((_,mi)=>{const k=`${state.yearSingle}-${String(mi+1).padStart(2,'0')}`;return (st.data[k]||{})[name]||0});
+          series.push({name:`${name} · ${state.yearSingle}`, baseName:name, color:PALETTE[globalIdx%PALETTE.length], values, dashed:false});
+        }
+      } else {
+        // compare: dos líneas por autoescuela (A sólida, B discontinua)
+        for(const name of drawNames){
+          const globalIdx=sortedNames.indexOf(name);
+          const color=PALETTE[globalIdx%PALETTE.length];
+          const valA=MESOS.map((_,mi)=>{const k=`${state.yearA}-${String(mi+1).padStart(2,'0')}`;return (st.data[k]||{})[name]||0});
+          const valB=MESOS.map((_,mi)=>{const k=`${state.yearB}-${String(mi+1).padStart(2,'0')}`;return (st.data[k]||{})[name]||0});
+          series.push({name:`${name} · ${state.yearA}`, baseName:name, color, values:valA, dashed:false});
+          series.push({name:`${name} · ${state.yearB}`, baseName:name, color, values:valB, dashed:true});
+        }
+      }
       let maxY=0;
       for(const s of series){for(const v of s.values){if(v>maxY)maxY=v}}
       if(maxY<10)maxY=10; maxY=Math.ceil(maxY/10)*10;
-      const W=900,H=420,padL=50,padR=20,padT=20,padB=40;
+      const W=900,H=440,padL=50,padR=20,padT=20,padB=40;
       const cw=W-padL-padR, ch=H-padT-padB;
       const stepX=cw/11;
       const yTicks=5;
       const yTickVals=[];for(let i=0;i<=yTicks;i++)yTickVals.push(Math.round(maxY*i/yTicks));
-      // Grid + axis
       let svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-height:60vh" data-testid="chart-svg">`;
-      // Y grid + labels
       svg+=`<g stroke="#1e293b" stroke-width="1">`;
       for(let i=0;i<=yTicks;i++){const y=padT+ch-(ch*i/yTicks);svg+=`<line x1="${padL}" y1="${y}" x2="${padL+cw}" y2="${y}" />`;}
       svg+=`</g>`;
       svg+=`<g fill="#94a3b8" font-size="10" font-family="Consolas,monospace">`;
       for(let i=0;i<=yTicks;i++){const y=padT+ch-(ch*i/yTicks);svg+=`<text x="${padL-6}" y="${y+3}" text-anchor="end">${yTickVals[i]}</text>`;}
-      // X labels (meses)
       for(let mi=0;mi<12;mi++){const x=padL+stepX*mi;svg+=`<text x="${x}" y="${padT+ch+18}" text-anchor="middle">${MESOS[mi].substring(0,3)}</text>`;}
       svg+=`</g>`;
-      // Series (líneas + puntos)
       for(const s of series){
         const pts=s.values.map((v,mi)=>`${padL+stepX*mi},${padT+ch-(ch*(v/maxY))}`).join(' ');
-        svg+=`<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />`;
+        const dash=s.dashed?'stroke-dasharray="6,4"':'';
+        svg+=`<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" ${dash} />`;
         s.values.forEach((v,mi)=>{
           const x=padL+stepX*mi, y=padT+ch-(ch*(v/maxY));
-          svg+=`<circle cx="${x}" cy="${y}" r="3.5" fill="${s.color}"><title>${s.name.replace(/</g,'&lt;')} · ${MESOS[mi]}: ${v}</title></circle>`;
-          if(v>0){svg+=`<text x="${x}" y="${y-7}" text-anchor="middle" font-size="9" fill="${s.color}" font-family="Consolas,monospace" font-weight="700">${v}</text>`;}
+          svg+=`<circle cx="${x}" cy="${y}" r="${s.dashed?3:3.5}" fill="${s.color}" stroke="${s.dashed?'#0b1121':'none'}" stroke-width="${s.dashed?1.5:0}"><title>${s.name.replace(/</g,'&lt;')} · ${MESOS[mi]}: ${v}</title></circle>`;
+          if(v>0 && !s.dashed){svg+=`<text x="${x}" y="${y-7}" text-anchor="middle" font-size="9" fill="${s.color}" font-family="Consolas,monospace" font-weight="700">${v}</text>`;}
         });
       }
       svg+=`</svg>`;
       if(!series.length){svg=`<div style="padding:60px;text-align:center;color:#64748b;font-style:italic">${isCA?'Cap autoescola activa. Clica al llegenda per activar-ne.':'Ninguna autoescuela activa. Haz clic en la leyenda para activar.'}</div>`;}
       chartBack.querySelector('#_ch_svg').innerHTML=svg;
+      // Update title
+      const t=chartBack.querySelector('#_ch_title');
+      if(state.mode==='single') t.innerHTML=`📈 ${isCA?'Evolució':'Evolución'} · ${state.yearSingle}`;
+      else t.innerHTML=`⚖️ ${isCA?'Comparació':'Comparación'} · ${state.yearA} vs <span style="color:#22d3ee">${state.yearB}</span>`;
     }
 
     function drawLegend(){
-      const chosen=state.topN==='all'?activeNames:activeNames.slice(0,+state.topN);
+      const chosen=state.topN==='all'?fallbackActive:fallbackActive.slice(0,+state.topN);
+      const totA=state.mode==='compare'?totalsFor(state.yearA):null;
+      const totB=state.mode==='compare'?totalsFor(state.yearB):totalsFor(state.yearSingle);
       const html=chosen.map(name=>{
         const idx=sortedNames.indexOf(name);
         const color=PALETTE[idx%PALETTE.length];
         const active=state.enabled.has(name);
+        let content='';
+        if(state.mode==='single'){
+          content=`<div style="flex:1;font-size:12px;font-weight:600;color:${active?'#e2e8f0':'#64748b'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name.replace(/</g,'&lt;')}</div>
+            <div style="font-size:10px;color:#94a3b8;font-family:Consolas,monospace">${totB[name]||0}</div>`;
+        } else {
+          const a=totA[name]||0, b=totB[name]||0;
+          const growth = a === 0 ? (b>0?'new':'—') : (((b-a)/a)*100);
+          let growthLbl, growthColor;
+          if(growth==='new'){growthLbl='NUEVO';growthColor='#22d3ee'}
+          else if(growth==='—'){growthLbl='—';growthColor='#64748b'}
+          else{const pct=growth;growthLbl=(pct>=0?'+':'')+pct.toFixed(1)+'%';growthColor=pct>0?'#3ddc97':(pct<0?'#f472b6':'#94a3b8')}
+          content=`<div style="flex:1;overflow:hidden">
+            <div style="font-size:12px;font-weight:600;color:${active?'#e2e8f0':'#64748b'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name.replace(/</g,'&lt;')}</div>
+            <div style="font-size:9px;color:#94a3b8;margin-top:2px"><span style="color:#94a3b8">${a}</span> → <span style="color:#22d3ee">${b}</span> · <span style="color:${growthColor};font-weight:700">${growthLbl}</span></div>
+          </div>`;
+        }
         return `<div class="ch-item" data-name="${name.replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:4px;background:${active?'#1e293b':'transparent'};border-radius:5px;cursor:pointer;opacity:${active?1:0.45};transition:all .15s ease" data-testid="chart-legend-item">
-          <div style="width:14px;height:14px;border-radius:3px;background:${color};flex-shrink:0"></div>
-          <div style="flex:1;font-size:12px;font-weight:600;color:${active?'#e2e8f0':'#64748b'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name.replace(/</g,'&lt;')}</div>
-          <div style="font-size:10px;color:#94a3b8;font-family:Consolas,monospace">${totals[name]}</div>
+          <div style="width:14px;height:14px;border-radius:3px;background:${color};flex-shrink:0"></div>${content}
         </div>`;
       }).join('');
       chartBack.querySelector('#_ch_legend').innerHTML=html;
       chartBack.querySelectorAll('.ch-item').forEach(el=>{el.onclick=()=>{const n=el.dataset.name;if(state.enabled.has(n))state.enabled.delete(n);else state.enabled.add(n);drawChart();drawLegend();};});
     }
+
+    // Toggle mode
+    chartBack.querySelectorAll('._ch_mode').forEach(btn=>{
+      btn.onclick=()=>{
+        state.mode=btn.dataset.mode;
+        chartBack.querySelectorAll('._ch_mode').forEach(b=>{b.style.background=b.dataset.mode===state.mode?'#22d3ee':'transparent';b.style.color=b.dataset.mode===state.mode?'#0b1121':'#94a3b8';});
+        chartBack.querySelector('#_ch_year_single').style.display=state.mode==='single'?'inline-block':'none';
+        chartBack.querySelector('#_ch_year_single').parentElement.style.display=state.mode==='single'?'flex':'none';
+        chartBack.querySelector('#_ch_compare_wrap').style.display=state.mode==='compare'?'flex':'none';
+        drawChart();drawLegend();
+      };
+    });
+    chartBack.querySelector('#_ch_year_single').onchange=ev=>{state.yearSingle=ev.target.value;drawChart();drawLegend();};
+    chartBack.querySelector('#_ch_year_a').onchange=ev=>{state.yearA=ev.target.value;drawChart();drawLegend();};
+    chartBack.querySelector('#_ch_year_b').onchange=ev=>{state.yearB=ev.target.value;drawChart();drawLegend();};
     chartBack.querySelector('#_ch_top').onchange=ev=>{
       state.topN=ev.target.value;
-      // Al cambiar Top → activar todas las del nuevo subconjunto
-      const chosen=state.topN==='all'?activeNames:activeNames.slice(0,+state.topN);
+      const chosen=state.topN==='all'?fallbackActive:fallbackActive.slice(0,+state.topN);
       state.enabled=new Set(chosen);
       drawChart();drawLegend();
     };
     chartBack.querySelector('#_ch_print').onclick=()=>{
       const modal=chartBack.querySelector('.modal');
+      const label = state.mode==='single'?state.yearSingle:`${state.yearA} vs ${state.yearB}`;
       printVisibleElement(modal, {
-        title:`Estadísticas Autoescuelas · Evolución ${year}`,
+        title:`Estadísticas Autoescuelas · ${label}`,
         landscape:true, margins:'8mm',
-        extraCss:'button, select, [data-no] { display:none !important } body{background:#fff;color:#000} .modal, .modal *{background:#fff !important;color:#000 !important} svg text{fill:#000 !important}'
+        extraCss:'button, select, [data-no], ._ch_mode { display:none !important } body{background:#fff;color:#000} .modal, .modal *{background:#fff !important;color:#000 !important} svg text{fill:#000 !important}'
       });
     };
     drawChart();drawLegend();
