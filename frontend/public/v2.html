@@ -2481,6 +2481,7 @@ function openEditEntryModal(e, ownerDate){
     document.removeEventListener('keydown', keyHandler);
     try{ toast('✓ Entrada actualizada', 1800); }catch(_){}
   };
+}
 function confirmModal(title,message,onYes,yesLabel='Sí, borrar',danger=true,extraBtn=null){const back=document.createElement('div');back.className='modal-back';let extraHTML=extraBtn?`<button class="btn btn-primary" data-extra>${extraBtn.label}</button>`:'';back.innerHTML=`<div class="modal"><h3>${title}</h3><p>${message}</p><div class="row"><button class="btn" data-no>Cancelar</button>${extraHTML}<button class="btn ${danger?'btn-danger':'btn-primary'}" data-yes>${yesLabel}</button></div></div>`;document.body.appendChild(back);back.querySelector('[data-no]').focus();back.addEventListener('click',ev=>{if(ev.target===back)back.remove();if(ev.target.matches('[data-no]'))back.remove();if(ev.target.matches('[data-yes]')){back.remove();onYes()}if(ev.target.matches('[data-extra]')&&extraBtn){back.remove();extraBtn.onClick()}});document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){back.remove();document.removeEventListener('keydown',esc)}})}
 $('#btnHistory').onclick=()=>{$('#btnBackupMenu').style.display='none';openBackupHistory()};
 // 🪗 Accordion top-menu: solo uno de los 4 desplegables superiores (Copias de seguridad,
