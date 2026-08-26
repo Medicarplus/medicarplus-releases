@@ -1273,8 +1273,17 @@ function openLibroRegistro(){
     printVisibleElement(modal, {
       title:'Libro de Registro',
       landscape:true,
-      margins:'8mm',
-      extraCss:'[data-no], [data-close], input[type="date"], input[type="month"], select { display:none !important }'
+      margins:'6mm',
+      extraCss:`@page { size: A4 landscape; margin: 6mm }
+        [data-no], [data-close], input[type="date"], input[type="month"], select, button { display:none !important }
+        body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important }
+        .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important }
+        .modal{ padding:4mm !important; max-width:none !important; width:100% !important; border:none !important }
+        h3{ color:#000 !important; font-size:13pt !important; margin:0 0 6pt 0 !important }
+        table{ border-collapse:collapse !important; width:100% !important; font-size:8pt !important; page-break-inside:auto }
+        thead{ display:table-header-group } tr{ page-break-inside:avoid }
+        th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:8pt !important }
+        td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 4pt !important; font-size:8pt !important; word-wrap:break-word }`
     });
   };
 }
@@ -3346,8 +3355,20 @@ function openHonorariosPanel(){
     printVisibleElement(modal, {
       title: `Honorarios · ${scope}`,
       landscape: false,
-      margins: '10mm',
-      extraCss: '.no-print, select, button { display:none !important } body{background:#fff;color:#000} .hn-modal{background:#fff !important;border:none !important;color:#000 !important;max-width:none !important;padding:0 !important} .hn-modal *{color:#000 !important} .hn-modal h3, .hn-modal h4{color:#000 !important} .hn-modal table{border:1px solid #666} .hn-modal thead tr{background:#eee !important} .hn-modal th, .hn-modal td{border:1px solid #ccc;color:#000 !important}'
+      margins: '8mm',
+      extraCss: `
+        @page { size: A4; margin: 8mm }
+        .no-print, select, button, [data-testid=honorarios-fix-legacy], [data-testid=honorarios-legacy-warn] { display:none !important }
+        body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important }
+        .hn-modal, .hn-modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important; border-color:#999 !important }
+        .hn-modal{ max-width:none !important; width:100% !important; padding:0 !important; border:none !important }
+        h3, h4{ color:#000 !important; margin:0 0 6pt 0 !important }
+        h3{ font-size:14pt !important } h4{ font-size:11pt !important; margin-top:8pt !important }
+        table{ border-collapse:collapse !important; width:100% !important; font-size:9pt !important; margin-bottom:6pt !important; page-break-inside:auto }
+        thead{ display:table-header-group } tr{ page-break-inside:avoid }
+        th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:8pt !important }
+        td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 5pt !important; font-size:9pt !important }
+      `
     });
   };
   back.addEventListener('click', ev => { if(ev.target === back) back.remove(); });
@@ -3737,8 +3758,19 @@ function openLedger(){
     printVisibleElement(modal, {
       title:'Llibreta comptable · '+compName(ledgerComp),
       landscape:true,
-      margins:'8mm',
-      extraCss:'button, select, input[type="date"] { display:none !important } .icon-btn { display:none !important }'
+      margins:'6mm',
+      extraCss:`
+        @page { size: A4 landscape; margin: 6mm }
+        button, select, input, .icon-btn, [data-no] { display:none !important }
+        body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important }
+        .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important }
+        .modal{ padding:4mm !important; max-width:none !important; width:100% !important; border:none !important }
+        h3{ color:#000 !important; font-size:13pt !important; margin:0 0 6pt 0 !important }
+        table{ border-collapse:collapse !important; width:100% !important; font-size:8pt !important; page-break-inside:auto }
+        thead{ display:table-header-group } tr{ page-break-inside:avoid }
+        th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:8pt !important }
+        td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 4pt !important; font-size:8pt !important; word-wrap:break-word }
+      `
     });
   };
   renderLedger();
@@ -4148,14 +4180,19 @@ function openIRPF(){
       landscape:true,
       margins:'8mm',
       extraCss:`
+        @page { size: A4 landscape; margin: 6mm }
         /* Ocultar barra de navegació superior (mes/prev/next/pct/close) al print */
         [id^="irpfTitle"], #irpfPrev, #irpfNext, #irpfMonth, [data-icomp], [data-no], [data-pct], #irpfPctInp, [id="irpfPrint"] { display:none !important }
         /* Ocultar botons + secció sobre IRPF (opcional) al print */
         #irpfAdd, #irpfPay, #irpfUndo, #sobreAdd, [data-sobredel] { display:none !important }
-        /* Colors forçats */
+        body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important }
+        .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important }
+        .modal{ padding:4mm !important; max-width:none !important; width:100% !important; border:none !important }
+        table { border-collapse:collapse !important; width:100% !important; font-size:8pt !important; page-break-inside:auto }
+        thead{ display:table-header-group } tr { page-break-inside:avoid; page-break-after:auto }
         table thead tr { background:#78350f !important; color:#fff !important }
-        table { page-break-inside:auto }
-        tr { page-break-inside:avoid; page-break-after:auto }
+        th{ border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:8pt !important }
+        td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 4pt !important; font-size:8pt !important; word-wrap:break-word }
       `
     });
   };
@@ -4193,8 +4230,20 @@ function openAnnualReport(){
     printVisibleElement(modal, {
       title:'Facturación anual',
       landscape:true,
-      margins:'8mm',
-      extraCss:'button, select, input, [data-no], .icon-btn { display:none !important }'
+      margins:'6mm',
+      extraCss:`
+        @page { size: A4 landscape; margin: 6mm }
+        button, select, input, [data-no], .icon-btn { display:none !important }
+        body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important }
+        .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important }
+        .modal{ padding:4mm !important; max-width:none !important; width:100% !important; border:none !important }
+        h3{ color:#000 !important; font-size:13pt !important; margin:0 0 6pt 0 !important }
+        h4{ color:#000 !important; font-size:11pt !important; margin:6pt 0 4pt 0 !important }
+        table{ border-collapse:collapse !important; width:100% !important; font-size:8pt !important; margin-bottom:6pt !important; table-layout:fixed !important; page-break-inside:auto }
+        thead{ display:table-header-group } tr{ page-break-inside:avoid }
+        th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 4pt !important; font-weight:700 !important; font-size:8pt !important; word-wrap:break-word }
+        td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 4pt !important; font-size:8pt !important; word-wrap:break-word; overflow-wrap:break-word }
+      `
     });
   };
   const yearSel=back.querySelector('#arYear');
@@ -4519,8 +4568,17 @@ function openYearComparison(){
     printVisibleElement(modal, {
       title:'Comparativa anual',
       landscape:true,
-      margins:'8mm',
-      extraCss:'button, select, input, [data-no], .icon-btn { display:none !important }'
+      margins:'6mm',
+      extraCss:`@page { size: A4 landscape; margin: 6mm }
+        button, select, input, [data-no], .icon-btn { display:none !important }
+        body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important }
+        .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important }
+        .modal{ padding:4mm !important; max-width:none !important; width:100% !important; border:none !important }
+        h3{ color:#000 !important; font-size:13pt !important; margin:0 0 6pt 0 !important }
+        table{ border-collapse:collapse !important; width:100% !important; font-size:8pt !important; page-break-inside:auto }
+        thead{ display:table-header-group } tr{ page-break-inside:avoid }
+        th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:8pt !important }
+        td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 4pt !important; font-size:8pt !important; word-wrap:break-word }`
     });
   };
   const sel=back.querySelector('#ycCount');
@@ -4820,11 +4878,16 @@ $('#btnPrint').onclick=()=>{
   printVisibleElement(wrapper, {
     title:`Cierre diario · ${currentDate}`,
     landscape:true,
-    margins:'8mm',
-    extraCss:`header, .no-print, #btnPrint, #btnClearDay, #btnAdd, #btnHistorial, #btnBackup, [data-icon-btn], .panel-actions button { display:none !important }
-      /* Amaga la barra de navegació superior */
-      nav, aside { display:none !important }
-      /* Sense colors de fons als botons */
+    margins:'6mm',
+    extraCss:`@page { size: A4 landscape; margin: 6mm }
+      header, .no-print, #btnPrint, #btnClearDay, #btnAdd, #btnHistorial, #btnBackup, [data-icon-btn], .panel-actions button, nav, aside { display:none !important }
+      body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important }
+      div, section, article{ background:#fff !important; color:#000 !important; box-shadow:none !important }
+      h1, h2, h3, h4{ color:#000 !important }
+      table{ border-collapse:collapse !important; width:100% !important; font-size:8pt !important; page-break-inside:auto }
+      thead{ display:table-header-group } tr{ page-break-inside:avoid }
+      th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:8pt !important }
+      td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 4pt !important; font-size:8pt !important; word-wrap:break-word }
       button { background:transparent !important; color:#000 !important; border:none !important }`
   });
 };
