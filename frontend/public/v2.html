@@ -420,7 +420,7 @@
         <div class="body tab" id="tab-dh" style="display:none">
           <div class="form-row dh">
             <div><label>Tipo</label><select id="dh-tipo"><option value="HABER">HABER (entra dinero)</option><option value="DEBE">DEBE (sale dinero)</option></select></div>
-            <div><label>Concepto libre</label><input type="text" id="dh-concepto" placeholder="Ej: Pago factura luz, Anticipo, Ajuste tasa..." /></div>
+            <div><label>Concepto libre</label><input type="text" id="dh-concepto" list="dh-workers-datalist" autocomplete="off" placeholder="Ej: Nómina Pep · Faena externa Carlos · Pago factura luz · Anticipo…" /><datalist id="dh-workers-datalist"></datalist></div>
             <div><label>Importe (€)</label><input type="number" step="0.01" id="dh-importe" /></div>
             <div><label>F. Pago</label><select id="dh-fp"><option value="E">Efectivo</option><option value="T">Tarjeta</option><option value="B">Bizum</option><option value="X">Transferencia</option></select></div>
           </div>
@@ -2119,10 +2119,29 @@ $$('.tabs button').forEach(b=>b.onclick=()=>{$$('.tabs button').forEach(x=>x.cla
 $$('#chips-priv .chip').forEach(c=>c.onclick=()=>{$$('#chips-priv .chip').forEach(x=>x.classList.remove('active'));c.classList.add('active');privConcept=c.dataset.c;if(c.dataset.preu){$('#p-importe').value=c.dataset.preu;$('#p-nombre').focus()}});
 $('#btnAddTraf').onclick=()=>{const e={id:uid(),kind:'TRAF',tipo:$('#t-tipo').value,grupo:$('#t-grupo').value,nombre:$('#t-nombre').value.trim()||'Cliente',importe:num($('#t-importe').value),descuento:0,tasa:num($('#t-tasa').value),fp:$('#t-fp').value,fpTasa:$('#t-fp').value,retorno:false};if(!e.importe&&!e.tasa&&!e.nombre){toast('Añade al menos un nombre/concepto');return}entriesOf(currentDate).push(e);saveState();render();$('#t-nombre').value='';$('#t-importe').value='';$('#t-tasa').value='0'};
 $('#btnAddPriv').onclick=()=>{const isC=currentCompany==='cempla';let nom=isC?$('#p-nombre-cempla').value.trim():$('#p-nombre').value.trim();let tipo=isC?($('#p-tipo-custom').value.trim()||privConcept||'Revisió'):privConcept;let imp=isC?num($('#p-preu-custom').value):num($('#p-importe').value);let fp=isC?$('#p-fp-cempla').value:$('#p-fp').value;if(isC){const b=num($('#p-pct-b').value)||0,cc=num($('#p-pct-c').value)||0,m=num($('#p-pct-m').value)||0;currentSplit=`${b}-${cc}-${m}`}const e={id:uid(),kind:'PRIV',tipo,grupo:'-',nombre:nom||'Cliente',importe:imp,descuento:isC?0:num($('#p-desc').value),tasa:isC?0:num($('#p-tasa').value),fp,fpTasa:fp,split:isC?currentSplit:null,retorno:false};if(!e.importe&&!e.tasa&&!e.nombre){toast('Afegeix un nom o import');return}entriesOf(currentDate).push(e);saveState();render();if(isC){$('#p-nombre-cempla').value=''}else{$('#p-nombre').value='';$('#p-importe').value='';$('#p-desc').value='0';$('#p-tasa').value='0'}};
-$('#btnAddDH').onclick=()=>{const e={id:uid(),kind:'DH',tipo:$('#dh-tipo').value,grupo:'-',nombre:$('#dh-concepto').value.trim()||'(sin concepto)',importe:num($('#dh-importe').value),descuento:0,tasa:0,fp:$('#dh-fp').value,fpTasa:'',retorno:false};if(!e.importe&&!e.nombre){toast('Indica un concepto');return}entriesOf(currentDate).push(e);saveState();render();$('#dh-concepto').value='';$('#dh-importe').value=''};
+$('#btnAddDH').onclick=()=>{const e={id:uid(),kind:'DH',tipo:$('#dh-tipo').value,grupo:'-',nombre:$('#dh-concepto').value.trim()||'(sin concepto)',importe:num($('#dh-importe').value),descuento:0,tasa:0,fp:$('#dh-fp').value,fpTasa:'',retorno:false};if(!e.importe&&!e.nombre){toast('Indica un concepto');return}entriesOf(currentDate).push(e);saveState();render();$('#dh-concepto').value='';$('#dh-importe').value='';try{refreshWorkersDatalist()}catch(_){}};
 function updateDhTipoColor(){const v=$('#dh-tipo').value;$('#dh-tipo').classList.toggle('haber-sel',v==='HABER');$('#dh-tipo').classList.toggle('debe-sel',v==='DEBE')}
 $('#dh-tipo').addEventListener('change',updateDhTipoColor);updateDhTipoColor();
-document.addEventListener('click',ev=>{const chip=ev.target.closest('#chips-dh .chip');if(!chip)return;document.querySelectorAll('#chips-dh .chip').forEach(x=>x.style.fontWeight='');chip.style.fontWeight='bold';$('#dh-tipo').value=chip.dataset.t;updateDhTipoColor();$('#dh-concepto').value=chip.dataset.c;setTimeout(()=>$('#dh-importe').focus(),50)});
+document.addEventListener('click',ev=>{const chip=ev.target.closest('#chips-dh .chip');if(!chip)return;document.querySelectorAll('#chips-dh .chip').forEach(x=>x.style.fontWeight='');chip.style.fontWeight='bold';$('#dh-tipo').value=chip.dataset.t;updateDhTipoColor();
+  // Si el chip es un pago a trabajador, prefija con espacio y refresca el datalist para sugerir nombres.
+  const isWorkerChip = /honoraris|nomina|nómina|sueldo|salario|faena|jornal|colaborador|autonom/i.test(chip.dataset.c||'');
+  if(isWorkerChip){
+    try{ refreshWorkersDatalist(); }catch(_){}
+    $('#dh-concepto').value = chip.dataset.c + ' ';
+    // Focus en el concepto y posiciona el cursor al final para que aparezcan las sugerencias
+    setTimeout(()=>{ const ip=$('#dh-concepto'); ip.focus(); ip.setSelectionRange(ip.value.length, ip.value.length); }, 50);
+  } else {
+    $('#dh-concepto').value = chip.dataset.c;
+    setTimeout(()=>$('#dh-importe').focus(),50);
+  }
+});
+// Refresca datalist cuando se activa la pestaña Debe/Haber
+document.addEventListener('click', ev => {
+  const tabBtn = ev.target.closest('.tabs button');
+  if(tabBtn && tabBtn.dataset.tab === 'tab-dh'){ try{ refreshWorkersDatalist(); }catch(_){} }
+});
+// Refresca al focar el input directamente (por si el usuario navega sin usar chip)
+setTimeout(() => { const dc = $('#dh-concepto'); if(dc){ dc.addEventListener('focus', () => { try{ refreshWorkersDatalist(); }catch(_){} }); } }, 800);
 $('#btnImport').onclick=()=>$('#fileInput').click();
 $('#fileInput').onchange=async ev=>{const f=ev.target.files[0];if(!f)return;try{const name=(f.name||'').toLowerCase();const buf=await f.arrayBuffer();if(name.endsWith('.xlsx')||name.endsWith('.xls')){if(typeof XLSX==='undefined'){toast('❌ Lector Excel no disponible — usa CSV');return}const wb=XLSX.read(buf,{type:'array'});const sheet=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:false,defval:''});importTrafficRows(rows)}else{let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){text=new TextDecoder('windows-1252').decode(buf)}if(/Ã[©±¡³]/.test(text)){text=new TextDecoder('windows-1252').decode(buf)}const rows=parseCSV(text);importTrafficRows(rows)}}catch(err){toast('Error al importar: '+err.message,3500)}ev.target.value=''};
 function parseCSV(text){const out=[];let row=[],cell='',inQ=false;for(let i=0;i<text.length;i++){const c=text[i];if(inQ){if(c==='"'){if(text[i+1]==='"'){cell+='"';i++}else inQ=false}else cell+=c}else{if(c==='"')inQ=true;else if(c===';'){row.push(cell);cell=''}else if(c==='\n'){row.push(cell);out.push(row);row=[];cell=''}else if(c==='\r'){}else cell+=c}}if(cell.length||row.length){row.push(cell);out.push(row)}return out.filter(r=>r.some(x=>x&&x.trim()!==''))}
@@ -2724,6 +2743,47 @@ const _HN_KEYWORDS = {
   HONORARIO: ['honorari','honorario','honorarios','honoraris'],
   FAENA_EXT: ['faena externa','faenes externes','faenas externas','faena ext','faena','feina externa','feines externes','jornal','jornales','jornada externa','colaborador','colaboradora','freelance','autonomo','autónomo','autonoma','autónoma','externa','externo','subcontrata','subcontratado','trabajo externo']
 };
+
+// 🧠 AUTOCOMPLETE de trabajadores en el input Debe/Haber
+// Escanea todas las entradas históricas (DH honorario-like), extrae nombres únicos de trabajadores
+// y genera opciones combinadas (Nómina X, Sueldo X, Honoraris X, Salario X, Faena externa X)
+// para que el datalist ofrezca sugerencias mientras escribes.
+function _getKnownWorkers(){
+  const names = new Set();
+  const stores = ['caja.v1', 'caja.cempla.v1'];
+  for(const key of stores){
+    try{
+      const raw = JSON.parse(localStorage.getItem(key)||'{"byDate":{}}');
+      const bd = raw.byDate || {};
+      for(const iso of Object.keys(bd)){
+        for(const e of (bd[iso]||[])){
+          if(_isHonorarioLikeEntry && _isHonorarioLikeEntry(e)){
+            const nm = _cleanWorkerName(e.nombre);
+            if(nm && nm !== '(sin nombre)') names.add(nm);
+          }
+        }
+      }
+    }catch(_){}
+  }
+  return Array.from(names).sort((a,b)=>a.localeCompare(b,'es'));
+}
+function refreshWorkersDatalist(){
+  const dl = document.getElementById('dh-workers-datalist');
+  if(!dl) return;
+  const workers = _getKnownWorkers();
+  const prefixes = ['Nómina','Sueldo','Salario','Honoraris','Faena externa'];
+  const opts = [];
+  // Combinaciones prefijo + nombre (para que "Nomina Pep" y "Faena externa Carlos" salgan sugeridos)
+  for(const w of workers){
+    for(const p of prefixes){ opts.push(`${p} ${w}`); }
+  }
+  // También los nombres raw (por si el usuario escribe solo el nombre)
+  for(const w of workers){ opts.push(w); }
+  dl.innerHTML = opts.map(v => `<option value="${v.replace(/"/g,'&quot;')}"></option>`).join('');
+}
+// Intentamos refrescar la primera vez tras la carga inicial
+setTimeout(()=>{ try{ refreshWorkersDatalist(); }catch(_){} }, 500);
+
 function _hnMatchKeyword(text){
   const bag = String(text||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   for(const [cat, kws] of Object.entries(_HN_KEYWORDS)){

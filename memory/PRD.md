@@ -722,3 +722,28 @@ Playwright script con dataset de 8 entradas cubre 5 escenarios (todos ✅):
 - Todos los meses: 6250€ ✅
 - Búsqueda "faena externa" en Buscador Global: 8 resultados ✅
 - Botón Imprimir presente y activable ✅
+
+
+---
+
+## 🧠 [26-Feb-2026] · Autocompletar Trabajador en Debe/Haber
+
+### Autocompletado nativo con `<datalist>`
+- Nuevo `<datalist id="dh-workers-datalist">` conectado al input `#dh-concepto`.
+- Función `_getKnownWorkers()` extrae nombres únicos limpios de trabajadores desde todas las entradas históricas honorario-like (DH con nombre/tipo/concepto que contenga: honorari · nomina · sueldo · salario · jornal · faena · colaborador · autónomo · etc.).
+- Función `refreshWorkersDatalist()` genera opciones combinadas: `Nómina <Worker>`, `Sueldo <Worker>`, `Salario <Worker>`, `Honoraris <Worker>`, `Faena externa <Worker>` + los nombres raw para sugerencia libre.
+- Refresco automático en 4 momentos:
+  1. Al cargar la app (setTimeout 500ms)
+  2. Al hacer clic en la pestaña "Debe/Haber"
+  3. Al hacer focus en el input concepto
+  4. Después de añadir una nueva entrada DH (`saveState`)
+
+### UX mejorado en chips
+- Al hacer clic en un chip de trabajador (Honoraris/Nómina/Faena externa), el input se rellena con `<keyword> ` (con espacio final) y recibe foco al final del texto → el navegador muestra automáticamente las sugerencias del datalist filtradas por ese prefijo.
+- Otros chips (IRPF, Material, etc.) mantienen el comportamiento anterior (foco al importe directamente).
+
+### Testing E2E validado
+- 4 trabajadores detectados de dataset histórico ✅
+- 24 opciones datalist (4 workers × 5 prefijos + 4 raw) ✅
+- Chip "Nómina" → input="Nómina ", tipo=DEBE, foco correcto ✅
+- Al añadir "Juan Rodriguez" el datalist se actualiza automáticamente ✅
