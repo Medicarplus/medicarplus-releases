@@ -770,3 +770,43 @@ Playwright script con dataset de 8 entradas cubre 5 escenarios (todos ✅):
 - Agregación de códigos duplicados funciona (PARTICULAR ×4 → suma 64)
 - Datos guardados en `caja.stats.v1` bajo la key `2026-06`
 - Botón data-yes del confirmModal ejecuta `doApply()` correctamente
+
+
+---
+
+## 📈 [26-Feb-2026] · Edit inline + Gráfico Evolución Autoescuelas + Print CSS
+
+### Fixes UX en Estadísticas Autoescuelas
+1. **Edit inline reemplazando `prompt()`** (que no funciona en Electron):
+   - Click en celda → aparece `<input type="number">` con foco y select automático
+   - Enter/blur guarda · Escape cancela · Tab avanza a la siguiente celda
+   - Colores destacados (borde amarillo #f5b301) para indicar edición activa
+2. **Botón `+ Autoescuela` con modal custom** (elimina `prompt()`): input dedicado con validación de duplicados, botón cancelar/añadir, Enter=confirmar, Escape=cerrar.
+3. **`Vaciar todo` migrado a `confirmModal`** (elimina `confirm()` nativo — más consistente y con estilo).
+
+### 📈 Gráfico de evolución mensual (nuevo)
+- Botón `📈 Gráfico` en la toolbar (solo sección Autoescuelas)
+- SVG nativo (sin Chart.js) · dibujado a partir de `st.data[year-MM]`
+- **Selector Top 3/6/10/20/Todas** (por default Top 6 = las más frecuentes del año)
+- **Leyenda clicable**: toggle línea on/off + muestra colores + total anual por autoescuela
+- **Eje Y auto-escalado** (máximo redondeado a decenas) · 5 gridlines
+- **Etiquetas de valor** en cada punto (solo si >0) del color de la serie
+- **12 meses** en eje X (Ene-Dic abreviados)
+- **Tooltip SVG nativo** (`<title>`) en cada punto: "AUTOESCUELA · Mes: valor"
+- **Botón Imprimir** con CSS específico para papel
+
+### Print CSS reforzado (aplica a tabla principal + gráfico)
+- Oculta botones/selects/inputs/toggles al imprimir
+- Fondo blanco + texto negro + bordes grises legibles
+- Tabla: `border-collapse:collapse`, thead con fondo `#eee`, tfoot con `#ddd`
+- Landscape 8mm de margen
+- Grafico: SVG con `fill:#000` para texto para preservar el color de líneas visible
+
+### Testing E2E validado
+- Edit inline guarda 99€ en celda ✅
+- Modal +Autoescuela añade "TEST NUEVA ESCUELA" ✅
+- Import CSV 613 certificados ✅ 
+- Gráfico Top 6 dibuja 6 polylines + 6 legend items ✅
+- Toggle leyenda decrementa a 5 líneas ✅
+- Top 3 filtra a 3 líneas ✅
+- Botón Imprimir del gráfico presente ✅

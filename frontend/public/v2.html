@@ -1314,6 +1314,7 @@ function openStats(initialSection){
       <input type="file" id="stFile" accept=".csv,.txt" style="display:none" />
       <button class="btn st-autos-only" id="stAdd">+ ${isCA?'Autoescola':'Autoescuela'}</button>
       <button class="btn st-autos-only" id="stClearAll" style="background:#7f1d1d;color:#fecaca;border-color:#b91c1c" title="${isCA?'Elimina totes les autoescoles i les seves dades':'Elimina todas las autoescuelas y sus datos'}">🗑 ${isCA?'Buidar tot':'Vaciar todo'}</button>
+      <button class="btn st-autos-only" id="stChart" data-testid="st-chart" style="background:#1e293b;border-color:#22d3ee;color:#22d3ee" title="${isCA?'Gràfic d\'evolució mensual':'Gráfico de evolución mensual'}">📈 ${isCA?'Gràfic':'Gráfico'}</button>
       <button class="btn btn-primary" id="stPrint">📥 ${isCA?'Descarregar PDF':'Descargar PDF'}</button>
       <button class="btn" data-no>✕ ${isCA?'Tancar':'Cerrar'}</button>
     </div>
@@ -1392,14 +1393,31 @@ function openStats(initialSection){
       body.innerHTML=`<table style="border-collapse:collapse;font-size:12px;font-family:'Consolas','Menlo',monospace"><thead><tr style="background:#1a1e26"><th style="padding:8px;border:1px solid #2a3040;position:sticky;left:0;background:#1a1e26;z-index:3;min-width:200px;text-align:left">AUTOESCOLES ${year}</th>${MESOS.map(m=>`<th style="padding:8px;border:1px solid #2a3040;text-transform:uppercase;font-size:10px;letter-spacing:.5px">${m}</th>`).join('')}<th style="padding:8px;border:1px solid #2a3040;background:#1f2530;color:#f5b301">TOTAL</th></tr></thead><tbody>${rows}</tbody><tfoot><tr style="background:#1f2530"><td style="padding:8px;border:1px solid #2a3040;font-weight:700;position:sticky;left:0;background:#1f2530">TOTAL CERTIFICATS</td>${colTot.map(v=>`<td style="padding:8px;border:1px solid #2a3040;text-align:center;font-weight:700">${v||''}</td>`).join('')}<td style="padding:8px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#f5b301;font-size:14px">${grandTot||''}</td></tr></tfoot></table>`;
     }
     body.querySelectorAll('.st-cell').forEach(c=>{c.onclick=()=>{
+      if(c.querySelector('input'))return; // ya en edición
       const ri=+c.dataset.r,mi=+c.dataset.m;const name=st.autoescoles[ri];const key=`${year}-${String(mi+1).padStart(2,'0')}`;
       const cur=(st.data[key]||{})[name]||0;
-      const val=prompt(`${name} · ${MESOS[mi]} ${year}`,cur);
-      if(val===null)return;
-      const n=parseInt(val)||0;
-      st.data[key]=st.data[key]||{};
-      if(n)st.data[key][name]=n;else delete st.data[key][name];
-      saveStats(st);renderTable();
+      const prevText=c.innerHTML;
+      c.innerHTML=`<input type="number" min="0" step="1" value="${cur||''}" data-testid="st-cell-input" style="width:100%;box-sizing:border-box;background:#0e1117;color:#f5b301;border:2px solid #f5b301;border-radius:4px;padding:4px 6px;font-size:13px;text-align:center;font-family:inherit;font-weight:700" />`;
+      const inp=c.querySelector('input');
+      inp.focus();inp.select();
+      let committed=false;
+      const commit=()=>{
+        if(committed)return;committed=true;
+        const n=parseInt(inp.value)||0;
+        st.data[key]=st.data[key]||{};
+        if(n)st.data[key][name]=n;else delete st.data[key][name];
+        saveStats(st);renderTable();
+      };
+      const cancel=()=>{if(committed)return;committed=true;c.innerHTML=prevText;};
+      inp.onblur=commit;
+      inp.onkeydown=(ev)=>{
+        if(ev.key==='Enter'){ev.preventDefault();inp.blur()}
+        else if(ev.key==='Escape'){ev.preventDefault();cancel()}
+        else if(ev.key==='Tab'){ev.preventDefault();commit();
+          // Saltar al siguiente cell
+          setTimeout(()=>{const cells=Array.from(body.querySelectorAll('.st-cell'));const idx=cells.findIndex(x=>x.dataset.r===String(ri)&&x.dataset.m===String(mi));const next=cells[idx+(ev.shiftKey?-1:1)];if(next)next.click();},80);
+        }
+      };
     }});
     body.querySelectorAll('[data-del]').forEach(b=>{b.onclick=(ev)=>{ev.stopPropagation();const ri=+b.dataset.del;const name=st.autoescoles[ri];confirmModal(isCA?'Eliminar autoescola':'Eliminar autoescuela',isCA?`Vols eliminar <b>${name}</b> i totes les seves dades?`:`¿Eliminar <b>${name}</b> y todos sus datos?`,()=>{st.autoescoles.splice(ri,1);for(const k in st.data)delete st.data[k][name];saveStats(st);renderTable()},isCA?'Eliminar':'Eliminar')}});
   };
@@ -1408,8 +1426,32 @@ function openStats(initialSection){
   back.querySelector('#stMonth').onchange=renderTable;
   back.querySelector('#stPrev').onclick=()=>{const y=$('#stYear');y.value=+y.value-1;renderTable()};
   back.querySelector('#stNext').onclick=()=>{const y=$('#stYear');y.value=+y.value+1;renderTable()};
-  back.querySelector('#stAdd').onclick=()=>{const n=prompt(isCA?'Nom de la nova autoescola:':'Nombre de la nueva autoescuela:');if(!n)return;const st=loadStats();if(st.autoescoles.includes(n.trim())){toast(isCA?'Ja existeix':'Ya existe');return}st.autoescoles.push(n.trim());saveStats(st);renderTable()};
-  back.querySelector('#stClearAll').onclick=()=>{if(!confirm(isCA?'⚠️ Esborrar TOTES les autoescoles i les seves dades?\n\nAquesta acció NO es pot desfer. Es recomana només al primer arrencament o si vols començar de zero.':'⚠️ ¿Borrar TODAS las autoescuelas y sus datos?\n\nEsta acción NO se puede deshacer. Recomendado solo en la primera puesta en marcha o si quieres empezar de cero.'))return;saveStats({autoescoles:[],data:{}});renderTable();toast(isCA?'🗑 Autoescoles esborrades':'🗑 Autoescuelas borradas')};
+  back.querySelector('#stAdd').onclick=()=>{
+    // Modal custom (prompt no funciona en Electron)
+    const m=document.createElement('div');m.className='modal-back';m.style.zIndex='999999';
+    m.innerHTML=`<div class="modal" style="max-width:400px"><h3>${isCA?'Nova autoescola':'Nueva autoescuela'}</h3>
+      <p style="color:#94a3b8;font-size:12px">${isCA?'Escriu el nom tal com vols que aparegui a la taula. Podràs afegir dades manualment o via import CSV.':'Escribe el nombre tal como quieres que aparezca en la tabla. Podrás añadir datos manualmente o vía import CSV.'}</p>
+      <input type="text" data-testid="st-add-name" placeholder="${isCA?'Ex: A.E.NOVA':'Ej: A.E.NUEVA'}" style="width:100%;box-sizing:border-box;background:#0e1117;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:14px;margin-bottom:12px" autofocus />
+      <div class="row" style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-no>${isCA?'Cancel·lar':'Cancelar'}</button><button class="btn btn-primary" data-testid="st-add-ok" data-yes>${isCA?'Afegir':'Añadir'}</button></div></div>`;
+    document.body.appendChild(m);
+    const inp=m.querySelector('input');
+    setTimeout(()=>inp.focus(),50);
+    const doAdd=()=>{
+      const n=(inp.value||'').trim();
+      if(!n){toast(isCA?'Nom buit':'Nombre vacío');return}
+      const st=loadStats();
+      if(st.autoescoles.includes(n)){toast(isCA?'Ja existeix':'Ya existe');return}
+      st.autoescoles.push(n);saveStats(st);m.remove();renderTable();
+      toast(isCA?`✅ Afegida: ${n}`:`✅ Añadida: ${n}`);
+    };
+    m.querySelector('[data-yes]').onclick=doAdd;
+    m.querySelector('[data-no]').onclick=()=>m.remove();
+    m.addEventListener('click',ev=>{if(ev.target===m)m.remove()});
+    inp.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();doAdd()}else if(ev.key==='Escape'){m.remove()}};
+  };
+  back.querySelector('#stClearAll').onclick=()=>{
+    confirmModal(isCA?'⚠️ Buidar totes les autoescoles':'⚠️ Vaciar todas las autoescuelas', isCA?'Vols esborrar <b>TOTES</b> les autoescoles i les seves dades?<br><br>Aquesta acció <b>NO es pot desfer</b>. Es recomana només al primer arrencament o si vols començar de zero.':'¿Borrar <b>TODAS</b> las autoescuelas y sus datos?<br><br>Esta acción <b>NO se puede deshacer</b>. Recomendado solo en la primera puesta en marcha o si quieres empezar de cero.', ()=>{saveStats({autoescoles:[],data:{}});renderTable();toast(isCA?'🗑 Autoescoles esborrades':'🗑 Autoescuelas borradas')}, isCA?'Sí, esborrar tot':'Sí, borrar todo', true);
+  };
   // Alias mapping CSV → canonical name
   const STAT_ALIAS={
     'TRAFIC':'TRÀFIC','TRÀFIC':'TRÀFIC',
@@ -1568,6 +1610,135 @@ function openStats(initialSection){
     });
     document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){back.remove();document.removeEventListener('keydown',esc)}});
   }
+  // 📈 Gráfico de evolución mensual por autoescuela (SVG nativo, sin libs)
+  function openAutoescolasChart(parentBack){
+    const st=loadStats();
+    const year=$('#stYear').value;
+    // Top autoescuelas por total anual (para preseleccionar las más relevantes)
+    const totals={};
+    for(const name of st.autoescoles){
+      let t=0;
+      for(let mi=0;mi<12;mi++){const k=`${year}-${String(mi+1).padStart(2,'0')}`;t+=(st.data[k]||{})[name]||0;}
+      totals[name]=t;
+    }
+    const sortedNames=st.autoescoles.slice().sort((a,b)=>totals[b]-totals[a]);
+    const activeNames=sortedNames.filter(n=>totals[n]>0);
+    if(!activeNames.length){toast(isCA?'No hi ha dades per graficar':'No hay datos para graficar');return}
+    const preselCount=Math.min(6,activeNames.length);
+    const PALETTE=['#22d3ee','#f5b301','#3ddc97','#c084fc','#f472b6','#7ec8ff','#fb923c','#a3e635','#e879f9','#fca5a5','#60a5fa','#facc15','#4ade80','#f87171','#818cf8','#94a3b8','#eab308','#06b6d4'];
+
+    const chartBack=document.createElement('div');
+    chartBack.className='modal-back';chartBack.style.zIndex='500000';chartBack.setAttribute('data-testid','st-chart-modal');
+    chartBack.innerHTML=`<div class="modal" style="max-width:1200px;width:96%;max-height:94vh;display:flex;flex-direction:column;padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap">
+        <h3 style="margin:0;color:#22d3ee;font-family:Georgia,serif">📈 ${isCA?'Evolució mensual':'Evolución mensual'} · ${year}</h3>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label class="small" style="margin:0;color:#94a3b8">${isCA?'Mostrar Top':'Mostrar Top'}:</label>
+          <select id="_ch_top" data-testid="chart-top" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12px">
+            <option value="3">Top 3</option>
+            <option value="6" selected>Top 6</option>
+            <option value="10">Top 10</option>
+            <option value="20">Top 20</option>
+            <option value="all">${isCA?'Totes':'Todas'}</option>
+          </select>
+          <button class="btn" id="_ch_print" data-testid="chart-print" style="background:linear-gradient(135deg,#22d3ee,#0891b2);color:#0b1121;border:none;padding:6px 12px;border-radius:6px;font-weight:700">🖨️ ${isCA?'Imprimir':'Imprimir'}</button>
+          <button class="btn" data-no data-testid="chart-close">✕ ${isCA?'Tancar':'Cerrar'}</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:14px;flex:1;overflow:hidden">
+        <div id="_ch_svg" style="flex:1;background:#0b1121;border:1px solid #1e293b;border-radius:8px;padding:14px;overflow:auto;min-width:0"></div>
+        <div style="width:240px;background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px;overflow-y:auto">
+          <div style="font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:8px;letter-spacing:.5px">${isCA?'AUTOESCOLES':'AUTOESCUELAS'}</div>
+          <div id="_ch_legend" data-testid="chart-legend"></div>
+        </div>
+      </div>
+      <div class="small" style="margin-top:10px;color:#64748b">💡 ${isCA?'Clica una autoescola per activar/desactivar la seva línia. La casella pintada mostra el color assignat.':'Haz clic en una autoescuela para activar/desactivar su línea. La casilla pintada muestra el color asignado.'}</div>
+    </div>`;
+    document.body.appendChild(chartBack);
+    chartBack.querySelector('[data-no]').onclick=()=>chartBack.remove();
+    chartBack.addEventListener('click',ev=>{if(ev.target===chartBack)chartBack.remove()});
+    document.addEventListener('keydown',function esc(ev){if(ev.key==='Escape'){chartBack.remove();document.removeEventListener('keydown',esc)}});
+
+    const state={topN:preselCount, enabled:new Set(sortedNames.slice(0,preselCount))};
+
+    function drawChart(){
+      const chosen=state.topN==='all'?activeNames:activeNames.slice(0,+state.topN);
+      // Solo dibujar las que están enabled Y en el subconjunto elegido
+      const drawNames=chosen.filter(n=>state.enabled.has(n));
+      // Preparar datos [{name, color, values:[12]}]
+      const series=drawNames.map((name,idx)=>{
+        const globalIdx=sortedNames.indexOf(name);
+        const values=MESOS.map((_,mi)=>{const k=`${year}-${String(mi+1).padStart(2,'0')}`;return (st.data[k]||{})[name]||0});
+        return {name, color:PALETTE[globalIdx%PALETTE.length], values, total:totals[name]};
+      });
+      // Y-axis max
+      let maxY=0;
+      for(const s of series){for(const v of s.values){if(v>maxY)maxY=v}}
+      if(maxY<10)maxY=10; maxY=Math.ceil(maxY/10)*10;
+      const W=900,H=420,padL=50,padR=20,padT=20,padB=40;
+      const cw=W-padL-padR, ch=H-padT-padB;
+      const stepX=cw/11;
+      const yTicks=5;
+      const yTickVals=[];for(let i=0;i<=yTicks;i++)yTickVals.push(Math.round(maxY*i/yTicks));
+      // Grid + axis
+      let svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-height:60vh" data-testid="chart-svg">`;
+      // Y grid + labels
+      svg+=`<g stroke="#1e293b" stroke-width="1">`;
+      for(let i=0;i<=yTicks;i++){const y=padT+ch-(ch*i/yTicks);svg+=`<line x1="${padL}" y1="${y}" x2="${padL+cw}" y2="${y}" />`;}
+      svg+=`</g>`;
+      svg+=`<g fill="#94a3b8" font-size="10" font-family="Consolas,monospace">`;
+      for(let i=0;i<=yTicks;i++){const y=padT+ch-(ch*i/yTicks);svg+=`<text x="${padL-6}" y="${y+3}" text-anchor="end">${yTickVals[i]}</text>`;}
+      // X labels (meses)
+      for(let mi=0;mi<12;mi++){const x=padL+stepX*mi;svg+=`<text x="${x}" y="${padT+ch+18}" text-anchor="middle">${MESOS[mi].substring(0,3)}</text>`;}
+      svg+=`</g>`;
+      // Series (líneas + puntos)
+      for(const s of series){
+        const pts=s.values.map((v,mi)=>`${padL+stepX*mi},${padT+ch-(ch*(v/maxY))}`).join(' ');
+        svg+=`<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />`;
+        s.values.forEach((v,mi)=>{
+          const x=padL+stepX*mi, y=padT+ch-(ch*(v/maxY));
+          svg+=`<circle cx="${x}" cy="${y}" r="3.5" fill="${s.color}"><title>${s.name.replace(/</g,'&lt;')} · ${MESOS[mi]}: ${v}</title></circle>`;
+          if(v>0){svg+=`<text x="${x}" y="${y-7}" text-anchor="middle" font-size="9" fill="${s.color}" font-family="Consolas,monospace" font-weight="700">${v}</text>`;}
+        });
+      }
+      svg+=`</svg>`;
+      if(!series.length){svg=`<div style="padding:60px;text-align:center;color:#64748b;font-style:italic">${isCA?'Cap autoescola activa. Clica al llegenda per activar-ne.':'Ninguna autoescuela activa. Haz clic en la leyenda para activar.'}</div>`;}
+      chartBack.querySelector('#_ch_svg').innerHTML=svg;
+    }
+
+    function drawLegend(){
+      const chosen=state.topN==='all'?activeNames:activeNames.slice(0,+state.topN);
+      const html=chosen.map(name=>{
+        const idx=sortedNames.indexOf(name);
+        const color=PALETTE[idx%PALETTE.length];
+        const active=state.enabled.has(name);
+        return `<div class="ch-item" data-name="${name.replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:4px;background:${active?'#1e293b':'transparent'};border-radius:5px;cursor:pointer;opacity:${active?1:0.45};transition:all .15s ease" data-testid="chart-legend-item">
+          <div style="width:14px;height:14px;border-radius:3px;background:${color};flex-shrink:0"></div>
+          <div style="flex:1;font-size:12px;font-weight:600;color:${active?'#e2e8f0':'#64748b'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name.replace(/</g,'&lt;')}</div>
+          <div style="font-size:10px;color:#94a3b8;font-family:Consolas,monospace">${totals[name]}</div>
+        </div>`;
+      }).join('');
+      chartBack.querySelector('#_ch_legend').innerHTML=html;
+      chartBack.querySelectorAll('.ch-item').forEach(el=>{el.onclick=()=>{const n=el.dataset.name;if(state.enabled.has(n))state.enabled.delete(n);else state.enabled.add(n);drawChart();drawLegend();};});
+    }
+    chartBack.querySelector('#_ch_top').onchange=ev=>{
+      state.topN=ev.target.value;
+      // Al cambiar Top → activar todas las del nuevo subconjunto
+      const chosen=state.topN==='all'?activeNames:activeNames.slice(0,+state.topN);
+      state.enabled=new Set(chosen);
+      drawChart();drawLegend();
+    };
+    chartBack.querySelector('#_ch_print').onclick=()=>{
+      const modal=chartBack.querySelector('.modal');
+      printVisibleElement(modal, {
+        title:`Estadísticas Autoescuelas · Evolución ${year}`,
+        landscape:true, margins:'8mm',
+        extraCss:'button, select, [data-no] { display:none !important } body{background:#fff;color:#000} .modal, .modal *{background:#fff !important;color:#000 !important} svg text{fill:#000 !important}'
+      });
+    };
+    drawChart();drawLegend();
+  }
+  back.querySelector('#stChart').onclick=()=>openAutoescolasChart(back);
   back.querySelector('#stPrint').onclick=()=>{
     if(currentSection === 'traffic'){ printTrafficReport(); return; }
     // WYSIWYG: imprimeix el contingut visible del modal
@@ -1578,7 +1749,17 @@ function openStats(initialSection){
       title,
       landscape:true,
       margins:'8mm',
-      extraCss:'button, select, input, [data-no] { display:none !important } .icon-btn { display:none !important }'
+      extraCss:`
+        button, select, input, [data-no], #stSectionSwitch, .icon-btn, [data-del], #stFooterHint { display:none !important }
+        body{ background:#fff !important; color:#000 !important }
+        .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important }
+        h3{ color:#000 !important; font-size:16pt !important; margin:0 0 8pt 0 !important }
+        table{ border-collapse:collapse !important; width:100% !important; font-size:9pt !important }
+        thead tr, thead th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:4pt 6pt !important; font-weight:700 !important }
+        tbody td{ border:1px solid #999 !important; color:#000 !important; padding:3pt 5pt !important }
+        tfoot tr, tfoot td{ background:#ddd !important; color:#000 !important; border:1px solid #666 !important; font-weight:700 !important }
+        .st-cell{ text-align:center !important }
+      `
     });
   };
   // ============================================================================
