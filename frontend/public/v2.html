@@ -293,6 +293,7 @@
         <button class="btn" id="btnIrpf" style="background:#3a2a1f;border-color:#8b5e2a;color:#f0d6bf;font-weight:600;width:100%;text-align:left">📋 IRPF</button>
         <button class="btn" id="btnCambio" style="background:#1f3a2e;border-color:#22c55e;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-i18n="reserve" data-testid="btn-cambio">💰 Reserva de cambio</button>
         <button class="btn" id="btnLibroRegMenu" style="background:#152a3a;border-color:#7ec8ff;color:#7ec8ff;font-weight:600;width:100%;text-align:left">📖 Libro de Registro</button>
+        <button class="btn" id="btnHonorarios" data-testid="btn-honorarios" style="background:#2a2015;border-color:#fbbf24;color:#fbbf24;font-weight:600;width:100%;text-align:left">💼 Honorarios</button>
         <button class="btn" id="btnWhatsNewMenu" data-testid="btn-whats-new" style="background:#2a1f15;border-color:#f97316;color:#fed7aa;font-weight:600;width:100%;text-align:left">🎁 Novedades</button>
       </div>
     </div>
@@ -2506,6 +2507,94 @@ $('#btnLedger').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLe
 $('#btnIrpf').onclick=()=>{$('#btnAccountingMenu').style.display='none';openIRPF()};
 $('#btnCambio').onclick=()=>{$('#btnAccountingMenu').style.display='none';openCambio()};
 $('#btnLibroRegMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLibroRegistro()};
+$('#btnHonorarios').onclick=()=>{$('#btnAccountingMenu').style.display='none';openHonorariosPanel()};
+
+// 💼 Panel de Honorarios: consulta pagos a trabajadores agregados por mes/trabajador
+// Fuente de datos: todas las entradas DH (Debe/Haber) con tipo 'HABER' y concepto 'Honoraris'
+// El nombre del trabajador se extrae del campo `nombre` de la entrada (limpiando prefijos).
+function openHonorariosPanel(){
+  // Recolectar todas las entradas de todas las empresas
+  const allEntries = [];
+  const stores = {trafic:'caja.v1', cempla:'caja.cempla.v1'};
+  for(const [comp, key] of Object.entries(stores)){
+    try{
+      const raw = JSON.parse(localStorage.getItem(key)||'{"byDate":{}}');
+      const bd = raw.byDate || {};
+      for(const iso of Object.keys(bd)){
+        for(const e of (bd[iso]||[])){
+          if(e.kind === 'DH' && (e.tipo === 'HABER' || e.tipo === 'HABER') && e.concepto === 'Honoraris' && (e.importe||0) > 0){
+            allEntries.push({date: iso, name: (e.nombre||'').replace(/^honoraris\s*/i,'').trim() || '(sin nombre)', amount: +e.importe||0, company: comp, fp: e.fp||''});
+          }
+        }
+      }
+    }catch(_){}
+  }
+  // Detección alternativa: entradas DH con tipo Honoraris (por si concepto no está)
+  for(const [comp, key] of Object.entries(stores)){
+    try{
+      const raw = JSON.parse(localStorage.getItem(key)||'{"byDate":{}}');
+      const bd = raw.byDate || {};
+      for(const iso of Object.keys(bd)){
+        for(const e of (bd[iso]||[])){
+          if(e.kind === 'DH' && String(e.tipo||'').toLowerCase().includes('honorari') && (e.importe||0) > 0){
+            const nm = (e.nombre||'').replace(/^honoraris\s*/i,'').trim() || '(sin nombre)';
+            if(!allEntries.some(x=>x.date===iso&&x.name===nm&&x.amount===+e.importe)){
+              allEntries.push({date: iso, name: nm, amount: +e.importe, company: comp, fp: e.fp||''});
+            }
+          }
+        }
+      }
+    }catch(_){}
+  }
+  // Agrupar por año-mes y por trabajador
+  const byMonth = {};
+  const byWorker = {};
+  let totalGlobal = 0;
+  for(const e of allEntries){
+    const ym = e.date.substring(0,7);
+    (byMonth[ym] = byMonth[ym] || []).push(e);
+    if(!byWorker[e.name]) byWorker[e.name] = {total:0, count:0};
+    byWorker[e.name].total += e.amount;
+    byWorker[e.name].count += 1;
+    totalGlobal += e.amount;
+  }
+  const months = Object.keys(byMonth).sort().reverse();
+  const workers = Object.keys(byWorker).sort((a,b)=>byWorker[b].total - byWorker[a].total);
+  const fmtEUR = v => v.toFixed(2).replace('.',',')+' €';
+  const fmtDate = iso => { const [y,m,d] = iso.split('-'); return `${d}/${m}/${y}`; };
+  const fmtMonth = ym => { const [y,m] = ym.split('-'); const mn = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][+m-1]; return `${mn} ${y}`; };
+
+  const back = document.createElement('div');
+  back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto';
+  const workersHtml = workers.length ? workers.map(w => `<tr><td style="padding:6px 10px;font-weight:600">${w.replace(/</g,'&lt;')}</td><td style="padding:6px 10px;text-align:right;color:#94a3b8">${byWorker[w].count} pagos</td><td style="padding:6px 10px;text-align:right;font-weight:700;color:#fbbf24">${fmtEUR(byWorker[w].total)}</td></tr>`).join('') : '<tr><td colspan="3" style="padding:12px;text-align:center;color:#64748b;font-style:italic">Sin pagos de honorarios registrados.</td></tr>';
+  const monthsHtml = months.length ? months.map(ym => {
+    const list = byMonth[ym].sort((a,b)=>a.date.localeCompare(b.date));
+    const monthTotal = list.reduce((s,e)=>s+e.amount, 0);
+    const rows = list.map(e => `<tr><td style="padding:5px 10px;font-size:12px">${fmtDate(e.date)}</td><td style="padding:5px 10px;font-size:12px;font-weight:600">${e.name.replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:11px;color:#64748b">${e.company==='trafic'?'Tráfico':'Cempla'}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${e.fp||'—'}</td><td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700;color:#fbbf24">${fmtEUR(e.amount)}</td></tr>`).join('');
+    return `<div style="margin-bottom:16px;background:#0f172a;border:1px solid #334155;border-radius:8px;overflow:hidden"><div style="background:#1e293b;padding:8px 14px;display:flex;justify-content:space-between;align-items:center"><b style="color:#fbbf24">📅 ${fmtMonth(ym)}</b><span style="color:#22c55e;font-weight:700">${fmtEUR(monthTotal)}</span></div><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#111827"><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Fecha</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Trabajador</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Empresa</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">FP</th><th style="padding:5px 10px;text-align:right;font-size:10px;color:#94a3b8">Importe</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }).join('') : '<div style="padding:20px;text-align:center;color:#64748b;font-style:italic">Añade una entrada Debe/Haber con tipo/concepto "Honoraris" y el nombre del trabajador para verla aquí.</div>';
+
+  back.innerHTML = `<div style="background:#111827;border:1px solid #334155;border-radius:12px;padding:22px;max-width:900px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);font-family:Arial,Helvetica,sans-serif">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div><h3 style="margin:0;color:#fbbf24;font-family:Georgia,serif">💼 Honorarios · Pagos a trabajadores</h3><div style="font-size:11px;color:#94a3b8;margin-top:3px">${allEntries.length} pagos · Total: <b style="color:#22c55e">${fmtEUR(totalGlobal)}</b></div></div>
+      <button id="_hn_close" style="background:#334155;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer">✕ Cerrar</button>
+    </div>
+    <div style="background:#0b1121;border:1px solid #78350f;border-radius:8px;padding:12px;margin-bottom:14px;font-size:11px;color:#fbbf24">💡 Añade pagos desde <b>Debe/Haber</b> escogiendo tipo <b>Honoraris</b> y como concepto/nombre <b>el nombre del trabajador</b> (ej: <i>Pep Brugulat Borras</i>). Aparecerán aquí automáticamente.</div>
+    <div style="margin-bottom:18px">
+      <h4 style="margin:0 0 8px 0;color:#e2e8f0;font-size:13px">📊 Resumen por trabajador</h4>
+      <table style="width:100%;border-collapse:collapse;background:#0f172a;border-radius:6px;overflow:hidden">
+        <thead><tr style="background:#1e293b"><th style="padding:6px 10px;text-align:left;font-size:10px;color:#94a3b8">Trabajador</th><th style="padding:6px 10px;text-align:right;font-size:10px;color:#94a3b8">Frecuencia</th><th style="padding:6px 10px;text-align:right;font-size:10px;color:#94a3b8">Total acumulado</th></tr></thead>
+        <tbody>${workersHtml}</tbody>
+      </table>
+    </div>
+    <div><h4 style="margin:0 0 8px 0;color:#e2e8f0;font-size:13px">🗓 Detalle mensual</h4>${monthsHtml}</div>
+  </div>`;
+  document.body.appendChild(back);
+  back.querySelector('#_hn_close').onclick = () => back.remove();
+  back.addEventListener('click', ev => { if(ev.target === back) back.remove(); });
+  document.addEventListener('keydown', function esc(ev){ if(ev.key === 'Escape'){ back.remove(); document.removeEventListener('keydown', esc); } });
+}
+
 $('#btnWhatsNewMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';showWhatsNew(true)};
 $('#btnAccountingToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnAccountingMenu');const willOpen=(m.style.display==='none'||!m.style.display);if(willOpen)closeTopMenus('btnAccountingMenu');m.style.display=willOpen?'flex':'none'};
 document.addEventListener('click',(e)=>{const box=$('#btnAccounting');const menu=$('#btnAccountingMenu');if(menu&&box&&!box.contains(e.target))menu.style.display='none'});
