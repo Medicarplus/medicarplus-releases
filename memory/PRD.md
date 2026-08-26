@@ -1083,3 +1083,15 @@ Crear trial → Cliente envía 2 msgs → Admin ve unread=2 → Admin responde �
 3. Placeholder actualizado: "🔍 Buscar por nombre, apellido o DNI…" (width 260px).
 4. Badge 🪪 con highlight amarillo cuando hay match.
 **Tests Playwright (4/4 OK)**: `12.345.678-A` → GARCIA · `X1234567Z` → MARTINEZ · `garcia` sigue funcionando (regresión OK) · DNI parcial `12345` encuentra ambos.
+
+### 🐛 FIX: Panel Notificaciones — "Marcar leída" no funcionaba + faltaba opción Borrar
+**Causa raíz**: El botón "Marcar leída" estaba `position:absolute; top:8px; right:8px`, solapado visualmente con el timestamp del mismo item. El usuario clicaba pensando que era la fecha y no había feedback claro. Además no existían botones de borrar.
+**Cambios**:
+1. Backend `admin_notifications.py`: nuevos endpoints `POST /admin/notifications/delete-all-read` y `POST /admin/notifications/delete-all`.
+2. Frontend `admin.html`:
+   - Cabecera del panel: 3 botones bien visibles → `✔ Marcar todas leídas`, `🗑 Borrar leídas`, `🗑 Borrar todas` (rojo, doble confirmación).
+   - `renderNotifItem`: los botones per-item ahora están en una **fila propia** al final del item (no absolute), con border-top dashed separador. Incluye `✔ Marcar leída` y `🗑 Borrar` (65px, altamente clicable).
+   - `markNotifRead()` / `deleteNotif()`: feedback visual (btn.disabled=true, texto '…') y alert on error.
+   - data-testids añadidos: `btn-notif-mark-all-read`, `btn-notif-delete-read`, `btn-notif-delete-all`, `notif-item`, `btn-notif-mark-read`, `btn-notif-delete`.
+**Test Playwright**: 27 items renderizados, todos con ambos botones visibles (89×21 y 65×21). Click Marcar → badge 27→26. Click Borrar → badge 26→25. Todos los endpoints backend curl OK.
+

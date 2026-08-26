@@ -165,6 +165,20 @@ def build_notifications_router(db):
         r = await db.notifications.delete_one({"id": nid})
         return {"ok": r.deleted_count > 0}
 
+    @router.post("/delete-all-read")
+    async def delete_all_read(x_admin_token: Optional[str] = Header(None)):
+        """Elimina TODAS las notificaciones marcadas como leídas."""
+        _admin_ok(x_admin_token)
+        r = await db.notifications.delete_many({"read": True})
+        return {"deleted": r.deleted_count}
+
+    @router.post("/delete-all")
+    async def delete_all(x_admin_token: Optional[str] = Header(None)):
+        """Elimina TODAS las notificaciones (leídas y no leídas). Irreversible."""
+        _admin_ok(x_admin_token)
+        r = await db.notifications.delete_many({})
+        return {"deleted": r.deleted_count}
+
     @router.post("/cleanup")
     async def cleanup_old(days: int = 90, x_admin_token: Optional[str] = Header(None)):
         """Elimina notificaciones LEÍDAS de hace más de `days` días."""

@@ -80,10 +80,12 @@
 
   <!-- 🔔 Panel de notificaciones (deslizable · fixed top-right) -->
   <div id="notifPanel" style="display:none;position:fixed;top:60px;right:16px;width:440px;max-width:calc(100vw - 32px);max-height:80vh;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.6);z-index:9999;overflow:hidden;font-family:Arial,sans-serif">
-    <div style="padding:14px 18px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:flex;justify-content:space-between;align-items:center">
+    <div style="padding:14px 18px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <span style="font-weight:700;font-size:14px">🔔 Notificaciones</span>
-      <div style="display:flex;gap:6px">
-        <button onclick="markAllNotifsRead()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700">✔ Marcar leídas</button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button onclick="markAllNotifsRead()" data-testid="btn-notif-mark-all-read" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700">✔ Marcar todas leídas</button>
+        <button onclick="deleteAllReadNotifs()" data-testid="btn-notif-delete-read" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700" title="Borra sólo las notificaciones ya leídas">🗑 Borrar leídas</button>
+        <button onclick="deleteAllNotifs()" data-testid="btn-notif-delete-all" style="background:rgba(220,38,38,.85);border:1px solid rgba(255,255,255,.35);color:#fff;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700" title="Borra TODAS las notificaciones (leídas + no leídas)">🗑 Borrar todas</button>
         <button onclick="toggleNotifPanel()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700">✕</button>
       </div>
     </div>
@@ -1578,35 +1580,85 @@ function renderNotifItem(n){
   const amount = n.amount_cents ? ` · <b style="color:#f5b301">${(n.amount_cents/100).toFixed(2).replace('.',',')} €</b>` : '';
   const link = n.invoice_url ? ` · <a href="${n.invoice_url}" target="_blank" style="color:#0ea5e9;font-size:11px">Factura ↗</a>` : '';
   const boldPrefix = isCritical && unread ? '<span style="background:#dc2626;color:#fff;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:800;margin-right:6px">URGENTE</span>' : '';
-  return `<div style="background:${bgColor};border-left:3px solid ${borderColor};padding:10px 12px;margin-bottom:6px;border-radius:6px;position:relative" data-notif-id="${n.id}">
+  const idEsc = String(n.id||'').replace(/'/g,"\\'");
+  return `<div data-testid="notif-item" style="background:${bgColor};border-left:3px solid ${borderColor};padding:10px 12px;margin-bottom:6px;border-radius:6px" data-notif-id="${n.id}">
     <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px">
-      <div style="font-size:12px;font-weight:${unread?'700':'400'};color:${unread?'#f5f5f5':'#94a3b8'}">${boldPrefix}${n.icon||''} ${(n.title||'').replace(/</g,'&lt;')}</div>
-      <div style="font-size:10px;color:#64748b;white-space:nowrap">${dt}</div>
+      <div style="font-size:12px;font-weight:${unread?'700':'400'};color:${unread?'#f5f5f5':'#94a3b8'};flex:1;min-width:0">${boldPrefix}${n.icon||''} ${(n.title||'').replace(/</g,'&lt;')}</div>
+      <div style="font-size:10px;color:#64748b;white-space:nowrap;flex-shrink:0">${dt}</div>
     </div>
     <div style="font-size:11px;color:${unread?'#cbd5e1':'#64748b'};line-height:1.5">${(n.message||'').replace(/</g,'&lt;')}${amount}${link}</div>
     ${n.email ? `<div style="font-size:10px;color:#94a3b8;margin-top:4px;font-family:monospace">${n.email.replace(/</g,'&lt;')}</div>` : ''}
-    ${unread ? `<button onclick="markNotifRead('${n.id}')" style="position:absolute;top:8px;right:8px;background:transparent;border:1px solid ${borderColor};color:${borderColor};padding:2px 6px;border-radius:3px;cursor:pointer;font-size:9px;font-weight:700">Marcar leída</button>` : ''}
+    <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:8px;padding-top:6px;border-top:1px dashed rgba(148,163,184,.2)">
+      ${unread ? `<button data-testid="btn-notif-mark-read" onclick="markNotifRead('${idEsc}', this)" style="background:${borderColor};border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700">✔ Marcar leída</button>` : `<span style="font-size:10px;color:#64748b;font-style:italic;padding:4px 10px">leída</span>`}
+      <button data-testid="btn-notif-delete" onclick="deleteNotif('${idEsc}', this)" style="background:transparent;border:1px solid #dc2626;color:#ef4444;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700" title="Borrar esta notificación">🗑 Borrar</button>
+    </div>
   </div>`;
 }
 
-async function markNotifRead(nid){
+async function markNotifRead(nid, btn){
   const tok = sessionStorage.getItem('mcp.admin.token');
   if(!tok) return;
+  if(btn){ btn.disabled = true; btn.textContent = '…'; }
   try{
-    await fetch(`/api/admin/notifications/${encodeURIComponent(nid)}/read`, {method:'POST', headers:{'X-Admin-Token':tok}});
+    const r = await fetch(`/api/admin/notifications/${encodeURIComponent(nid)}/read`, {method:'POST', headers:{'X-Admin-Token':tok}});
+    if(!r.ok){ alert(`Error ${r.status}: no se pudo marcar como leída`); if(btn){ btn.disabled=false; btn.textContent='✔ Marcar leída'; } return; }
     fetchNotifBadge();
     loadNotifList();
-  }catch(e){/* silent */}
+  }catch(e){ alert('Error de red: '+e.message); if(btn){ btn.disabled=false; btn.textContent='✔ Marcar leída'; } }
 }
 
 async function markAllNotifsRead(){
   const tok = sessionStorage.getItem('mcp.admin.token');
   if(!tok) return;
   try{
-    await fetch('/api/admin/notifications/mark-all-read', {method:'POST', headers:{'X-Admin-Token':tok}});
+    const r = await fetch('/api/admin/notifications/mark-all-read', {method:'POST', headers:{'X-Admin-Token':tok}});
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok){ alert(`Error ${r.status}: no se pudo marcar todo`); return; }
     fetchNotifBadge();
     loadNotifList();
-  }catch(e){/* silent */}
+  }catch(e){ alert('Error de red: '+e.message); }
+}
+
+async function deleteNotif(nid, btn){
+  if(!confirm('¿Borrar esta notificación? Esta acción no se puede deshacer.')) return;
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok) return;
+  if(btn){ btn.disabled = true; btn.textContent = '…'; }
+  try{
+    const r = await fetch(`/api/admin/notifications/${encodeURIComponent(nid)}`, {method:'DELETE', headers:{'X-Admin-Token':tok}});
+    if(!r.ok){ alert(`Error ${r.status}: no se pudo borrar`); if(btn){ btn.disabled=false; btn.textContent='🗑 Borrar'; } return; }
+    fetchNotifBadge();
+    loadNotifList();
+  }catch(e){ alert('Error de red: '+e.message); if(btn){ btn.disabled=false; btn.textContent='🗑 Borrar'; } }
+}
+
+async function deleteAllReadNotifs(){
+  if(!confirm('¿Borrar TODAS las notificaciones ya leídas?\n\nLas no leídas se conservarán. Esta acción no se puede deshacer.')) return;
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok) return;
+  try{
+    const r = await fetch('/api/admin/notifications/delete-all-read', {method:'POST', headers:{'X-Admin-Token':tok}});
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok){ alert(`Error ${r.status}: no se pudo borrar`); return; }
+    alert(`✅ ${j.deleted || 0} notificación(es) leída(s) eliminadas.`);
+    fetchNotifBadge();
+    loadNotifList();
+  }catch(e){ alert('Error de red: '+e.message); }
+}
+
+async function deleteAllNotifs(){
+  if(!confirm('⚠️ ¿Borrar TODAS las notificaciones (leídas y NO leídas)?\n\nPerderás toda la traza del panel. Esta acción no se puede deshacer.')) return;
+  if(!confirm('Confirmación final: se borrarán TODAS. ¿Continuar?')) return;
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok) return;
+  try{
+    const r = await fetch('/api/admin/notifications/delete-all', {method:'POST', headers:{'X-Admin-Token':tok}});
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok){ alert(`Error ${r.status}: no se pudo borrar`); return; }
+    alert(`✅ ${j.deleted || 0} notificación(es) eliminadas.`);
+    fetchNotifBadge();
+    loadNotifList();
+  }catch(e){ alert('Error de red: '+e.message); }
 }
 
 // ---------------- 🖥 Modal Ver Dispositivos (por licencia) ----------------
