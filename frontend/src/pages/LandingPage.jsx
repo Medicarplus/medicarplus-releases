@@ -15,23 +15,28 @@ const C = {
   greenSoft: "#7ee3aa",
 };
 
-const Feature = ({ icon, title, children }) => (
+const Feature = ({ icon, title, children, mockup, onOpen }) => (
   <div
     style={{
       background: C.bgCard,
       border: `1px solid ${C.border}`,
       borderRadius: 14,
       padding: "22px 20px",
-      transition: "transform .2s, border-color .2s",
+      transition: "transform .2s, border-color .2s, box-shadow .2s",
+      cursor: mockup ? "pointer" : "default",
+      position: "relative",
     }}
     onMouseEnter={(e) => {
       e.currentTarget.style.transform = "translateY(-4px)";
       e.currentTarget.style.borderColor = C.gold;
+      if (mockup) e.currentTarget.style.boxShadow = `0 8px 24px rgba(245,179,1,.15)`;
     }}
     onMouseLeave={(e) => {
       e.currentTarget.style.transform = "translateY(0)";
       e.currentTarget.style.borderColor = C.border;
+      e.currentTarget.style.boxShadow = "none";
     }}
+    onClick={() => mockup && onOpen && onOpen({ icon, title, mockup, children })}
     data-testid={`feature-card-${title.toLowerCase().replace(/\s/g, "-")}`}
   >
     <div style={{ fontSize: 32, marginBottom: 10 }}>{icon}</div>
@@ -39,8 +44,61 @@ const Feature = ({ icon, title, children }) => (
       {title}
     </h3>
     <p style={{ margin: 0, color: C.textDim, fontSize: 14, lineHeight: 1.55 }}>{children}</p>
+    {mockup && (
+      <div style={{ marginTop: 12, fontSize: 11, color: C.gold, fontWeight: 600, letterSpacing: ".5px" }}>
+        👆 CLICA PARA VER EJEMPLO
+      </div>
+    )}
   </div>
 );
+
+// Modal lightbox para las capturas de ejemplo · click fuera o dentro cierra
+const FeatureModal = ({ feature, onClose }) => {
+  useEffect(() => {
+    if (!feature) return;
+    const esc = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", esc);
+    document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", esc); document.body.style.overflow = ""; };
+  }, [feature, onClose]);
+  if (!feature) return null;
+  return (
+    <div
+      onClick={onClose}
+      data-testid="feature-modal-backdrop"
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,.85)", backdropFilter: "blur(8px)",
+        zIndex: 100000, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px",
+        animation: "fadeIn .2s ease",
+      }}
+    >
+      <div
+        style={{
+          background: C.bgCard, border: `2px solid ${C.gold}`, borderRadius: 16,
+          maxWidth: 900, width: "100%", maxHeight: "92vh", overflow: "auto",
+          boxShadow: "0 20px 60px rgba(0,0,0,.6)", cursor: "pointer",
+          animation: "slideUp .3s ease",
+        }}
+        onClick={onClose}
+      >
+        <div style={{ padding: "20px 24px 12px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 32, marginBottom: 4 }}>{feature.icon}</div>
+            <h2 style={{ margin: 0, color: C.gold, fontFamily: "Georgia, serif", fontSize: 22 }}>{feature.title}</h2>
+          </div>
+          <button
+            aria-label="Cerrar"
+            data-testid="feature-modal-close"
+            style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.text, width: 36, height: 36, borderRadius: 8, cursor: "pointer", fontSize: 18 }}
+          >✕</button>
+        </div>
+        <div style={{ padding: "16px 24px", color: C.textDim, fontSize: 14, lineHeight: 1.6 }}>{feature.children}</div>
+        <div style={{ padding: "0 24px 24px" }} dangerouslySetInnerHTML={{ __html: feature.mockup }} />
+        <div style={{ textAlign: "center", padding: "8px 24px 20px", color: C.textDim, fontSize: 11, fontStyle: "italic" }}>Clica en cualquier punto para cerrar · o pulsa Esc</div>
+      </div>
+    </div>
+  );
+};
 
 const PriceCard = ({ plan, monthlyPrice, annualPrice, period, features, highlighted, ctaHref, packageId, apiBase }) => {
   const price = period === "annual" ? annualPrice : monthlyPrice;
@@ -234,7 +292,20 @@ const PriceCard = ({ plan, monthlyPrice, annualPrice, period, features, highligh
 
 export default function LandingPage() {
   const [period, setPeriod] = useState("annual"); // annual | monthly
+  const [openFeature, setOpenFeature] = useState(null);
   const apiBase = process.env.REACT_APP_BACKEND_URL;
+
+  // 🎨 Mockups SVG estilizados para cada función · realistas pero simulados
+  const MOCKUP_DGT = `<div style="background:#0b1121;border:1px solid #1e293b;border-radius:8px;padding:16px;font-family:Consolas,monospace"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="color:#f5b301;font-weight:700;font-size:14px">📥 Import CSV DGT · Junio 2026</div><div style="background:#22c55e22;color:#22c55e;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700">✓ CARGADO</div></div><div style="background:#0f172a;border-radius:6px;padding:10px;margin-bottom:8px"><div style="color:#94a3b8;font-size:10px;letter-spacing:1px;margin-bottom:6px">DETECTADO AUTOMÁTICAMENTE</div><table style="width:100%;font-size:12px;color:#e2e8f0"><tr><td>📊 Total registros procesados</td><td style="text-align:right;color:#22d3ee;font-weight:700">613</td></tr><tr><td>🏫 Autoescuelas identificadas</td><td style="text-align:right;color:#22d3ee;font-weight:700">24</td></tr><tr><td>💵 TRÀFIC (mayoría)</td><td style="text-align:right;color:#f5b301;font-weight:700">310</td></tr><tr><td>💵 PARTICULAR (agregados ×4)</td><td style="text-align:right;color:#f5b301;font-weight:700">64</td></tr><tr><td>💵 CANJE + HOY-VOY + MABEL</td><td style="text-align:right;color:#f5b301;font-weight:700">87</td></tr><tr><td style="padding-top:8px;color:#22c55e">✅ Sin duplicados · Efectivo/Tarjeta/Bizum cuadrados</td><td></td></tr></table></div></div>`;
+  const MOCKUP_CERT = `<div style="background:#0b1121;border:1px solid #1e293b;border-radius:8px;padding:16px;font-family:'Segoe UI'"><div style="color:#f5b301;font-weight:700;margin-bottom:10px">📋 Certificados médicos · 2026</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px"><div style="background:#0f172a;border-left:3px solid #22d3ee;padding:8px 12px;border-radius:4px"><div style="font-size:10px;color:#94a3b8">Permiso conducir</div><div style="font-size:22px;color:#22d3ee;font-weight:700">847</div></div><div style="background:#0f172a;border-left:3px solid #3ddc97;padding:8px 12px;border-radius:4px"><div style="font-size:10px;color:#94a3b8">Armas</div><div style="font-size:22px;color:#3ddc97;font-weight:700">142</div></div><div style="background:#0f172a;border-left:3px solid #f5b301;padding:8px 12px;border-radius:4px"><div style="font-size:10px;color:#94a3b8">Embarcaciones</div><div style="font-size:22px;color:#f5b301;font-weight:700">89</div></div><div style="background:#0f172a;border-left:3px solid #c084fc;padding:8px 12px;border-radius:4px"><div style="font-size:10px;color:#94a3b8">Bomberos + Seguridad</div><div style="font-size:22px;color:#c084fc;font-weight:700">31</div></div></div><div style="background:#0f172a;padding:8px;border-radius:6px;font-size:11px;color:#94a3b8"><b style="color:#e2e8f0">Filtros:</b> Tipo · Rango fechas · Autoescuela · Forma de pago</div></div>`;
+  const MOCKUP_IRPF = `<div style="background:#0b1121;border:1px solid #1e293b;border-radius:8px;padding:16px;font-family:'Segoe UI'"><div style="color:#f5b301;font-weight:700;margin-bottom:10px">📊 IRPF · Trimestre 2 · 2026</div><table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="background:#1e293b"><th style="padding:8px;text-align:left;color:#94a3b8;font-size:10px">CONCEPTO</th><th style="padding:8px;text-align:right;color:#94a3b8;font-size:10px">BASE</th><th style="padding:8px;text-align:right;color:#94a3b8;font-size:10px">RETENCIÓN</th></tr></thead><tbody><tr><td style="padding:8px;color:#e2e8f0">Facturación bruta</td><td style="padding:8px;text-align:right;color:#22d3ee;font-family:Consolas">42.850,00 €</td><td style="padding:8px;text-align:right;color:#94a3b8">—</td></tr><tr><td style="padding:8px;color:#e2e8f0">IRPF autónomo (15%)</td><td style="padding:8px;text-align:right;color:#94a3b8">—</td><td style="padding:8px;text-align:right;color:#fbbf24;font-family:Consolas;font-weight:700">−6.427,50 €</td></tr><tr><td style="padding:8px;color:#e2e8f0">Gastos deducibles</td><td style="padding:8px;text-align:right;color:#94a3b8">—</td><td style="padding:8px;text-align:right;color:#f472b6;font-family:Consolas">−8.320,15 €</td></tr><tr style="background:#0f172a"><td style="padding:10px;color:#22c55e;font-weight:700">✓ NETO A DECLARAR</td><td></td><td style="padding:10px;text-align:right;color:#22c55e;font-family:Consolas;font-weight:700;font-size:14px">28.102,35 €</td></tr></tbody></table></div>`;
+  const MOCKUP_AUD = `<div style="background:#0b1121;border:1px solid #1e293b;border-radius:8px;padding:16px;font-family:'Segoe UI'"><div style="color:#f5b301;font-weight:700;margin-bottom:10px">🔍 Auditoría inteligente</div><div style="background:#7f1d1d22;border:1px solid #ef4444;border-radius:6px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:center"><div style="font-size:20px">⚠️</div><div style="flex:1"><div style="color:#fecaca;font-weight:700;font-size:13px">3 importes en 0€ detectados</div><div style="font-size:11px;color:#94a3b8">Renovaciones sin cobro · posibles interrumpidas</div></div><button style="background:#ef4444;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:11px;font-weight:700">REVISAR</button></div><div style="background:#78350f22;border:1px solid #f59e0b;border-radius:6px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:center"><div style="font-size:20px">🔄</div><div style="flex:1"><div style="color:#fde68a;font-weight:700;font-size:13px">2 duplicados de cliente hoy</div><div style="font-size:11px;color:#94a3b8">Mismo nombre, mismo grupo · verificar</div></div><button style="background:#f59e0b;color:#0b1121;border:none;padding:4px 10px;border-radius:4px;font-size:11px;font-weight:700">REVISAR</button></div><div style="background:#065f4622;border:1px solid #22c55e;border-radius:6px;padding:10px;display:flex;gap:10px;align-items:center"><div style="font-size:20px">✅</div><div style="flex:1"><div style="color:#6ee7b7;font-weight:700;font-size:13px">Efectivo cuadrado: 1.234,50 €</div><div style="font-size:11px;color:#94a3b8">Sin discrepancias entre caja y sistema</div></div></div></div>`;
+  const MOCKUP_CAMBIO = `<div style="background:#0b1121;border:1px solid #1e293b;border-radius:8px;padding:16px;font-family:'Segoe UI'"><div style="color:#f5b301;font-weight:700;margin-bottom:10px">💰 Reserva de cambio · Caja física</div><table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="background:#1e293b"><th style="padding:6px 10px;text-align:left;color:#94a3b8;font-size:10px">DENOM.</th><th style="padding:6px 10px;text-align:right;color:#94a3b8;font-size:10px">CANT.</th><th style="padding:6px 10px;text-align:right;color:#94a3b8;font-size:10px">TOTAL</th></tr></thead><tbody><tr><td style="padding:5px 10px;color:#e2e8f0">🟦 Billete 50€</td><td style="padding:5px 10px;text-align:right;color:#22d3ee">4</td><td style="padding:5px 10px;text-align:right;color:#f5b301;font-family:Consolas">200,00 €</td></tr><tr><td style="padding:5px 10px;color:#e2e8f0">🟩 Billete 20€</td><td style="padding:5px 10px;text-align:right;color:#22d3ee">10</td><td style="padding:5px 10px;text-align:right;color:#f5b301;font-family:Consolas">200,00 €</td></tr><tr><td style="padding:5px 10px;color:#e2e8f0">🟨 Billete 10€</td><td style="padding:5px 10px;text-align:right;color:#22d3ee">15</td><td style="padding:5px 10px;text-align:right;color:#f5b301;font-family:Consolas">150,00 €</td></tr><tr><td style="padding:5px 10px;color:#e2e8f0">🟥 Billete 5€</td><td style="padding:5px 10px;text-align:right;color:#22d3ee">20</td><td style="padding:5px 10px;text-align:right;color:#f5b301;font-family:Consolas">100,00 €</td></tr><tr><td style="padding:5px 10px;color:#e2e8f0">🪙 Monedas mixtas</td><td style="padding:5px 10px;text-align:right;color:#22d3ee">-</td><td style="padding:5px 10px;text-align:right;color:#f5b301;font-family:Consolas">47,30 €</td></tr><tr style="background:#0f172a"><td style="padding:8px 10px;color:#22c55e;font-weight:700">✓ TOTAL CAJA</td><td></td><td style="padding:8px 10px;text-align:right;color:#22c55e;font-family:Consolas;font-weight:700;font-size:14px">697,30 €</td></tr></tbody></table></div>`;
+  const MOCKUP_SEC = `<div style="background:#0b1121;border:1px solid #1e293b;border-radius:8px;padding:16px;font-family:'Segoe UI';text-align:center"><div style="font-size:48px;margin-bottom:10px">🔒</div><div style="color:#f5b301;font-weight:700;font-size:16px;margin-bottom:14px">100% Offline · 100% Privado</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px"><div style="background:#0f172a;padding:12px;border-radius:6px;text-align:left"><div style="color:#22c55e;font-weight:700;margin-bottom:4px">✓ Sin internet</div><div style="color:#94a3b8;font-size:11px">Funciona en tu ordenador. Nunca subes datos a la nube.</div></div><div style="background:#0f172a;padding:12px;border-radius:6px;text-align:left"><div style="color:#22c55e;font-weight:700;margin-bottom:4px">✓ RGPD compliant</div><div style="color:#94a3b8;font-size:11px">Datos cifrados en local · sin transferencias a terceros.</div></div><div style="background:#0f172a;padding:12px;border-radius:6px;text-align:left"><div style="color:#22c55e;font-weight:700;margin-bottom:4px">✓ Backup automático</div><div style="color:#94a3b8;font-size:11px">Snapshot cada 10 min · restauración a un clic.</div></div><div style="background:#0f172a;padding:12px;border-radius:6px;text-align:left"><div style="color:#22c55e;font-weight:700;margin-bottom:4px">✓ Sin suscripción cloud</div><div style="color:#94a3b8;font-size:11px">Tu licencia = tuyo para siempre. Sin sorpresas.</div></div></div></div>`;
+  const MOCKUP_SMS = `<div style="background:#0b1121;border:1px solid #1e293b;border-radius:8px;padding:16px;font-family:'Segoe UI'"><div style="color:#f5b301;font-weight:700;margin-bottom:10px">📱 Campaña SMS · Recordatorios DGT</div><div style="background:#0f172a;padding:14px;border-radius:8px;margin-bottom:8px"><div style="font-size:11px;color:#94a3b8;margin-bottom:6px">DESTINATARIOS DETECTADOS AUTOMÁTICAMENTE</div><div style="font-size:22px;color:#22d3ee;font-weight:700">142 clientes</div><div style="font-size:12px;color:#94a3b8">Con permiso de conducir que caduca en los próximos 45 días</div></div><div style="background:#065f4622;border:1px solid #22c55e;border-radius:8px;padding:12px;margin-bottom:8px;font-family:Consolas,monospace;font-size:11px;color:#6ee7b7;line-height:1.6">"Hola {NOMBRE}, tu permiso de conducir caduca el {FECHA}. En MediCar Plus tenemos cita disponible. Reserva llamando al 93 XXX XX XX. — Autoescola X"</div><div style="display:flex;justify-content:space-between;font-size:12px"><div style="color:#94a3b8">Coste estimado</div><div style="color:#f5b301;font-weight:700">142 × 0,10 € = 14,20 €</div></div><button style="width:100%;margin-top:10px;background:#22c55e;color:#0b1121;border:none;padding:8px;border-radius:6px;font-weight:700;font-size:13px">✓ ENVIAR CAMPAÑA</button></div>`;
+  const MOCKUP_PRINT = `<div style="background:#0b1121;border:1px solid #1e293b;border-radius:8px;padding:16px;font-family:'Segoe UI'"><div style="color:#f5b301;font-weight:700;margin-bottom:10px">🖨️ Informes profesionales</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><div style="background:#0f172a;padding:12px;border-radius:6px;text-align:center;border-top:3px solid #22d3ee"><div style="font-size:24px;margin-bottom:4px">📅</div><div style="color:#22d3ee;font-weight:700;font-size:12px">Cierre diario</div><div style="color:#94a3b8;font-size:10px;margin-top:4px">Efectivo · Tarjeta · Bizum · Detalles</div></div><div style="background:#0f172a;padding:12px;border-radius:6px;text-align:center;border-top:3px solid #f5b301"><div style="font-size:24px;margin-bottom:4px">📊</div><div style="color:#f5b301;font-weight:700;font-size:12px">Resumen mensual</div><div style="color:#94a3b8;font-size:10px;margin-top:4px">Estadísticas por autoescuela + evolución</div></div><div style="background:#0f172a;padding:12px;border-radius:6px;text-align:center;border-top:3px solid #3ddc97"><div style="font-size:24px;margin-bottom:4px">📆</div><div style="color:#3ddc97;font-weight:700;font-size:12px">Informe anual</div><div style="color:#94a3b8;font-size:10px;margin-top:4px">Total facturación + comparativa año anterior</div></div><div style="background:#0f172a;padding:12px;border-radius:6px;text-align:center;border-top:3px solid #c084fc"><div style="font-size:24px;margin-bottom:4px">📓</div><div style="color:#c084fc;font-weight:700;font-size:12px">Libro de registro</div><div style="color:#94a3b8;font-size:10px;margin-top:4px">Contabilidad oficial · asientos Debe/Haber</div></div><div style="background:#0f172a;padding:12px;border-radius:6px;text-align:center;border-top:3px solid #f472b6"><div style="font-size:24px;margin-bottom:4px">💼</div><div style="color:#f472b6;font-weight:700;font-size:12px">Honorarios</div><div style="color:#94a3b8;font-size:10px;margin-top:4px">Pagos a trabajadores por mes</div></div><div style="background:#0f172a;padding:12px;border-radius:6px;text-align:center;border-top:3px solid #fb923c"><div style="font-size:24px;margin-bottom:4px">📥</div><div style="color:#fb923c;font-weight:700;font-size:12px">Export IRPF</div><div style="color:#94a3b8;font-size:10px;margin-top:4px">Trimestres listos para Hacienda</div></div></div><div style="text-align:center;margin-top:10px;color:#94a3b8;font-size:11px;font-style:italic">Todos exportables a PDF o impresión directa</div></div>`;
+  const MOCKUP_UPD = `<div style="background:#0b1121;border:1px solid #1e293b;border-radius:8px;padding:16px;font-family:'Segoe UI'"><div style="color:#f5b301;font-weight:700;margin-bottom:14px">🔄 Actualizaciones automáticas</div><div style="background:#065f4622;border:1px solid #22c55e;border-radius:8px;padding:12px;margin-bottom:8px;display:flex;gap:10px;align-items:center"><div style="font-size:20px">✅</div><div style="flex:1"><div style="color:#6ee7b7;font-weight:700">MediCar Plus v2.14.3</div><div style="font-size:11px;color:#94a3b8">Última versión · descargada e instalada hace 2 min</div></div></div><div style="background:#0f172a;padding:12px;border-radius:6px;font-size:12px;color:#e2e8f0"><div style="color:#22d3ee;font-weight:700;margin-bottom:6px;font-size:11px;letter-spacing:1px">NOVEDADES DE ESTA VERSIÓN</div><ul style="margin:0;padding-left:18px;line-height:1.7"><li>Buscador global con sinónimos ⚡</li><li>Gráfico comparación 2 años en Autoescuelas 📈</li><li>Autocompletar nombres de trabajadores en nóminas 🧠</li><li>Panel Honorarios por mes con impresión PDF 💼</li></ul></div><div style="text-align:center;margin-top:10px;color:#94a3b8;font-size:11px;font-style:italic">Sin instalar nada. Sin reiniciar el ordenador. Sin coste extra.</div></div>`;
+
 
   useEffect(() => {
     document.title = "MediCar Plus · Software para centros de reconocimiento médico";
@@ -502,39 +573,39 @@ export default function LandingPage() {
               gap: 18,
             }}
           >
-            <Feature icon="🚗" title="Importación DGT">
+            <Feature icon="🚗" title="Importación DGT" mockup={MOCKUP_DGT} onOpen={setOpenFeature}>
               Carga los archivos CSV de la DGT en un clic. Detecta duplicados, agrupa clientes y
               cuadra automáticamente el efectivo, tarjeta, Bizum y transferencia.
             </Feature>
-            <Feature icon="📋" title="Certificados médicos">
+            <Feature icon="📋" title="Certificados médicos" mockup={MOCKUP_CERT} onOpen={setOpenFeature}>
               Registro completo de certificados de conducir, permisos, embarcaciones, armas y
               bomberos. Filtros por tipo y período.
             </Feature>
-            <Feature icon="📊" title="Contabilidad IRPF">
+            <Feature icon="📊" title="Contabilidad IRPF" mockup={MOCKUP_IRPF} onOpen={setOpenFeature}>
               Retención IRPF configurable por empresa (7% autónomos nuevos, 15% general, 19%
               capital). Cálculos trimestrales listos para Hacienda.
             </Feature>
-            <Feature icon="🔍" title="Auditoría inteligente">
+            <Feature icon="🔍" title="Auditoría inteligente" mockup={MOCKUP_AUD} onOpen={setOpenFeature}>
               Detecta errores (importes 0€, duplicados de grupo, discrepancias efectivo/tarjeta) con
               filtros por categoría. Nunca más un cuadre erróneo.
             </Feature>
-            <Feature icon="💰" title="Reserva de cambio">
+            <Feature icon="💰" title="Reserva de cambio" mockup={MOCKUP_CAMBIO} onOpen={setOpenFeature}>
               Control por paquetes de monedas y billetes. Repercute automáticamente al saldo
               anterior y a la caja física. Perfecto para el cambio diario.
             </Feature>
-            <Feature icon="🔒" title="100% seguro y offline">
+            <Feature icon="🔒" title="100% seguro y offline" mockup={MOCKUP_SEC} onOpen={setOpenFeature}>
               Funciona sin internet. Tus datos nunca salen de tu ordenador. Backups automáticos
               cifrados. Cumple RGPD y LOPDGDD.
             </Feature>
-            <Feature icon="📱" title="SMS y WhatsApp (Premium)">
+            <Feature icon="📱" title="SMS y WhatsApp (Premium)" mockup={MOCKUP_SMS} onOpen={setOpenFeature}>
               Envío automático de recordatorios de renovación DGT y avisos de certificados
               expirados. Ideal para fidelizar clientes.
             </Feature>
-            <Feature icon="🖨️" title="Informes profesionales">
+            <Feature icon="🖨️" title="Informes profesionales" mockup={MOCKUP_PRINT} onOpen={setOpenFeature}>
               Cierre diario, resumen mensual, informe anual, ledger de libreta y export IRPF.
               Impresión directa o PDF.
             </Feature>
-            <Feature icon="🔄" title="Actualizaciones automáticas">
+            <Feature icon="🔄" title="Actualizaciones automáticas" mockup={MOCKUP_UPD} onOpen={setOpenFeature}>
               El programa se actualiza solo. Nuevas funcionalidades, mejoras y correcciones sin que
               tengas que hacer nada.
             </Feature>
@@ -930,6 +1001,7 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+      <FeatureModal feature={openFeature} onClose={() => setOpenFeature(null)} />
     </div>
   );
 }
