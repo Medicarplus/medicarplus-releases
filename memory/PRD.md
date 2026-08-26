@@ -853,3 +853,22 @@ Separar de forma inequívoca **Gastos del centro** (luz, agua, alquiler, papel, 
 ### Testing
 - 10/10 assertions pasan (validación headless via `page.evaluate` con datos ficticios).
 - Verificación visual de chips en pestaña Debe/Haber ✅.
+
+## 2026-02 (b) · Detección universal de gastos + Asesor IA con rango (DONE)
+
+### 1. Keyword universal "OTROS"
+Nuevo grupo de keywords que atrapa cualquier concepto genérico de gasto: `factura`, `recibo`, `gasto`, `despesa`, `despeses`, `pago proveedor`, `proveedor`, `compra`, `compras`. Así si el usuario escribe `Factura X` sin categoría específica → detectado como Gasto (categoría OTROS).
+
+### 2. Asesor IA · Selector de rango de fechas
+- **Nuevos inputs**: `Desde` / `Hasta` / `Descuadre` (grid 3 columnas)
+- **Filtrado front-end**: si el usuario define rango, `filterByDate()` corta los datos localmente antes de enviarlos → menos tokens, más rápido, más preciso
+- **Audit summary limitado al rango**: `computeAudit(dFrom,dTo)` usa el rango del usuario (o últimos 12 meses si no)
+- **Prompt enriquecido**: se añade `[Rango solicitado: X → Y]` a la pregunta para que la IA lo tenga presente
+- **Payload nuevo**: `dateRange:{from,to}` (opcional) enviado al backend
+
+### 3. Casos de uso soportados
+- *"Del 1/7 al 31/7 me faltan 4€, ¿puedes repasar?"* → filtra solo julio y busca candidatos que sumen 4€
+- *"Busca duplicados esta semana"* → rango últimos 7 días
+- *"¿Qué gastos he tenido este mes?"* → rango mes en curso
+- *"Encuentra días con caja rara"* → sin rango = todo el histórico
+
