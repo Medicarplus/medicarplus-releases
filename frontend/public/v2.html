@@ -3221,10 +3221,22 @@ function openGastosPanel(){
   }
   const fmtEUR = v => v.toFixed(2).replace('.',',')+' €';
   const fmtDate = iso => { const [y,m,d] = iso.split('-'); return `${d}/${m}/${y}`; };
-  const fmtMonth = ym => { const [y,m] = ym.split('-'); const mn = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][+m-1]; return `${mn} ${y}`; };
-  const allMonths = Array.from(new Set(allEntries.map(e => e.date.substring(0,7)))).sort().reverse();
-  const currentMonth = new Date().toISOString().slice(0,7);
-  const initialMonth = allMonths.includes(currentMonth) ? currentMonth : (allMonths[0] || currentMonth);
+  const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const fmtMonth = ym => { const [y,m] = ym.split('-'); return `${MONTH_NAMES[+m-1]} ${y}`; };
+  // Años disponibles: de datos + últimos 3 años + año actual + año siguiente
+  const yearSet = new Set(allEntries.map(e => e.date.substring(0,4)));
+  for(const key of ['caja.v1','caja.cempla.v1']){
+    try{
+      const bd = (JSON.parse(localStorage.getItem(key)||'{"byDate":{}}').byDate)||{};
+      for(const iso of Object.keys(bd)){ if((bd[iso]||[]).length) yearSet.add(iso.substring(0,4)); }
+    }catch(_){}
+  }
+  const nowYear = new Date().getFullYear();
+  for(let i=0;i<4;i++){ yearSet.add(String(nowYear-i)); }
+  const allYears = Array.from(yearSet).sort().reverse();
+  const monthsWithGastos = new Set(allEntries.map(e => e.date.substring(0,7)));
+  const currentYear = String(nowYear);
+  const currentMonth = String(new Date().getMonth()+1).padStart(2,'0');
 
   const back = document.createElement('div');
   back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto';
@@ -3232,11 +3244,14 @@ function openGastosPanel(){
     <div class="no-print" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px">
       <div><h3 style="margin:0;color:#f472b6;font-family:Georgia,serif">🧾 Gastos · Facturas y recibos operativos</h3><div id="_gs_subtitle" style="font-size:11px;color:#94a3b8;margin-top:3px"></div></div>
       <div style="display:flex;gap:8px;align-items:center">
-        <label style="font-size:10px;color:#94a3b8;font-weight:700">MES</label>
+        <label style="font-size:10px;color:#94a3b8;font-weight:700">AÑO</label>
+        <select id="_gs_year" data-testid="gastos-year-select" style="background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;padding:6px 10px;font-size:13px">
+          ${allYears.map(y => `<option value="${y}" ${y===currentYear?'selected':''}>${y}</option>`).join('')}
+        </select>
+        <label style="font-size:10px;color:#94a3b8;font-weight:700;margin-left:6px">MES</label>
         <select id="_gs_month" data-testid="gastos-month-select" style="background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;padding:6px 10px;font-size:13px">
-          <option value="__ALL__">📆 Todos los meses</option>
-          ${allMonths.map(ym => `<option value="${ym}" ${ym===initialMonth?'selected':''}>${fmtMonth(ym)}</option>`).join('')}
-          ${allMonths.length===0 ? `<option value="${currentMonth}" selected>${fmtMonth(currentMonth)}</option>` : ''}
+          <option value="__ALL__">📆 Todo el año</option>
+          ${MONTH_NAMES.map((mn,i)=>{ const mm=String(i+1).padStart(2,'0'); return `<option value="${mm}" ${mm===currentMonth?'selected':''}>${mn}</option>`; }).join('')}
         </select>
         <button id="_gs_print" data-testid="gastos-print" style="background:linear-gradient(135deg,#f472b6,#be185d);color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px">🖨️ Imprimir</button>
         <button id="_gs_close" data-testid="gastos-close" style="background:#334155;color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer">✕ Cerrar</button>
@@ -3247,8 +3262,13 @@ function openGastosPanel(){
   </div>`;
   document.body.appendChild(back);
 
-  function renderBody(monthFilter){
-    const filtered = monthFilter === '__ALL__' ? allEntries.slice() : allEntries.filter(e => e.date.substring(0,7) === monthFilter);
+  function renderBody(year, monthNum){
+    // monthNum = '__ALL__' → todo el año | 'MM' → mes concreto
+    const filtered = allEntries.filter(e => {
+      if(e.date.substring(0,4) !== year) return false;
+      if(monthNum === '__ALL__') return true;
+      return e.date.substring(5,7) === monthNum;
+    });
     const byMonth = {};
     const byCategory = {};
     let totalGlobal = 0;
@@ -3264,7 +3284,7 @@ function openGastosPanel(){
     const categories = Object.keys(byCategory).sort((a,b)=>byCategory[b].total - byCategory[a].total);
     const subt = document.getElementById('_gs_subtitle');
     if(subt){
-      const scope = monthFilter === '__ALL__' ? 'Todo el histórico' : fmtMonth(monthFilter);
+      const scope = monthNum === '__ALL__' ? `Todo ${year}` : `${MONTH_NAMES[+monthNum-1]} ${year}`;
       subt.innerHTML = `${filtered.length} gastos · Total: <b style="color:#ef4444" data-testid="gastos-total">${fmtEUR(totalGlobal)}</b> · <span style="color:#f472b6">${scope}</span>`;
     }
     const catsHtml = categories.length ? categories.map(c => `<span style="background:#1e293b;padding:4px 10px;border-radius:20px;font-size:11px;margin-right:6px;border-left:3px solid ${_gsCategoryColor(c)}"><b style="color:${_gsCategoryColor(c)}">${_gsCategoryLabel(c)}</b> · ${byCategory[c].count} · <b>${fmtEUR(byCategory[c].total)}</b></span>`).join('') : '';
@@ -3274,19 +3294,38 @@ function openGastosPanel(){
       const rows = list.map(e => {
         const fpFull = ({E:'Efectivo',T:'Banco',B:'Bizum',X:'Otros'})[e.fp] || e.fp || '—';
         const cn = (typeof _companyName === 'function' ? _companyName(e.company) : e.company);
-        return `<tr><td style="padding:5px 10px;font-size:12px">${fmtDate(e.date)}</td><td style="padding:5px 10px"><span style="background:${_gsCategoryColor(e.cat)}22;color:${_gsCategoryColor(e.cat)};padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700">${_gsCategoryLabel(e.cat)}</span></td><td style="padding:5px 10px;font-size:12px;font-weight:600">${e.name.replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:11px;color:#64748b">${cn}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${fpFull}</td><td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700;color:#ef4444">-${fmtEUR(e.amount)}</td></tr>`;
+        return `<tr data-goto-date="${e.date}" data-goto-company="${e.company}" style="cursor:pointer" title="Clic para ir al día ${fmtDate(e.date)}"><td style="padding:5px 10px;font-size:12px">${fmtDate(e.date)}</td><td style="padding:5px 10px"><span style="background:${_gsCategoryColor(e.cat)}22;color:${_gsCategoryColor(e.cat)};padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700">${_gsCategoryLabel(e.cat)}</span></td><td style="padding:5px 10px;font-size:12px;font-weight:600">${e.name.replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:11px;color:#64748b">${cn}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${fpFull}</td><td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700;color:#ef4444">-${fmtEUR(e.amount)}</td></tr>`;
       }).join('');
       return `<div style="margin-bottom:16px;background:#0f172a;border:1px solid #334155;border-radius:8px;overflow:hidden"><div style="background:#1e293b;padding:8px 14px;display:flex;justify-content:space-between;align-items:center"><b style="color:#f472b6">📅 ${fmtMonth(ym)}</b><span style="color:#ef4444;font-weight:700">-${fmtEUR(monthTotal)}</span></div><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#111827"><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Fecha</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Categoría</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Concepto</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Empresa</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Pago</th><th style="padding:5px 10px;text-align:right;font-size:10px;color:#94a3b8">Importe</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }).join('') : '<div style="padding:20px;text-align:center;color:#64748b;font-style:italic">Sin gastos en este período. Añade una entrada Debe/Haber con concepto como "Factura Endesa", "Recibo agua", "Alquiler local", "Seguro Mapfre"…</div>';
     document.getElementById('_gs_body').innerHTML = `${catsHtml ? `<div style="margin-bottom:16px">${catsHtml}</div>` : ''}<div>${monthsHtml}</div>`;
+    // Filas clicables → cerrar modal + navegar al día
+    document.getElementById('_gs_body').querySelectorAll('tr[data-goto-date]').forEach(tr => {
+      tr.addEventListener('mouseenter', () => tr.style.background = 'rgba(244,114,182,.08)');
+      tr.addEventListener('mouseleave', () => tr.style.background = '');
+      tr.addEventListener('click', () => {
+        const targetDate = tr.dataset.gotoDate;
+        const targetCompany = tr.dataset.gotoCompany;
+        try{
+          if(targetCompany && targetCompany !== currentCompany && typeof switchCompany === 'function'){
+            switchCompany(targetCompany);
+          }
+          if(typeof setDate === 'function') setDate(targetDate);
+        }catch(_){}
+        back.remove();
+      });
+    });
   }
 
+  const yearSel = back.querySelector('#_gs_year');
   const monthSel = back.querySelector('#_gs_month');
-  monthSel.addEventListener('change', () => renderBody(monthSel.value));
+  const rerender = () => renderBody(yearSel.value, monthSel.value);
+  yearSel.addEventListener('change', rerender);
+  monthSel.addEventListener('change', rerender);
   back.querySelector('#_gs_close').onclick = () => back.remove();
   back.querySelector('#_gs_print').onclick = () => {
     const modal = back.querySelector('.gs-modal');
-    const scope = monthSel.value === '__ALL__' ? 'Todo el histórico' : fmtMonth(monthSel.value);
+    const scope = monthSel.value === '__ALL__' ? `Todo ${yearSel.value}` : `${MONTH_NAMES[+monthSel.value-1]} ${yearSel.value}`;
     printVisibleElement(modal, {
       title: `Gastos · ${scope}`,
       landscape: false,
@@ -3305,7 +3344,7 @@ function openGastosPanel(){
   };
   back.addEventListener('click', ev => { if(ev.target === back) back.remove(); });
   document.addEventListener('keydown', function esc(ev){ if(ev.key === 'Escape'){ back.remove(); document.removeEventListener('keydown', esc); } });
-  renderBody(initialMonth);
+  rerender();
 }
 
 // 💼 Panel de Honorarios: consulta pagos a trabajadores + faenas externas por mes
@@ -3411,12 +3450,22 @@ function openHonorariosPanel(){
   }
   const fmtEUR = v => v.toFixed(2).replace('.',',')+' €';
   const fmtDate = iso => { const [y,m,d] = iso.split('-'); return `${d}/${m}/${y}`; };
-  const fmtMonth = ym => { const [y,m] = ym.split('-'); const mn = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][+m-1]; return `${mn} ${y}`; };
+  const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const fmtMonth = ym => { const [y,m] = ym.split('-'); return `${MONTH_NAMES[+m-1]} ${y}`; };
 
-  // Meses disponibles (para el selector)
-  const allMonths = Array.from(new Set(allEntries.map(e => e.date.substring(0,7)))).sort().reverse();
-  const currentMonth = new Date().toISOString().slice(0,7);
-  const initialMonth = allMonths.includes(currentMonth) ? currentMonth : (allMonths[0] || currentMonth);
+  // Años disponibles: de datos + últimos 3 años + año actual
+  const yearSet = new Set(allEntries.map(e => e.date.substring(0,4)));
+  for(const key of ['caja.v1','caja.cempla.v1']){
+    try{
+      const bd = (JSON.parse(localStorage.getItem(key)||'{"byDate":{}}').byDate)||{};
+      for(const iso of Object.keys(bd)){ if((bd[iso]||[]).length) yearSet.add(iso.substring(0,4)); }
+    }catch(_){}
+  }
+  const nowYear = new Date().getFullYear();
+  for(let i=0;i<4;i++){ yearSet.add(String(nowYear-i)); }
+  const allYears = Array.from(yearSet).sort().reverse();
+  const currentYear = String(nowYear);
+  const currentMonth = String(new Date().getMonth()+1).padStart(2,'0');
 
   const back = document.createElement('div');
   back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto';
@@ -3424,11 +3473,14 @@ function openHonorariosPanel(){
     <div class="no-print" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px">
       <div><h3 style="margin:0;color:#fbbf24;font-family:Georgia,serif">💼 Honorarios · Pagos a trabajadores</h3><div id="_hn_subtitle" style="font-size:11px;color:#94a3b8;margin-top:3px"></div></div>
       <div style="display:flex;gap:8px;align-items:center">
-        <label style="font-size:10px;color:#94a3b8;font-weight:700">MES</label>
+        <label style="font-size:10px;color:#94a3b8;font-weight:700">AÑO</label>
+        <select id="_hn_year" data-testid="honorarios-year-select" style="background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;padding:6px 10px;font-size:13px">
+          ${allYears.map(y => `<option value="${y}" ${y===currentYear?'selected':''}>${y}</option>`).join('')}
+        </select>
+        <label style="font-size:10px;color:#94a3b8;font-weight:700;margin-left:6px">MES</label>
         <select id="_hn_month" data-testid="honorarios-month-select" style="background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;padding:6px 10px;font-size:13px">
-          <option value="__ALL__">📆 Todos los meses</option>
-          ${allMonths.map(ym => `<option value="${ym}" ${ym===initialMonth?'selected':''}>${fmtMonth(ym)}</option>`).join('')}
-          ${allMonths.length===0 ? `<option value="${currentMonth}" selected>${fmtMonth(currentMonth)}</option>` : ''}
+          <option value="__ALL__">📆 Todo el año</option>
+          ${MONTH_NAMES.map((mn,i)=>{ const mm=String(i+1).padStart(2,'0'); return `<option value="${mm}" ${mm===currentMonth?'selected':''}>${mn}</option>`; }).join('')}
         </select>
         <button id="_hn_print" data-testid="honorarios-print" style="background:linear-gradient(135deg,#fbbf24,#d97706);color:#0b1121;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px">🖨️ Imprimir</button>
         <button id="_hn_close" data-testid="honorarios-close" style="background:#334155;color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer">✕ Cerrar</button>
@@ -3446,8 +3498,12 @@ function openHonorariosPanel(){
   </div>`;
   document.body.appendChild(back);
 
-  function renderBody(monthFilter){
-    const filtered = monthFilter === '__ALL__' ? allEntries.slice() : allEntries.filter(e => e.date.substring(0,7) === monthFilter);
+  function renderBody(year, monthNum){
+    const filtered = allEntries.filter(e => {
+      if(e.date.substring(0,4) !== year) return false;
+      if(monthNum === '__ALL__') return true;
+      return e.date.substring(5,7) === monthNum;
+    });
     // Agrupar por año-mes y por trabajador
     const byMonth = {};
     const byWorker = {};
@@ -3472,7 +3528,7 @@ function openHonorariosPanel(){
     // Actualizar subtitle
     const subt = document.getElementById('_hn_subtitle');
     if(subt){
-      const scope = monthFilter === '__ALL__' ? 'Todo el histórico' : fmtMonth(monthFilter);
+      const scope = monthNum === '__ALL__' ? `Todo ${year}` : `${MONTH_NAMES[+monthNum-1]} ${year}`;
       subt.innerHTML = `${filtered.length} pagos · Total: <b style="color:#22c55e" data-testid="honorarios-total">${fmtEUR(totalGlobal)}</b> · <span style="color:#fbbf24">${scope}</span>`;
     }
 
@@ -3508,8 +3564,11 @@ function openHonorariosPanel(){
       <div><h4 style="margin:0 0 8px 0;color:#e2e8f0;font-size:13px">🗓 Detalle</h4>${monthsHtml}</div>`;
   }
 
+  const yearSel = back.querySelector('#_hn_year');
   const monthSel = back.querySelector('#_hn_month');
-  monthSel.addEventListener('change', () => renderBody(monthSel.value));
+  const rerender = () => renderBody(yearSel.value, monthSel.value);
+  yearSel.addEventListener('change', rerender);
+  monthSel.addEventListener('change', rerender);
   back.querySelector('#_hn_close').onclick = () => back.remove();
   // Botón de conversión legacy HABER→DEBE
   const fixBtn = back.querySelector('#_hn_fix_legacy');
@@ -3550,7 +3609,7 @@ function openHonorariosPanel(){
   }
   back.querySelector('#_hn_print').onclick = () => {
     const modal = back.querySelector('.hn-modal');
-    const scope = monthSel.value === '__ALL__' ? 'Todo el histórico' : fmtMonth(monthSel.value);
+    const scope = monthSel.value === '__ALL__' ? `Todo ${yearSel.value}` : `${MONTH_NAMES[+monthSel.value-1]} ${yearSel.value}`;
     printVisibleElement(modal, {
       title: `Honorarios · ${scope}`,
       landscape: false,
@@ -3573,7 +3632,7 @@ function openHonorariosPanel(){
   back.addEventListener('click', ev => { if(ev.target === back) back.remove(); });
   document.addEventListener('keydown', function esc(ev){ if(ev.key === 'Escape'){ back.remove(); document.removeEventListener('keydown', esc); } });
 
-  renderBody(initialMonth);
+  rerender();
 }
 
 $('#btnWhatsNewMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';showWhatsNew(true)};
