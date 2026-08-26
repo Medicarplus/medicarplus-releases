@@ -9059,6 +9059,7 @@ function showLicenseInfo(){
     +'</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">'
     +((lic&&lic.type==='JWT'&&LIC.VERIFY_URL)?'<button class="btn" id="btnVerifyNow" data-testid="btn-verify-now" style="background:#0891b2;color:#fff;border-color:#0891b2">↻ Verificar ahora</button>':'')
+    +'<button class="btn" id="btnContactSupport" data-testid="btn-contact-support" style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none">💬 Contactar Soporte</button>'
     +'<button class="btn" id="btnDeactivate" style="background:#b91c1c;color:#fff;border-color:#b91c1c">↺ Desactivar</button>'
     +'<button class="btn" data-no>Cerrar</button>'
     +'</div>'
@@ -9067,6 +9068,65 @@ function showLicenseInfo(){
   back.querySelector('[data-no]').onclick=()=>back.remove();
   back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
   back.querySelector('#btnDeactivate').onclick=()=>{if(confirm('¿Desactivar la licencia? Tendrás que volver a introducirla.')){localStorage.removeItem('caja.license.v1');location.reload()}};
+  // 💬 Contactar Soporte — envía mensaje al admin desde la app
+  const supportBtn = back.querySelector('#btnContactSupport');
+  if(supportBtn){
+    supportBtn.onclick=()=>{
+      const inner=document.createElement('div');
+      inner.className='modal-back';
+      inner.style.zIndex='100001';
+      inner.innerHTML=`<div class="modal" style="max-width:520px;padding:0;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#7c3aed,#a855f7);padding:16px 22px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:11px;color:#e9d5ff;text-transform:uppercase;letter-spacing:.5px;font-weight:700">💬 Contactar Soporte</div>
+            <div style="font-size:15px;color:#fff;font-weight:700;margin-top:2px">Escríbenos, te respondemos rápido</div>
+          </div>
+          <button class="btn" data-cancel style="background:transparent;color:#fff;border:1px solid #fff;padding:4px 10px">✕</button>
+        </div>
+        <div style="padding:20px 22px">
+          <label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">Asunto</label>
+          <input type="text" id="scSubject" data-testid="input-support-subject" placeholder="Ej: Duda sobre estadísticas · Problema con impresión" style="width:100%;background:#0b1121;border:1px solid #475569;border-radius:6px;color:#e5e7eb;padding:8px 12px;font-size:13px;margin-bottom:12px">
+          <label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">Mensaje</label>
+          <textarea id="scBody" data-testid="input-support-body" rows="6" placeholder="Cuéntanos qué te pasa o qué necesitas. Te contestamos por email y también verás la respuesta en tu app la próxima vez que la abras." style="width:100%;background:#0b1121;border:1px solid #475569;border-radius:6px;color:#e5e7eb;padding:10px 12px;font-family:inherit;font-size:13px;line-height:1.6;resize:vertical"></textarea>
+          <div style="margin-top:14px;display:flex;justify-content:flex-end;gap:8px">
+            <button class="btn" data-cancel>Cancelar</button>
+            <button class="btn" id="scSend" data-testid="btn-send-support" style="background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border:none;font-weight:800">🚀 Enviar</button>
+          </div>
+        </div>
+      </div>`;
+      document.body.appendChild(inner);
+      inner.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>inner.remove());
+      inner.addEventListener('click',ev=>{if(ev.target===inner)inner.remove()});
+      inner.querySelector('#scSend').onclick=async()=>{
+        const subject=inner.querySelector('#scSubject').value.trim();
+        const bodyText=inner.querySelector('#scBody').value.trim();
+        if(subject.length<3){alert('Escribe un asunto (mínimo 3 caracteres)');return}
+        if(bodyText.length<5){alert('Escribe un mensaje');return}
+        const sendBtn=inner.querySelector('#scSend');
+        sendBtn.disabled=true;sendBtn.textContent='⏳ Enviando…';
+        try{
+          const apiBase=(typeof getApiBase==='function')?getApiBase():'';
+          const r=await fetch(apiBase+'/api/support/client-message',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({install_id:installId,license_key:lic.key,subject,body:bodyText})
+          });
+          const j=await r.json();
+          if(!r.ok){
+            alert('❌ '+(j.detail||'No se pudo enviar el mensaje. Vuelve a intentarlo.'));
+            sendBtn.disabled=false;sendBtn.textContent='🚀 Enviar';
+            return;
+          }
+          alert('✅ Mensaje enviado. Te responderemos pronto por email.');
+          inner.remove();
+        }catch(e){
+          alert('❌ Error de red: '+e.message);
+          sendBtn.disabled=false;sendBtn.textContent='🚀 Enviar';
+        }
+      };
+      setTimeout(()=>{ const s=inner.querySelector('#scSubject'); if(s) s.focus(); }, 100);
+    };
+  }
   // 🔄 Auto-verify silencioso: al abrir el modal, comprobamos con el servidor si el admin
   // ha actualizado la licencia (extensión de trial, cambio de plan…). Si detecta cambios,
   // aplica el nuevo JWT y recarga la app para reflejar la nueva expiración al momento.

@@ -993,3 +993,29 @@ Subir `MediCarPlus-Setup.exe` compilado a `/app/frontend/public/downloads/` para
 - Tabla: filas rediseñadas visuales OK ✅
 
 - Panel admin ES: 8/10 palabras esperadas, 0 catalán restante
+
+
+## 2026-02 (g) · Chat bidireccional cliente ↔ admin (DONE)
+
+### 1. Buscador con botón
+- Botón `🔎 Buscar` con gradient dorado + botón `✕` limpiar · ejecuta al Enter
+
+### 2. Chat de soporte bidireccional
+**Backend** (`routes/admin_support.py`): 
+- Admin: `send-support`, `support-history` (con `unread_count`), `mark-read`
+- Público: `POST /api/support/client-message` (autenticado por install_id + license_key)
+- Colección `support_messages` con `direction`, `read_by_admin_at`
+- Notifica al admin por email cuando llega inbound
+
+**Frontend v2.html**: Botón "💬 Contactar Soporte" (violet gradient) en modal licencia
+**Frontend admin.html**:
+- `SUPPORT_UNREAD_CACHE` precargado en `loadLicenses()` con todas las cuentas
+- **Badge 🔔 N con animación pulse** en fila tabla + botón detalle
+- `openSupportChat()` con historial + auto-`mark-read` al abrir + envío
+- Estilos: inbound (gold border) vs outbound (blue border)
+
+### 3. Seguridad
+Endpoint público valida: install_id existe · status=active · license_key coincide → 401 si no
+
+### Testing E2E (8/8 pasan)
+Crear trial → Cliente envía 2 msgs → Admin ve unread=2 → Admin responde → mark-read=2 → Historial 3 msgs unread=0 → Seguridad 401

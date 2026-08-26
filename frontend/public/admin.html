@@ -49,6 +49,10 @@
     0%,100% { transform: scale(1); box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px rgba(220,38,38,.6); }
     50% { transform: scale(1.15); box-shadow: 0 0 0 2px var(--bg), 0 0 0 8px rgba(220,38,38,0); }
   }
+  @keyframes _pulse {
+    0%,100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.08); opacity: .85; }
+  }
 </style>
 </head>
 <body>
@@ -96,7 +100,9 @@
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input id="filterSearch" placeholder="🔎 Buscar (nombre, install_id, email)..." style="width:280px" oninput="applyFilters()">
+          <input id="filterSearch" placeholder="🔎 Buscar (nombre, install_id, email)..." style="width:280px" oninput="applyFilters()" onkeydown="if(event.key==='Enter'){event.preventDefault();applyFilters();document.getElementById('filterSearch').focus()}">
+          <button id="btnSearch" data-testid="btn-search" onclick="applyFilters()" style="background:linear-gradient(135deg,#f5b301,#eab308);color:#0b1121;border:none;padding:8px 16px;border-radius:6px;font-weight:800;cursor:pointer;font-size:13px">🔎 Buscar</button>
+          <button id="btnClearSearch" data-testid="btn-clear-search" onclick="document.getElementById('filterSearch').value='';applyFilters();document.getElementById('filterSearch').focus()" style="background:#334155;color:#e2e8f0;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:12px" title="Limpiar búsqueda">✕</button>
           <select id="filterStatus" onchange="applyFilters()">
             <option value="">Todos los estados</option>
             <option value="active">Activas</option>
@@ -355,6 +361,100 @@ async function resendInstaller(licenseKey, defaultEmail){
 }
 window.resendInstaller = resendInstaller;
 
+// 💬 Chat de soporte con el cliente (envío por email + historial)
+let SUPPORT_UNREAD_CACHE = {}; // {install_id: unread_count}
+async function fetchSupportUnread(licenseKey, installId){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok) return 0;
+  try{
+    const r = await fetch(`/api/admin/licenses/${encodeURIComponent(licenseKey)}/support-history`, { headers: {'X-Admin-Token': tok} });
+    if(!r.ok) return 0;
+    const j = await r.json();
+    const n = j.unread_count || 0;
+    if(installId) SUPPORT_UNREAD_CACHE[installId] = n;
+    return n;
+  }catch(e){ return 0; }
+}
+async function openSupportChat(licenseKey, clientEmail, clientName){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok){ alert('Sesión caducada, vuelve a entrar'); return; }
+  // Cargar historial primero
+  let history = [];
+  try{
+    const r = await fetch(`/api/admin/licenses/${encodeURIComponent(licenseKey)}/support-history`, { headers: {'X-Admin-Token': tok} });
+    if(r.ok){ const j = await r.json(); history = j.messages || []; }
+  }catch(e){}
+  // Marcar como leídos (fire and forget)
+  fetch(`/api/admin/licenses/${encodeURIComponent(licenseKey)}/mark-read`, { method:'POST', headers:{'X-Admin-Token':tok} }).catch(()=>{});
+  
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  const historyHtml = history.length ? history.map(m => `
+    <div style="background:${m.direction==='outbound'?'#1e3a8a':'#0f172a'};border-left:3px solid ${m.direction==='outbound'?'#38bdf8':'#f5b301'};padding:10px 14px;margin-bottom:8px;border-radius:6px">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin-bottom:4px">
+        <b style="color:${m.direction==='outbound'?'#7dd3fc':'#f5b301'}">${m.direction==='outbound'?'📤 Enviado por admin':'📥 Cliente'}</b>
+        <span>${m.sent_at?new Date(m.sent_at).toLocaleString('es-ES'):''}</span>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#e5e7eb;margin-bottom:4px">${(m.subject||'').replace(/</g,'&lt;')}</div>
+      <div style="font-size:12px;color:#cbd5e1;white-space:pre-wrap;line-height:1.5">${(m.body||'').replace(/</g,'&lt;').substring(0,400)}${(m.body||'').length>400?'…':''}</div>
+    </div>
+  `).join('') : '<div style="text-align:center;color:#64748b;font-style:italic;padding:20px">Sin historial · este será tu primer mensaje al cliente</div>';
+  
+  back.innerHTML = `<div class="modal" style="max-width:640px;padding:0;overflow:hidden">
+    <div style="background:linear-gradient(135deg,#7c3aed,#a855f7);padding:18px 24px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:11px;color:#e9d5ff;text-transform:uppercase;letter-spacing:.5px;font-weight:600">💬 Chat de soporte</div>
+        <div style="font-size:16px;color:#fff;font-weight:700;margin-top:2px">${(clientName||'Cliente').replace(/</g,'&lt;')}</div>
+        <div style="font-size:11px;color:#e9d5ff;margin-top:2px">📧 ${(clientEmail||'').replace(/</g,'&lt;')}</div>
+      </div>
+      <button class="ghost" onclick="this.closest('.modal-back').remove()" style="padding:6px 12px">✕</button>
+    </div>
+    <div style="padding:18px 24px;max-height:280px;overflow-y:auto;background:#0b1121">
+      <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:10px">📜 Historial (${history.length} mensajes)</div>
+      ${historyHtml}
+    </div>
+    <div style="padding:16px 24px;background:#0f172a;border-top:1px solid #1e293b">
+      <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:6px">✏️ NUEVO MENSAJE</div>
+      <input type="text" id="supportSubject" data-testid="input-support-subject" placeholder="Asunto (ej: Ampliación de trial · Consulta técnica)" style="width:100%;background:#0b1121;border:1px solid #475569;border-radius:6px;color:#e5e7eb;padding:8px 12px;font-size:13px;margin-bottom:8px">
+      <textarea id="supportBody" data-testid="input-support-body" rows="6" placeholder="Escribe tu mensaje al cliente. El cliente lo recibirá por email en su bandeja y podrá responderte directamente." style="width:100%;background:#0b1121;border:1px solid #475569;border-radius:6px;color:#e5e7eb;padding:10px 12px;font-family:inherit;font-size:13px;line-height:1.6;resize:vertical"></textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:10px;flex-wrap:wrap">
+        <div style="font-size:10px;color:#94a3b8">💡 El email se envía desde <b style="color:#f5b301">info@medicarplus.es</b> · el cliente responderá a esa dirección</div>
+        <button id="btnSendSupport" data-testid="btn-send-support" style="background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border:none;padding:10px 22px;border-radius:6px;font-weight:800;font-size:13px;cursor:pointer">🚀 Enviar mensaje</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(back);
+  back.addEventListener('click', e => { if(e.target===back) back.remove(); });
+  
+  const btnSend = back.querySelector('#btnSendSupport');
+  btnSend.onclick = async () => {
+    const subject = back.querySelector('#supportSubject').value.trim();
+    const bodyText = back.querySelector('#supportBody').value.trim();
+    if(subject.length < 3){ alert('Escribe un asunto (mínimo 3 caracteres)'); return; }
+    if(bodyText.length < 5){ alert('Escribe un mensaje (mínimo 5 caracteres)'); return; }
+    btnSend.disabled = true; btnSend.textContent = '⏳ Enviando…';
+    try{
+      const r = await fetch(`/api/admin/licenses/${encodeURIComponent(licenseKey)}/send-support`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Admin-Token':tok},
+        body: JSON.stringify({ subject, body: bodyText })
+      });
+      const j = await r.json();
+      if(!r.ok){
+        alert(`❌ Error: ${j.detail || 'no se pudo enviar'}`);
+        btnSend.disabled = false; btnSend.textContent = '🚀 Enviar mensaje';
+        return;
+      }
+      alert(`✅ Mensaje enviado a ${j.sent_to}\n\nEl cliente lo recibirá en su email y podrá responderte directamente a info@medicarplus.es`);
+      back.remove();
+    }catch(e){
+      alert('Error de red: ' + e.message);
+      btnSend.disabled = false; btnSend.textContent = '🚀 Enviar mensaje';
+    }
+  };
+}
+window.openSupportChat = openSupportChat;
+
 async function doLogin(){
   const credential = document.getElementById('passInput').value.trim();
   if(!credential){document.getElementById('err').textContent='Introduce contraseña o token';return}
@@ -404,14 +504,18 @@ async function loadLicenses(){
     if(!r.ok) throw new Error('HTTP '+r.status);
     const data = await r.json();
     ALL_LICS = data.items || [];
-    // Precarrega enriched per tots (paral·lel, en background)
+    // Precarrega enriched + unread messages per tots (paral·lel, en background)
     ENRICHED_CACHE = {};
+    SUPPORT_UNREAD_CACHE = {};
     for(const lic of ALL_LICS){
       fetchEnriched(lic.install_id).then(e=>{ENRICHED_CACHE[lic.install_id]=e;renderStats();applyFilters()});
+      if(lic.license_key){
+        fetchSupportUnread(lic.license_key, lic.install_id).then(n=>{ if(n>0) applyFilters(); });
+      }
     }
     renderStats();
     applyFilters();
-  }catch(e){alert('Error carregant llicències: '+e.message)}
+  }catch(e){alert('Error cargando licencias: '+e.message)}
 }
 
 async function fetchEnriched(install_id){
@@ -549,11 +653,13 @@ function applyFilters(){
     const clientName = (l.client_name||l.company_name||'Sin nombre').replace(/</g,'&lt;');
     const flags = (Array.isArray(l.abuse_flags)&&l.abuse_flags.length) ? ` <span data-testid="abuse-flag-badge-${l.install_id}" onclick="event.stopPropagation();showFlagsModal('${(l.install_id||'').replace(/'/g,"\\\\'")}','${encodeURIComponent(JSON.stringify(l.abuse_flags))}')" title="Clic para ver el motivo del flag" style="background:#78350f;color:#fbbf24;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:800;letter-spacing:.3px;cursor:pointer">⚠️ ${l.abuse_flags.length} FLAG${l.abuse_flags.length>1?'S':''}</span>` : '';
     const iidEsc = (l.install_id||'').replace(/'/g,"\\\\'");
+    const unread = SUPPORT_UNREAD_CACHE[l.install_id] || 0;
+    const unreadBadge = unread>0 ? ` <span style="background:#ef4444;color:#fff;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:800;animation:_pulse 1.5s ease-in-out infinite" data-testid="badge-unread-row-${l.install_id}" title="${unread} mensaje${unread===1?'':'s'} sin leer del cliente">🔔 ${unread}</span>` : '';
     return `<tr class="row-card" style="cursor:pointer;border-left:4px solid ${sem.color};transition:background .15s" onclick="openDetail('${iidEsc}')" onmouseenter="this.style.background='#1e293b'" onmouseleave="this.style.background=''">
       <td style="padding:12px 14px">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span style="font-size:18px">${sem.emo}</span>
-          <b style="font-size:14px;color:#f5b301;font-family:Georgia,serif">${clientName}</b>${flags}
+          <b style="font-size:14px;color:#f5b301;font-family:Georgia,serif">${clientName}</b>${flags}${unreadBadge}
         </div>
         <div style="font-size:11px;color:#cbd5e1;margin-top:3px">📧 ${(l.client_email||'—').replace(/</g,'&lt;')}</div>
         <div style="margin-top:4px;display:flex;align-items:center;gap:6px">
@@ -610,6 +716,8 @@ async function openDetail(install_id){
   const enP = ENRICHED_CACHE[install_id] || await fetchEnriched(install_id);
   if(!enP){alert('Error obteniendo datos');return}
   const l = enP.license;
+  // Pre-cargar unread para poder mostrar badge
+  if(l.license_key){ try{ await fetchSupportUnread(l.license_key, l.install_id); }catch(_){} }
   const sms = enP.sms;
   const p = (l.plan_family||l.plan||'').toUpperCase();
   const dl = daysLeft(l.expires_at);
@@ -674,6 +782,7 @@ async function openDetail(install_id){
       <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:8px">🎯 Acciones sobre el cliente</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         ${l.license_key?`<button class="ghost" style="background:linear-gradient(135deg,#0c2340,#1e40af);border:1px solid #38bdf8;color:#fff;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer" onclick="resendInstaller('${licKeyEsc}','${emailEsc}')" data-testid="btn-resend-installer">📩 Reenviar programa por email</button>`:''}
+        ${l.client_email?`<button class="ghost" style="background:linear-gradient(135deg,#7c3aed,#a855f7);border:1px solid #c084fc;color:#fff;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;position:relative" onclick="openSupportChat('${(l.license_key||l.id||l.install_id||'').replace(/'/g,"\\\\'")}','${emailEsc}','${clientName.replace(/'/g,"\\\\'")}')" data-testid="btn-support-chat">💬 Enviar mensaje ${(SUPPORT_UNREAD_CACHE[l.install_id]||0)>0?`<span style="background:#ef4444;color:#fff;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:800;margin-left:6px" data-testid="badge-unread-detail">🔔 ${SUPPORT_UNREAD_CACHE[l.install_id]}</span>`:''}</button>`:''}
         ${l.license_key?`<button class="ghost" style="background:#1e293b;border:1px solid #475569;color:#e2e8f0;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer" onclick="copyVal(this,\`${(l.license_key||'').replace(/\`/g,'\\\\\`')}\`)">🔑 Copiar clave</button>`:''}
         <button class="ghost" style="background:#1e293b;border:1px solid #475569;color:#e2e8f0;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer" onclick="copyVal(this,'${(l.install_id||'').replace(/'/g,"\\\\'")}')">🖥 Copiar Install ID</button>
       </div>
