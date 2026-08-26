@@ -430,8 +430,10 @@
               <span class="chip" data-t="DEBE" data-c="IRPF" style="border-color:#ff5d6c;color:#ff8a93">IRPF</span>
               <span class="chip" data-t="DEBE" data-c="Mercadona / material" style="border-color:#ff5d6c;color:#ff8a93">Mercadona / material</span>
               <span class="chip" data-t="DEBE" data-c="Devolució tasa DGT" style="border-color:#ff5d6c;color:#ff8a93">Devolució tasa DGT</span>
+              <span class="chip" data-t="DEBE" data-c="Honoraris" style="border-color:#ff5d6c;color:#ff8a93" title="Pago a trabajador · sale dinero de caja (gasto)">Honoraris</span>
+              <span class="chip" data-t="DEBE" data-c="Nómina" style="border-color:#ff5d6c;color:#ff8a93" title="Nómina · sale dinero de caja (gasto)">Nómina</span>
+              <span class="chip" data-t="DEBE" data-c="Faena externa" style="border-color:#ff5d6c;color:#ff8a93" title="Trabajo subcontratado / colaborador · sale dinero de caja (gasto)">Faena externa</span>
               <span class="chip" data-t="HABER" data-c="Ingreso en metálico" style="border-color:#3ddc97;color:#3ddc97">Ingreso en metálico</span>
-              <span class="chip" data-t="HABER" data-c="Honoraris" style="border-color:#3ddc97;color:#3ddc97">Honoraris</span>
               <span class="chip" data-t="HABER" data-c="Foto" style="border-color:#3ddc97;color:#3ddc97">Foto</span>
               <span class="chip" data-t="HABER" data-c="Ciclista" style="border-color:#3ddc97;color:#3ddc97">Ciclista</span>
             </div>
@@ -2527,7 +2529,7 @@ const CAJA_SEARCH_DIMENSIONS = {
     OTROS_FP: ['otros_fp','cheque','talon','talón']
   },
   CONCEPT: {
-    HONORARIOS: ['honorari','honorario','honorarios','honoraris','nomina','nómina','sueldo','sueldos','salario','salarios','salari','salaris','paga trabajador','pago empleado','empleado','trabajador','treballador'],
+    HONORARIOS: ['honorari','honorario','honorarios','honoraris','nomina','nómina','nòmina','sueldo','sueldos','salario','salarios','salari','salaris','sou','paga trabajador','pago empleado','empleado','trabajador','treballador','faena','faenas','feina','feines','faena externa','faenes externes','faenas externas','jornal','jornales','jornada externa','colaborador','colaboradora','freelance','autonomo','autónomo','autonoma','autónoma','externa','externo','subcontrata','subcontratado','trabajo externo'],
     IRPF:       ['irpf','retencion','retención','retenció'],
     IVA:        ['iva','impuesto','impuestos','impost'],
     MATERIAL:   ['material','materiales','materials','papeleria','papelería'],
@@ -2711,20 +2713,40 @@ function openBuscadorOperaciones(){
 }
 
 
-// 💼 Panel de Honorarios: consulta pagos a trabajadores agregados por mes/trabajador
+// 💼 Panel de Honorarios: consulta pagos a trabajadores + faenas externas por mes
 // Fuente de datos: entradas DH (Debe/Haber) cuyo nombre/tipo/concepto contenga alguno de estos sinónimos:
-//   honorari · nomina · sueldo · salario · paga trabajador · empleado
+//   honorari · nomina · sueldo · salario · paga trabajador · empleado · faena · jornal · colaborador · autonomo · externa
 // El nombre del trabajador se toma del campo `nombre` (quitando el prefijo del keyword detectado).
+const _HN_KEYWORDS = {
+  NOMINA:    ['nomina','nómina','nòmina'],
+  SUELDO:    ['sueldo','sou'],
+  SALARIO:   ['salario','salari'],
+  HONORARIO: ['honorari','honorario','honorarios','honoraris'],
+  FAENA_EXT: ['faena externa','faenes externes','faenas externas','faena ext','faena','feina externa','feines externes','jornal','jornales','jornada externa','colaborador','colaboradora','freelance','autonomo','autónomo','autonoma','autónoma','externa','externo','subcontrata','subcontratado','trabajo externo']
+};
+function _hnMatchKeyword(text){
+  const bag = String(text||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  for(const [cat, kws] of Object.entries(_HN_KEYWORDS)){
+    for(const k of kws){ if(bag.includes(k.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''))) return {cat, kw:k}; }
+  }
+  return null;
+}
 function _isHonorarioLikeEntry(e){
   if(!e || e.kind !== 'DH' || (e.importe||0) <= 0) return false;
-  const kws = ['honorari','honorario','honoraris','nomina','sueldo','salario','salari','paga trabajador','pago empleado','empleado'];
-  const bag = (String(e.nombre||'')+' '+String(e.tipo||'')+' '+String(e.concepto||'')+' '+String(e.grupo||''))
-    .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  return kws.some(k => bag.includes(k));
+  const bag = (String(e.nombre||'')+' '+String(e.tipo||'')+' '+String(e.concepto||'')+' '+String(e.grupo||''));
+  return !!_hnMatchKeyword(bag);
 }
 function _cleanWorkerName(raw){
-  // Quita prefijos tipo "honoraris ", "nomina ", "sueldo ", etc. del inicio del nombre
-  return String(raw||'').replace(/^\s*(honoraris|honorari|honorarios|honorario|nomina|nómina|sueldo|salario|salari|paga trabajador|pago empleado)\s*[:\-]?\s*/i,'').trim() || '(sin nombre)';
+  // Quita prefijos tipo "honoraris ", "nomina ", "sueldo ", "faena externa", etc. del inicio del nombre
+  return String(raw||'')
+    .replace(/^\s*(honoraris|honorari|honorarios|honorario|nomina|nómina|nòmina|sueldo|sou|salario|salari|paga trabajador|pago empleado|jornal|jornales|feina externa|feines externes|faena externa|faenes externes|faenas externas|faena ext|faena|colaborador|colaboradora|freelance|autonomo|autónomo|autonoma|autónoma|externa|externo|subcontrata|subcontratado|trabajo externo)\s*[:\-·]?\s*/i,'')
+    .trim() || '(sin nombre)';
+}
+function _hnCategoryLabel(cat){
+  return {NOMINA:'Nómina', SUELDO:'Sueldo', SALARIO:'Salario', HONORARIO:'Honorario', FAENA_EXT:'Faena externa'}[cat] || cat;
+}
+function _hnCategoryColor(cat){
+  return {NOMINA:'#3ddc97', SUELDO:'#22d3ee', SALARIO:'#a855f7', HONORARIO:'#fbbf24', FAENA_EXT:'#f97316'}[cat] || '#94a3b8';
 }
 function openHonorariosPanel(){
   // Recolectar todas las entradas de todas las empresas
@@ -2737,59 +2759,122 @@ function openHonorariosPanel(){
       for(const iso of Object.keys(bd)){
         for(const e of (bd[iso]||[])){
           if(_isHonorarioLikeEntry(e)){
-            allEntries.push({date: iso, name: _cleanWorkerName(e.nombre), amount: +e.importe||0, company: comp, fp: e.fp||''});
+            const match = _hnMatchKeyword((e.nombre||'')+' '+(e.tipo||'')+' '+(e.concepto||''));
+            allEntries.push({date: iso, name: _cleanWorkerName(e.nombre), amount: +e.importe||0, company: comp, fp: e.fp||'', cat: match ? match.cat : 'HONORARIO'});
           }
         }
       }
     }catch(_){}
   }
-  // Agrupar por año-mes y por trabajador
-  const byMonth = {};
-  const byWorker = {};
-  let totalGlobal = 0;
-  for(const e of allEntries){
-    const ym = e.date.substring(0,7);
-    (byMonth[ym] = byMonth[ym] || []).push(e);
-    if(!byWorker[e.name]) byWorker[e.name] = {total:0, count:0};
-    byWorker[e.name].total += e.amount;
-    byWorker[e.name].count += 1;
-    totalGlobal += e.amount;
-  }
-  const months = Object.keys(byMonth).sort().reverse();
-  const workers = Object.keys(byWorker).sort((a,b)=>byWorker[b].total - byWorker[a].total);
   const fmtEUR = v => v.toFixed(2).replace('.',',')+' €';
   const fmtDate = iso => { const [y,m,d] = iso.split('-'); return `${d}/${m}/${y}`; };
   const fmtMonth = ym => { const [y,m] = ym.split('-'); const mn = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][+m-1]; return `${mn} ${y}`; };
 
+  // Meses disponibles (para el selector)
+  const allMonths = Array.from(new Set(allEntries.map(e => e.date.substring(0,7)))).sort().reverse();
+  const currentMonth = new Date().toISOString().slice(0,7);
+  const initialMonth = allMonths.includes(currentMonth) ? currentMonth : (allMonths[0] || currentMonth);
+
   const back = document.createElement('div');
   back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto';
-  const workersHtml = workers.length ? workers.map(w => `<tr><td style="padding:6px 10px;font-weight:600">${w.replace(/</g,'&lt;')}</td><td style="padding:6px 10px;text-align:right;color:#94a3b8">${byWorker[w].count} pagos</td><td style="padding:6px 10px;text-align:right;font-weight:700;color:#fbbf24">${fmtEUR(byWorker[w].total)}</td></tr>`).join('') : '<tr><td colspan="3" style="padding:12px;text-align:center;color:#64748b;font-style:italic">Sin pagos de honorarios registrados.</td></tr>';
-  const monthsHtml = months.length ? months.map(ym => {
-    const list = byMonth[ym].sort((a,b)=>a.date.localeCompare(b.date));
-    const monthTotal = list.reduce((s,e)=>s+e.amount, 0);
-    const rows = list.map(e => `<tr><td style="padding:5px 10px;font-size:12px">${fmtDate(e.date)}</td><td style="padding:5px 10px;font-size:12px;font-weight:600">${e.name.replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:11px;color:#64748b">${e.company==='trafic'?'Tráfico':'Cempla'}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${e.fp||'—'}</td><td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700;color:#fbbf24">${fmtEUR(e.amount)}</td></tr>`).join('');
-    return `<div style="margin-bottom:16px;background:#0f172a;border:1px solid #334155;border-radius:8px;overflow:hidden"><div style="background:#1e293b;padding:8px 14px;display:flex;justify-content:space-between;align-items:center"><b style="color:#fbbf24">📅 ${fmtMonth(ym)}</b><span style="color:#22c55e;font-weight:700">${fmtEUR(monthTotal)}</span></div><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#111827"><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Fecha</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Trabajador</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Empresa</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">FP</th><th style="padding:5px 10px;text-align:right;font-size:10px;color:#94a3b8">Importe</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-  }).join('') : '<div style="padding:20px;text-align:center;color:#64748b;font-style:italic">Añade una entrada Debe/Haber con concepto "Honoraris", "Nómina", "Sueldo" o "Salario" seguido del nombre del trabajador para verla aquí.</div>';
-
-  back.innerHTML = `<div style="background:#111827;border:1px solid #334155;border-radius:12px;padding:22px;max-width:900px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);font-family:Arial,Helvetica,sans-serif">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div><h3 style="margin:0;color:#fbbf24;font-family:Georgia,serif">💼 Honorarios · Pagos a trabajadores</h3><div style="font-size:11px;color:#94a3b8;margin-top:3px">${allEntries.length} pagos · Total: <b style="color:#22c55e">${fmtEUR(totalGlobal)}</b></div></div>
-      <button id="_hn_close" style="background:#334155;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer">✕ Cerrar</button>
+  back.innerHTML = `<div class="hn-modal" style="background:#111827;border:1px solid #334155;border-radius:12px;padding:22px;max-width:960px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);font-family:Arial,Helvetica,sans-serif" data-testid="honorarios-modal">
+    <div class="no-print" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px">
+      <div><h3 style="margin:0;color:#fbbf24;font-family:Georgia,serif">💼 Honorarios · Pagos a trabajadores</h3><div id="_hn_subtitle" style="font-size:11px;color:#94a3b8;margin-top:3px"></div></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="font-size:10px;color:#94a3b8;font-weight:700">MES</label>
+        <select id="_hn_month" data-testid="honorarios-month-select" style="background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;padding:6px 10px;font-size:13px">
+          <option value="__ALL__">📆 Todos los meses</option>
+          ${allMonths.map(ym => `<option value="${ym}" ${ym===initialMonth?'selected':''}>${fmtMonth(ym)}</option>`).join('')}
+          ${allMonths.length===0 ? `<option value="${currentMonth}" selected>${fmtMonth(currentMonth)}</option>` : ''}
+        </select>
+        <button id="_hn_print" data-testid="honorarios-print" style="background:linear-gradient(135deg,#fbbf24,#d97706);color:#0b1121;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px">🖨️ Imprimir</button>
+        <button id="_hn_close" data-testid="honorarios-close" style="background:#334155;color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer">✕ Cerrar</button>
+      </div>
     </div>
-    <div style="background:#0b1121;border:1px solid #78350f;border-radius:8px;padding:12px;margin-bottom:14px;font-size:11px;color:#fbbf24">💡 Añade pagos desde <b>Debe/Haber</b> escribiendo en el concepto libre alguna palabra como <b>Honoraris</b>, <b>Nómina</b>, <b>Sueldo</b> o <b>Salario</b> seguido del <b>nombre del trabajador</b> (ej: <i>"Nomina Pep Brugulat"</i> o <i>"Sueldo Maria"</i>). Aparecerán aquí automáticamente.</div>
-    <div style="margin-bottom:18px">
-      <h4 style="margin:0 0 8px 0;color:#e2e8f0;font-size:13px">📊 Resumen por trabajador</h4>
-      <table style="width:100%;border-collapse:collapse;background:#0f172a;border-radius:6px;overflow:hidden">
-        <thead><tr style="background:#1e293b"><th style="padding:6px 10px;text-align:left;font-size:10px;color:#94a3b8">Trabajador</th><th style="padding:6px 10px;text-align:right;font-size:10px;color:#94a3b8">Frecuencia</th><th style="padding:6px 10px;text-align:right;font-size:10px;color:#94a3b8">Total acumulado</th></tr></thead>
-        <tbody>${workersHtml}</tbody>
-      </table>
-    </div>
-    <div><h4 style="margin:0 0 8px 0;color:#e2e8f0;font-size:13px">🗓 Detalle mensual</h4>${monthsHtml}</div>
+    <div class="no-print" style="background:#0b1121;border:1px solid #78350f;border-radius:8px;padding:12px;margin-bottom:14px;font-size:11px;color:#fbbf24">💡 Añade pagos desde <b>Debe/Haber</b> escribiendo en el concepto libre palabras como <b>Honoraris</b>, <b>Nómina</b>, <b>Sueldo</b>, <b>Salario</b>, <b>Jornal</b>, <b>Faena externa</b>, <b>Colaborador</b> o <b>Autónomo</b> seguido del <b>nombre del trabajador</b> (ej: <i>"Nomina Pep Brugulat"</i> o <i>"Faena externa Carlos electricista"</i>). Aparecerán aquí automáticamente.</div>
+    <div id="_hn_body"></div>
   </div>`;
   document.body.appendChild(back);
+
+  function renderBody(monthFilter){
+    const filtered = monthFilter === '__ALL__' ? allEntries.slice() : allEntries.filter(e => e.date.substring(0,7) === monthFilter);
+    // Agrupar por año-mes y por trabajador
+    const byMonth = {};
+    const byWorker = {};
+    const byCategory = {};
+    let totalGlobal = 0;
+    for(const e of filtered){
+      const ym = e.date.substring(0,7);
+      (byMonth[ym] = byMonth[ym] || []).push(e);
+      if(!byWorker[e.name]) byWorker[e.name] = {total:0, count:0, cats:new Set()};
+      byWorker[e.name].total += e.amount;
+      byWorker[e.name].count += 1;
+      byWorker[e.name].cats.add(e.cat);
+      if(!byCategory[e.cat]) byCategory[e.cat] = {total:0, count:0};
+      byCategory[e.cat].total += e.amount;
+      byCategory[e.cat].count += 1;
+      totalGlobal += e.amount;
+    }
+    const months = Object.keys(byMonth).sort().reverse();
+    const workers = Object.keys(byWorker).sort((a,b)=>byWorker[b].total - byWorker[a].total);
+    const categories = Object.keys(byCategory).sort((a,b)=>byCategory[b].total - byCategory[a].total);
+
+    // Actualizar subtitle
+    const subt = document.getElementById('_hn_subtitle');
+    if(subt){
+      const scope = monthFilter === '__ALL__' ? 'Todo el histórico' : fmtMonth(monthFilter);
+      subt.innerHTML = `${filtered.length} pagos · Total: <b style="color:#22c55e" data-testid="honorarios-total">${fmtEUR(totalGlobal)}</b> · <span style="color:#fbbf24">${scope}</span>`;
+    }
+
+    // Resumen por categoría (chips)
+    const catsHtml = categories.length ? categories.map(c => `<span style="background:#1e293b;padding:4px 10px;border-radius:20px;font-size:11px;margin-right:6px;border-left:3px solid ${_hnCategoryColor(c)}"><b style="color:${_hnCategoryColor(c)}">${_hnCategoryLabel(c)}</b> · ${byCategory[c].count} pago${byCategory[c].count>1?'s':''} · <b>${fmtEUR(byCategory[c].total)}</b></span>`).join('') : '';
+
+    // Resumen por trabajador
+    const workersHtml = workers.length ? workers.map(w => {
+      const cats = Array.from(byWorker[w].cats).map(c => `<span style="background:${_hnCategoryColor(c)}22;color:${_hnCategoryColor(c)};padding:1px 6px;border-radius:3px;font-size:9px;margin-right:3px">${_hnCategoryLabel(c)}</span>`).join('');
+      return `<tr><td style="padding:6px 10px;font-weight:600">${w.replace(/</g,'&lt;')}</td><td style="padding:6px 10px">${cats}</td><td style="padding:6px 10px;text-align:right;color:#94a3b8">${byWorker[w].count} pagos</td><td style="padding:6px 10px;text-align:right;font-weight:700;color:#fbbf24">${fmtEUR(byWorker[w].total)}</td></tr>`;
+    }).join('') : '<tr><td colspan="4" style="padding:12px;text-align:center;color:#64748b;font-style:italic">Sin pagos en este período.</td></tr>';
+
+    // Detalle mensual
+    const monthsHtml = months.length ? months.map(ym => {
+      const list = byMonth[ym].sort((a,b)=>a.date.localeCompare(b.date));
+      const monthTotal = list.reduce((s,e)=>s+e.amount, 0);
+      const rows = list.map(e => {
+        const fpFull = ({E:'Efectivo',T:'Banco',B:'Bizum',X:'Otros'})[e.fp] || e.fp || '—';
+        return `<tr><td style="padding:5px 10px;font-size:12px">${fmtDate(e.date)}</td><td style="padding:5px 10px"><span style="background:${_hnCategoryColor(e.cat)}22;color:${_hnCategoryColor(e.cat)};padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700">${_hnCategoryLabel(e.cat)}</span></td><td style="padding:5px 10px;font-size:12px;font-weight:600">${e.name.replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:11px;color:#64748b">${e.company==='trafic'?'Tráfico':'Cempla'}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${fpFull}</td><td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700;color:#fbbf24">${fmtEUR(e.amount)}</td></tr>`;
+      }).join('');
+      return `<div style="margin-bottom:16px;background:#0f172a;border:1px solid #334155;border-radius:8px;overflow:hidden"><div style="background:#1e293b;padding:8px 14px;display:flex;justify-content:space-between;align-items:center"><b style="color:#fbbf24">📅 ${fmtMonth(ym)}</b><span style="color:#22c55e;font-weight:700">${fmtEUR(monthTotal)}</span></div><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#111827"><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Fecha</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Categoría</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Trabajador</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Empresa</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Pago</th><th style="padding:5px 10px;text-align:right;font-size:10px;color:#94a3b8">Importe</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join('') : '<div style="padding:20px;text-align:center;color:#64748b;font-style:italic">Sin pagos en este período. Añade una entrada Debe/Haber con concepto "Honoraris", "Nómina", "Sueldo", "Salario", "Faena externa" o "Jornal" seguido del nombre del trabajador.</div>';
+
+    document.getElementById('_hn_body').innerHTML = `
+      ${catsHtml ? `<div style="margin-bottom:16px">${catsHtml}</div>` : ''}
+      <div style="margin-bottom:18px">
+        <h4 style="margin:0 0 8px 0;color:#e2e8f0;font-size:13px">📊 Resumen por trabajador</h4>
+        <table style="width:100%;border-collapse:collapse;background:#0f172a;border-radius:6px;overflow:hidden" data-testid="honorarios-workers-table">
+          <thead><tr style="background:#1e293b"><th style="padding:6px 10px;text-align:left;font-size:10px;color:#94a3b8">Trabajador</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#94a3b8">Tipo</th><th style="padding:6px 10px;text-align:right;font-size:10px;color:#94a3b8">Frecuencia</th><th style="padding:6px 10px;text-align:right;font-size:10px;color:#94a3b8">Total</th></tr></thead>
+          <tbody>${workersHtml}</tbody>
+        </table>
+      </div>
+      <div><h4 style="margin:0 0 8px 0;color:#e2e8f0;font-size:13px">🗓 Detalle</h4>${monthsHtml}</div>`;
+  }
+
+  const monthSel = back.querySelector('#_hn_month');
+  monthSel.addEventListener('change', () => renderBody(monthSel.value));
   back.querySelector('#_hn_close').onclick = () => back.remove();
+  back.querySelector('#_hn_print').onclick = () => {
+    const modal = back.querySelector('.hn-modal');
+    const scope = monthSel.value === '__ALL__' ? 'Todo el histórico' : fmtMonth(monthSel.value);
+    printVisibleElement(modal, {
+      title: `Honorarios · ${scope}`,
+      landscape: false,
+      margins: '10mm',
+      extraCss: '.no-print, select, button { display:none !important } body{background:#fff;color:#000} .hn-modal{background:#fff !important;border:none !important;color:#000 !important;max-width:none !important;padding:0 !important} .hn-modal *{color:#000 !important} .hn-modal h3, .hn-modal h4{color:#000 !important} .hn-modal table{border:1px solid #666} .hn-modal thead tr{background:#eee !important} .hn-modal th, .hn-modal td{border:1px solid #ccc;color:#000 !important}'
+    });
+  };
   back.addEventListener('click', ev => { if(ev.target === back) back.remove(); });
   document.addEventListener('keydown', function esc(ev){ if(ev.key === 'Escape'){ back.remove(); document.removeEventListener('keydown', esc); } });
+
+  renderBody(initialMonth);
 }
 
 $('#btnWhatsNewMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';showWhatsNew(true)};

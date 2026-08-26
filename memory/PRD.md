@@ -690,3 +690,35 @@ Incluye:
 ### Testing E2E
 Playwright script con dataset de 8 entradas cubre 5 escenarios (todos ✅):
 - `ingreso efectivo` → 2 · `metalico` → 3 · `ingreso efectivo banco` → 6 · `gasto banco` → 1 · Panel Honorarios agrupa Nomina+Sueldo+Honoraris en 2 trabajadores.
+
+
+---
+
+## 💼 [26-Feb-2026] · Honorarios: Selector de mes + Faenas externas + Imprimir
+
+### Panel Honorarios ampliado
+- **Selector de mes** en la cabecera con todas las opciones de meses con datos + "📆 Todos los meses". Por defecto abre en el mes actual.
+- **Categorías detectadas** (con colores propios): `NOMINA` (verde) · `SUELDO` (cian) · `SALARIO` (violeta) · `HONORARIO` (dorado) · `FAENA_EXT` (naranja).
+- **Faenas externas** ahora reconoce: `faena`, `faena externa`, `feina externa`, `jornal`, `jornales`, `colaborador`, `freelance`, `autónomo`, `externa`, `subcontrata`, `trabajo externo`.
+- **Chips resumen por categoría** en la parte superior (ej: "Sueldo · 1 pago · 1400 €").
+- **Tabla trabajadores** ahora muestra badge de tipo (Nómina/Sueldo/Faena externa) junto al nombre.
+- **Detalle mensual** con badge coloreado por categoría en cada fila.
+- Diccionario `_HN_KEYWORDS` centralizado con función `_hnMatchKeyword()` para clasificar cualquier entrada.
+- `_cleanWorkerName()` ampliado para retirar prefijos "faena externa", "jornal", "colaborador", "autónomo", etc.
+
+### Impresión
+- Botón `🖨️ Imprimir` que llama a `printVisibleElement(modal, {...})` con CSS específico:
+  - Oculta controles interactivos (`.no-print, select, button`)
+  - Fuerza fondo blanco y texto negro sobre tabla legible
+  - Título dinámico: `Honorarios · <mes seleccionado>` o `Honorarios · Todo el histórico`
+  - Consistente con IRPF, Libro de Registro, Estadísticas Tráfico.
+
+### Sincronización con Buscador Global
+- Categoría HONORARIOS del diccionario `CAJA_SEARCH_DIMENSIONS.CONCEPT` ampliada con los mismos sinónimos de faenas externas → una búsqueda como "faena externa" o "jornal" en el Buscador devuelve todos los pagos relacionados.
+
+### Testing E2E validado
+- Enero 2026: 3130€ (4 pagos · Sueldo/Nómina/2 Faenas externas) ✅
+- Febrero 2026: 1920€ (3 pagos · Honorario + 2 Faenas externas) ✅
+- Todos los meses: 6250€ ✅
+- Búsqueda "faena externa" en Buscador Global: 8 resultados ✅
+- Botón Imprimir presente y activable ✅
