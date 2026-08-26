@@ -810,3 +810,46 @@ Playwright script con dataset de 8 entradas cubre 5 escenarios (todos ✅):
 - Toggle leyenda decrementa a 5 líneas ✅
 - Top 3 filtra a 3 líneas ✅
 - Botón Imprimir del gráfico presente ✅
+
+
+---
+
+## 2026-02 · Panel de Gastos + Clasificación Bulletproof (DONE)
+
+### Objetivo
+Separar de forma inequívoca **Gastos del centro** (luz, agua, alquiler, papel, batas, seguros…) de **Honorarios** (pagos a trabajadores). Ambos son DEBE en la pestaña Debe/Haber pero deben contabilizarse en paneles distintos para que "los números salgan bien".
+
+### Cambios en `v2.html`
+
+1. **Nuevo chip rojo "🧾 GASTO"** en `#chips-dh` (línea 437):
+   - `background:#4c0519; border-color:#dc2626; color:#fecaca; font-weight:700`
+   - `data-role="gasto"` para trigger de comportamiento especial
+   - Prefija el input con `Gasto: ` (con espacio) y enfoca el campo
+
+2. **Chips Honoraris / Nómina / Faena externa en AZUL BRILLANTE** (antes rojos):
+   - `background:#0c2340; border-color:#38bdf8; color:#7dd3fc`
+   - Con emoji 💼 para distinción visual instantánea
+
+3. **Función `_hasExplicitGastoMarker(e)`**: detecta prefijo `Gasto:` en el nombre (regex `/^gasto\s*[:\-·]/`).
+
+4. **Regla determinista en `_isGastoEntry`**:
+   - Si tiene marca explícita `Gasto:` → SIEMPRE es Gasto (gana sobre keywords)
+   - Fallback: detección por keywords (LUZ, AGUA, GAS, ALQUILER, TELEFONO, INTERNET, GESTORIA, SEGURO, MATERIAL, IRPF, IVA, TASAS, MANTENIMIENTO, COMBUSTIBLE, BANCO_COM)
+   - Categoría `OTROS` para gastos explícitos sin keyword conocido
+
+5. **Exclusión mutua en `_isHonorarioLikeEntry`**:
+   - Si tiene marca explícita `Gasto:` → NUNCA es honorario (aunque contenga "Nómina", "Sueldo", etc.)
+
+### Casos edge validados E2E
+| Concepto | Va a | Regla |
+|---|---|---|
+| `Gasto: Factura Endesa` | Gastos (LUZ) | Explícito + keyword |
+| `Gasto: Reparación tejado` | Gastos (OTROS) | Explícito sin keyword |
+| `Gasto: Nómina Endesa` | Gastos (LUZ) | **Explícito gana** aunque contenga "Nómina" |
+| `Recibo agua Sorea` | Gastos (AGUA) | Solo keyword |
+| `Nomina Maria Lopez` | Honorarios | Solo keyword honorario |
+| `Honoraris Pep Garcia` | Honorarios | Solo keyword honorario |
+
+### Testing
+- 10/10 assertions pasan (validación headless via `page.evaluate` con datos ficticios).
+- Verificación visual de chips en pestaña Debe/Haber ✅.

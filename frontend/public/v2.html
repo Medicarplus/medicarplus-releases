@@ -294,6 +294,7 @@
         <button class="btn" id="btnCambio" style="background:#1f3a2e;border-color:#22c55e;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-i18n="reserve" data-testid="btn-cambio">💰 Reserva de cambio</button>
         <button class="btn" id="btnLibroRegMenu" style="background:#152a3a;border-color:#7ec8ff;color:#7ec8ff;font-weight:600;width:100%;text-align:left">📖 Libro de Registro</button>
         <button class="btn" id="btnHonorarios" data-testid="btn-honorarios" style="background:#2a2015;border-color:#fbbf24;color:#fbbf24;font-weight:600;width:100%;text-align:left">💼 Honorarios</button>
+        <button class="btn" id="btnGastos" data-testid="btn-gastos" style="background:#2a1515;border-color:#f472b6;color:#f472b6;font-weight:600;width:100%;text-align:left">🧾 Gastos (luz · agua · alquiler…)</button>
         <button class="btn" id="btnBuscarOps" data-testid="btn-buscar-ops" style="background:#152a25;border-color:#22d3ee;color:#22d3ee;font-weight:600;width:100%;text-align:left">🔎 Buscar operaciones</button>
         <button class="btn" id="btnWhatsNewMenu" data-testid="btn-whats-new" style="background:#2a1f15;border-color:#f97316;color:#fed7aa;font-weight:600;width:100%;text-align:left">🎁 Novedades</button>
       </div>
@@ -420,7 +421,7 @@
         <div class="body tab" id="tab-dh" style="display:none">
           <div class="form-row dh">
             <div><label>Tipo</label><select id="dh-tipo"><option value="HABER">HABER (entra dinero)</option><option value="DEBE">DEBE (sale dinero)</option></select></div>
-            <div><label>Concepto libre</label><input type="text" id="dh-concepto" list="dh-workers-datalist" autocomplete="off" placeholder="Ej: Nómina Pep · Faena externa Carlos · Pago factura luz · Anticipo…" /><datalist id="dh-workers-datalist"></datalist></div>
+            <div><label>Concepto libre</label><input type="text" id="dh-concepto" list="dh-workers-datalist" autocomplete="off" placeholder="Ej: Gasto: Factura Endesa · Nómina Pep · Faena externa Carlos · Anticipo…" /><datalist id="dh-workers-datalist"></datalist></div>
             <div><label>Importe (€)</label><input type="number" step="0.01" id="dh-importe" /></div>
             <div><label>F. Pago</label><select id="dh-fp"><option value="E">Efectivo</option><option value="T">Tarjeta</option><option value="B">Bizum</option><option value="X">Transferencia</option></select></div>
           </div>
@@ -430,9 +431,10 @@
               <span class="chip" data-t="DEBE" data-c="IRPF" style="border-color:#ff5d6c;color:#ff8a93">IRPF</span>
               <span class="chip" data-t="DEBE" data-c="Mercadona / material" style="border-color:#ff5d6c;color:#ff8a93">Mercadona / material</span>
               <span class="chip" data-t="DEBE" data-c="Devolució tasa DGT" style="border-color:#ff5d6c;color:#ff8a93">Devolució tasa DGT</span>
-              <span class="chip" data-t="DEBE" data-c="Honoraris" style="border-color:#ff5d6c;color:#ff8a93" title="Pago a trabajador · sale dinero de caja (gasto)">Honoraris</span>
-              <span class="chip" data-t="DEBE" data-c="Nómina" style="border-color:#ff5d6c;color:#ff8a93" title="Nómina · sale dinero de caja (gasto)">Nómina</span>
-              <span class="chip" data-t="DEBE" data-c="Faena externa" style="border-color:#ff5d6c;color:#ff8a93" title="Trabajo subcontratado / colaborador · sale dinero de caja (gasto)">Faena externa</span>
+              <span class="chip" data-t="DEBE" data-c="Honoraris" style="background:#0c2340;border-color:#38bdf8;color:#7dd3fc;font-weight:700" title="Pago a trabajador · sale dinero de caja (gasto)">💼 Honoraris</span>
+              <span class="chip" data-t="DEBE" data-c="Nómina" style="background:#0c2340;border-color:#38bdf8;color:#7dd3fc;font-weight:700" title="Nómina · sale dinero de caja (gasto)">💼 Nómina</span>
+              <span class="chip" data-t="DEBE" data-c="Faena externa" style="background:#0c2340;border-color:#38bdf8;color:#7dd3fc;font-weight:700" title="Trabajo subcontratado / colaborador · sale dinero de caja (gasto)">💼 Faena externa</span>
+              <span class="chip" data-t="DEBE" data-c="Gasto:" data-role="gasto" style="background:#4c0519;border-color:#dc2626;color:#fecaca;font-weight:700" title="Gasto del centro (luz, agua, alquiler, material, seguros, teléfono, gestoría…). Marca explícita: SIEMPRE se contabiliza como Gasto y NUNCA como Honorario.">🧾 GASTO</span>
               <span class="chip" data-t="HABER" data-c="Ingreso en metálico" style="border-color:#3ddc97;color:#3ddc97">Ingreso en metálico</span>
               <span class="chip" data-t="HABER" data-c="Foto" style="border-color:#3ddc97;color:#3ddc97">Foto</span>
               <span class="chip" data-t="HABER" data-c="Ciclista" style="border-color:#3ddc97;color:#3ddc97">Ciclista</span>
@@ -2450,10 +2452,15 @@ $('#dh-tipo').addEventListener('change',updateDhTipoColor);updateDhTipoColor();
 document.addEventListener('click',ev=>{const chip=ev.target.closest('#chips-dh .chip');if(!chip)return;document.querySelectorAll('#chips-dh .chip').forEach(x=>x.style.fontWeight='');chip.style.fontWeight='bold';$('#dh-tipo').value=chip.dataset.t;updateDhTipoColor();
   // Si el chip es un pago a trabajador, prefija con espacio y refresca el datalist para sugerir nombres.
   const isWorkerChip = /honoraris|nomina|nómina|sueldo|salario|faena|jornal|colaborador|autonom/i.test(chip.dataset.c||'');
+  const isGastoChip = chip.dataset.role === 'gasto';
   if(isWorkerChip){
     try{ refreshWorkersDatalist(); }catch(_){}
     $('#dh-concepto').value = chip.dataset.c + ' ';
     // Focus en el concepto y posiciona el cursor al final para que aparezcan las sugerencias
+    setTimeout(()=>{ const ip=$('#dh-concepto'); ip.focus(); ip.setSelectionRange(ip.value.length, ip.value.length); }, 50);
+  } else if(isGastoChip){
+    // Marca explícita "Gasto:" — siempre se contabiliza como Gasto y NUNCA como Honorario
+    $('#dh-concepto').value = 'Gasto: ';
     setTimeout(()=>{ const ip=$('#dh-concepto'); ip.focus(); ip.setSelectionRange(ip.value.length, ip.value.length); }, 50);
   } else {
     $('#dh-concepto').value = chip.dataset.c;
@@ -2855,6 +2862,7 @@ $('#btnIrpf').onclick=()=>{$('#btnAccountingMenu').style.display='none';openIRPF
 $('#btnCambio').onclick=()=>{$('#btnAccountingMenu').style.display='none';openCambio()};
 $('#btnLibroRegMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLibroRegistro()};
 $('#btnHonorarios').onclick=()=>{$('#btnAccountingMenu').style.display='none';openHonorariosPanel()};
+$('#btnGastos').onclick=()=>{$('#btnAccountingMenu').style.display='none';openGastosPanel()};
 $('#btnBuscarOps').onclick=()=>{$('#btnAccountingMenu').style.display='none';openBuscadorOperaciones()};
 
 // 🔎 Buscador global de operaciones · Sinónimos por dimensiones + rango de fechas
@@ -3111,6 +3119,166 @@ function openBuscadorOperaciones(){
 }
 
 
+// 🧾 Panel de Gastos: consulta gastos operativos (luz, agua, alquiler, seguros, etc.) por mes
+// Fuente: entradas DH DEBE (o HABER con concepto de gasto) que NO sean honorarios/nómina/faenas
+// Reconoce categorías por keyword: LUZ, AGUA, ALQUILER, GESTORIA, SEGURO, TELEFONO, INTERNET, MATERIAL, IRPF, IVA, TASAS, MANTENIMIENTO, COMBUSTIBLE.
+const _GS_KEYWORDS = {
+  LUZ:          ['luz','electricidad','electricitat','endesa','iberdrola','naturgy','holaluz','factura electric','recibo luz'],
+  AGUA:         ['agua','aigua','sorea','factura agua','recibo agua','canal isabel','acsa'],
+  GAS:          ['gas','naturgy','repsol gas','factura gas','recibo gas'],
+  ALQUILER:     ['alquiler','lloguer','renta','arrendamiento','rent'],
+  TELEFONO:     ['telefono','teléfono','telèfon','movistar','vodafone','orange','yoigo','pepe','fibra','movil','móvil'],
+  INTERNET:     ['internet','wifi','fibra','router','conexion','conexión'],
+  GESTORIA:     ['gestoria','gestor','asesoria','asesoría','asesor','contable','abogado','notario'],
+  SEGURO:       ['seguro','seguros','assegurança','poliza','póliza','mapfre','allianz','axa','mutua','zurich','linea directa'],
+  MATERIAL:     ['material','materiales','materials','papeleria','papelería','oficina','mercadona','carrefour','lidl','compras'],
+  IRPF:         ['irpf','retencion','retención','retenció'],
+  IVA:          ['iva','impuesto','impuestos','impost','declaracion','declaración'],
+  TASAS:        ['tasa','tasas','taxa','taxes','dgt','ayuntamiento','impuesto municipal'],
+  MANTENIMIENTO:['mantenimiento','reparacion','reparación','arreglar','fontanero','electricista','pintor','limpieza','neteja'],
+  COMBUSTIBLE:  ['combustible','gasolina','diesel','gasoil','repsol','cepsa','shell','bp'],
+  BANCO_COM:    ['comision banco','comisión banco','comisión bancaria','mantenimiento cuenta']
+};
+function _gsMatchKeyword(text){
+  const bag = String(text||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  for(const [cat, kws] of Object.entries(_GS_KEYWORDS)){
+    for(const k of kws){ if(bag.includes(k.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''))) return {cat, kw:k}; }
+  }
+  return null;
+}
+function _hasExplicitGastoMarker(e){
+  // Marca explícita e inequívoca añadida por el chip "🧾 GASTO"
+  const bag = String(e && e.nombre || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  return /^gasto\s*[:\-·]/.test(bag);
+}
+function _isGastoEntry(e){
+  if(!e || e.kind !== 'DH' || (e.importe||0) <= 0) return false;
+  if(e.tipo !== 'DEBE') return false;
+  // 1) Marca explícita "Gasto:" — regla determinista, gana siempre
+  if(_hasExplicitGastoMarker(e)) return true;
+  // 2) Detección por keywords (fallback para datos antiguos y comodidad)
+  //    Excluir si ya es un honorario detectado (sin marca explícita)
+  if(typeof _isHonorarioLikeEntry === 'function' && _isHonorarioLikeEntry(e)) return false;
+  const bag = (String(e.nombre||'')+' '+String(e.tipo||'')+' '+String(e.concepto||'')+' '+String(e.grupo||''));
+  return !!_gsMatchKeyword(bag);
+}
+function _gsCategoryLabel(cat){
+  return {LUZ:'Luz', AGUA:'Agua', GAS:'Gas', ALQUILER:'Alquiler', TELEFONO:'Teléfono', INTERNET:'Internet', GESTORIA:'Gestoría', SEGURO:'Seguros', MATERIAL:'Material', IRPF:'IRPF', IVA:'IVA', TASAS:'Tasas', MANTENIMIENTO:'Mantenim.', COMBUSTIBLE:'Combustible', BANCO_COM:'Comisiones', OTROS:'Otros'}[cat] || cat;
+}
+function _gsCategoryColor(cat){
+  return {LUZ:'#fbbf24', AGUA:'#22d3ee', GAS:'#f97316', ALQUILER:'#c084fc', TELEFONO:'#3ddc97', INTERNET:'#7ec8ff', GESTORIA:'#a3e635', SEGURO:'#f472b6', MATERIAL:'#fca5a5', IRPF:'#ef4444', IVA:'#f59e0b', TASAS:'#94a3b8', MANTENIMIENTO:'#60a5fa', COMBUSTIBLE:'#e879f9', BANCO_COM:'#818cf8', OTROS:'#e2e8f0'}[cat] || '#94a3b8';
+}
+function openGastosPanel(){
+  const allEntries = [];
+  const stores = {trafic:'caja.v1', cempla:'caja.cempla.v1'};
+  for(const [comp, key] of Object.entries(stores)){
+    try{
+      const raw = JSON.parse(localStorage.getItem(key)||'{"byDate":{}}');
+      const bd = raw.byDate || {};
+      for(const iso of Object.keys(bd)){
+        for(const e of (bd[iso]||[])){
+          if(_isGastoEntry(e)){
+            const bag2 = (e.nombre||'')+' '+(e.tipo||'')+' '+(e.concepto||'');
+            const match = _gsMatchKeyword(bag2);
+            // Si es Gasto explícito sin keyword conocido, cae en OTROS
+            const cat = match ? match.cat : (_hasExplicitGastoMarker(e) ? 'OTROS' : 'MATERIAL');
+            // Limpia el prefijo "Gasto:" del nombre mostrado para que quede legible
+            const displayName = String(e.nombre||'(sin concepto)').replace(/^\s*gasto\s*[:\-·]\s*/i,'').trim() || '(sin concepto)';
+            allEntries.push({date: iso, name: displayName, amount: +e.importe||0, company: comp, fp: e.fp||'', cat, explicit: _hasExplicitGastoMarker(e)});
+          }
+        }
+      }
+    }catch(_){}
+  }
+  const fmtEUR = v => v.toFixed(2).replace('.',',')+' €';
+  const fmtDate = iso => { const [y,m,d] = iso.split('-'); return `${d}/${m}/${y}`; };
+  const fmtMonth = ym => { const [y,m] = ym.split('-'); const mn = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][+m-1]; return `${mn} ${y}`; };
+  const allMonths = Array.from(new Set(allEntries.map(e => e.date.substring(0,7)))).sort().reverse();
+  const currentMonth = new Date().toISOString().slice(0,7);
+  const initialMonth = allMonths.includes(currentMonth) ? currentMonth : (allMonths[0] || currentMonth);
+
+  const back = document.createElement('div');
+  back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto';
+  back.innerHTML = `<div class="gs-modal" style="background:#111827;border:1px solid #334155;border-radius:12px;padding:22px;max-width:960px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);font-family:Arial,Helvetica,sans-serif" data-testid="gastos-modal">
+    <div class="no-print" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px">
+      <div><h3 style="margin:0;color:#f472b6;font-family:Georgia,serif">🧾 Gastos · Facturas y recibos operativos</h3><div id="_gs_subtitle" style="font-size:11px;color:#94a3b8;margin-top:3px"></div></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="font-size:10px;color:#94a3b8;font-weight:700">MES</label>
+        <select id="_gs_month" data-testid="gastos-month-select" style="background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;padding:6px 10px;font-size:13px">
+          <option value="__ALL__">📆 Todos los meses</option>
+          ${allMonths.map(ym => `<option value="${ym}" ${ym===initialMonth?'selected':''}>${fmtMonth(ym)}</option>`).join('')}
+          ${allMonths.length===0 ? `<option value="${currentMonth}" selected>${fmtMonth(currentMonth)}</option>` : ''}
+        </select>
+        <button id="_gs_print" data-testid="gastos-print" style="background:linear-gradient(135deg,#f472b6,#be185d);color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px">🖨️ Imprimir</button>
+        <button id="_gs_close" data-testid="gastos-close" style="background:#334155;color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer">✕ Cerrar</button>
+      </div>
+    </div>
+    <div class="no-print" style="background:#0b1121;border:1px solid #831843;border-radius:8px;padding:12px;margin-bottom:14px;font-size:11px;color:#f9a8d4">💡 Marca gastos con el chip <b style="background:#4c0519;color:#fecaca;padding:2px 8px;border-radius:20px;border:1px solid #dc2626">🧾 GASTO</b> en Debe/Haber — así el programa <b>siempre</b> los clasifica como gasto y nunca como honorario. También reconoce por keywords: <b>Factura Endesa</b>, <b>Recibo agua</b>, <b>Alquiler</b>, <b>Seguro Mapfre</b>, <b>Movistar</b>, <b>Gestoría</b>, <b>Gasolina</b>, <b>Bata</b>, <b>Papelería</b>…</div>
+    <div id="_gs_body"></div>
+  </div>`;
+  document.body.appendChild(back);
+
+  function renderBody(monthFilter){
+    const filtered = monthFilter === '__ALL__' ? allEntries.slice() : allEntries.filter(e => e.date.substring(0,7) === monthFilter);
+    const byMonth = {};
+    const byCategory = {};
+    let totalGlobal = 0;
+    for(const e of filtered){
+      const ym = e.date.substring(0,7);
+      (byMonth[ym] = byMonth[ym] || []).push(e);
+      if(!byCategory[e.cat]) byCategory[e.cat] = {total:0, count:0};
+      byCategory[e.cat].total += e.amount;
+      byCategory[e.cat].count += 1;
+      totalGlobal += e.amount;
+    }
+    const months = Object.keys(byMonth).sort().reverse();
+    const categories = Object.keys(byCategory).sort((a,b)=>byCategory[b].total - byCategory[a].total);
+    const subt = document.getElementById('_gs_subtitle');
+    if(subt){
+      const scope = monthFilter === '__ALL__' ? 'Todo el histórico' : fmtMonth(monthFilter);
+      subt.innerHTML = `${filtered.length} gastos · Total: <b style="color:#ef4444" data-testid="gastos-total">${fmtEUR(totalGlobal)}</b> · <span style="color:#f472b6">${scope}</span>`;
+    }
+    const catsHtml = categories.length ? categories.map(c => `<span style="background:#1e293b;padding:4px 10px;border-radius:20px;font-size:11px;margin-right:6px;border-left:3px solid ${_gsCategoryColor(c)}"><b style="color:${_gsCategoryColor(c)}">${_gsCategoryLabel(c)}</b> · ${byCategory[c].count} · <b>${fmtEUR(byCategory[c].total)}</b></span>`).join('') : '';
+    const monthsHtml = months.length ? months.map(ym => {
+      const list = byMonth[ym].sort((a,b)=>a.date.localeCompare(b.date));
+      const monthTotal = list.reduce((s,e)=>s+e.amount, 0);
+      const rows = list.map(e => {
+        const fpFull = ({E:'Efectivo',T:'Banco',B:'Bizum',X:'Otros'})[e.fp] || e.fp || '—';
+        const cn = (typeof _companyName === 'function' ? _companyName(e.company) : e.company);
+        return `<tr><td style="padding:5px 10px;font-size:12px">${fmtDate(e.date)}</td><td style="padding:5px 10px"><span style="background:${_gsCategoryColor(e.cat)}22;color:${_gsCategoryColor(e.cat)};padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700">${_gsCategoryLabel(e.cat)}</span></td><td style="padding:5px 10px;font-size:12px;font-weight:600">${e.name.replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:11px;color:#64748b">${cn}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${fpFull}</td><td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700;color:#ef4444">-${fmtEUR(e.amount)}</td></tr>`;
+      }).join('');
+      return `<div style="margin-bottom:16px;background:#0f172a;border:1px solid #334155;border-radius:8px;overflow:hidden"><div style="background:#1e293b;padding:8px 14px;display:flex;justify-content:space-between;align-items:center"><b style="color:#f472b6">📅 ${fmtMonth(ym)}</b><span style="color:#ef4444;font-weight:700">-${fmtEUR(monthTotal)}</span></div><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#111827"><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Fecha</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Categoría</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Concepto</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Empresa</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Pago</th><th style="padding:5px 10px;text-align:right;font-size:10px;color:#94a3b8">Importe</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join('') : '<div style="padding:20px;text-align:center;color:#64748b;font-style:italic">Sin gastos en este período. Añade una entrada Debe/Haber con concepto como "Factura Endesa", "Recibo agua", "Alquiler local", "Seguro Mapfre"…</div>';
+    document.getElementById('_gs_body').innerHTML = `${catsHtml ? `<div style="margin-bottom:16px">${catsHtml}</div>` : ''}<div>${monthsHtml}</div>`;
+  }
+
+  const monthSel = back.querySelector('#_gs_month');
+  monthSel.addEventListener('change', () => renderBody(monthSel.value));
+  back.querySelector('#_gs_close').onclick = () => back.remove();
+  back.querySelector('#_gs_print').onclick = () => {
+    const modal = back.querySelector('.gs-modal');
+    const scope = monthSel.value === '__ALL__' ? 'Todo el histórico' : fmtMonth(monthSel.value);
+    printVisibleElement(modal, {
+      title: `Gastos · ${scope}`,
+      landscape: false,
+      margins: '8mm',
+      extraCss: `@page { size: A4; margin: 8mm }
+        .no-print, select, button { display:none !important }
+        body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important }
+        .gs-modal, .gs-modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important; border-color:#999 !important }
+        .gs-modal{ max-width:none !important; width:100% !important; padding:0 !important; border:none !important }
+        h3{ color:#000 !important; font-size:14pt !important; margin:0 0 6pt 0 !important }
+        table{ border-collapse:collapse !important; width:100% !important; font-size:9pt !important; page-break-inside:auto }
+        thead{ display:table-header-group } tr{ page-break-inside:avoid }
+        th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:8pt !important }
+        td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 5pt !important; font-size:9pt !important; word-wrap:break-word }`
+    });
+  };
+  back.addEventListener('click', ev => { if(ev.target === back) back.remove(); });
+  document.addEventListener('keydown', function esc(ev){ if(ev.key === 'Escape'){ back.remove(); document.removeEventListener('keydown', esc); } });
+  renderBody(initialMonth);
+}
+
 // 💼 Panel de Honorarios: consulta pagos a trabajadores + faenas externas por mes
 // Fuente de datos: entradas DH (Debe/Haber) cuyo nombre/tipo/concepto contenga alguno de estos sinónimos:
 //   honorari · nomina · sueldo · salario · paga trabajador · empleado · faena · jornal · colaborador · autonomo · externa
@@ -3172,6 +3340,8 @@ function _hnMatchKeyword(text){
 }
 function _isHonorarioLikeEntry(e){
   if(!e || e.kind !== 'DH' || (e.importe||0) <= 0) return false;
+  // Si tiene marca explícita "Gasto:" → NUNCA es honorario (regla determinista)
+  if(typeof _hasExplicitGastoMarker === 'function' && _hasExplicitGastoMarker(e)) return false;
   const bag = (String(e.nombre||'')+' '+String(e.tipo||'')+' '+String(e.concepto||'')+' '+String(e.grupo||''));
   return !!_hnMatchKeyword(bag);
 }
