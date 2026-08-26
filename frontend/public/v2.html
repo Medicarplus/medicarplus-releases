@@ -2414,19 +2414,36 @@ function openStats(initialSection){
       </div>` : ''}
       <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px 16px;margin-bottom:12px">
         <label style="font-size:11px;color:#94a3b8;font-weight:700;letter-spacing:.5px;display:block;margin-bottom:6px">🔎 BUSCAR POR NOMBRE</label>
-        <input type="search" id="citesSearch" data-testid="cites-search-input" placeholder="Escribe un nombre, DNI o fragmento (ej: García López)..." autocomplete="off" style="width:100%;padding:10px 14px;background:#0b1220;border:1px solid #334155;color:#e2e8f0;border-radius:6px;font-size:14px" />
-        <div id="citesSearchMeta" style="font-size:11px;color:#64748b;margin-top:6px">Escribe para filtrar. Muestra hasta 200 resultados ordenados por fecha (más recientes primero).</div>
+        <input type="search" id="citesSearch" data-testid="cites-search-input" placeholder="Buscar por nombre, DNI, NIE (ej: 12345678A · X1234567Z · García)..." autocomplete="off" style="width:100%;padding:10px 14px;background:#0b1220;border:1px solid #334155;color:#e2e8f0;border-radius:6px;font-size:14px" />
+        <div id="citesSearchMeta" style="font-size:11px;color:#64748b;margin-top:6px">💡 Busca por nombre o DNI (con o sin guiones/puntos). Muestra hasta 200 resultados ordenados por fecha (más recientes primero).</div>
       </div>
       <div id="citesResults"></div>`;
     // Wire search
     const searchInp = body.querySelector('#citesSearch');
     const resultsDiv = body.querySelector('#citesResults');
     const metaDiv = body.querySelector('#citesSearchMeta');
+    function _normDni(s){
+      // Normaliza el texto para búsqueda por DNI: quita espacios, guiones, puntos y pasa a mayúsculas
+      return String(s||'').toUpperCase().replace(/[\s\-\.\/]/g,'');
+    }
     function renderResults(query){
       const q = (query||'').trim().toLowerCase();
+      const qNorm = _normDni(query);
+      // Detecta si la búsqueda parece un DNI/NIE (ej: 12345678A, X1234567Z, 87654321H)
+      const looksLikeDni = /^[XYZ]?\d{5,8}[A-Z]?$/.test(qNorm) && qNorm.length >= 5;
       let matches = entries.slice();
       if(q){
-        matches = matches.filter(e => (e.summary||'').toLowerCase().includes(q) || (e.description||'').toLowerCase().includes(q));
+        matches = matches.filter(e => {
+          // Búsqueda estándar por nombre / descripción
+          if((e.summary||'').toLowerCase().includes(q)) return true;
+          if((e.description||'').toLowerCase().includes(q)) return true;
+          // Búsqueda por DNI: normaliza y busca en summary + description + dni si existe
+          const nSum = _normDni(e.summary);
+          const nDesc = _normDni(e.description);
+          const nDni = _normDni(e.dni);
+          if(qNorm && (nSum.includes(qNorm) || nDesc.includes(qNorm) || nDni.includes(qNorm))) return true;
+          return false;
+        });
       }
       matches.sort((a,b) => (b.date||'').localeCompare(a.date||'') || (b.time||'').localeCompare(a.time||''));
       const shown = matches.slice(0, 200);
@@ -9088,6 +9105,11 @@ function showLicenseInfo(){
           <input type="text" id="scSubject" data-testid="input-support-subject" placeholder="Ej: Duda sobre estadísticas · Problema con impresión" style="width:100%;background:#0b1121;border:1px solid #475569;border-radius:6px;color:#e5e7eb;padding:8px 12px;font-size:13px;margin-bottom:12px">
           <label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">Mensaje</label>
           <textarea id="scBody" data-testid="input-support-body" rows="6" placeholder="Cuéntanos qué te pasa o qué necesitas. Te contestamos por email y también verás la respuesta en tu app la próxima vez que la abras." style="width:100%;background:#0b1121;border:1px solid #475569;border-radius:6px;color:#e5e7eb;padding:10px 12px;font-family:inherit;font-size:13px;line-height:1.6;resize:vertical"></textarea>
+          <div style="margin-top:10px">
+            <label for="scAttach" style="display:inline-block;background:#1e293b;border:1px dashed #475569;color:#94a3b8;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700" data-testid="btn-attach-image">📎 Adjuntar captura (opcional · máx 3 imágenes)</label>
+            <input type="file" id="scAttach" data-testid="input-attach-image" accept="image/*" multiple style="display:none">
+            <div id="scAttachPreview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
+          </div>
           <div style="margin-top:14px;display:flex;justify-content:flex-end;gap:8px">
             <button class="btn" data-cancel>Cancelar</button>
             <button class="btn" id="scSend" data-testid="btn-send-support" style="background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border:none;font-weight:800">🚀 Enviar</button>
@@ -9097,6 +9119,49 @@ function showLicenseInfo(){
       document.body.appendChild(inner);
       inner.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>inner.remove());
       inner.addEventListener('click',ev=>{if(ev.target===inner)inner.remove()});
+      // Attachments: convertir imágenes a base64 con compresión si son muy grandes
+      const attachedImages = []; // array de dataURL
+      const attachInput = inner.querySelector('#scAttach');
+      const attachPreview = inner.querySelector('#scAttachPreview');
+      function _refreshPreview(){
+        attachPreview.innerHTML = attachedImages.map((d,i)=>`<div style="position:relative;width:60px;height:60px"><img src="${d}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #475569"><button data-remove="${i}" style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;border:none;width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:10px;font-weight:800">✕</button></div>`).join('');
+        attachPreview.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{ attachedImages.splice(+b.dataset.remove,1); _refreshPreview(); });
+      }
+      function _compressImage(file, maxDim, quality){
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+              let w=img.width, h=img.height;
+              if(w>maxDim || h>maxDim){
+                if(w>h){ h = Math.round(h*maxDim/w); w = maxDim; }
+                else { w = Math.round(w*maxDim/h); h = maxDim; }
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width=w; canvas.height=h;
+              canvas.getContext('2d').drawImage(img,0,0,w,h);
+              resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = reject;
+            img.src = reader.result;
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+      attachInput.onchange = async (ev) => {
+        const files = Array.from(ev.target.files||[]).slice(0, 3-attachedImages.length);
+        for(const f of files){
+          if(!f.type.startsWith('image/')) continue;
+          try{
+            const b64 = await _compressImage(f, 1400, 0.75);
+            if(b64.length < 2_800_000) attachedImages.push(b64);
+          }catch(e){ console.warn('No se pudo procesar imagen',e); }
+        }
+        attachInput.value = '';
+        _refreshPreview();
+      };
       inner.querySelector('#scSend').onclick=async()=>{
         const subject=inner.querySelector('#scSubject').value.trim();
         const bodyText=inner.querySelector('#scBody').value.trim();
@@ -9106,10 +9171,12 @@ function showLicenseInfo(){
         sendBtn.disabled=true;sendBtn.textContent='⏳ Enviando…';
         try{
           const apiBase=(typeof getApiBase==='function')?getApiBase():'';
+          const payload={install_id:installId,license_key:lic.key,subject,body:bodyText};
+          if(attachedImages.length) payload.attachments = attachedImages;
           const r=await fetch(apiBase+'/api/support/client-message',{
             method:'POST',
             headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({install_id:installId,license_key:lic.key,subject,body:bodyText})
+            body:JSON.stringify(payload)
           });
           const j=await r.json();
           if(!r.ok){

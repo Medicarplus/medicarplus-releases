@@ -1015,6 +1015,51 @@ Subir `MediCarPlus-Setup.exe` compilado a `/app/frontend/public/downloads/` para
 - Estilos: inbound (gold border) vs outbound (blue border)
 
 ### 3. Seguridad
+
+## 2026-02 (h) · Bandeja unificada + Adjuntos + DNI search (DONE)
+
+### 1. Búsqueda por DNI en Estadísticas Autoescuelas
+Buscador `citesSearch` (v2.html): 
+- Nueva función `_normDni()` que quita espacios, guiones, puntos y pasa a mayúsculas
+- Detecta patrón DNI/NIE (`[XYZ]?\d{5,8}[A-Z]?`) y busca normalizando el texto de origen
+- Placeholder actualizado: "Buscar por nombre, DNI, NIE (ej: 12345678A · X1234567Z · García)"
+- Tests node.js: 8/8 pasan (con y sin guiones/puntos, nombre normal, NIE)
+
+### 2. Bandeja unificada de mensajes
+Backend endpoint: `GET /api/admin/licenses/inbox-unified?unread_only=true|false&limit=100`
+- Devuelve `messages[]` con `client_name`, `client_email`, `plan`, `subject`, `body` (preview 400 chars), `has_attachments`, `attachments_count`, `sent_at`, `unread`
+- Devuelve `total_unread` global (independiente del filtro)
+- Cross-join con licenses para enriquecer con datos del cliente
+
+Frontend admin:
+- Botón "📨 Bandeja" en topbar (violet gradient) con badge `🔔 N` pulsante
+- Modal 900px con 2 tabs: "No leídos" (por defecto) · "Todos los recibidos"
+- Botón ↻ Refrescar
+- `refreshInboxBadge()` llamado en `loadLicenses()` para actualizar el contador global
+- Click en un item → abre `openSupportChat` del cliente correspondiente
+
+### 3. Adjuntos de imagen (cliente → admin)
+Backend (`admin_support.py`):
+- Campo `attachments: Optional[List[str]]` en `ClientSupportMessageBody`
+- Validación: máx 3 imágenes, cada una <2.8MB base64, formato `data:image/…`
+- Guardado en `support_messages.attachments`
+
+Frontend v2.html (`Contactar Soporte`):
+- Botón `📎 Adjuntar captura` con `<input type="file" accept="image/*" multiple>`
+- Función `_compressImage()`: usa Canvas para redimensionar a máx 1400px + JPEG 75% calidad
+- Preview 60×60 con botón ✕ para quitar cada una
+- Envía en el payload `attachments: [b64...]`
+
+Frontend admin.html (`openSupportChat`):
+- Thumbnails 120×80 clicables (abren en tamaño completo en nueva pestaña)
+- Icono 📎 con contador en la lista del inbox unificado
+
+### Testing E2E (todos pasan)
+Backend curl 8/8:
+- Crear licencia · enviar mensaje con adjunto · enviar sin adjunto · inbox unread=2 con `attachments_count=1` · historial con adjunto 867b · mark-read=2 · inbox unread=0 · all_inbox=4
+
+Visual: modal Bandeja abre con tabs, badge en topbar, empty state correcto en modal
+
 Endpoint público valida: install_id existe · status=active · license_key coincide → 401 si no
 
 ### Testing E2E (8/8 pasan)

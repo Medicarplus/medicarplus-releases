@@ -74,6 +74,7 @@
       <button id="btnNotifs" onclick="toggleNotifPanel()" style="position:relative;padding:8px 14px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700" title="Notificaciones · pagos fallidos, cancelaciones, altas">🔔 Notificaciones <span id="notifBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:#dc2626;color:#fff;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:800;box-shadow:0 0 0 2px var(--bg)">0</span></button>
       <button class="ghost" onclick="loadLicenses()" data-testid="btn-reload">🔄 Recarregar</button>
       <button class="red" onclick="logout()">🚪 Salir</button>
+      <button id="btnUnifiedInbox" data-testid="btn-unified-inbox" onclick="openUnifiedInbox()" style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:800;cursor:pointer;position:relative;margin-left:8px">📨 Bandeja <span id="inboxBadge" data-testid="inbox-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:800;margin-left:6px;animation:_pulse 1.5s ease-in-out infinite"></span></button>
     </div>
   </header>
 
@@ -397,6 +398,7 @@ async function openSupportChat(licenseKey, clientEmail, clientName){
       </div>
       <div style="font-size:12px;font-weight:700;color:#e5e7eb;margin-bottom:4px">${(m.subject||'').replace(/</g,'&lt;')}</div>
       <div style="font-size:12px;color:#cbd5e1;white-space:pre-wrap;line-height:1.5">${(m.body||'').replace(/</g,'&lt;').substring(0,400)}${(m.body||'').length>400?'…':''}</div>
+      ${(m.attachments&&m.attachments.length)?`<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${m.attachments.map(a=>`<a href="${a}" target="_blank" title="Clic para ver en tamaño completo"><img src="${a}" style="max-width:120px;max-height:80px;object-fit:cover;border-radius:6px;border:1px solid #475569;cursor:zoom-in"></a>`).join('')}</div>`:''}
     </div>
   `).join('') : '<div style="text-align:center;color:#64748b;font-style:italic;padding:20px">Sin historial · este será tu primer mensaje al cliente</div>';
   
@@ -454,6 +456,100 @@ async function openSupportChat(licenseKey, clientEmail, clientName){
   };
 }
 window.openSupportChat = openSupportChat;
+
+// 📨 Bandeja unificada · todos los mensajes no leídos de todos los clientes en un solo lugar
+async function refreshInboxBadge(){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok) return;
+  try{
+    const r = await fetch('/api/admin/licenses/inbox-unified?unread_only=true&limit=1', { headers:{'X-Admin-Token':tok} });
+    if(!r.ok) return;
+    const j = await r.json();
+    const badge = document.getElementById('inboxBadge');
+    if(badge){
+      const n = j.total_unread || 0;
+      if(n > 0){ badge.textContent = `🔔 ${n}`; badge.style.display = 'inline-block'; }
+      else { badge.style.display = 'none'; }
+    }
+  }catch(e){}
+}
+async function openUnifiedInbox(){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok){ alert('Sesión caducada, vuelve a entrar'); return; }
+  // Carga inicial: solo no leídos
+  let currentFilter = 'unread';
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  back.innerHTML = `<div class="modal" style="max-width:900px;padding:0;overflow:hidden;max-height:85vh;display:flex;flex-direction:column">
+    <div style="background:linear-gradient(135deg,#7c3aed,#a855f7);padding:18px 24px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+      <div>
+        <div style="font-size:11px;color:#e9d5ff;text-transform:uppercase;letter-spacing:.5px;font-weight:700">📨 Bandeja unificada de mensajes</div>
+        <div style="font-size:16px;color:#fff;font-weight:700;margin-top:2px" id="inboxTitle">Cargando…</div>
+      </div>
+      <button class="ghost" onclick="this.closest('.modal-back').remove()" style="padding:6px 12px">✕</button>
+    </div>
+    <div style="padding:12px 24px;background:#0f172a;border-bottom:1px solid #1e293b;flex-shrink:0;display:flex;gap:8px">
+      <button data-testid="inbox-tab-unread" data-filter="unread" style="background:linear-gradient(135deg,#f5b301,#eab308);color:#0b1121;border:none;padding:6px 14px;border-radius:6px;font-weight:800;font-size:12px;cursor:pointer">🔔 No leídos</button>
+      <button data-testid="inbox-tab-all" data-filter="all" style="background:#334155;color:#e5e7eb;border:none;padding:6px 14px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer">📋 Todos los recibidos</button>
+      <button data-testid="inbox-refresh" onclick="this.closest('.modal-back').querySelector('#inboxList').innerText='Cargando…';loadInbox()" style="background:#334155;color:#e5e7eb;border:none;padding:6px 14px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;margin-left:auto">↻ Refrescar</button>
+    </div>
+    <div id="inboxList" data-testid="inbox-list" style="padding:14px 24px;overflow-y:auto;background:#0b1121;flex:1">Cargando…</div>
+  </div>`;
+  document.body.appendChild(back);
+  back.addEventListener('click', e => { if(e.target===back) back.remove(); });
+  const list = back.querySelector('#inboxList');
+  const title = back.querySelector('#inboxTitle');
+  
+  async function loadInbox(){
+    const unreadOnly = currentFilter === 'unread';
+    try{
+      const r = await fetch(`/api/admin/licenses/inbox-unified?unread_only=${unreadOnly}&limit=100`, { headers:{'X-Admin-Token':tok} });
+      const j = await r.json();
+      const msgs = j.messages || [];
+      title.textContent = `${msgs.length} mensaje${msgs.length===1?'':'s'} ${unreadOnly?'no leídos':'recibidos'} · Total no leídos: ${j.total_unread||0}`;
+      if(!msgs.length){
+        list.innerHTML = `<div style="text-align:center;padding:40px;color:#64748b;font-style:italic">${unreadOnly?'🎉 No hay mensajes pendientes':'Sin mensajes en la bandeja'}</div>`;
+        return;
+      }
+      list.innerHTML = msgs.map(m => `
+        <div class="inbox-item" style="background:${m.unread?'#0f172a':'#0b1121'};border-left:4px solid ${m.unread?'#a855f7':'#334155'};border:1px solid #1e293b;border-left-width:4px;border-radius:8px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:background .15s" onclick="event.stopPropagation();openSupportChat('${(m.license_key||m.install_id||'').replace(/'/g,"\\\\'")}','${(m.client_email||'').replace(/'/g,"\\\\'")}','${(m.client_name||'').replace(/'/g,"\\\\'")}')" onmouseenter="this.style.background='#1e293b'" onmouseleave="this.style.background='${m.unread?'#0f172a':'#0b1121'}'">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                ${m.unread ? '<span style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:800;letter-spacing:.5px">NUEVO</span>' : ''}
+                <b style="color:#f5b301;font-family:Georgia,serif;font-size:14px">${(m.client_name||'Sin nombre').replace(/</g,'&lt;')}</b>
+                ${m.plan?`<span class="pill pill-${m.plan==='TRIAL'?'trial':'std'}" style="font-size:9px">${m.plan}</span>`:''}
+              </div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:2px">📧 ${(m.client_email||'—').replace(/</g,'&lt;')} · 🖥 <span class="mono">${(m.install_id||'').slice(0,14)}…</span></div>
+              <div style="font-size:13px;color:#e5e7eb;font-weight:700;margin-top:6px">${(m.subject||'').replace(/</g,'&lt;')}${m.has_attachments?` <span title="${m.attachments_count} imagen${m.attachments_count===1?'':'es'} adjunta${m.attachments_count===1?'':'s'}" style="color:#3ddc97;font-size:11px;margin-left:4px">📎 ${m.attachments_count}</span>`:''}</div>
+              <div style="font-size:12px;color:#cbd5e1;margin-top:4px;line-height:1.5">${(m.body||'').replace(/</g,'&lt;').substring(0,180)}${(m.body||'').length>180?'…':''}</div>
+            </div>
+            <div style="font-size:10px;color:#94a3b8;text-align:right;flex-shrink:0">
+              ${m.sent_at?new Date(m.sent_at).toLocaleString('es-ES'):''}
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }catch(e){
+      list.innerHTML = `<div style="color:#ef4444;padding:20px;text-align:center">Error: ${e.message}</div>`;
+    }
+  }
+  // Tabs
+  back.querySelectorAll('[data-filter]').forEach(btn => {
+    btn.onclick = () => {
+      currentFilter = btn.dataset.filter;
+      back.querySelectorAll('[data-filter]').forEach(b => {
+        b.style.background = b === btn ? 'linear-gradient(135deg,#f5b301,#eab308)' : '#334155';
+        b.style.color = b === btn ? '#0b1121' : '#e5e7eb';
+      });
+      loadInbox();
+    };
+  });
+  window.loadInbox = loadInbox;
+  loadInbox();
+}
+window.openUnifiedInbox = openUnifiedInbox;
+window.refreshInboxBadge = refreshInboxBadge;
 
 async function doLogin(){
   const credential = document.getElementById('passInput').value.trim();
@@ -513,6 +609,8 @@ async function loadLicenses(){
         fetchSupportUnread(lic.license_key, lic.install_id).then(n=>{ if(n>0) applyFilters(); });
       }
     }
+    // Actualizar badge de la bandeja global cada carga
+    if(typeof refreshInboxBadge==='function') refreshInboxBadge();
     renderStats();
     applyFilters();
   }catch(e){alert('Error cargando licencias: '+e.message)}

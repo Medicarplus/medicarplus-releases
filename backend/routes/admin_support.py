@@ -41,6 +41,8 @@ class ClientSupportMessageBody(BaseModel):
     license_key: str = Field(..., min_length=10, max_length=2000)
     subject: str = Field(..., min_length=3, max_length=200)
     body: str = Field(..., min_length=5, max_length=5000)
+    # Adjuntos: lista de imágenes en base64 (data:image/…;base64,…) máx 3 imágenes, ~2MB cada una
+    attachments: Optional[List[str]] = None
 
 
 def _build_support_email(client_name: str, admin_message: str) -> str:
@@ -137,11 +139,56 @@ def build_support_router(db):
                 "direction": m.get("direction"),
                 "subject": m.get("subject"),
                 "body": m.get("body"),
+                "attachments": m.get("attachments") or [],
                 "sent_at": m.get("sent_at"),
                 "to_email": m.get("to_email"),
                 "unread": is_unread,
             })
         return {"install_id": install_id, "messages": messages, "count": len(messages), "unread_count": unread_count}
+
+    @router.get("/inbox-unified")
+    async def get_unified_inbox(
+        unread_only: bool = True,
+        limit: int = 100,
+        x_admin_token: Optional[str] = Header(None),
+    ):
+        """Bandeja unificada · todos los mensajes de todos los clientes en un solo listado."""
+        _admin_ok(x_admin_token)
+        query = {"direction": "inbound"}
+        if unread_only:
+            query["read_by_admin_at"] = None
+        cur = coll.find(query).sort("sent_at", -1).limit(min(limit, 500))
+        # Cargar info de licencias en batch
+        install_ids = []
+        msgs_raw = []
+        async for m in cur:
+            msgs_raw.append(m)
+            iid = m.get("install_id")
+            if iid and iid not in install_ids: install_ids.append(iid)
+        lic_map = {}
+        if install_ids:
+            async for lic in db.licenses.find({"install_id": {"$in": install_ids}}, {"install_id": 1, "client_name": 1, "client_email": 1, "license_key": 1, "plan": 1, "status": 1}):
+                lic_map[lic.get("install_id")] = lic
+        messages = []
+        for m in msgs_raw:
+            iid = m.get("install_id") or ""
+            lic = lic_map.get(iid) or {}
+            messages.append({
+                "install_id": iid,
+                "license_key": lic.get("license_key"),
+                "client_name": lic.get("client_name") or m.get("client_name") or "",
+                "client_email": lic.get("client_email") or m.get("from_email") or "",
+                "plan": lic.get("plan") or "",
+                "subject": m.get("subject"),
+                "body": (m.get("body") or "")[:400],  # preview
+                "has_attachments": bool(m.get("attachments")),
+                "attachments_count": len(m.get("attachments") or []),
+                "sent_at": m.get("sent_at"),
+                "unread": not m.get("read_by_admin_at"),
+            })
+        # Cuenta total no leídos (independiente del filtro)
+        total_unread = await coll.count_documents({"direction": "inbound", "read_by_admin_at": None})
+        return {"messages": messages, "count": len(messages), "total_unread": total_unread}
 
     @router.post("/{license_key}/mark-read")
     async def mark_messages_read(
@@ -181,6 +228,14 @@ def build_support_router(db):
 
         client_name = (lic.get("client_name") or lic.get("centre") or "").strip()
         client_email = (lic.get("client_email") or "").strip()
+        # Saneamos adjuntos: máximo 3 imágenes, cada una <2.5MB base64, formato data:image/*;base64,
+        clean_attachments = []
+        if body.attachments and isinstance(body.attachments, list):
+            for att in body.attachments[:3]:  # máx 3
+                if not isinstance(att, str): continue
+                if not att.startswith("data:image/"): continue
+                if len(att) > 2_800_000: continue  # ~2MB útiles
+                clean_attachments.append(att)
         now = datetime.now(timezone.utc)
         await coll.insert_one({
             "install_id": body.install_id,
@@ -190,6 +245,7 @@ def build_support_router(db):
             "direction": "inbound",  # cliente → admin
             "subject": body.subject,
             "body": body.body,
+            "attachments": clean_attachments,
             "sent_at": now.isoformat(),
             "read_by_admin_at": None,
         })
