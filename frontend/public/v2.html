@@ -464,7 +464,7 @@
       </div>
     </div>
     <div>
-      <div class="panel" style="margin-bottom:14px"><h2 style="display:flex;align-items:center;gap:8px"><span data-i18n="day_close">Cierre del día</span><button id="btnPrivacyToggle" data-testid="btn-privacy-toggle" title="Ocultar/mostrar importes (privacidad)" style="margin-left:auto;background:transparent;border:1px solid #3a4050;color:#94a3b8;border-radius:6px;padding:3px 8px;font-size:14px;cursor:pointer;line-height:1">👁️</button></h2><div class="body"><div class="summary" id="sumBox"></div></div></div>
+      <div class="panel" style="margin-bottom:14px"><h2 style="display:flex;align-items:center;gap:8px"><span data-i18n="day_close">Cierre del día</span><button id="btnReviewDayAi" data-testid="btn-review-day-ai" title="Preguntar al Asesor IA por el día actual (busca descuadres, duplicados, importes raros)" style="margin-left:auto;background:linear-gradient(135deg,#7c3aed,#a855f7);border:none;color:#fff;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:700;box-shadow:0 2px 6px rgba(124,58,237,.35)">🔎 Repasar día (IA)</button><button id="btnPrivacyToggle" data-testid="btn-privacy-toggle" title="Ocultar/mostrar importes (privacidad)" style="background:transparent;border:1px solid #3a4050;color:#94a3b8;border-radius:6px;padding:3px 8px;font-size:14px;cursor:pointer;line-height:1">👁️</button></h2><div class="body"><div class="summary" id="sumBox"></div></div></div>
       <div class="panel" id="cemplaSplitPanel" style="margin-bottom:14px;display:none"><h2 data-i18n="month_split">Repartiment mes actual</h2><div class="body" id="cemplaSplitBox"></div></div>
       <div class="panel" style="margin-bottom:14px"><h2 data-i18n="by_concept">Resumen por concepto</h2><div class="body" id="byConcept"></div></div>
       <div class="panel"><h2><span data-i18n="history_title">Histórico</span> <span class="small" id="histCount"></span></h2><div id="histList" style="max-height:40vh;overflow:auto"></div></div>
@@ -1058,6 +1058,34 @@ $('#btnPrevDay').onclick=()=>shiftDate(-1);$('#btnNextDay').onclick=()=>shiftDat
   apply(true);
   btn.onclick=()=>apply(!document.body.classList.contains('privacy-on'));
 })();
+// 🔎 Botón "Repasar día (IA)" · abre el Asesor IA con el día actual pre-rellenado
+document.addEventListener('click', function(ev){
+  const b = ev.target.closest('#btnReviewDayAi');
+  if(!b) return;
+  const date = currentDate || isoToday();
+  const [y,m,d] = date.split('-');
+  const humanDate = `${d}/${m}/${y}`;
+  // Contar entradas del día para dar contexto al usuario
+  const dayEntries = (state && state.byDate && state.byDate[date]) || [];
+  const cntTotal = dayEntries.length;
+  // Abre el Asesor IA
+  const aiBtn = document.getElementById('btnAiAsk');
+  if(!aiBtn){ toast('Asesor IA no disponible'); return; }
+  aiBtn.click();
+  // Pre-rellena Desde/Hasta y la pregunta después de que el modal se monte
+  setTimeout(()=>{
+    const from = document.getElementById('aiFrom');
+    const to = document.getElementById('aiTo');
+    const q = document.getElementById('aiQ');
+    if(from) from.value = date;
+    if(to) to.value = date;
+    if(q){
+      q.value = `Repasa el día ${humanDate} (${cntTotal} ${cntTotal===1?'entrada':'entradas'}). Busca posibles descuadres, duplicados, importes en 0€, entradas sin nombre, o gastos que puedan faltar. Dime si algo te llama la atención.`;
+      q.focus();
+      q.setSelectionRange(q.value.length, q.value.length);
+    }
+  }, 200);
+});
 $('#cTrafic').onclick=()=>switchCompany('trafic');
 $('#cCempla').onclick=()=>switchCompany('cempla');
 // Handlers de #cStats i #cLibroReg eliminats: ambdós accessos ara viuen dins de "Contabilidad ▼"

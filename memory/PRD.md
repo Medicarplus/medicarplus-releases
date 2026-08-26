@@ -872,3 +872,23 @@ Nuevo grupo de keywords que atrapa cualquier concepto genérico de gasto: `factu
 - *"¿Qué gastos he tenido este mes?"* → rango mes en curso
 - *"Encuentra días con caja rara"* → sin rango = todo el histórico
 
+
+## 2026-02 (c) · Botón "🔎 Repasar día (IA)" en Cierre del día (DONE)
+
+### Objetivo
+Acceso 1-clic al Asesor IA con el día actual pre-rellenado. Elimina la fricción de tener que ir a Utilidades → Asesor IA → escribir fechas → escribir pregunta.
+
+### Implementación
+- **Botón violeta gradient** (`data-testid="btn-review-day-ai"`) en el header del panel Cierre del día, al lado del toggle de privacidad
+- **Handler delegado en document**: al pulsar, llama `#btnAiAsk.click()` y luego pre-rellena:
+  - `#aiFrom` = `currentDate` (día visible)
+  - `#aiTo` = `currentDate` (día visible)
+  - `#aiQ` = template con la fecha en formato humano + nº de entradas del día + instrucciones de auditoría típicas
+- Pone el foco al final del textarea para que el usuario pueda añadir contexto o pulsar Preguntar directamente
+
+### Validado E2E
+- Botón visible con texto correcto ✅
+- Click abre Asesor IA ✅
+- Desde/Hasta = fecha en curso ISO ✅
+- Pregunta contiene "Repasa el día DD/MM/YYYY (X entradas)" ✅
+
