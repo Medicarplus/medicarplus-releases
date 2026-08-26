@@ -33,8 +33,12 @@ class ResendDownloadBody(BaseModel):
 
 
 def _download_url() -> str:
-    """URL pública del instalador. Configurable via env var."""
-    return (os.environ.get("INSTALLER_DOWNLOAD_URL") or "https://medicarplus.es/downloads/MediCarPlus-Setup.exe").strip()
+    """URL pública del instalador. Configurable via env var.
+
+    Por defecto apunta a la página de descargas de medicarplus.es que redirige
+    a GitHub Releases (donde publicamos las versiones compiladas del .exe).
+    """
+    return (os.environ.get("INSTALLER_DOWNLOAD_URL") or "https://medicarplus.es/downloads/").strip()
 
 
 def _build_email_html(client_name: str, license_key: str, install_id: str, download_url: str) -> str:
@@ -48,8 +52,8 @@ def _build_email_html(client_name: str, license_key: str, install_id: str, downl
   <h2 style="color:#111;font-size:18px">Hola{(' ' + client_name) if client_name else ''},</h2>
   <p style="line-height:1.6">Aquí tienes de nuevo el instalador de <b>MediCar Plus</b> para reinstalar el programa en tu ordenador.</p>
   <div style="background:#fff8e1;border-left:4px solid #f5b301;padding:14px;margin:18px 0;border-radius:4px">
-    <p style="margin:0;font-size:14px"><b>📥 Descargar instalador:</b></p>
-    <p style="margin:8px 0 0 0"><a href="{download_url}" style="display:inline-block;background:#f5b301;color:#0b1121;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:700">Descargar MediCar Plus</a></p>
+    <p style="margin:0;font-size:14px"><b>📥 Página de descarga:</b></p>
+    <p style="margin:8px 0 0 0"><a href="{download_url}" style="display:inline-block;background:#f5b301;color:#0b1121;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:700">Ir a la página de descarga</a></p>
     <p style="margin:10px 0 0 0;font-size:11px;color:#666">Enlace directo: <a href="{download_url}" style="color:#666">{download_url}</a></p>
   </div>
   <h3 style="color:#111;font-size:15px;margin-top:24px">🔑 Tus datos de activación</h3>

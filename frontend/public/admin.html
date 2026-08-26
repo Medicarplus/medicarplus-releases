@@ -69,7 +69,7 @@
       <span style="font-size:11px;color:var(--muted)">Env: <span id="envLabel" style="color:var(--green);font-weight:700">—</span></span>
       <button id="btnNotifs" onclick="toggleNotifPanel()" style="position:relative;padding:8px 14px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700" title="Notificaciones · pagos fallidos, cancelaciones, altas">🔔 Notificaciones <span id="notifBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:#dc2626;color:#fff;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:800;box-shadow:0 0 0 2px var(--bg)">0</span></button>
       <button class="ghost" onclick="loadLicenses()" data-testid="btn-reload">🔄 Recarregar</button>
-      <button class="red" onclick="logout()">🚪 Sortir</button>
+      <button class="red" onclick="logout()">🚪 Salir</button>
     </div>
   </header>
 
@@ -96,47 +96,47 @@
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input id="filterSearch" placeholder="🔎 Buscar (nom, install_id, email)..." style="width:280px" oninput="applyFilters()">
+          <input id="filterSearch" placeholder="🔎 Buscar (nombre, install_id, email)..." style="width:280px" oninput="applyFilters()">
           <select id="filterStatus" onchange="applyFilters()">
-            <option value="">Tots els estats</option>
-            <option value="active">Actives</option>
-            <option value="revoked">Revocades</option>
+            <option value="">Todos los estados</option>
+            <option value="active">Activas</option>
+            <option value="revoked">Revocadas</option>
           </select>
           <select id="filterPlan" onchange="applyFilters()">
-            <option value="">Tots els plans</option>
+            <option value="">Todos los planes</option>
             <option value="TRIAL">TRIAL</option>
             <option value="STD">STANDARD</option>
             <option value="PREMIUM">PREMIUM</option>
             <option value="MASTER">MASTER</option>
           </select>
           <select id="filterSmsMode" onchange="applyFilters()">
-            <option value="">Tots modes SMS</option>
-            <option value="medicar">Mode MediCar</option>
-            <option value="byoa">Mode BYOA</option>
-            <option value="none">Sense SMS</option>
+            <option value="">Todos modos SMS</option>
+            <option value="medicar">Modo MediCar</option>
+            <option value="byoa">Modo BYOA</option>
+            <option value="none">Sin SMS</option>
           </select>
           <select id="filterActivity" onchange="applyFilters()">
-            <option value="">Tota activitat</option>
-            <option value="active">🟢 Actiu (≤72h)</option>
-            <option value="inactive">🔴 Inactiu (>72h)</option>
-            <option value="never">⚪ Sense connexions</option>
+            <option value="">Toda actividad</option>
+            <option value="active">🟢 Activo (≤72h)</option>
+            <option value="inactive">🔴 Inactivo (>72h)</option>
+            <option value="never">⚪ Sin conexiones</option>
           </select>
         </div>
-        <div style="font-size:11px;color:var(--muted)"><span id="resultCount">0</span> resultats</div>
+        <div style="font-size:11px;color:var(--muted)"><span id="resultCount">0</span> resultados</div>
       </div>
       <div style="overflow-x:auto;max-height:70vh">
         <table id="tbl">
           <thead><tr>
             <th>Install ID</th>
-            <th>Centre / Email</th>
-            <th>Pla</th>
-            <th>Estat</th>
+            <th>Centro / Email</th>
+            <th>Plan</th>
+            <th>Estado</th>
             <th>Expira</th>
-            <th>Dies restants</th>
-            <th>Última activitat</th>
-            <th>Mode SMS</th>
-            <th>Consum mes</th>
-            <th>Accions</th>
+            <th>Días restantes</th>
+            <th>Última actividad</th>
+            <th>Modo SMS</th>
+            <th>Consumo mes</th>
+            <th>Acciones</th>
           </tr></thead>
           <tbody id="tbody"></tbody>
         </table>
@@ -457,12 +457,12 @@ function renderStats(){
     }
   });
   document.getElementById('stats').innerHTML = `
-    <div class="stat"><div class="stat-lbl">Total llicències</div><div class="stat-val">${total}</div></div>
-    <div class="stat"><div class="stat-lbl">Actives</div><div class="stat-val" style="color:var(--green)">${active}</div></div>
-    <div class="stat"><div class="stat-lbl">🟢 Actius ≤72h · 🔴 Inactius</div><div class="stat-val" style="font-size:18px"><span style="color:var(--green)">${active72h}</span> · <span style="color:var(--red)">${inactive72h}</span></div></div>
+    <div class="stat"><div class="stat-lbl">Total licencias</div><div class="stat-val">${total}</div></div>
+    <div class="stat"><div class="stat-lbl">Activas</div><div class="stat-val" style="color:var(--green)">${active}</div></div>
+    <div class="stat"><div class="stat-lbl">🟢 Activas ≤72h · 🔴 Inactivas</div><div class="stat-val" style="font-size:18px"><span style="color:var(--green)">${active72h}</span> · <span style="color:var(--red)">${inactive72h}</span></div></div>
     <div class="stat"><div class="stat-lbl">Trials · Std · Prem</div><div class="stat-val" style="font-size:16px">🎁${trial} · 💼${std} · ⭐${prem}${master?' · 👑'+master:''}</div></div>
-    <div class="stat"><div class="stat-lbl">Usuaris MediCar · BYOA</div><div class="stat-val" style="font-size:18px"><span style="color:var(--purple)">${medUsers}</span> · <span style="color:var(--green)">${byoaUsers}</span></div></div>
-    <div class="stat"><div class="stat-lbl">SMS aquest mes (MediCar)</div><div class="stat-val" style="color:var(--gold)">${totalSMSMes} <span style="font-size:14px;color:#a5b4fc"> · ${totalEURMes.toFixed(2)}€</span></div></div>
+    <div class="stat"><div class="stat-lbl">Usuarios MediCar · BYOA</div><div class="stat-val" style="font-size:18px"><span style="color:var(--purple)">${medUsers}</span> · <span style="color:var(--green)">${byoaUsers}</span></div></div>
+    <div class="stat"><div class="stat-lbl">SMS este mes (MediCar)</div><div class="stat-val" style="color:var(--gold)">${totalSMSMes} <span style="font-size:14px;color:#a5b4fc"> · ${totalEURMes.toFixed(2)}€</span></div></div>
   `;
 }
 
@@ -524,11 +524,11 @@ function applyFilters(){
       const dslv = en.activity.days_since_last_verify;
       const cnt = en.activity.verify_count || 0;
       if(dslv === null || dslv === undefined){
-        activityCell = `<span class="mono" style="color:var(--muted)">⚪ Sense connexions</span>`;
+        activityCell = `<span class="mono" style="color:var(--muted)">⚪ Sin conexiones</span>`;
       } else if(dslv <= 3){
-        activityCell = `<span class="mono" style="color:var(--green);font-weight:700">🟢 Fa ${dslv}d${cnt?' · '+cnt+'×':''}</span>`;
+        activityCell = `<span class="mono" style="color:var(--green);font-weight:700">🟢 Hace ${dslv}d${cnt?' · '+cnt+'×':''}</span>`;
       } else {
-        activityCell = `<span class="mono" style="color:var(--red);font-weight:700">🔴 Inactiu · fa ${dslv}d</span>`;
+        activityCell = `<span class="mono" style="color:var(--red);font-weight:700">🔴 Inactivo · hace ${dslv}d</span>`;
       }
     }
     let smsMode = '<span class="mono" style="color:var(--muted)">—</span>';
@@ -555,16 +555,16 @@ function applyFilters(){
       <td>${smsMode}</td>
       <td>${smsUsage}</td>
       <td>
-        <button class="ghost" onclick="openDetail('${l.install_id}')" data-testid="btn-detail-${l.install_id}">👁 Detall</button>
+        <button class="ghost" onclick="openDetail('${l.install_id}')" data-testid="btn-detail-${l.install_id}">👁 Detalle</button>
         ${isTrial && l.status==='active' ? `<button class="gold" style="margin-top:4px" onclick="adjustTrial('${l.install_id}', 7)">+7d</button> <button class="ghost" style="margin-top:4px" onclick="adjustTrialCustom('${l.install_id}')">±</button>` : ''}
       </td>
     </tr>`;
   }).join('');
-  document.getElementById('tbody').innerHTML = rows || '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">Cap resultat</td></tr>';
+  document.getElementById('tbody').innerHTML = rows || '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">Sin resultados</td></tr>';
 }
 
 async function adjustTrial(install_id, days){
-  if(!confirm(`Ampliar la Trial ${days>0?'+':''}${days} dies?`)) return;
+  if(!confirm(`¿Ampliar la Trial ${days>0?'+':''}${days} días?`)) return;
   try{
     const r = await fetch(API_BASE+'/api/licenses/'+encodeURIComponent(install_id)+'/adjust-trial',{
       method:'POST',
@@ -573,72 +573,128 @@ async function adjustTrial(install_id, days){
     });
     const d = await r.json();
     if(d.ok){
-      alert(`✅ Trial ajustat ${days>0?'+':''}${days} dies. Nova data: ${new Date(d.new_expires_at).toLocaleDateString('ca-ES')}`);
+      const nd = new Date(d.new_expires_at).toLocaleDateString('es-ES');
+      const em = d.email_notified ? '\n\n📧 Hemos avisado al cliente por email · abrirá la app y pulsará Verificar para aplicar el cambio' : '';
+      alert(`✅ Trial ajustada ${days>0?'+':''}${days} días. Nueva fecha: ${nd}${em}`);
       loadLicenses();
     } else alert('Error: '+(d.detail||JSON.stringify(d)));
-  }catch(e){alert('Error xarxa: '+e.message)}
+  }catch(e){alert('Error de red: '+e.message)}
 }
 
 function adjustTrialCustom(install_id){
-  const val = prompt('Quants dies vols ajustar? (positiu = ampliar, negatiu = reduir)\nExemple: 15 o -5', '7');
+  const val = prompt('¿Cuántos días quieres ajustar? (positivo = ampliar, negativo = reducir)\nEjemplo: 15 o -5', '7');
   if(val===null) return;
   const n = parseInt(val,10);
-  if(isNaN(n)||n===0){alert('Valor invàlid');return}
+  if(isNaN(n)||n===0){alert('Valor inválido');return}
   adjustTrial(install_id, n);
 }
 
 async function openDetail(install_id){
   const enP = ENRICHED_CACHE[install_id] || await fetchEnriched(install_id);
-  if(!enP){alert('Error obtenint dades');return}
+  if(!enP){alert('Error obteniendo datos');return}
   const l = enP.license;
   const sms = enP.sms;
   const p = (l.plan_family||l.plan||'').toUpperCase();
   const dl = daysLeft(l.expires_at);
+  const st = (l.status||'').toLowerCase();
+  // Semáforo del estado
+  const stCfg = (st==='revoked') ? {emo:'⚫',label:'REVOCADA',color:'#64748b',bg:'#1e293b'}
+              : (dl!==null && dl<0) ? {emo:'🔴',label:'EXPIRADA',color:'#ef4444',bg:'#450a0a'}
+              : (dl!==null && dl<=7) ? {emo:'🟠',label:`EXPIRA EN ${dl}d`,color:'#f97316',bg:'#431407'}
+              : (p==='TRIAL') ? {emo:'🟡',label:'TRIAL ACTIVA',color:'#eab308',bg:'#422006'}
+              : {emo:'🟢',label:'ACTIVA',color:'#22c55e',bg:'#052e16'};
+  const clientName = (l.client_name||l.company_name||'Sin nombre').replace(/</g,'&lt;');
+  const email = (l.client_email||'—').replace(/</g,'&lt;');
+  const expHuman = l.expires_at ? new Date(l.expires_at).toLocaleDateString('es-ES', {day:'2-digit',month:'long',year:'numeric'}) : '—';
+  const daysBadge = dl!==null ? `<span style="color:${stCfg.color};font-weight:800">${dl>=0?`quedan ${dl} día${dl===1?'':'s'}`:`hace ${Math.abs(dl)} día${Math.abs(dl)===1?'':'s'}`}</span>` : '';
   const back = document.createElement('div');
   back.className='modal-back';
-  back.innerHTML = `<div class="modal">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <h3 style="margin:0;color:var(--gold);font-family:Georgia,serif">👁 Detall Llicència</h3>
-      <button class="ghost" onclick="this.closest('.modal-back').remove()">✕</button>
-    </div>
-    <div class="kv">
-      <b>Install ID</b><span><span class="mono">${l.install_id||'—'}</span> <button class="ghost" style="padding:2px 8px;font-size:10px" onclick="copyVal(this,'${(l.install_id||'').replace(/'/g,"\\\\'")}')">📋 Copiar</button></span>
-      <b>Clau (license_key)</b><span><span class="mono" style="word-break:break-all;font-size:10px;color:#94a3b8">${(l.license_key||'—').substring(0,60)}${(l.license_key||'').length>60?'…':''}</span> ${l.license_key?`<button class="ghost" style="padding:2px 8px;font-size:10px" onclick="copyVal(this,\`${(l.license_key||'').replace(/`/g,'\\\\`')}\`)">📋 Copiar clau sencera</button>`:''}</span>
-      <b>Codi de referit propi</b><span>${l.referral_code?`<span class="mono" style="color:#3ddc97;font-weight:700;font-size:14px">${l.referral_code}</span> <button class="ghost" style="padding:2px 8px;font-size:10px" onclick="copyVal(this,'${l.referral_code}')">📋 Copiar</button>`:'<span style="color:var(--muted)">— (no generat encara)</span>'}</span>
-      <b>Referred by (l'ha convidat)</b><span class="mono">${l.referred_by||'—'}</span>
-      <b>Centre</b><span>${(l.client_name||l.company_name||'—').replace(/</g,'&lt;')}</span>
-      <b>Email</b><span class="mono">${(l.client_email||'—').replace(/</g,'&lt;')} ${l.license_key?`<button class="ghost" style="padding:2px 8px;font-size:10px;background:#0c2340;border-color:#38bdf8;color:#7dd3fc" onclick="resendInstaller('${(l.license_key||'').replace(/'/g,"\\\\'")}', '${(l.client_email||'').replace(/'/g,"\\\\'")}')" data-testid="btn-resend-installer" title="Reenviar el instalador de MediCar Plus a este cliente por email">📩 Reenviar programa</button>`:''}</span>
-      <b>Pla</b><span>${p}</span>
-      <b>Estat</b><span>${l.status||'—'}</span>
-      <b>Creada</b><span class="mono">${l.created_at?new Date(l.created_at).toLocaleString('ca-ES'):'—'}</span>
-      <b>Expira</b><span class="mono">${l.expires_at?new Date(l.expires_at).toLocaleString('ca-ES'):'—'} ${dl!==null?'('+dl+' dies)':''}</span>
-      <b>Última activitat</b><span>${enP.activity && enP.activity.last_verify_at ? `<span class="mono">${new Date(enP.activity.last_verify_at).toLocaleString('ca-ES')}</span> · <span style="color:var(--muted)">fa ${enP.activity.days_since_last_verify}d · ${enP.activity.verify_count} connexions</span>` : '<span style="color:var(--muted)">⚪ Encara no s\'ha connectat</span>'}</span>
-      <b>Stripe Sub ID</b><span class="mono">${l.stripe_subscription_id||'—'}</span>
-      <b>Stripe Customer</b><span class="mono">${l.stripe_customer_id||'—'}</span>
-      ${(Array.isArray(l.abuse_flags)&&l.abuse_flags.length)?`<b style="color:#fbbf24">⚠️ Senyals d'abús</b><span><ul style="margin:0;padding-left:18px;color:#fbbf24">${l.abuse_flags.map(f=>`<li>${String(f).replace(/</g,'&lt;')}</li>`).join('')}</ul></span>`:''}
-    </div>
-    <hr style="border-color:#1e293b;margin:12px 0">
-    <h4 style="color:var(--purple);margin:8px 0">📱 SMS</h4>
-    <div class="kv">
-      <b>Mode principal</b><span>${sms.mode_used||'—'} ${sms.mode_used==='medicar'?'<span class="badge badge-medicar">⭐ Cloud</span>':(sms.mode_used==='byoa'?'<span class="badge badge-byoa">🔧 BYOA</span>':'')}</span>
-      <b>Campanyes BYOA</b><span>${sms.byoa_campaigns||0}</span>
-      <b>Campanyes MediCar</b><span>${sms.medicar_campaigns||0}</span>
-      <b>SMS mes actual (${sms.current_month.period})</b><span><b style="color:var(--gold)">${sms.current_month.sent_count}</b> SMS · ${sms.current_month.cost_eur.toFixed(2)}€ ${sms.current_month.billed?'✅ facturat':'⏳ pendent'}</span>
-      <b>Sender (si MediCar)</b><span class="mono">${sms.current_month.medicar_sender||'—'}</span>
-      <b>Total històric</b><span>${sms.total_historic.sent_count} SMS · ${sms.total_historic.months} mesos</span>
-      <b>Preu per SMS</b><span>${sms.price_per_sms_eur.toFixed(2)}€</span>
-    </div>
-    ${p==='TRIAL' && l.status==='active' ? `
-      <hr style="border-color:#1e293b;margin:12px 0">
-      <h4 style="color:var(--gold);margin:8px 0">⚙️ Ajustar dies Trial</h4>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="green" onclick="adjustTrial('${l.install_id}',7).then(()=>this.closest('.modal-back').remove())">+7d</button>
-        <button class="green" onclick="adjustTrial('${l.install_id}',15).then(()=>this.closest('.modal-back').remove())">+15d</button>
-        <button class="green" onclick="adjustTrial('${l.install_id}',30).then(()=>this.closest('.modal-back').remove())">+30d</button>
-        <button class="red" onclick="adjustTrial('${l.install_id}',-7).then(()=>this.closest('.modal-back').remove())">-7d</button>
-        <button class="ghost" onclick="adjustTrialCustom('${l.install_id}');this.closest('.modal-back').remove()">± Custom</button>
+  const licKeyEsc = (l.license_key||'').replace(/'/g,"\\\\'");
+  const emailEsc = (l.client_email||'').replace(/'/g,"\\\\'");
+  back.innerHTML = `<div class="modal" style="max-width:720px;padding:0;overflow:hidden">
+    <!-- Cabecera con nombre del cliente + estado -->
+    <div style="background:linear-gradient(135deg,${stCfg.bg} 0%,#0b1121 100%);padding:22px 26px;border-bottom:2px solid ${stCfg.color}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;font-weight:600">Ficha del cliente</div>
+          <h2 style="margin:0;color:#f5b301;font-family:Georgia,serif;font-size:22px;word-break:break-word">${clientName}</h2>
+          <div style="margin-top:6px;font-size:13px;color:#cbd5e1">📧 <a href="mailto:${email}" style="color:#7dd3fc;text-decoration:none">${email}</a></div>
+        </div>
+        <div style="text-align:right">
+          <div style="background:${stCfg.color};color:#0b1121;padding:6px 14px;border-radius:20px;font-weight:800;font-size:12px;display:inline-block">${stCfg.emo} ${stCfg.label}</div>
+          <div style="margin-top:8px;font-size:11px;color:#94a3b8">Plan: <b style="color:#f5b301">${p||'—'}</b></div>
+        </div>
       </div>
-    `:''}
+      <!-- Barra de expiración destacada -->
+      <div style="background:rgba(15,23,42,.6);border:1px solid ${stCfg.color}44;border-radius:10px;padding:12px 16px;margin-top:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <div>
+          <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;font-weight:600">Expira</div>
+          <div style="font-size:16px;font-weight:700;color:#e2e8f0;margin-top:2px">${expHuman}</div>
+          <div style="font-size:12px;margin-top:2px">${daysBadge}</div>
+        </div>
+        <button class="ghost" onclick="this.closest('.modal-back').remove()" style="padding:6px 12px;font-size:12px">✕ Cerrar</button>
+      </div>
+    </div>
+
+    ${p==='TRIAL' && st==='active' ? `
+    <!-- Acciones rápidas trial -->
+    <div style="padding:18px 26px 6px;background:#0f172a;border-bottom:1px solid #1e293b">
+      <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:8px">⚡ Ampliar / reducir días</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="green" style="background:linear-gradient(135deg,#22c55e,#16a34a);border:none;color:#fff;padding:10px 18px;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(34,197,94,.35)" onclick="adjustTrial('${l.install_id}',7).then(()=>this.closest('.modal-back').remove())">+7 días</button>
+        <button class="green" style="background:linear-gradient(135deg,#22c55e,#16a34a);border:none;color:#fff;padding:10px 18px;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(34,197,94,.35)" onclick="adjustTrial('${l.install_id}',15).then(()=>this.closest('.modal-back').remove())">+15 días</button>
+        <button class="green" style="background:linear-gradient(135deg,#f5b301,#eab308);border:none;color:#0b1121;padding:10px 18px;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(245,179,1,.4)" onclick="adjustTrial('${l.install_id}',30).then(()=>this.closest('.modal-back').remove())">+30 días</button>
+        <button class="green" style="background:linear-gradient(135deg,#f5b301,#eab308);border:none;color:#0b1121;padding:10px 18px;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(245,179,1,.4)" onclick="adjustTrial('${l.install_id}',90).then(()=>this.closest('.modal-back').remove())">+90 días</button>
+        <button class="green" style="background:linear-gradient(135deg,#a855f7,#7c3aed);border:none;color:#fff;padding:10px 18px;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(168,85,247,.4)" onclick="adjustTrial('${l.install_id}',365).then(()=>this.closest('.modal-back').remove())">+1 año</button>
+        <button class="red" style="background:#450a0a;border:1px solid #ef4444;color:#fca5a5;padding:10px 14px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer" onclick="adjustTrial('${l.install_id}',-7).then(()=>this.closest('.modal-back').remove())">−7 días</button>
+        <button class="ghost" style="padding:10px 14px;border-radius:8px;font-size:12px" onclick="adjustTrialCustom('${l.install_id}');this.closest('.modal-back').remove()">⚙ Personalizado</button>
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- Acciones principales -->
+    <div style="padding:14px 26px;background:#0f172a;border-bottom:1px solid #1e293b">
+      <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:8px">🎯 Acciones sobre el cliente</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${l.license_key?`<button class="ghost" style="background:linear-gradient(135deg,#0c2340,#1e40af);border:1px solid #38bdf8;color:#fff;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer" onclick="resendInstaller('${licKeyEsc}','${emailEsc}')" data-testid="btn-resend-installer">📩 Reenviar programa por email</button>`:''}
+        ${l.license_key?`<button class="ghost" style="background:#1e293b;border:1px solid #475569;color:#e2e8f0;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer" onclick="copyVal(this,\`${(l.license_key||'').replace(/\`/g,'\\\\\`')}\`)">🔑 Copiar clave</button>`:''}
+        <button class="ghost" style="background:#1e293b;border:1px solid #475569;color:#e2e8f0;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer" onclick="copyVal(this,'${(l.install_id||'').replace(/'/g,"\\\\'")}')">🖥 Copiar Install ID</button>
+      </div>
+    </div>
+
+    <!-- Datos técnicos (colapsable) -->
+    <details style="background:#0b1121">
+      <summary style="padding:14px 26px;cursor:pointer;font-size:12px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #1e293b">📋 Datos técnicos y trazabilidad</summary>
+      <div style="padding:14px 26px">
+        <div class="kv">
+          <b>Install ID</b><span><span class="mono" style="font-size:11px">${l.install_id||'—'}</span></span>
+          <b>Clave (license_key)</b><span><span class="mono" style="word-break:break-all;font-size:10px;color:#94a3b8">${(l.license_key||'—').substring(0,60)}${(l.license_key||'').length>60?'…':''}</span></span>
+          <b>Código de referido propio</b><span>${l.referral_code?`<span class="mono" style="color:#3ddc97;font-weight:700;font-size:13px">${l.referral_code}</span> <button class="ghost" style="padding:2px 8px;font-size:10px" onclick="copyVal(this,'${l.referral_code}')">📋</button>`:'<span style="color:var(--muted)">— (aún sin generar)</span>'}</span>
+          <b>Referred by (quien lo invitó)</b><span class="mono">${l.referred_by||'—'}</span>
+          <b>Creada</b><span class="mono">${l.created_at?new Date(l.created_at).toLocaleString('es-ES'):'—'}</span>
+          <b>Última actividad</b><span>${enP.activity && enP.activity.last_verify_at ? `<span class="mono">${new Date(enP.activity.last_verify_at).toLocaleString('es-ES')}</span> · <span style="color:var(--muted)">hace ${enP.activity.days_since_last_verify}d · ${enP.activity.verify_count} conexiones</span>` : '<span style="color:var(--muted)">⚪ Aún no se ha conectado</span>'}</span>
+          <b>Stripe Sub ID</b><span class="mono">${l.stripe_subscription_id||'—'}</span>
+          <b>Stripe Customer</b><span class="mono">${l.stripe_customer_id||'—'}</span>
+          ${(Array.isArray(l.abuse_flags)&&l.abuse_flags.length)?`<b style="color:#fbbf24">⚠️ Señales de abuso</b><span><ul style="margin:0;padding-left:18px;color:#fbbf24">${l.abuse_flags.map(f=>`<li>${String(f).replace(/</g,'&lt;')}</li>`).join('')}</ul></span>`:''}
+        </div>
+      </div>
+    </details>
+
+    <!-- SMS panel -->
+    <details style="background:#0b1121">
+      <summary style="padding:14px 26px;cursor:pointer;font-size:12px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #1e293b">📱 Uso de SMS y facturación</summary>
+      <div style="padding:14px 26px">
+        <div class="kv">
+          <b>Modo principal</b><span>${sms.mode_used||'—'} ${sms.mode_used==='medicar'?'<span class="badge badge-medicar">⭐ Cloud</span>':(sms.mode_used==='byoa'?'<span class="badge badge-byoa">🔧 BYOA</span>':'')}</span>
+          <b>Campañas BYOA</b><span>${sms.byoa_campaigns||0}</span>
+          <b>Campañas MediCar</b><span>${sms.medicar_campaigns||0}</span>
+          <b>SMS mes actual (${sms.current_month.period})</b><span><b style="color:var(--gold)">${sms.current_month.sent_count}</b> SMS · ${sms.current_month.cost_eur.toFixed(2)}€ ${sms.current_month.billed?'✅ facturado':'⏳ pendiente'}</span>
+          <b>Sender (si MediCar)</b><span class="mono">${sms.current_month.medicar_sender||'—'}</span>
+          <b>Total histórico</b><span>${sms.total_historic.sent_count} SMS · ${sms.total_historic.months} meses</span>
+          <b>Precio por SMS</b><span>${sms.price_per_sms_eur.toFixed(2)}€</span>
+        </div>
+      </div>
+    </details>
   </div>`;
   document.body.appendChild(back);
   back.addEventListener('click',e=>{if(e.target===back)back.remove()});

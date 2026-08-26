@@ -920,3 +920,42 @@ Traducidas todas las cadenas hardcoded catalanas + `toLocaleDateString('es-ES')`
 
 ### Pendiente (usuario)
 Subir `MediCarPlus-Setup.exe` compilado a `/app/frontend/public/downloads/` para que el enlace `https://medicarplus.es/downloads/MediCarPlus-Setup.exe` funcione.
+
+
+## 2026-02 (e) · 4 mejoras completas del sistema de licencias (DONE)
+
+### 1. Página de descargas · `/app/frontend/public/downloads/index.html`
+- Landing bonita en español con branding MediCar Plus
+- Botón principal → GitHub Releases (`github.com/Medicarplus/medicarplus-releases/releases/latest`)
+- Instrucciones paso a paso (5 steps) de reinstalación
+- Sección "¿Perdiste tu clave?" con mailto:info@medicarplus.es
+- Warning HWID binding + soporte
+
+### 2. Panel admin rediseñado · `admin.html openDetail()`
+- Cabecera con nombre grande + estado con emoji semáforo (🟢🟡🟠🔴⚫) + expiración destacada con contador de días
+- Grid `[+7d] [+15d] [+30d] [+90d] [+1año] [-7d] [⚙ Personalizado]` con gradients por color
+- Botones "Reenviar programa" · "Copiar clave" · "Copiar Install ID" grandes
+- Datos técnicos y SMS en `<details>` colapsables (no ensucian)
+- Panel principal traducido: "Total licencias", "Activas", "Todos los estados", "Sin conexiones", "Hace Xd", "Detalle", "Salir"…
+
+### 3. Email automático al extender trial · `licenses.py adjust_trial_days()`
+- Al hacer +X días desde admin, se envía HTML formateado al `client_email` desde `info@medicarplus.es` (IONOS SMTP)
+- Contenido: nueva fecha destacada + instrucciones "1) Abrir app 2) Pulsar 🔐 3) Pulsar Verificar ahora"
+- Response del endpoint incluye `email_notified: bool` para feedback en admin
+- Alert del admin ahora muestra "📧 Hemos avisado al cliente por email"
+
+### 4. Verify Auto al abrir modal · `v2.html showLicenseInfo()`
+- Al abrir el modal de licencia (candado), lanza `verifyOnline()` en background automáticamente
+- Banner animado "Comprobando actualizaciones..." con spinner CSS
+- Si detecta `new_key` → aplica silenciosamente + banner verde "✅ Licencia actualizada" + reload a los 2s
+- Si server responde OK sin cambios → banner verde "✅ Al día" y desaparece
+- Si server rechaza → banner rojo con motivo
+- Si sin conexión → banner naranja "Trabajando offline"
+- Robusto: nunca bloquea la UI
+
+### Testing E2E (todos pasan)
+- Página descargas: 4/4 checks (título, instrucciones, GitHub link, contacto)
+- Modal admin rediseñado: 8/8 checks (Ficha, nombre, estado, +30d, +1año, Reenviar, Datos técnicos, SMS)
+- Extend con email: `email_notified: true`, `new_expires_at: 2026-10-25`
+- Verify auto: banner aparece + reemplaza con `new_key` si cambia
+- Panel admin ES: 8/10 palabras esperadas, 0 catalán restante

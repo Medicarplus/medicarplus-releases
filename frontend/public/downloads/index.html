@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Descargar MediCar Plus · Reinstalar programa</title>
+<meta name="description" content="Descarga el instalador de MediCar Plus para reinstalar el programa en tu ordenador. Rápido, seguro y con licencia HWID." />
+<link rel="icon" href="/favicon.ico" />
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#0b1121 0%,#1a1f35 100%);color:#e5e7eb;min-height:100vh;padding:20px}
+  .container{max-width:720px;margin:0 auto;padding:40px 20px}
+  .logo{text-align:center;margin-bottom:32px}
+  .logo h1{color:#f5b301;font-size:38px;font-weight:800;letter-spacing:-.5px}
+  .logo p{color:#94a3b8;font-size:14px;margin-top:4px}
+  .card{background:rgba(30,37,54,.6);border:1px solid #334155;border-radius:14px;padding:32px;margin-bottom:24px;backdrop-filter:blur(10px)}
+  .card h2{font-size:22px;color:#f5b301;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+  .download-btn{display:inline-block;background:linear-gradient(135deg,#f5b301,#eab308);color:#0b1121;padding:16px 36px;border-radius:10px;text-decoration:none;font-weight:800;font-size:16px;transition:transform .2s,box-shadow .2s;box-shadow:0 4px 14px rgba(245,179,1,.4)}
+  .download-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(245,179,1,.55)}
+  .download-btn.secondary{background:#334155;color:#e5e7eb;box-shadow:none}
+  .buttons{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}
+  .steps{list-style:none;counter-reset:step;margin-top:20px}
+  .steps li{counter-increment:step;padding:14px 14px 14px 60px;position:relative;background:rgba(15,23,42,.6);border-radius:10px;margin-bottom:10px;line-height:1.6}
+  .steps li::before{content:counter(step);position:absolute;left:16px;top:14px;background:#f5b301;color:#0b1121;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800}
+  .steps li b{color:#f5b301}
+  .warn{background:#450a0a;border:1px solid #ef4444;color:#fca5a5;padding:14px;border-radius:8px;margin:16px 0;font-size:13px;line-height:1.6}
+  .info{background:#1e3a8a;border:1px solid #38bdf8;color:#bae6fd;padding:14px;border-radius:8px;margin:16px 0;font-size:13px;line-height:1.6}
+  footer{text-align:center;padding:20px;color:#64748b;font-size:12px}
+  footer a{color:#94a3b8;text-decoration:none;margin:0 8px}
+  footer a:hover{color:#f5b301}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">
+    <h1>MediCar Plus</h1>
+    <p>Software profesional de gestión de caja</p>
+  </div>
+
+  <div class="card">
+    <h2>📥 Descargar el programa</h2>
+    <p style="color:#cbd5e1;line-height:1.7;margin-bottom:8px">Descarga la última versión del instalador para Windows. Compatible con Windows 10 y 11.</p>
+    <div class="buttons">
+      <a href="https://github.com/Medicarplus/medicarplus-releases/releases/latest" class="download-btn" data-testid="btn-download-github">📥 Descargar última versión</a>
+      <a href="mailto:info@medicarplus.es?subject=Necesito ayuda con MediCar Plus" class="download-btn secondary">📧 Necesito ayuda</a>
+    </div>
+    <div class="info">💡 El enlace te lleva a la página oficial de GitHub Releases donde encontrarás siempre la <b>versión más reciente</b>. Busca el archivo <b>MediCar-Plus-Setup-X.X.X.exe</b> y descárgalo.</div>
+  </div>
+
+  <div class="card">
+    <h2>🔑 ¿Cómo reactivar tu licencia?</h2>
+    <ol class="steps">
+      <li>Descarga el instalador desde el botón de arriba</li>
+      <li>Ejecuta <b>MediCar-Plus-Setup.exe</b> y sigue las instrucciones del asistente</li>
+      <li>Abre el programa una vez instalado</li>
+      <li>Introduce tu <b>Install ID</b> y <b>Clave de licencia</b> (te los enviamos por email cuando compraste)</li>
+      <li>Si es el mismo ordenador donde ya tenías el programa, se reactivará automáticamente sin gastar activaciones nuevas</li>
+    </ol>
+    <div class="warn">⚠️ <b>Importante:</b> La licencia está vinculada al hardware de tu ordenador (HWID). Si intentas activarla en otro equipo distinto, contacta con nosotros primero en <a href="mailto:info@medicarplus.es" style="color:#fca5a5">info@medicarplus.es</a> para transferirla.</div>
+  </div>
+
+  <div class="card">
+    <h2>❓ ¿Perdiste tu clave de licencia?</h2>
+    <p style="color:#cbd5e1;line-height:1.7">No te preocupes — te la reenviamos gratis. Escríbenos con el email que usaste al comprar el programa a:</p>
+    <div style="text-align:center;margin-top:16px">
+      <a href="mailto:info@medicarplus.es?subject=He perdido mi clave de licencia" class="download-btn">📧 Escribir a info@medicarplus.es</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <a href="https://medicarplus.es">← Volver a la web</a>
+  ·
+  <a href="mailto:info@medicarplus.es">Contacto</a>
+</footer>
+
+</body>
+</html>

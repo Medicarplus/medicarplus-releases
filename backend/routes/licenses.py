@@ -1117,7 +1117,53 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             {"$set": {"expires_at": new_exp_iso, "trial_adjusted_at": _dt.now(_tz.utc).isoformat(), "trial_adjusted_by": days}},
         )
         await _audit(request, "trial_adjust", install_id, extra={"days": days, "new_exp": new_exp_iso})
-        return {"ok": True, "install_id": install_id, "days_adjusted": days, "new_expires_at": new_exp_iso}
+
+        # 📧 Enviar email al cliente para que sepa que debe abrir la app y pulsar Verificar
+        email_sent = False
+        try:
+            from services.mailer import _send_smtp, _smtp_configured
+            client_email = (lic.get("client_email") or "").strip()
+            if client_email and _smtp_configured():
+                client_name = (lic.get("client_name") or lic.get("centre") or "").strip()
+                # Fecha en formato humano ES
+                new_exp_human = new_exp.strftime("%d/%m/%Y")
+                action_verb = "ampliada" if days > 0 else "reducida"
+                days_abs = abs(days)
+                subject = f"MediCar Plus · Tu licencia ha sido {action_verb} · Nueva expiración {new_exp_human}"
+                html = f"""<!DOCTYPE html>
+<html><body style="font-family:Arial,sans-serif;background:#f4f4f7;padding:20px;color:#111">
+<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:10px;padding:30px;box-shadow:0 2px 10px rgba(0,0,0,.05)">
+  <div style="text-align:center;margin-bottom:20px">
+    <h1 style="color:#f5b301;margin:0;font-size:24px">MediCar Plus</h1>
+    <p style="color:#666;margin:4px 0 0 0;font-size:12px">Software profesional de gestión de caja</p>
+  </div>
+  <h2 style="color:#111;font-size:18px">Hola{(' ' + client_name) if client_name else ''},</h2>
+  <p style="line-height:1.6">Hemos <b style="color:#0891b2">{action_verb}</b> tu período de prueba en <b>{days_abs} {'día' if days_abs==1 else 'días'}</b>. Tu nueva fecha de expiración es:</p>
+  <div style="background:#fff8e1;border-left:4px solid #f5b301;padding:14px;margin:18px 0;border-radius:4px;text-align:center">
+    <p style="margin:0;font-size:13px;color:#666">Nueva expiración</p>
+    <p style="margin:6px 0 0 0;font-size:24px;font-weight:700;color:#f5b301">{new_exp_human}</p>
+  </div>
+  <div style="background:#e0f2fe;border-left:4px solid #0284c7;padding:14px;margin:18px 0;border-radius:6px">
+    <p style="margin:0;line-height:1.6"><b>🔄 Cómo aplicar el cambio</b></p>
+    <ol style="margin:8px 0 0 20px;line-height:1.8">
+      <li>Abre <b>MediCar Plus</b> en tu ordenador</li>
+      <li>Pulsa el candado 🔐 en la esquina superior derecha</li>
+      <li>Pulsa <b style="color:#0891b2">↻ Verificar ahora</b></li>
+      <li>La app se actualizará automáticamente con la nueva fecha</li>
+    </ol>
+    <p style="margin:8px 0 0 0;font-size:12px;color:#666">💡 O simplemente cierra y abre la app: se sincroniza sola al detectar el cambio.</p>
+  </div>
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0" />
+  <p style="font-size:11px;color:#999;text-align:center">¿Dudas? Escríbenos a <a href="mailto:info@medicarplus.es" style="color:#f5b301">info@medicarplus.es</a><br />MediCar Plus · <a href="https://medicarplus.es" style="color:#666">medicarplus.es</a></p>
+</div></body></html>"""
+                ok, info = _send_smtp(client_email, subject, html)
+                email_sent = bool(ok)
+                if not ok:
+                    logger.warning("adjust-trial email failed for %s: %s", install_id, info)
+        except Exception as ex:
+            logger.warning("adjust-trial email exception for %s: %s", install_id, ex)
+
+        return {"ok": True, "install_id": install_id, "days_adjusted": days, "new_expires_at": new_exp_iso, "email_notified": email_sent}
 
     # ---------- Info enriquida d'una llicència (SMS mode + subscription state) ----------
     @router.get("/{install_id}/enriched", dependencies=[Depends(require_admin)])
