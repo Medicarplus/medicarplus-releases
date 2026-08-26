@@ -1,0 +1,37 @@
+# MediCar Plus · robots.txt
+# https://medicarplus.es
+
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /admin
+Disallow: /api/
+Disallow: /caja_del_dia_electron.zip
+Disallow: /downloads/
+Disallow: /preview-*.html
+Disallow: /link-healer.html
+Disallow: /guia-deploy.html
+Disallow: /guia-publicar-versions.html
+Disallow: /guia-github-releases.html
+Disallow: /guia-stripe-setup.html
+
+# Google-specific
+User-agent: Googlebot
+Allow: /
+Disallow: /admin.html
+Disallow: /api/
+
+# Bing
+User-agent: Bingbot
+Allow: /
+Disallow: /admin.html
+
+# Bloquea scrapers de IA sin consentimiento
+User-agent: GPTBot
+Disallow: /
+User-agent: CCBot
+Disallow: /
+User-agent: ClaudeBot
+Disallow: /
+
+Sitemap: https://medicarplus.es/sitemap.xml

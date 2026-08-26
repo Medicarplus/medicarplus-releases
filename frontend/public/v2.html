@@ -2904,9 +2904,17 @@ function _cajaKindLabel(e){
 }
 
 // Devuelve true si la entrada satisface la categoría (por texto o semánticamente)
+// IMPORTANTE: match por PALABRA COMPLETA (word boundary), no substring, para evitar falsos positivos
+// (ej: "sou" no debe matchear "MANSOURI")
 function _cajaEntryMatchesCategory(cat, e, hay){
   const flat = CAJA_SEARCH_DIMENSIONS.FLOW[cat] || CAJA_SEARCH_DIMENSIONS.FP[cat] || CAJA_SEARCH_DIMENSIONS.CONCEPT[cat] || CAJA_SEARCH_DIMENSIONS.SERVICE[cat] || [];
-  for(const s of flat){ if(hay.includes(_cajaNorm(s))) return true; }
+  // Rodear el haystack de espacios para poder testear word-boundary con "hay.includes(' '+syn+' ')"
+  const paddedHay = ' ' + hay + ' ';
+  for(const s of flat){
+    const sn = _cajaNorm(s);
+    if(!sn) continue;
+    if(paddedHay.includes(' ' + sn + ' ')) return true;
+  }
   // Match semántico por estructura de la entrada
   if(cat === 'INGRESO'){
     if(!e.retorno && (e.kind === 'TRAF' || e.kind === 'PRIV' || (e.kind === 'DH' && e.tipo === 'HABER'))) return true;
@@ -2945,7 +2953,13 @@ function _cajaParseQuery(q){
 }
 
 // Determina si una entrada matchea la query completa
+// IMPORTANTE: Este buscador SOLO busca movimientos de las pestañas
+//  · "Revisiones / Certificados / Otros" (kind='PRIV')
+//  · "Debe / Haber"                       (kind='DH')
+// Las operaciones de "Tráfico (Renov/Exped)" (kind='TRAF' · CSV DGT) tienen su propio
+// buscador en la esquina superior derecha de esa pestaña.
 function _cajaEntryMatches(e, parsed){
+  if(e.kind !== 'DH' && e.kind !== 'PRIV') return false; // ← excluye TRAF
   const parts = [e.nombre, e.tipo, e.grupo, e.concepto, _cajaFpLabel(e.fp), _cajaKindLabel(e), String(e.importe||'')];
   const hay = _cajaNorm(parts.filter(Boolean).join(' '));
   // Por cada dimensión activa: al menos una categoría debe matchear (OR intra-dim)
@@ -2956,8 +2970,10 @@ function _cajaEntryMatches(e, parsed){
     }
     if(!anyMatch) return false;
   }
-  // Palabras libres: AND
-  for(const w of parsed.freeWords){ if(!hay.includes(w)) return false; }
+  // Palabras libres: match por PALABRA COMPLETA (word boundary) para evitar falsos positivos
+  // (ej: "sou" no debe matchear la palabra "MANSOURI")
+  const paddedHay = ' ' + hay + ' ';
+  for(const w of parsed.freeWords){ if(!paddedHay.includes(' ' + w + ' ')) return false; }
   return true;
 }
 
@@ -2968,19 +2984,19 @@ function openBuscadorOperaciones(){
   back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto';
   back.innerHTML = `<div style="background:#111827;border:1px solid #334155;border-radius:12px;padding:22px;max-width:1000px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);font-family:Arial,Helvetica,sans-serif" data-testid="buscador-global-modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <h3 style="margin:0;color:#22d3ee;font-family:Georgia,serif">🔎 Buscar operaciones</h3>
+      <div><h3 style="margin:0;color:#22d3ee;font-family:Georgia,serif">🔎 Buscar movimientos</h3><div style="font-size:11px;color:#94a3b8;margin-top:3px">Busca en <b>Revisiones / Certificados / Otros</b> + <b>Debe / Haber</b>. <span style="color:#64748b">Para operaciones de Tráfico usa el buscador de la pestaña <i>"Tráfico (Renov/Exped)"</i>.</span></div></div>
       <button id="_bo_close" data-testid="buscador-global-close" style="background:#334155;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer">✕ Cerrar</button>
     </div>
     <div style="background:#0b1121;border:1px solid #164e63;border-radius:8px;padding:12px;margin-bottom:10px;display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;align-items:end">
-      <div><label style="display:block;font-size:10px;color:#94a3b8;font-weight:700;margin-bottom:4px">TEXTO A BUSCAR</label><input id="_bo_q" data-testid="buscador-global-query" type="text" placeholder="ej: ingreso efectivo · nomina · renovación José · gasto banco..." style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:14px;box-sizing:border-box" autofocus /></div>
+      <div><label style="display:block;font-size:10px;color:#94a3b8;font-weight:700;margin-bottom:4px">TEXTO A BUSCAR</label><input id="_bo_q" data-testid="buscador-global-query" type="text" placeholder="ej: honorari · nomina Pep · gasto banco · faena externa Carlos · luz · irpf…" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:14px;box-sizing:border-box" autofocus /></div>
       <div><label style="display:block;font-size:10px;color:#94a3b8;font-weight:700;margin-bottom:4px">DESDE</label><input id="_bo_from" data-testid="buscador-global-from" type="date" value="${firstOfMonth}" style="width:100%;padding:8px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box" /></div>
       <div><label style="display:block;font-size:10px;color:#94a3b8;font-weight:700;margin-bottom:4px">HASTA</label><input id="_bo_to" data-testid="buscador-global-to" type="date" value="${today}" style="width:100%;padding:8px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box" /></div>
       <button id="_bo_search" data-testid="buscador-global-run" style="background:linear-gradient(135deg,#22d3ee,#0891b2);color:#0b1121;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:800">🔎 Buscar</button>
     </div>
     <div style="background:#0f172a;border:1px solid #1e293b;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#64748b;line-height:1.5">
-      💡 <b style="color:#22d3ee">Entiende sinónimos:</b> <i>"ingreso" ≡ entrada · cobro · haber</i> · <i>"efectivo" ≡ metálico · cash</i> · <i>"banco" ≡ tarjeta · transferencia · TPV</i> · <i>"gasto" ≡ debe · pago · despesa</i> · <i>"nomina" ≡ sueldo · salario · honorarios</i>. Puedes combinar: <b>"ingreso efectivo banco"</b> = ingresos en efectivo <u>o</u> por banco.
+      💡 <b style="color:#22d3ee">Entiende sinónimos:</b> <i>"ingreso" ≡ entrada · cobro · haber</i> · <i>"efectivo" ≡ metálico · cash</i> · <i>"banco" ≡ tarjeta · transferencia · TPV</i> · <i>"gasto" ≡ debe · pago · despesa</i> · <i>"nomina" ≡ sueldo · salario · honorarios · faena externa</i>. Puedes combinar: <b>"ingreso efectivo banco"</b> = ingresos manuales en efectivo <u>o</u> por banco.
     </div>
-    <div id="_bo_results" data-testid="buscador-global-results" style="font-size:12px;color:#94a3b8"><i>Introduce texto y clica Buscar. Recorre Tráfico + Debe/Haber + Cempla en el rango elegido.</i></div>
+    <div id="_bo_results" data-testid="buscador-global-results" style="font-size:12px;color:#94a3b8"><i>Introduce texto y clica Buscar. Solo Revisiones/Certificados/Otros + Debe/Haber en el rango elegido.</i></div>
   </div>`;
   document.body.appendChild(back);
   const $$ = s => back.querySelector(s);
