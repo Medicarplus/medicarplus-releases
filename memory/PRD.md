@@ -958,4 +958,38 @@ Subir `MediCarPlus-Setup.exe` compilado a `/app/frontend/public/downloads/` para
 - Modal admin rediseñado: 8/8 checks (Ficha, nombre, estado, +30d, +1año, Reenviar, Datos técnicos, SMS)
 - Extend con email: `email_notified: true`, `new_expires_at: 2026-10-25`
 - Verify auto: banner aparece + reemplaza con `new_key` si cambia
+
+## 2026-02 (f) · Panel admin: filas, referidos, empresas (DONE)
+
+### 1. Rediseño de filas de tabla · `admin.html applyFilters()`
+- 10 columnas → 6 columnas (Cliente · Plan/Estado · Expira · Actividad · SMS · Acciones)
+- Cada fila con `border-left:4px solid ${sem.color}` (semáforo lateral)
+- Semáforo emoji + nombre grande en gold Georgia serif + email + install_id acortado + botón `📋` inline
+- Click en la fila entera abre `openDetail()` (con hover background)
+- Días restantes con color según urgencia (rojo <7, naranja <30, verde >30)
+- Botón "Detalle" con gradient gold prominente
+
+### 2. Sección "Programa de referidos" · `openDetail()`
+- 3 tarjetas grandes: **Ha traído N personas · Meses ganados · Ahorro estimado €** (asumiendo 15€/mes)
+- Código propio (con botón copiar) + quién le invitó (`referred_by`)
+- Últimas 5 recompensas con email + meses añadidos + fecha
+- Data leída de `l.referral_rewards[]` (ya guardado por el sistema de referidos existente)
+
+### 3. Sección "Empresas y datos del cliente" · `openDetail()`
+- Muestra `Empresa 1` y `Empresa 2` (o "No usa segunda empresa" si solo tiene una)
+- Indica **📊 Usa 1 sola / 2 empresas**
+- Metadata técnica: plataforma (electron/web), versión app, locale
+- Timestamp de última sincronización
+
+### 4. Sincronización client_meta · verify endpoint
+- Frontend `verifyOnline()` ahora envía `client_meta` con `company1_name`, `company2_name`, `uses_two_companies`, `app_version`, `platform`, `locale`
+- Backend model `LicenseVerify.client_meta: Optional[dict]`
+- Endpoint verify sanea (máx 20 campos, strings ≤500 chars) y persiste en `licenses.client_meta` + `client_meta_updated_at`
+- Se sincroniza automáticamente en cada verify (auto + manual)
+
+### Testing E2E
+- Backend curl: client_meta persiste tras verify ✅ + `client_meta_updated_at` timestamp ✅
+- Frontend playwright: modal muestra Empresa 1, Empresa 2, "Usa 2 empresas", referidos, código, meses ganados, emails recompensa ✅
+- Tabla: filas rediseñadas visuales OK ✅
+
 - Panel admin ES: 8/10 palabras esperadas, 0 catalán restante

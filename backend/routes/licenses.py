@@ -736,10 +736,21 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
                             len(new_linked) + 1, doc.get("id"), body.install_id)
 
         # 4) Tot OK → actualitzem estadístiques
+        _upd_set = {"last_verified_at": _now().isoformat()}
+        # Guardar meta info que el cliente sincroniza (empresas configuradas, versión, etc.)
+        if body.client_meta and isinstance(body.client_meta, dict):
+            # Sanea a strings/números básicos para evitar objetos pesados
+            _clean_meta = {}
+            for k, v in list(body.client_meta.items())[:20]:  # máximo 20 campos
+                if isinstance(v, (str, int, float, bool)) or v is None:
+                    _clean_meta[str(k)[:64]] = (v if not isinstance(v, str) else v[:500])
+            if _clean_meta:
+                _upd_set["client_meta"] = _clean_meta
+                _upd_set["client_meta_updated_at"] = _now().isoformat()
         await coll.update_one(
             {"_id": doc["_id"]},
             {
-                "$set": {"last_verified_at": _now().isoformat()},
+                "$set": _upd_set,
                 "$inc": {"verify_count": 1},
             },
         )

@@ -8782,7 +8782,27 @@ function _getHwid(){
 async function verifyOnline(key,installId){
   if(!LIC.VERIFY_URL)return {ok:true,skipped:true};
   const hwid=_getHwid();
-  const r=await fetch(LIC.VERIFY_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({install_id:installId,key,hwid})});
+  // Sincroniza metadata útil para el admin: qué empresas usa el cliente + versión app
+  let clientMeta=null;
+  try{
+    const cfgRaw=localStorage.getItem('caja.config.v1');
+    if(cfgRaw){
+      const cfg=JSON.parse(cfgRaw);
+      const c1=(cfg.company1&&cfg.company1.name||'').toString().trim().slice(0,120);
+      const c2=(cfg.company2&&cfg.company2.name||'').toString().trim().slice(0,120);
+      clientMeta={
+        company1_name: c1||null,
+        company2_name: c2||null,
+        uses_two_companies: !!(c1 && c2 && c1.toLowerCase()!==c2.toLowerCase()),
+        app_version: (typeof APP_VERSION!=='undefined'?APP_VERSION:'') || (typeof window!=='undefined'&&window.APP_VERSION?window.APP_VERSION:''),
+        platform: (navigator.userAgent||'').indexOf('Electron')>=0?'electron':'web',
+        locale: (navigator.language||'').slice(0,10)
+      };
+    }
+  }catch(_){ clientMeta=null; }
+  const body={install_id:installId,key,hwid};
+  if(clientMeta) body.client_meta=clientMeta;
+  const r=await fetch(LIC.VERIFY_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   return await r.json();
 }
 function isLicenseActive(){

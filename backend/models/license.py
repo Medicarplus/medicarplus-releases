@@ -53,6 +53,12 @@ class LicenseVerify(BaseModel):
         None, max_length=64,
         description="Hardware fingerprint (HW-XXXXXXXX...). Lligat a la 1a activació."
     )
+    # Meta info opcional que el cliente sincroniza al verificar (Feb 2026)
+    # Permite al admin ver qué empresas usa el cliente y otros metadatos útiles
+    client_meta: Optional[dict] = Field(
+        None,
+        description="Metadata sincronizada por el cliente (empresas configuradas, versión app, etc.)"
+    )
 
     @field_validator("install_id")
     @classmethod

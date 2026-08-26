@@ -127,15 +127,11 @@
       <div style="overflow-x:auto;max-height:70vh">
         <table id="tbl">
           <thead><tr>
-            <th>Install ID</th>
-            <th>Centro / Email</th>
-            <th>Plan</th>
-            <th>Estado</th>
+            <th style="min-width:280px">Cliente</th>
+            <th>Plan / Estado</th>
             <th>Expira</th>
-            <th>Días restantes</th>
-            <th>Última actividad</th>
-            <th>Modo SMS</th>
-            <th>Consumo mes</th>
+            <th>Actividad</th>
+            <th>SMS este mes</th>
             <th>Acciones</th>
           </tr></thead>
           <tbody id="tbody"></tbody>
@@ -512,55 +508,76 @@ function applyFilters(){
     const pillCls = p==='MASTER'?'pill-master':(p==='PREMIUM'||p==='PRM')?'pill-premium':p==='TRIAL'?'pill-trial':'pill-std';
     const stCls = l.status==='active'?'pill-active':'pill-revoked';
     const dl = daysLeft(l.expires_at);
+    const st = (l.status||'').toLowerCase();
+    // Semáforo unificado (mismo que en el modal)
+    const sem = st==='revoked' ? {emo:'⚫',color:'#64748b'}
+              : (dl!==null && dl<0) ? {emo:'🔴',color:'#ef4444'}
+              : (dl!==null && dl<=7) ? {emo:'🟠',color:'#f97316'}
+              : (dl!==null && dl<=30) ? {emo:'🟡',color:'#f59e0b'}
+              : {emo:'🟢',color:'#22c55e'};
     const dlStr = dl===null ? '<span class="mono" style="color:var(--muted)">—</span>' :
-      dl<0 ? `<span class="mono" style="color:var(--red)">${dl}d (expirat)</span>` :
-      dl<=7 ? `<span class="mono" style="color:var(--red);font-weight:800">${dl}d</span>` :
-      dl<=30 ? `<span class="mono" style="color:#f59e0b">${dl}d</span>` :
-      `<span class="mono" style="color:var(--green)">${dl}d</span>`;
+      dl<0 ? `<span style="color:var(--red);font-weight:800">Expirada · hace ${Math.abs(dl)}d</span>` :
+      dl===0 ? `<span style="color:var(--red);font-weight:800">Expira HOY</span>` :
+      `<span style="color:${sem.color};font-weight:800">${dl} día${dl===1?'':'s'}</span>`;
     const en = ENRICHED_CACHE[l.install_id];
-    // 🔥 Activitat recent (última verificació de llicència) · llindar 72h
     let activityCell = '<span class="mono" style="color:var(--muted)">—</span>';
     if(en && en.activity){
       const dslv = en.activity.days_since_last_verify;
       const cnt = en.activity.verify_count || 0;
       if(dslv === null || dslv === undefined){
-        activityCell = `<span class="mono" style="color:var(--muted)">⚪ Sin conexiones</span>`;
+        activityCell = `<span class="mono" style="color:var(--muted);font-size:11px">⚪ Sin conexión</span>`;
       } else if(dslv <= 3){
-        activityCell = `<span class="mono" style="color:var(--green);font-weight:700">🟢 Hace ${dslv}d${cnt?' · '+cnt+'×':''}</span>`;
+        activityCell = `<span class="mono" style="color:var(--green);font-weight:700;font-size:11px">🟢 Hace ${dslv}d${cnt?' · '+cnt+'×':''}</span>`;
       } else {
-        activityCell = `<span class="mono" style="color:var(--red);font-weight:700">🔴 Inactivo · hace ${dslv}d</span>`;
+        activityCell = `<span class="mono" style="color:var(--red);font-weight:700;font-size:11px">🔴 hace ${dslv}d</span>`;
       }
     }
-    let smsMode = '<span class="mono" style="color:var(--muted)">—</span>';
-    let smsUsage = '<span class="mono" style="color:var(--muted)">—</span>';
+    let smsCell = '<span class="mono" style="color:var(--muted);font-size:11px">—</span>';
     if(en && en.sms){
       const m = en.sms.mode_used;
-      if(m==='medicar') smsMode = `<span class="badge badge-medicar">⭐ Cloud</span>`+(en.sms.current_month.medicar_sender?`<span class="mono" style="margin-left:4px;color:#e879f9">"${en.sms.current_month.medicar_sender}"</span>`:'');
-      else if(m==='byoa') smsMode = `<span class="badge badge-byoa">🔧 BYOA</span>`;
-      else smsMode = `<span class="mono" style="color:var(--muted)">—</span>`;
       const cm = en.sms.current_month;
+      let modeIcon = m==='medicar'?'⭐':m==='byoa'?'🔧':'';
       if(cm && cm.sent_count>0){
-        smsUsage = `<span class="mono">${cm.sent_count} SMS<br><span style="color:var(--gold);font-weight:700">${(cm.cost_eur||0).toFixed(2)}€</span> ${cm.billed?'<span class="badge" style="background:#052e16;color:var(--green)">✓ facturat</span>':'<span class="badge" style="background:#78350f;color:#fbbf24">pendent</span>'}</span>`;
+        smsCell = `<span style="font-size:11px">${modeIcon} <b style="color:var(--gold)">${cm.sent_count}</b> · ${(cm.cost_eur||0).toFixed(2)}€</span>`;
+      } else if(modeIcon){
+        smsCell = `<span style="font-size:11px;color:var(--muted)">${modeIcon} sin envíos</span>`;
       }
     }
     const isTrial = p==='TRIAL';
-    return `<tr>
-      <td><span class="mono">${(l.install_id||'').slice(0,18)}${(l.install_id||'').length>18?'…':''}</span></td>
-      <td><b>${(l.client_name||l.company_name||'—').replace(/</g,'&lt;')}</b>${(Array.isArray(l.abuse_flags)&&l.abuse_flags.length)?` <span data-testid="abuse-flag-badge-${l.install_id}" onclick="event.stopPropagation();showFlagsModal('${(l.install_id||'').replace(/'/g,"\\\\'")}','${encodeURIComponent(JSON.stringify(l.abuse_flags))}')" title="Clic para ver el motivo del flag" style="background:#78350f;color:#fbbf24;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:800;letter-spacing:.3px;cursor:pointer">⚠️ ${l.abuse_flags.length} FLAG${l.abuse_flags.length>1?'S':''}</span>`:''}<br><span class="mono" style="color:var(--muted)">${(l.client_email||'—').replace(/</g,'&lt;')}</span></td>
-      <td><span class="pill ${pillCls}">${p||'—'}</span></td>
-      <td><span class="pill ${stCls}">${l.status||'—'}</span></td>
-      <td class="mono">${l.expires_at?new Date(l.expires_at).toLocaleDateString('ca-ES'):'—'}</td>
-      <td>${dlStr}</td>
-      <td>${activityCell}</td>
-      <td>${smsMode}</td>
-      <td>${smsUsage}</td>
-      <td>
-        <button class="ghost" onclick="openDetail('${l.install_id}')" data-testid="btn-detail-${l.install_id}">👁 Detalle</button>
-        ${isTrial && l.status==='active' ? `<button class="gold" style="margin-top:4px" onclick="adjustTrial('${l.install_id}', 7)">+7d</button> <button class="ghost" style="margin-top:4px" onclick="adjustTrialCustom('${l.install_id}')">±</button>` : ''}
+    const isActive = l.status==='active';
+    const installIdShort = (l.install_id||'').slice(0,14) + ((l.install_id||'').length>14?'…':'');
+    const clientName = (l.client_name||l.company_name||'Sin nombre').replace(/</g,'&lt;');
+    const flags = (Array.isArray(l.abuse_flags)&&l.abuse_flags.length) ? ` <span data-testid="abuse-flag-badge-${l.install_id}" onclick="event.stopPropagation();showFlagsModal('${(l.install_id||'').replace(/'/g,"\\\\'")}','${encodeURIComponent(JSON.stringify(l.abuse_flags))}')" title="Clic para ver el motivo del flag" style="background:#78350f;color:#fbbf24;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:800;letter-spacing:.3px;cursor:pointer">⚠️ ${l.abuse_flags.length} FLAG${l.abuse_flags.length>1?'S':''}</span>` : '';
+    const iidEsc = (l.install_id||'').replace(/'/g,"\\\\'");
+    return `<tr class="row-card" style="cursor:pointer;border-left:4px solid ${sem.color};transition:background .15s" onclick="openDetail('${iidEsc}')" onmouseenter="this.style.background='#1e293b'" onmouseleave="this.style.background=''">
+      <td style="padding:12px 14px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:18px">${sem.emo}</span>
+          <b style="font-size:14px;color:#f5b301;font-family:Georgia,serif">${clientName}</b>${flags}
+        </div>
+        <div style="font-size:11px;color:#cbd5e1;margin-top:3px">📧 ${(l.client_email||'—').replace(/</g,'&lt;')}</div>
+        <div style="margin-top:4px;display:flex;align-items:center;gap:6px">
+          <span class="mono" style="font-size:10px;color:#94a3b8" title="${l.install_id||''}">🖥 ${installIdShort}</span>
+          <button class="ghost" onclick="event.stopPropagation();copyVal(this,'${iidEsc}')" data-testid="btn-copy-iid-${l.install_id}" style="padding:1px 6px;font-size:9px;border-radius:4px;background:#1e293b;border:1px solid #475569" title="Copiar Install ID al portapapeles">📋</button>
+        </div>
+      </td>
+      <td style="padding:12px 10px">
+        <span class="pill ${pillCls}">${p||'—'}</span>
+        <div style="margin-top:4px"><span class="pill ${stCls}" style="font-size:9px">${l.status||'—'}</span></div>
+      </td>
+      <td style="padding:12px 10px">
+        <div style="font-size:12px;color:#cbd5e1">${l.expires_at?new Date(l.expires_at).toLocaleDateString('es-ES'):'—'}</div>
+        <div style="margin-top:3px">${dlStr}</div>
+      </td>
+      <td style="padding:12px 10px">${activityCell}</td>
+      <td style="padding:12px 10px">${smsCell}</td>
+      <td style="padding:12px 10px" onclick="event.stopPropagation()">
+        <button class="ghost" onclick="openDetail('${iidEsc}')" data-testid="btn-detail-${l.install_id}" style="background:linear-gradient(135deg,#f5b301,#eab308);color:#0b1121;border:none;padding:8px 14px;border-radius:6px;font-weight:800;font-size:12px;cursor:pointer">👁 Detalle</button>
+        ${isTrial && isActive ? `<button class="green" onclick="adjustTrial('${iidEsc}', 7)" style="margin-top:4px;background:linear-gradient(135deg,#22c55e,#16a34a);border:none;color:#fff;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">+7d</button>` : ''}
       </td>
     </tr>`;
   }).join('');
-  document.getElementById('tbody').innerHTML = rows || '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">Sin resultados</td></tr>';
+  document.getElementById('tbody').innerHTML = rows || '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">Sin resultados</td></tr>';
 }
 
 async function adjustTrial(install_id, days){
@@ -663,6 +680,84 @@ async function openDetail(install_id){
     </div>
 
     <!-- Datos técnicos (colapsable) -->
+    <details style="background:#0b1121">
+      <summary style="padding:14px 26px;cursor:pointer;font-size:12px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #1e293b">🏢 Empresas y datos del cliente</summary>
+      <div style="padding:14px 26px">
+        ${(() => {
+          const cm = l.client_meta || {};
+          const c1 = cm.company1_name || '';
+          const c2 = cm.company2_name || '';
+          const uses2 = cm.uses_two_companies;
+          const upd = l.client_meta_updated_at ? new Date(l.client_meta_updated_at).toLocaleString('es-ES') : '—';
+          if(!c1 && !c2){
+            return `<div style="color:var(--muted);font-style:italic;padding:10px 0">⚪ El cliente aún no ha sincronizado su configuración. Aparecerá aquí cuando abra la app y verifique.</div>`;
+          }
+          return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px">
+              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">🏢 Empresa 1</div>
+              <div style="font-size:15px;color:#f5b301;font-weight:700">${(c1||'—').replace(/</g,'&lt;')}</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid ${uses2?'#334155':'#1e293b'};border-radius:8px;padding:12px;${!uses2?'opacity:.4':''}">
+              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">🏢 Empresa 2</div>
+              <div style="font-size:15px;color:${uses2?'#3ddc97':'#64748b'};font-weight:700">${uses2 ? (c2||'—').replace(/</g,'&lt;') : '⚪ No usa segunda empresa'}</div>
+            </div>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:#94a3b8;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <span>${uses2?'📊 Usa <b style="color:#3ddc97">2 empresas</b>':'📊 Usa <b>1 sola empresa</b>'}</span>
+            <span>Última sincronización: <b class="mono">${upd}</b></span>
+          </div>
+          ${cm.app_version||cm.platform?`<div style="margin-top:6px;font-size:10px;color:var(--muted)">
+            ${cm.platform?`🖥 ${cm.platform}`:''}
+            ${cm.app_version?` · Versión ${cm.app_version}`:''}
+            ${cm.locale?` · ${cm.locale}`:''}
+          </div>`:''}`;
+        })()}
+      </div>
+    </details>
+
+    <!-- Programa de referidos -->
+    <details style="background:#0b1121">
+      <summary style="padding:14px 26px;cursor:pointer;font-size:12px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #1e293b">🎁 Programa de referidos</summary>
+      <div style="padding:14px 26px">
+        ${(() => {
+          const rewards = l.referral_rewards || [];
+          const totalRefs = rewards.length || (l.referral_reward_count || 0);
+          const monthsEarned = rewards.reduce((s,r)=>s+(parseInt(r.months_added||0,10)||0), 0);
+          const eurEarned = (monthsEarned * 15).toFixed(2); // suponemos 15€/mes standard
+          const code = l.referral_code || '';
+          const rby = l.referred_by || '';
+          return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;text-align:center">
+              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:600">Ha traído</div>
+              <div style="font-size:22px;color:#3ddc97;font-weight:800;margin-top:4px">${totalRefs}</div>
+              <div style="font-size:10px;color:#94a3b8">persona${totalRefs===1?'':'s'}</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;text-align:center">
+              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:600">Meses ganados</div>
+              <div style="font-size:22px;color:#f5b301;font-weight:800;margin-top:4px">${monthsEarned}</div>
+              <div style="font-size:10px;color:#94a3b8">de descuento</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;text-align:center">
+              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:600">Ahorro estimado</div>
+              <div style="font-size:22px;color:#3ddc97;font-weight:800;margin-top:4px">${eurEarned}€</div>
+              <div style="font-size:10px;color:#94a3b8">(~15€/mes)</div>
+            </div>
+          </div>
+          <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px">
+            <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:12px">
+              <div><b style="color:#94a3b8">Su código:</b> ${code?`<span class="mono" style="color:#3ddc97;font-weight:700">${code}</span> <button class="ghost" style="padding:1px 6px;font-size:10px" onclick="copyVal(this,'${code}')">📋</button>`:'<span style="color:var(--muted)">— aún no generado</span>'}</div>
+              <div><b style="color:#94a3b8">Le invitó:</b> ${rby?`<span class="mono" style="color:#a855f7">${rby}</span>`:'<span style="color:var(--muted)">nadie</span>'}</div>
+            </div>
+            ${rewards.length ? `<div style="margin-top:10px">
+              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:600;margin-bottom:6px">📋 Últimas ${Math.min(rewards.length,5)} recompensas</div>
+              ${rewards.slice(-5).reverse().map(r => `<div style="font-size:11px;color:#cbd5e1;padding:4px 0;border-bottom:1px solid #1e293b">✅ ${(r.referred_email||'—').replace(/</g,'&lt;')} · <b style="color:#f5b301">+${r.months_added||0} mes</b> · ${r.awarded_at?new Date(r.awarded_at).toLocaleDateString('es-ES'):''}</div>`).join('')}
+            </div>`:''}
+          </div>`;
+        })()}
+      </div>
+    </details>
+
+    <!-- Datos técnicos originales (colapsable) -->
     <details style="background:#0b1121">
       <summary style="padding:14px 26px;cursor:pointer;font-size:12px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #1e293b">📋 Datos técnicos y trazabilidad</summary>
       <div style="padding:14px 26px">
