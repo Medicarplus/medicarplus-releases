@@ -1064,3 +1064,22 @@ Endpoint público valida: install_id existe · status=active · license_key coin
 
 ### Testing E2E (8/8 pasan)
 Crear trial → Cliente envía 2 msgs → Admin ve unread=2 → Admin responde → mark-read=2 → Historial 3 msgs unread=0 → Seguridad 401
+
+
+---
+
+## Feb 26, 2026 — Fixes rápidos post-deploy
+
+### 🐛 FIX: "Reenviar programa por email" → "Sesión caducada" falso positivo
+**Causa**: `admin.html` línea 345 leía el token de `localStorage.getItem('adminTok')` mientras que todo el resto del panel usa `sessionStorage.getItem('mcp.admin.token')`. El botón siempre abortaba antes de hacer la llamada.
+**Fix**: cambiado el getter en `resendInstaller()` para usar el mismo storage que el resto (`sessionStorage.getItem('mcp.admin.token')`).
+**Test**: Playwright login + monkey-patch fetch → `X-Admin-Token` se envía correctamente y llega a "✅ Enviado correctamente". Bug NO reproducible.
+
+### ✨ Buscador `#searchClient` del panel Tráfico ahora acepta DNI
+**Contexto**: usuario pidió buscar por DNI en el input de la parte superior del panel Tráfico (donde se sube el CSV DGT). Anteriormente sólo buscaba por nombre/tipo/grupo.
+**Cambios en `frontend/public/v2.html`**:
+1. `importTrafficRows` — nueva detección de columna DNI/NIE/NIF/DOCUMENTO en el CSV DGT; guarda `e.dni` en la entrada.
+2. `initClientSearch` — añade `normDni()` (quita espacios, guiones, puntos, mayúsculas), busca en `e.dni` y también en `nombre` cuando la query parece un DNI/NIE.
+3. Placeholder actualizado: "🔍 Buscar por nombre, apellido o DNI…" (width 260px).
+4. Badge 🪪 con highlight amarillo cuando hay match.
+**Tests Playwright (4/4 OK)**: `12.345.678-A` → GARCIA · `X1234567Z` → MARTINEZ · `garcia` sigue funcionando (regresión OK) · DNI parcial `12345` encuentra ambos.

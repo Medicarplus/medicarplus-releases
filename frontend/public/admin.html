@@ -342,7 +342,7 @@ async function resendInstaller(licenseKey, defaultEmail){
   );
   if(!targetEmail || !targetEmail.trim()) return;
   const clean = targetEmail.trim();
-  const tok = localStorage.getItem('adminTok') || '';
+  const tok = sessionStorage.getItem('mcp.admin.token') || '';
   if(!tok){ alert('Sesión caducada, vuelve a entrar'); return; }
   try{
     const r = await fetch(`/api/admin/licenses/${encodeURIComponent(licenseKey)}/resend-download`, {

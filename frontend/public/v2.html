@@ -354,7 +354,7 @@
           <button data-tab="tab-dh" data-i18n="tab_dh">Debe / Haber</button>
           <div style="flex:1"></div>
           <div id="searchWrap" style="position:relative;margin:0 8px 0 0">
-            <input type="text" id="searchClient" placeholder="🔍 Buscar por nombre o apellido..." autocomplete="off" spellcheck="false" style="background:#0e1117;color:#e2e8f0;border:1px solid #3a4050;border-radius:6px;padding:6px 10px;font-size:12px;width:230px;font-family:inherit" data-testid="client-search-input" />
+            <input type="text" id="searchClient" placeholder="🔍 Buscar por nombre, apellido o DNI..." autocomplete="off" spellcheck="false" style="background:#0e1117;color:#e2e8f0;border:1px solid #3a4050;border-radius:6px;padding:6px 10px;font-size:12px;width:260px;font-family:inherit" data-testid="client-search-input" />
             <div id="searchResults" style="display:none;position:absolute;top:calc(100% + 4px);right:0;width:360px;max-height:340px;overflow:auto;background:#141821;border:1px solid #3a4050;border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.6);z-index:9998"></div>
           </div>
         </div>
@@ -2523,6 +2523,9 @@ $('#btnImport').onclick=()=>$('#fileInput').click();
 $('#fileInput').onchange=async ev=>{const f=ev.target.files[0];if(!f)return;try{const name=(f.name||'').toLowerCase();const buf=await f.arrayBuffer();if(name.endsWith('.xlsx')||name.endsWith('.xls')){if(typeof XLSX==='undefined'){toast('❌ Lector Excel no disponible — usa CSV');return}const wb=XLSX.read(buf,{type:'array'});const sheet=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:false,defval:''});importTrafficRows(rows)}else{let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){text=new TextDecoder('windows-1252').decode(buf)}if(/Ã[©±¡³]/.test(text)){text=new TextDecoder('windows-1252').decode(buf)}const rows=parseCSV(text);importTrafficRows(rows)}}catch(err){toast('Error al importar: '+err.message,3500)}ev.target.value=''};
 function parseCSV(text){const out=[];let row=[],cell='',inQ=false;for(let i=0;i<text.length;i++){const c=text[i];if(inQ){if(c==='"'){if(text[i+1]==='"'){cell+='"';i++}else inQ=false}else cell+=c}else{if(c==='"')inQ=true;else if(c===';'){row.push(cell);cell=''}else if(c==='\n'){row.push(cell);out.push(row);row=[];cell=''}else if(c==='\r'){}else cell+=c}}if(cell.length||row.length){row.push(cell);out.push(row)}return out.filter(r=>r.some(x=>x&&x.trim()!==''))}
 async function importTrafficRows(rows){if(!rows.length){toast('Archivo vacío');return}const header=rows[0].map(s=>String(s).trim().toUpperCase());const idx=name=>header.findIndex(h=>h===name||h.startsWith(name));const iFecha=idx('FECHA'),iNombre=idx('NOMBRE'),iAp1=idx('APELLIDO1'),iAp2=idx('APELLIDO2'),iTipo=idx('TIPO'),iGrupo=idx('GRUPO'),iImporte=idx('IMPORTE');
+  // Detecta columna DNI/NIE/Documento (para búsqueda por DNI en el buscador del panel Tráfico)
+  const DNI_NAMES=['DNI','NIE','NIF','DOCUMENTO','DOC','DOC.IDENTIDAD','DOCUMENTO_IDENTIDAD','IDENTIFICACION','IDENTIFICACIÓN'];
+  let iDni=-1;for(const n of DNI_NAMES){const i=idx(n);if(i>=0){iDni=i;break}}
   // Detecta la columna del sufix (Normal/Profesional/Classe) — busca noms coneguts o
   // examina si alguna columna té valors reconeguts (Profesional / classes C, D, C+E, etc.)
   const CATEG_NAMES=['CATEGORIA','CATEGORÍA','CLASE','PERMISO','TIPO_CARNET','CATEGORIA_CARNET','CLASE_CARNET','CARNET','PROFESIONAL'];
@@ -2570,7 +2573,7 @@ async function importTrafficRows(rows){if(!rows.length){toast('Archivo vacío');
   const data=rows.slice(1);const grouped={};let total=0,dates=new Set();
   // Normaliza FP: si el valor viene entero como "EFECTIVO"/"TARJETA"/"BIZUM"/"TRANSFERENCIA", extrae primera letra correcta
   const normFp=v=>{const s=String(v||'').trim().toUpperCase();if(!s)return 'E';if(/^TAR/.test(s)||s==='T')return 'T';if(/^BIZ/.test(s)||s==='B')return 'B';if(/^TRA/.test(s)||s==='X')return 'X';if(/^EFE/.test(s)||s==='E')return 'E';return s[0]||'E'};
-  data.forEach(r=>{const fechaRaw=String(r[iFecha]||'').trim();if(!fechaRaw)return;const m=fechaRaw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);if(!m)return;let[_,d,mo,y]=m;if(y.length===2)y='20'+y;const iso=`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;const nombre=[String(r[iNombre]||'').trim(),String(r[iAp1]||'').trim(),String(r[iAp2]||'').trim()].filter(Boolean).join(' ').replace(/\s+/g,' ').trim()||'(sin nombre)';const fpVal=iFp>=0?normFp(r[iFp]):'E';const fpTasaVal=iFpTasa>=0?normFp(r[iFpTasa]):fpVal;let tipoRaw=String(r[iTipo]||'').trim()||'Otro';if(iCateg>=0){const cat=String(r[iCateg]||'').trim();if(cat&&!tipoRaw.toLowerCase().includes(cat.toLowerCase()))tipoRaw=tipoRaw+', '+cat;}const e={id:uid(),kind:'TRAF',_csv:true,tipo:tipoRaw,grupo:String(r[iGrupo]||'').trim()||'-',nombre,importe:num(r[iImporte]),descuento:0,tasa:iTasas.length?iTasas.reduce((s,i)=>s+num(r[i]),0):0,fp:fpVal,fpTasa:fpTasaVal,retorno:false};if(e.importe===0&&e.tasa===0&&!nombre)return;(grouped[iso]||=[]).push(e);total++;dates.add(iso)});
+  data.forEach(r=>{const fechaRaw=String(r[iFecha]||'').trim();if(!fechaRaw)return;const m=fechaRaw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);if(!m)return;let[_,d,mo,y]=m;if(y.length===2)y='20'+y;const iso=`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;const nombre=[String(r[iNombre]||'').trim(),String(r[iAp1]||'').trim(),String(r[iAp2]||'').trim()].filter(Boolean).join(' ').replace(/\s+/g,' ').trim()||'(sin nombre)';const fpVal=iFp>=0?normFp(r[iFp]):'E';const fpTasaVal=iFpTasa>=0?normFp(r[iFpTasa]):fpVal;let tipoRaw=String(r[iTipo]||'').trim()||'Otro';if(iCateg>=0){const cat=String(r[iCateg]||'').trim();if(cat&&!tipoRaw.toLowerCase().includes(cat.toLowerCase()))tipoRaw=tipoRaw+', '+cat;}const e={id:uid(),kind:'TRAF',_csv:true,tipo:tipoRaw,grupo:String(r[iGrupo]||'').trim()||'-',nombre,dni:iDni>=0?String(r[iDni]||'').trim():'',importe:num(r[iImporte]),descuento:0,tasa:iTasas.length?iTasas.reduce((s,i)=>s+num(r[i]),0):0,fp:fpVal,fpTasa:fpTasaVal,retorno:false};if(e.importe===0&&e.tasa===0&&!nombre)return;(grouped[iso]||=[]).push(e);total++;dates.add(iso)});
   if(!total){toast('No se han encontrado filas válidas');return}
   let added=0,skipped=0;for(const[date,arr]of Object.entries(grouped)){const list=entriesOf(date);for(const e of arr){const dup=list.some(x=>x._csv&&x.nombre===e.nombre&&x.tipo===e.tipo&&x.importe===e.importe&&x.tasa===e.tasa);if(dup){skipped++;continue}list.push(e);added++}}
   saveState();const first=[...dates].sort()[0];if(first)setDate(first);else render();
@@ -7825,6 +7828,7 @@ if(isPremiumLicense() && loadCalUrls().filter(u=>u.enabled).length>0){
   const box=document.getElementById('searchResults');
   if(!inp||!box)return;
   const escHtml=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const normDni=s=>String(s||'').toUpperCase().replace(/[\s\-\.\/]/g,'');
   const highlight=(txt,q)=>{
     const s=escHtml(txt);
     if(!q)return s;
@@ -7834,12 +7838,18 @@ if(isPremiumLicense() && loadCalUrls().filter(u=>u.enabled).length>0){
     const q=inp.value.trim();
     if(q.length<2){box.style.display='none';box.innerHTML='';return}
     const qL=q.toLowerCase();
+    const qNorm=normDni(q);
+    const looksLikeDni=/^[XYZ]?\d{4,8}[A-Z]?$/.test(qNorm) && qNorm.length>=4;
     const results=[];
     Object.entries(state.byDate).forEach(([date,arr])=>{
       arr.forEach(e=>{
         const nomMatch=(e.nombre||'').toLowerCase().includes(qL);
         const conceptMatch=(e.tipo||'').toLowerCase().includes(qL)||(e.grupo||'').toLowerCase().includes(qL);
-        if(nomMatch||conceptMatch)results.push({date,e,strong:nomMatch});
+        // Búsqueda por DNI: normaliza y compara contra e.dni y contra e.nombre (por si el DNI viniera dentro del nombre)
+        const nDni=normDni(e.dni);
+        const nNom=normDni(e.nombre);
+        const dniMatch=qNorm && (nDni.includes(qNorm) || (looksLikeDni && nNom.includes(qNorm)));
+        if(nomMatch||conceptMatch||dniMatch)results.push({date,e,strong:nomMatch||dniMatch});
       });
     });
     results.sort((a,b)=>(b.strong-a.strong)||(a.date<b.date?1:-1));
@@ -7856,13 +7866,14 @@ if(isPremiumLicense() && loadCalUrls().filter(u=>u.enabled).length>0){
         const tipoColor=isDh?(r.e.tipo==='HABER'?'#7ee3aa':'#ff96a0'):(r.e.kind==='PRIV'?'#5aa9ff':'#3ddc97');
         const tipoLbl=escHtml(r.e.tipo||r.e.kind||'-');
         const dateFmt=r.date.split('-').reverse().join('/');
+        const dniHtml=r.e.dni?' · <span style="color:#f5b301">🪪 '+highlight(r.e.dni,q)+'</span>':'';
         return '<div class="search-row" style="padding:10px 12px;border-bottom:1px solid #1e242f;cursor:pointer" data-date="'+r.date+'" data-entry-id="'+r.e.id+'">'
           +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'
           +'<span style="font-weight:700;color:#e8ecf2;font-size:13px">'+highlight(r.e.nombre||'(sense nom)',q)+'</span>'
           +'<span style="color:#7ee3aa;font-weight:700;font-size:13px">'+fmt(imp)+' €</span>'
           +'</div>'
           +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:3px;font-size:11px">'
-          +'<span style="color:#94a3b8">📅 '+dateFmt+' · <span style="color:'+tipoColor+';font-weight:600">'+tipoLbl+'</span>'+(r.e.grupo&&r.e.grupo!=='-'?' · '+highlight(r.e.grupo,q):'')+'</span>'
+          +'<span style="color:#94a3b8">📅 '+dateFmt+' · <span style="color:'+tipoColor+';font-weight:600">'+tipoLbl+'</span>'+(r.e.grupo&&r.e.grupo!=='-'?' · '+highlight(r.e.grupo,q):'')+dniHtml+'</span>'
           +'<span style="color:#94a3b8">'+(fpLabels[r.e.fp]||'')+' '+escHtml(r.e.fp||'')+(r.e.retorno?' <span style="color:#ff96a0">↺ retorn</span>':'')+'</span>'
           +'</div>'
           +'</div>';
