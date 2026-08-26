@@ -3547,7 +3547,7 @@ function openHonorariosPanel(){
       const monthTotal = list.reduce((s,e)=>s+e.amount, 0);
       const rows = list.map(e => {
         const fpFull = ({E:'Efectivo',T:'Banco',B:'Bizum',X:'Otros'})[e.fp] || e.fp || '—';
-        return `<tr><td style="padding:5px 10px;font-size:12px">${fmtDate(e.date)}</td><td style="padding:5px 10px"><span style="background:${_hnCategoryColor(e.cat)}22;color:${_hnCategoryColor(e.cat)};padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700">${_hnCategoryLabel(e.cat)}</span></td><td style="padding:5px 10px;font-size:12px;font-weight:600">${e.name.replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:11px;color:#64748b">${_companyName(e.company)}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${fpFull}</td><td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700;color:#fbbf24">${fmtEUR(e.amount)}</td></tr>`;
+        return `<tr data-goto-date="${e.date}" data-goto-company="${e.company}" style="cursor:pointer" title="Clic para ir al día ${fmtDate(e.date)}"><td style="padding:5px 10px;font-size:12px">${fmtDate(e.date)}</td><td style="padding:5px 10px"><span style="background:${_hnCategoryColor(e.cat)}22;color:${_hnCategoryColor(e.cat)};padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700">${_hnCategoryLabel(e.cat)}</span></td><td style="padding:5px 10px;font-size:12px;font-weight:600">${e.name.replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:11px;color:#64748b">${_companyName(e.company)}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${fpFull}</td><td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700;color:#fbbf24">${fmtEUR(e.amount)}</td></tr>`;
       }).join('');
       return `<div style="margin-bottom:16px;background:#0f172a;border:1px solid #334155;border-radius:8px;overflow:hidden"><div style="background:#1e293b;padding:8px 14px;display:flex;justify-content:space-between;align-items:center"><b style="color:#fbbf24">📅 ${fmtMonth(ym)}</b><span style="color:#22c55e;font-weight:700">${fmtEUR(monthTotal)}</span></div><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#111827"><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Fecha</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Categoría</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Trabajador</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Empresa</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Pago</th><th style="padding:5px 10px;text-align:right;font-size:10px;color:#94a3b8">Importe</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }).join('') : '<div style="padding:20px;text-align:center;color:#64748b;font-style:italic">Sin pagos en este período. Añade una entrada Debe/Haber con concepto "Honoraris", "Nómina", "Sueldo", "Salario", "Faena externa" o "Jornal" seguido del nombre del trabajador.</div>';
@@ -3562,6 +3562,22 @@ function openHonorariosPanel(){
         </table>
       </div>
       <div><h4 style="margin:0 0 8px 0;color:#e2e8f0;font-size:13px">🗓 Detalle</h4>${monthsHtml}</div>`;
+    // Filas clicables → cerrar modal + navegar al día
+    document.getElementById('_hn_body').querySelectorAll('tr[data-goto-date]').forEach(tr => {
+      tr.addEventListener('mouseenter', () => tr.style.background = 'rgba(251,191,36,.08)');
+      tr.addEventListener('mouseleave', () => tr.style.background = '');
+      tr.addEventListener('click', () => {
+        const targetDate = tr.dataset.gotoDate;
+        const targetCompany = tr.dataset.gotoCompany;
+        try{
+          if(targetCompany && targetCompany !== currentCompany && typeof switchCompany === 'function'){
+            switchCompany(targetCompany);
+          }
+          if(typeof setDate === 'function') setDate(targetDate);
+        }catch(_){}
+        back.remove();
+      });
+    });
   }
 
   const yearSel = back.querySelector('#_hn_year');
