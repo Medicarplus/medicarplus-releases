@@ -747,3 +747,26 @@ Playwright script con dataset de 8 entradas cubre 5 escenarios (todos ✅):
 - 24 opciones datalist (4 workers × 5 prefijos + 4 raw) ✅
 - Chip "Nómina" → input="Nómina ", tipo=DEBE, foco correcto ✅
 - Al añadir "Juan Rodriguez" el datalist se actualiza automáticamente ✅
+
+
+---
+
+## 📥 [26-Feb-2026] · Fix Import CSV Estadísticas Autoescuelas
+
+### Bug crítico solucionado
+- **Silent failure en Electron**: la función usaba `prompt()` del navegador para pedir el mes, pero Electron lo tiene deshabilitado por defecto → el usuario clicaba "Importar CSV", subía el archivo, y "no pasaba nada".
+- **Parser rígido**: sólo aceptaba `;` como separador. CSVs con `,` fallaban silenciosamente.
+
+### Solución implementada en `openStats('autos')`
+1. **Selector `#stImportMonth` visible en la toolbar** (data-testid `st-import-month`), aparece junto al botón "Importar CSV" con clase `st-autos-only` (solo visible en la sección Autoescuelas). Default = mes actual.
+2. **Autodetección de separador**: analiza la primera línea del CSV y detecta si usa `;`, `,` o `\t` automáticamente.
+3. **Encoding fallback mejorado**: prueba UTF-8 primero, si falla o detecta `�` cae a Windows-1252 (los CSVs exportados desde Excel/Access suelen ser cp1252).
+4. **Mensaje de error más útil**: si el CSV no contiene filas válidas, indica el formato esperado `"CODIGO";"TOTAL"`.
+
+### Testing E2E con CSV real (Junio 2026 · 30 filas)
+- 613 certificados totales ✅ (exacto)
+- 24 autoescuelas detectadas ✅
+- STAT_ALIAS mapea automáticamente para MASTER users (TRÀFIC, MABEL→A.E.MABEL, DAINA→A.E.DAINA, etc.)
+- Agregación de códigos duplicados funciona (PARTICULAR ×4 → suma 64)
+- Datos guardados en `caja.stats.v1` bajo la key `2026-06`
+- Botón data-yes del confirmModal ejecuta `doApply()` correctamente

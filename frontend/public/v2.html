@@ -1310,6 +1310,7 @@ function openStats(initialSection){
       <button class="btn" id="stNext">${isCA?'Any seg.':'Año sig.'} →</button>
       <div style="flex:1"></div>
       <button class="btn btn-primary st-autos-only" id="stImport">📥 ${isCA?'Importar CSV':'Importar CSV'}</button>
+      <select class="st-autos-only" id="stImportMonth" title="${isCA?'Mes al qual pertanyen les dades del CSV':'Mes al que pertenecen los datos del CSV'}" style="background:#141821;color:var(--text);border:1px solid #f5b301;border-radius:8px;padding:6px 10px;font-weight:600" data-testid="st-import-month">${MESOS.map((m,i)=>`<option value="${i+1}" ${(i+1)===(new Date().getMonth()+1)?'selected':''}>📅 ${m}</option>`).join('')}</select>
       <input type="file" id="stFile" accept=".csv,.txt" style="display:none" />
       <button class="btn st-autos-only" id="stAdd">+ ${isCA?'Autoescola':'Autoescuela'}</button>
       <button class="btn st-autos-only" id="stClearAll" style="background:#7f1d1d;color:#fecaca;border-color:#b91c1c" title="${isCA?'Elimina totes les autoescoles i les seves dades':'Elimina todas las autoescuelas y sus datos'}">🗑 ${isCA?'Buidar tot':'Vaciar todo'}</button>
@@ -1440,25 +1441,28 @@ function openStats(initialSection){
   back.querySelector('#stImport').onclick=()=>$('#stFile').click();
   $('#stFile').onchange=async ev=>{
     const f=ev.target.files[0];if(!f)return;ev.target.value='';
-    // Ask month
-    const monthInput=prompt(isCA?`Import CSV per a l'any ${$('#stYear').value}.\nQuin mes? (1-12, per exemple 6 per Juny)`:`Importar CSV para el año ${$('#stYear').value}.\n¿Qué mes? (1-12, por ejemplo 6 para Junio)`);
-    if(!monthInput)return;
-    const mi=parseInt(monthInput);if(!mi||mi<1||mi>12){toast(isCA?'Mes no vàlid':'Mes no válido');return}
+    // Mes seleccionado desde el dropdown visible en la toolbar (no prompt, funciona en Electron)
+    const monthSel=back.querySelector('#stImportMonth');
+    const mi=parseInt(monthSel && monthSel.value ? monthSel.value : (new Date().getMonth()+1));
+    if(!mi||mi<1||mi>12){toast(isCA?'Mes no vàlid':'Mes no válido');return}
     // Read file with encoding detection
     const buf=await f.arrayBuffer();
     let txt;try{txt=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){txt=new TextDecoder('windows-1252').decode(buf)}
     if(/�/.test(txt))txt=new TextDecoder('windows-1252').decode(buf);
-    // Parse CSV (semicolon). Track BOTH raw codes and canonical names.
+    // Detecta separador automáticamente (; o ,) mirando la primera línea
     const lines=txt.split(/\r?\n/).filter(l=>l.trim());
+    if(!lines.length){toast(isCA?'CSV buit':'CSV vacío');return}
+    const firstLine=lines[0];
+    const sep = firstLine.split(';').length >= 2 ? ';' : (firstLine.split(',').length >= 2 ? ',' : '\t');
     const rawCounts={}; // {RAW_UPPER: total}  · útil per l'onboarding
     for(let i=1;i<lines.length;i++){
-      const parts=lines[i].split(';').map(x=>x.replace(/^"|"$/g,'').trim());
+      const parts=lines[i].split(sep).map(x=>x.replace(/^"|"$/g,'').replace(/"/g,'').trim());
       if(parts.length<2)continue;
       const code=parts[0];const n=parseInt(parts[1])||0;if(!code||!n)continue;
       const rawU=String(code).trim().toUpperCase().replace(/\s+/g,' ');
       rawCounts[rawU]=(rawCounts[rawU]||0)+n;
     }
-    if(!Object.keys(rawCounts).length){toast(isCA?'El CSV no conté cap fila vàlida':'El CSV no contiene ninguna fila válida');return}
+    if(!Object.keys(rawCounts).length){toast(isCA?'El CSV no conté cap fila vàlida':'El CSV no contiene ninguna fila válida · Revisa que las columnas sean "CODIGO";"TOTAL"',4000);return}
     const st=loadStats();
     // Detectar codis "nous" (adaptatius): raw no mapejat per aliases del client (i, si és Master, tampoc per STAT_ALIAS), i el seu canònic no és a la llista de l'usuari.
     const clientMap=loadStatsAliases();
