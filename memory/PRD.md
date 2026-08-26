@@ -663,3 +663,30 @@ Incluye:
 - ✅ Toggles Stripe Dashboard activados por Marc en TEST: "Pagos correctos" + "Reembolsos"
 - ⏳ Pendiente Marc en Billing → Automations: fallos de pago + Smart Retries + recordatorios
 - ✅ Nuestro backend maneja correctamente TODOS los eventos webhook (validado E2E)
+
+
+---
+
+## 🔎 [26-Feb-2026] · Buscador Global con Sinónimos + Fix Honorarios
+
+### Buscador Global de Operaciones (Contabilidad → 🔎 Buscar operaciones)
+- Nueva función `openBuscadorOperaciones()` en `v2.html` con sistema de **matching por dimensiones semánticas**:
+  - `FLOW`: INGRESO (ingreso/entrada/cobro/haber/abono) vs GASTO (gasto/despesa/pago/debe/cargo/compra)
+  - `FP`: EFECTIVO (metálico/cash) · BANCO (tarjeta/transferencia/TPV) · BIZUM · OTROS_FP (cheque/talón)
+  - `CONCEPT`: HONORARIOS · IRPF · IVA · MATERIAL · TASAS · DGT · LUZ · AGUA · ALQUILER · GESTORIA · SEGURO
+  - `SERVICE`: RENOVACION · DUPLICADO · CANJE · CAMBIO · CICLOMOTOR · MEDICAR · CEMPLA
+- **Semántica**: OR intra-dimensión (efectivo O banco) · AND entre dimensiones (ingreso Y efectivo)
+- Normalización con `NFD` (elimina acentos), tolera mayúsculas y frases multi-palabra ("paga trabajador")
+- Coincidencia semántica adicional por estructura: INGRESO matchea TRAF/PRIV/HABER · EFECTIVO matchea `fp='E'` · etc.
+- UI muestra la interpretación detectada como chips (ej: `FLOW: INGRESO · FP: EFECTIVO o BANCO`)
+- Rango de fechas obligatorio · resultados ordenados por fecha desc · suma total de importes
+- Data-testids: `buscador-global-modal`, `-query`, `-from`, `-to`, `-run`, `-close`, `-results`, `-count`
+
+### Fix Honorarios (Panel `openHonorariosPanel`)
+- **Bug detectado**: la detección anterior buscaba `e.concepto === 'Honoraris'` pero el campo real es `e.nombre` → panel nunca detectaba nada.
+- Nueva función `_isHonorarioLikeEntry(e)` que reconoce cualquier DH con importe > 0 cuyo `nombre/tipo/concepto/grupo` contenga: `honorari`, `honorario`, `honoraris`, `nomina`, `sueldo`, `salario`, `salari`, `paga trabajador`, `pago empleado`, `empleado`.
+- `_cleanWorkerName()` limpia el prefijo (ej: "Nomina Pep Brugulat" → "Pep Brugulat") para agrupar correctamente por trabajador.
+
+### Testing E2E
+Playwright script con dataset de 8 entradas cubre 5 escenarios (todos ✅):
+- `ingreso efectivo` → 2 · `metalico` → 3 · `ingreso efectivo banco` → 6 · `gasto banco` → 1 · Panel Honorarios agrupa Nomina+Sueldo+Honoraris en 2 trabajadores.
