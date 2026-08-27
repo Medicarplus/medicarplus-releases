@@ -53,6 +53,10 @@
     0%,100% { transform: scale(1); opacity: 1; }
     50% { transform: scale(1.08); opacity: .85; }
   }
+  @keyframes pulse-online {
+    0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,.5); }
+    50% { box-shadow: 0 0 0 4px rgba(34,197,94,0); }
+  }
 </style>
 </head>
 <body>
@@ -148,9 +152,10 @@
             <option value="never">⚪ Sin conexiones</option>
           </select>
           <select id="sortBy" data-testid="sort-licenses" onchange="applyFilters()">
+            <option value="online">🟢 En línea ahora primero</option>
             <option value="recent">🕒 Más recientes primero</option>
             <option value="msgs_desc">💬 Más mensajes primero</option>
-            <option value="last_conn_desc">🟢 Última conexión reciente</option>
+            <option value="last_conn_desc">🕐 Última conexión reciente</option>
             <option value="last_conn_asc">⚪ Sin conexión / más antiguo</option>
             <option value="expires_asc">⏰ Próximos a expirar</option>
             <option value="name_asc">🔤 Nombre A-Z</option>
@@ -719,6 +724,10 @@ async function loadLicenses(){
     if(typeof refreshInboxBadge==='function') refreshInboxBadge();
     renderStats();
     applyFilters();
+    // Auto-refresh silencioso cada 60s para que "En línea ahora" se mantenga fresco
+    if(!window._licAutoRefresh){
+      window._licAutoRefresh = setInterval(()=>{ if(document.visibilityState==='visible') loadLicenses(); }, 60000);
+    }
   }catch(e){alert('Error cargando licencias: '+e.message)}
 }
 
@@ -811,16 +820,25 @@ function applyFilters(){
     return true;
   });
   // Ordenación
-  const sortBy = (document.getElementById('sortBy')||{}).value || 'recent';
+  const sortBy = (document.getElementById('sortBy')||{}).value || 'online';
   const tsOrZero = v => v ? new Date(v).getTime() : 0;
   const tsOrInf = v => v ? new Date(v).getTime() : Infinity; // "sin conexión" al final por desc
+  const ONLINE_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutos = "en línea ahora"
+  const isOnline = l => l.last_verified_at && (Date.now() - new Date(l.last_verified_at).getTime()) <= ONLINE_THRESHOLD_MS;
   items.sort((a,b)=>{
+    if(sortBy==='online'){
+      // 1º: online ahora (≤15 min) · 2º: resto por última conexión desc
+      const oa = isOnline(a) ? 1 : 0;
+      const ob = isOnline(b) ? 1 : 0;
+      if(oa !== ob) return ob - oa;
+      return tsOrZero(b.last_verified_at) - tsOrZero(a.last_verified_at);
+    }
     if(sortBy==='msgs_desc') return (b.message_count||0) - (a.message_count||0);
     if(sortBy==='last_conn_desc') return tsOrZero(b.last_verified_at) - tsOrZero(a.last_verified_at);
     if(sortBy==='last_conn_asc') return tsOrInf(a.last_verified_at) - tsOrInf(b.last_verified_at);
     if(sortBy==='expires_asc') return tsOrInf(a.expires_at) - tsOrInf(b.expires_at);
     if(sortBy==='name_asc') return (a.client_name||'').localeCompare(b.client_name||'', 'es', {sensitivity:'base'});
-    // default 'recent': por fecha de creación desc
+    // 'recent'
     return tsOrZero(b.created_at) - tsOrZero(a.created_at);
   });
   document.getElementById('resultCount').textContent = items.length;
@@ -882,7 +900,9 @@ function applyFilters(){
         ${l.contact_name?`<div style="font-size:11px;color:#cbd5e1;margin-top:2px">👤 ${l.contact_name.replace(/</g,'&lt;')}</div>`:''}
         ${l.phone?`<div style="font-size:11px;color:#cbd5e1;margin-top:2px">📞 <a href="tel:${l.phone.replace(/[^0-9+]/g,'')}" style="color:#7ee3aa;text-decoration:none" onclick="event.stopPropagation()">${l.phone.replace(/</g,'&lt;')}</a></div>`:''}
         ${l.tax_id?`<div style="font-size:11px;color:#94a3b8;margin-top:2px">🏛 ${l.tax_id.replace(/</g,'&lt;')}</div>`:''}
-        <div style="font-size:10px;color:#64748b;margin-top:6px;padding-top:4px;border-top:1px dashed #1e293b;display:flex;gap:8px;flex-wrap:wrap">
+        <div style="font-size:10px;color:#64748b;margin-top:6px;padding-top:4px;border-top:1px dashed #1e293b;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          ${l.last_verified_at && (Date.now() - new Date(l.last_verified_at).getTime()) <= 15*60*1000
+            ? '<span data-testid="online-badge" style="background:#22c55e;color:#0b1121;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:800;letter-spacing:.5px;animation:pulse-online 2s infinite">🟢 EN LÍNEA</span>' : ''}
           ${(l.message_count||0)>0?`<span title="Mensajes recibidos del cliente">💬 ${l.message_count} msg</span>`:''}
           ${l.last_verified_at?`<span title="Última verificación de licencia (indica actividad reciente)">🟢 ${new Date(l.last_verified_at).toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'})}</span>`:'<span style="color:#475569">⚪ nunca conectado</span>'}
           ${l.last_message_at?`<span title="Último mensaje del cliente">📩 ${new Date(l.last_message_at).toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'})}</span>`:''}
