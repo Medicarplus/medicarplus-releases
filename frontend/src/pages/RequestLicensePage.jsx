@@ -266,18 +266,43 @@ export default function RequestLicensePage() {
           </div>
 
           <div style={{ display: "grid", gap: 14 }}>
-            <div>
-              <label style={labelStyle}>INSTALL ID <span style={{ color: "#64748b", fontWeight: 400 }}>(opcional)</span></label>
-              <input
-                data-testid="req-install-id"
-                placeholder="CD-XXXX-XXXX-XXXX-XXXX o deixa-ho buit"
-                value={form.install_id}
-                onChange={(e) => setForm({ ...form, install_id: e.target.value.toUpperCase() })}
-                style={inputStyle}
-              />
+            <div style={{ background: "#0f172a", border: "1px dashed #334155", borderRadius: 8, padding: 12 }}>
+              {!showInstallId ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                    ¿Ya tienes la app instalada en tu ordenador?
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="toggle-install-id"
+                    onClick={() => setShowInstallId(true)}
+                    style={{ background: "transparent", border: "1px solid #f5b301", color: "#f5b301", padding: "6px 12px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", letterSpacing: .5 }}
+                  >
+                    SÍ, INTRODUCIR INSTALL ID
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <label style={labelStyle}>INSTALL ID <span style={{ color: "#64748b", fontWeight: 400 }}>(código que aparece en la app)</span></label>
+                  <input
+                    data-testid="req-install-id"
+                    placeholder="CD-XXXX-XXXX-XXXX-XXXX"
+                    value={form.install_id}
+                    onChange={(e) => setForm({ ...form, install_id: e.target.value.toUpperCase() })}
+                    style={inputStyle}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setShowInstallId(false); setForm({ ...form, install_id: "" }); }}
+                    style={{ marginTop: 8, background: "transparent", border: "none", color: "#94a3b8", fontSize: 11, cursor: "pointer", textDecoration: "underline", padding: 0 }}
+                  >
+                    ↩ Aún no tengo la app instalada
+                  </button>
+                </div>
+              )}
             </div>
             <div>
-              <label style={labelStyle}>NOM DE L'EMPRESA *</label>
+              <label style={labelStyle}>NOMBRE DE LA EMPRESA *</label>
               <input
                 data-testid="req-company"
                 required
@@ -288,7 +313,7 @@ export default function RequestLicensePage() {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
-                <label style={labelStyle}>PERSONA DE CONTACTE</label>
+                <label style={labelStyle}>PERSONA DE CONTACTO</label>
                 <input
                   data-testid="req-contact"
                   value={form.contact_name}
@@ -319,7 +344,7 @@ export default function RequestLicensePage() {
                 />
               </div>
               <div>
-                <label style={labelStyle}>TELÈFON</label>
+                <label style={labelStyle}>TELÉFONO</label>
                 <input
                   data-testid="req-phone"
                   value={form.phone}
@@ -329,26 +354,26 @@ export default function RequestLicensePage() {
               </div>
             </div>
             <div>
-              <label style={labelStyle}>PLAN SELECCIONAT</label>
+              <label style={labelStyle}>PLAN SELECCIONADO</label>
               <div style={{ padding: "10px 14px", background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#f5b301", fontFamily: "Georgia,serif", fontSize: 13 }}>
                 {form.plan_requested === "TRIAL" && "🆓 TRIAL — Prueba gratuita 60 días"}
                 {form.plan_requested === "STD_MES" && "📦 STD Mensual — 29,90€/mes"}
-                {form.plan_requested === "STD_ANY" && "📦 STD Anual — 299,90€/any (estalvies 16%)"}
+                {form.plan_requested === "STD_ANY" && "📦 STD Anual — 299,90€/año (ahorras 16%)"}
                 {form.plan_requested === "PREMIUM_MES" && "⭐ PREMIUM Mensual — 39,90€/mes"}
-                {form.plan_requested === "PREMIUM_ANY" && "⭐ PREMIUM Anual — 399,90€/any (estalvies 17%)"}
+                {form.plan_requested === "PREMIUM_ANY" && "⭐ PREMIUM Anual — 399,90€/año (ahorras 17%)"}
                 <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, fontStyle: "italic" }}>
-                  Selecciona un altre pla clicant les targetes de dalt.
+                  Selecciona otro plan clicando las tarjetas de arriba.
                 </div>
               </div>
             </div>
             <div>
-              <label style={labelStyle}>NOTES / COMENTARIS</label>
+              <label style={labelStyle}>NOTAS / COMENTARIOS</label>
               <textarea
                 data-testid="req-notes"
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 rows={3}
-                placeholder="Explica'ns qualsevol cosa que ens ajudi a preparar la teva llicència…"
+                placeholder="Cuéntanos cualquier cosa que nos ayude a preparar tu licencia…"
                 style={{ ...inputStyle, resize: "vertical", fontFamily: "Georgia, serif" }}
               />
             </div>
@@ -408,16 +433,16 @@ export default function RequestLicensePage() {
               style={{ marginTop: 3, transform: "scale(1.2)", accentColor: "#f5b301" }}
             />
             <span>
-              He llegit i accepto la{" "}
+              He leído y acepto la{" "}
               <a
                 href="/privacy"
                 target="_blank"
                 rel="noreferrer"
                 style={{ color: "#f5b301", textDecoration: "underline" }}
               >
-                política de privacitat
+                política de privacidad
               </a>
-              . Les meves dades es tractaran per gestionar la meva sol·licitud de llicència.
+              . Mis datos se tratarán para gestionar mi solicitud de licencia.
             </span>
           </label>
 
@@ -444,7 +469,7 @@ export default function RequestLicensePage() {
               textTransform: "uppercase",
             }}
           >
-            {busy ? "Enviant…" : "✉ Enviar sol·licitud"}
+            {busy ? "Enviando…" : "✉ Enviar solicitud"}
           </button>
 
           <p
@@ -458,9 +483,9 @@ export default function RequestLicensePage() {
               lineHeight: 1.55,
             }}
           >
-            En enviar, acceptes que rebis la teva clau de llicència a l'adreça de correu
-            indicada. MediCar Plus es reserva el dret d'aprovar o denegar
-            sol·licituds.
+            Al enviar, aceptas recibir tu clave de licencia en la dirección de correo
+            indicada. MediCar Plus se reserva el derecho de aprobar o denegar
+            solicitudes.
           </p>
         </form>
       </div>
@@ -523,7 +548,7 @@ function PricingCard({
           {hasBillingToggle && isYearly ? altPrice.split("/")[0] : price}
         </div>
         <div style={{ color: "#64748b", fontSize: 11 }}>
-          {hasBillingToggle && isYearly ? "/any" : period}
+          {hasBillingToggle && isYearly ? "/año" : period}
         </div>
       </div>
       {hasBillingToggle && (
