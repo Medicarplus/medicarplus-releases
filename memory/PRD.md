@@ -1,5 +1,13 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-27 · Panel Maestro unificado (chuleta admin)
+- Creado `/app/frontend/public/panel-maestro.html`: 1 solo panel en castellano con 5 tabs (Credenciales · Links · Funciones · Estado · Operativa), buscador cross-tab, credenciales borrosas con hover-to-reveal, botones "Copiar" al portapapeles con feedback visual.
+- Sustituye a los 2 antiguos ficheros obsoletos `index-guies.html` y `guia-medicar-plus.html` (última actualización 15/07/2026, en catalán, con URL preview muerta que provocaba pantalla en blanco).
+- Los 2 ficheros antiguos se convirtieron en redirects 302 al nuevo `/panel-maestro.html` para no romper bookmarks.
+- `v2.html`: sustituidos los 2 botones "🎛️ Panell Mestre" + "📚 Guía Admin" por un único botón "📚 Panel Maestro (Chuleta)".
+- Datos vigentes hoy: Trial 60d, URL medicarplus.es (no preview), Stripe TEST activo, credenciales sensibles (LICENSE_SECRET, GITHUB_TOKEN, sk_test) NO expuestas en el HTML.
+
+
 ## Original Problem Statement
 Marc Brugulat (Catalonia) is turning a legacy offline HTML cash register app into a commercial Electron desktop app called **MediCar Plus** for medical driver-licence renewal centres in Spain. The product covers:
 - HWID-locked license verification

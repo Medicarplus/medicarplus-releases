@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>MediCar Plus · Panel Maestro (Chuleta admin)</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;line-height:1.6;padding:32px 20px;min-height:100vh}
+  .wrap{max-width:1080px;margin:0 auto}
+  .header{text-align:center;margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid #f5b301}
+  .header h1{margin:0;color:#f5b301;font-size:32px;letter-spacing:.5px;font-family:Georgia,serif}
+  .header p{color:#94a3b8;font-size:13px;margin:6px 0 0}
+  .header .stamp{display:inline-block;background:#f5b301;color:#0f172a;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800;margin-top:8px;letter-spacing:.5px}
+
+  /* Filtro rápido */
+  .search-box{width:100%;padding:12px 18px;background:#0f172a;border:2px solid #334155;border-radius:10px;color:#e2e8f0;font-size:14px;margin-bottom:20px;font-family:inherit}
+  .search-box:focus{outline:none;border-color:#f5b301}
+
+  /* Tabs */
+  .tabs{display:flex;flex-wrap:wrap;gap:6px;background:#0f172a;padding:8px;border-radius:12px;border:1px solid #334155;margin-bottom:20px;position:sticky;top:10px;z-index:10;backdrop-filter:blur(8px)}
+  .tab{background:transparent;border:none;color:#94a3b8;padding:9px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit;white-space:nowrap}
+  .tab:hover{background:#1e293b;color:#e2e8f0}
+  .tab.active{background:#f5b301;color:#0f172a}
+  .panel{display:none;animation:fadeIn .2s ease}
+  .panel.active{display:block}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  h2{color:#a7f3d0;margin:24px 0 14px;padding:10px 14px;background:linear-gradient(90deg,rgba(34,197,94,.15),transparent);border-left:5px solid #22c55e;font-size:18px;font-family:Georgia,serif;border-radius:4px}
+  h2.orange{color:#fed7aa;background:linear-gradient(90deg,rgba(234,88,12,.15),transparent);border-left-color:#f97316}
+  h2.blue{color:#bfdbfe;background:linear-gradient(90deg,rgba(59,130,246,.15),transparent);border-left-color:#3b82f6}
+  h2.purple{color:#e9d5ff;background:linear-gradient(90deg,rgba(147,51,234,.15),transparent);border-left-color:#9333ea}
+  h2.red{color:#fecaca;background:linear-gradient(90deg,rgba(220,38,38,.15),transparent);border-left-color:#dc2626}
+  h3{color:#f5b301;font-size:15px;margin:16px 0 8px;font-family:Georgia,serif}
+
+  .card{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:14px 16px;margin:8px 0;display:flex;align-items:flex-start;gap:12px;text-decoration:none;color:#e2e8f0;transition:all .15s}
+  .card:hover{border-color:#f5b301;background:#243044;transform:translateX(3px)}
+  .card-icon{font-size:22px;flex-shrink:0;line-height:1}
+  .card-content{flex:1;min-width:0}
+  .card-title{font-weight:700;color:#f5b301;font-size:14px;margin-bottom:2px}
+  .card-desc{color:#cbd5e1;font-size:12.5px;line-height:1.5}
+  .card-url{color:#7ee3aa;font-size:11px;font-family:'Courier New',monospace;word-break:break-all;opacity:.75;margin-top:4px}
+
+  /* Credenciales */
+  .cred-box{background:linear-gradient(135deg,#7f1d1d,#450a0a);border:1px solid #dc2626;border-radius:10px;padding:16px 18px;margin:12px 0}
+  .cred-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed rgba(220,38,38,.3);flex-wrap:wrap}
+  .cred-row:last-child{border:none}
+  .cred-row .label{color:#fecaca;font-size:12px;font-weight:600;flex-shrink:0}
+  .cred-row .value{background:#0f172a;color:#fca5a5;padding:5px 10px;border-radius:5px;font-family:'Courier New',monospace;font-size:12px;user-select:all;word-break:break-all;flex:1;min-width:200px}
+  .cred-row .value.masked{filter:blur(4px);transition:filter .2s;cursor:pointer}
+  .cred-row .value.masked:hover,.cred-row .value.revealed{filter:none}
+  .btn-copy{background:#dc2626;color:#fff;border:none;border-radius:5px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:700;font-family:inherit;transition:background .15s}
+  .btn-copy:hover{background:#ef4444}
+  .cred-warning{color:#fde68a;font-size:11px;margin-top:6px;font-style:italic}
+
+  /* Estado */
+  .status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:14px 0}
+  .status-card{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px 14px}
+  .status-card .st-icon{font-size:20px;margin-bottom:4px}
+  .status-card .st-title{font-size:13px;color:#f5b301;font-weight:700}
+  .status-card .st-desc{font-size:11.5px;color:#94a3b8;margin-top:3px;line-height:1.4}
+  .status-card.ok{border-left:3px solid #22c55e}
+  .status-card.wait{border-left:3px solid #f59e0b}
+  .status-card.later{border-left:3px solid #6b7280;opacity:.75}
+
+  /* Callouts */
+  .callout{background:linear-gradient(135deg,rgba(34,197,94,.1),transparent);border:1px solid rgba(34,197,94,.4);border-radius:8px;padding:12px 14px;margin:12px 0;color:#a7f3d0;font-size:13px}
+  .callout.blue{background:linear-gradient(135deg,rgba(59,130,246,.1),transparent);border-color:rgba(59,130,246,.4);color:#bfdbfe}
+  .callout.orange{background:linear-gradient(135deg,rgba(249,115,22,.1),transparent);border-color:rgba(249,115,22,.4);color:#fed7aa}
+  .callout.red{background:linear-gradient(135deg,rgba(220,38,38,.1),transparent);border-color:rgba(220,38,38,.4);color:#fecaca}
+
+  code{background:#0f172a;color:#7ee3aa;padding:3px 7px;border-radius:4px;font-family:'Courier New',monospace;font-size:12.5px}
+  pre{background:#0b1220;color:#e2e8f0;padding:12px 14px;border-radius:8px;font-size:12px;overflow-x:auto;line-height:1.5;border:1px solid #334155}
+
+  /* Función tabla */
+  .fn-table{display:grid;grid-template-columns:200px 1fr;gap:8px 16px;margin:12px 0;background:#1e293b;padding:14px 18px;border-radius:10px;border:1px solid #334155}
+  .fn-table dt{color:#f5b301;font-weight:700;font-size:13px;padding-top:2px}
+  .fn-table dd{color:#cbd5e1;font-size:12.5px;margin:0;line-height:1.5}
+  .fn-table dt,.fn-table dd{padding:6px 0;border-bottom:1px dashed rgba(148,163,184,.15)}
+  .fn-table dt:last-of-type,.fn-table dd:last-of-type{border:none}
+  @media(max-width:640px){.fn-table{grid-template-columns:1fr}.fn-table dt{padding-bottom:0;border:none}.fn-table dd{padding-top:2px;padding-bottom:10px;padding-left:12px}}
+
+  .footer{text-align:center;color:#64748b;font-size:11px;margin-top:40px;padding-top:20px;border-top:1px solid #334155}
+  .kbd{background:#0f172a;border:1px solid #475569;border-bottom-width:2px;color:#e2e8f0;padding:1px 6px;border-radius:4px;font-family:'Courier New',monospace;font-size:11px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="header">
+  <h1>🎛️ MediCar Plus · Panel Maestro</h1>
+  <p>Chuleta rápida con credenciales, links y funciones · <b>Solo para tus ojos</b></p>
+  <div class="stamp">Actualizado <span id="today"></span></div>
+</div>
+
+<input type="search" class="search-box" id="filter" placeholder="🔍 Buscar (ej: stripe, admin, twilio, master, ionos…)" autocomplete="off">
+
+<nav class="tabs" role="tablist">
+  <button class="tab active" data-panel="credenciales">🔑 Credenciales</button>
+  <button class="tab" data-panel="links">🔗 Links</button>
+  <button class="tab" data-panel="funciones">⚙️ Funciones</button>
+  <button class="tab" data-panel="estado">📊 Estado</button>
+  <button class="tab" data-panel="operativa">🚀 Operativa</button>
+</nav>
+
+<!-- ============ CREDENCIALES ============ -->
+<section class="panel active" data-panel="credenciales">
+
+<div class="callout blue">
+  💡 <b>Consejo:</b> pasa el ratón por encima de las claves borrosas para verlas. Todos los <code>Copiar</code> las copian al portapapeles al instante.
+</div>
+
+<h2 class="red">🔐 Acceso a la App</h2>
+<div class="cred-box">
+  <div class="cred-row">
+    <div class="label">Master Key (dueño · desbloquea cualquier PC)</div>
+    <div class="value masked">MB-MASTER-BRUGULAT-2026-OWNER</div>
+    <button class="btn-copy" data-copy="MB-MASTER-BRUGULAT-2026-OWNER">📋 Copiar</button>
+  </div>
+  <div class="cred-row">
+    <div class="label">Login admin · Usuario</div>
+    <div class="value">ADMINISTRADOR</div>
+    <button class="btn-copy" data-copy="ADMINISTRADOR">📋</button>
+  </div>
+  <div class="cred-row">
+    <div class="label">Login admin · Contraseña</div>
+    <div class="value masked">Mbrugulat24</div>
+    <button class="btn-copy" data-copy="Mbrugulat24">📋 Copiar</button>
+  </div>
+  <div class="cred-warning">⚠️ Con estas 2 vías (Master Key o Usuario/Contraseña) entras a la app como MASTER en cualquier PC.</div>
+</div>
+
+<h2 class="red">🎛️ Panel Admin Web (gestión de licencias)</h2>
+<div class="cred-box">
+  <div class="cred-row">
+    <div class="label">URL</div>
+    <div class="value">https://medicarplus.es/admin.html</div>
+    <button class="btn-copy" data-copy="https://medicarplus.es/admin.html">📋</button>
+  </div>
+  <div class="cred-row">
+    <div class="label">Admin Token (cabecera X-Admin-Token)</div>
+    <div class="value masked">MB-ADMIN-BRUGULAT-2026-4F8E2A1C</div>
+    <button class="btn-copy" data-copy="MB-ADMIN-BRUGULAT-2026-4F8E2A1C">📋 Copiar</button>
+  </div>
+  <div class="cred-warning">💡 Desde la app en modo MASTER, botón "🎛️ Panel Licencias" abre este panel con auto-login.</div>
+</div>
+
+<h2 class="red">💳 Stripe (modo TEST · aún NO live)</h2>
+<div class="cred-box">
+  <div class="cred-row">
+    <div class="label">Dashboard Stripe</div>
+    <div class="value">https://dashboard.stripe.com</div>
+    <button class="btn-copy" data-copy="https://dashboard.stripe.com">📋</button>
+  </div>
+  <div class="cred-row">
+    <div class="label">Cuenta email</div>
+    <div class="value">info@medicarplus.es</div>
+    <button class="btn-copy" data-copy="info@medicarplus.es">📋</button>
+  </div>
+  <div class="cred-row">
+    <div class="label">Tarjeta de prueba (checkout test)</div>
+    <div class="value">4242 4242 4242 4242 · 12/34 · CVC 123 · CP 28001</div>
+    <button class="btn-copy" data-copy="4242 4242 4242 4242">📋</button>
+  </div>
+  <div class="cred-warning">⚠️ Las claves <code>sk_test</code>, <code>whsec</code> y los 4 <code>price_...</code> viven en el backend (<code>backend/.env</code>). NO se guardan aquí por seguridad.</div>
+</div>
+
+<h2 class="red">🔄 GitHub Releases (auto-updater)</h2>
+<div class="cred-box">
+  <div class="cred-row">
+    <div class="label">Usuario</div>
+    <div class="value">Medicarplus</div>
+    <button class="btn-copy" data-copy="Medicarplus">📋</button>
+  </div>
+  <div class="cred-row">
+    <div class="label">Repositorio (privado)</div>
+    <div class="value">Medicarplus/medicarplus-releases</div>
+    <button class="btn-copy" data-copy="Medicarplus/medicarplus-releases">📋</button>
+  </div>
+  <div class="cred-row">
+    <div class="label">Releases (URL directa)</div>
+    <div class="value">github.com/Medicarplus/medicarplus-releases/releases</div>
+    <a class="btn-copy" href="https://github.com/Medicarplus/medicarplus-releases/releases" target="_blank" rel="noopener" style="text-decoration:none">🔗 Abrir</a>
+  </div>
+  <div class="cred-warning">🔑 El Personal Access Token (PAT) vive en el backend (<code>GITHUB_TOKEN</code>) y en tu PC como variable <code>$env:GH_TOKEN</code>. NO lo guardamos aquí.</div>
+</div>
+
+<h2 class="red">📧 Correo IONOS (multi-buzón)</h2>
+<div class="cred-box">
+  <div class="cred-row">
+    <div class="label">Webmail</div>
+    <div class="value">https://mailbusiness.ionos.es</div>
+    <a class="btn-copy" href="https://mailbusiness.ionos.es" target="_blank" rel="noopener" style="text-decoration:none">🔗 Abrir</a>
+  </div>
+  <div class="cred-row">
+    <div class="label">Buzón principal</div>
+    <div class="value">info@medicarplus.es</div>
+    <button class="btn-copy" data-copy="info@medicarplus.es">📋</button>
+  </div>
+  <div class="cred-row">
+    <div class="label">Alias activos</div>
+    <div class="value">suport@ · factures@ · marc@ · no-reply@medicarplus.es</div>
+    <button class="btn-copy" data-copy="suport@medicarplus.es, factures@medicarplus.es, marc@medicarplus.es, no-reply@medicarplus.es">📋</button>
+  </div>
+  <div class="cred-row">
+    <div class="label">SMTP salida</div>
+    <div class="value">smtp.ionos.es:587 (TLS)</div>
+  </div>
+  <div class="cred-row">
+    <div class="label">IMAP entrada</div>
+    <div class="value">imap.ionos.es:993 (SSL)</div>
+  </div>
+</div>
+
+</section>
+
+<!-- ============ LINKS ============ -->
+<section class="panel" data-panel="links">
+
+<h2>🎯 Paneles diarios</h2>
+<a class="card" href="/admin.html" target="_blank" rel="noopener">
+  <div class="card-icon">🎛️</div>
+  <div class="card-content">
+    <div class="card-title">Panel Admin (gestión completa)</div>
+    <div class="card-desc">Licencias, solicitudes, transferencias, edición de email, estadísticas MRR/ARR, instalaciones, chat con clientes, notificaciones.</div>
+    <div class="card-url">medicarplus.es/admin.html</div>
+  </div>
+</a>
+<a class="card" href="/v2.html" target="_blank" rel="noopener">
+  <div class="card-icon">💻</div>
+  <div class="card-content">
+    <div class="card-title">App v2 (versión web · para pruebas)</div>
+    <div class="card-desc">Versión navegador de la app comercial. Útil para probar cambios rápidamente sin recompilar el .exe.</div>
+    <div class="card-url">medicarplus.es/v2.html</div>
+  </div>
+</a>
+<a class="card" href="https://medicarplus.es" target="_blank" rel="noopener">
+  <div class="card-icon">🌐</div>
+  <div class="card-content">
+    <div class="card-title">Landing pública (medicarplus.es)</div>
+    <div class="card-desc">Web comercial con precios, checkout Stripe, formulario de solicitud, privacidad.</div>
+    <div class="card-url">medicarplus.es</div>
+  </div>
+</a>
+<a class="card" href="/request-license" target="_blank" rel="noopener">
+  <div class="card-icon">📝</div>
+  <div class="card-content">
+    <div class="card-title">Formulario público de solicitud</div>
+    <div class="card-desc">Enlace directo para enviar a clientes potenciales por email/WhatsApp.</div>
+    <div class="card-url">medicarplus.es/request-license</div>
+  </div>
+</a>
+
+<h2 class="blue">🛠️ Servicios externos</h2>
+<a class="card" href="https://dashboard.stripe.com" target="_blank" rel="noopener">
+  <div class="card-icon">💳</div>
+  <div class="card-content">
+    <div class="card-title">Stripe Dashboard</div>
+    <div class="card-desc">Cobros, suscripciones, webhooks, informes financieros. Actualmente en modo TEST.</div>
+    <div class="card-url">dashboard.stripe.com</div>
+  </div>
+</a>
+<a class="card" href="https://github.com/Medicarplus/medicarplus-releases/releases" target="_blank" rel="noopener">
+  <div class="card-icon">🔄</div>
+  <div class="card-content">
+    <div class="card-title">GitHub Releases (updates .exe)</div>
+    <div class="card-desc">Aquí se publican los instaladores. El auto-updater de la app los detecta y descarga solo.</div>
+    <div class="card-url">github.com/Medicarplus/medicarplus-releases/releases</div>
+  </div>
+</a>
+<a class="card" href="https://mailbusiness.ionos.es" target="_blank" rel="noopener">
+  <div class="card-icon">📧</div>
+  <div class="card-content">
+    <div class="card-title">Webmail IONOS</div>
+    <div class="card-desc">Bandeja de entrada de info@, suport@, factures@, marc@, no-reply@medicarplus.es.</div>
+    <div class="card-url">mailbusiness.ionos.es</div>
+  </div>
+</a>
+<a class="card" href="https://search.google.com/search-console" target="_blank" rel="noopener">
+  <div class="card-icon">🔎</div>
+  <div class="card-content">
+    <div class="card-title">Google Search Console</div>
+    <div class="card-desc">Métricas SEO de medicarplus.es. Solicitar indexación, subir sitemap.xml, ver clics/impresiones.</div>
+    <div class="card-url">search.google.com/search-console</div>
+  </div>
+</a>
+<a class="card" href="https://www.twilio.com/console" target="_blank" rel="noopener">
+  <div class="card-icon">📱</div>
+  <div class="card-content">
+    <div class="card-title">Twilio (SMS · pendiente)</div>
+    <div class="card-desc">Cuando compres un número + saldo, aquí gestionarás envíos. Por ahora los clientes usan modo BYOA.</div>
+    <div class="card-url">twilio.com/console</div>
+  </div>
+</a>
+
+<h2 class="orange">📥 Descargas</h2>
+<a class="card" href="/api/download/latest-installer" target="_blank" rel="noopener">
+  <div class="card-icon">📦</div>
+  <div class="card-content">
+    <div class="card-title">Descargar último instalador .exe</div>
+    <div class="card-desc">Redirige a la última release publicada en GitHub (para enviar a clientes que reinstalan).</div>
+    <div class="card-url">medicarplus.es/api/download/latest-installer</div>
+  </div>
+</a>
+
+</section>
+
+<!-- ============ FUNCIONES ============ -->
+<section class="panel" data-panel="funciones">
+
+<div class="callout blue">
+  📚 <b>Chuleta:</b> qué hace cada pieza del sistema. Si algún día olvidas para qué sirve algo, aquí lo tienes en 1 línea.
+</div>
+
+<h2>🎛️ Panel Admin (<code>/admin.html</code>)</h2>
+<dl class="fn-table">
+  <dt>Licencias</dt><dd>Lista de todos los clientes. Genera claves, revoca, extiende días, edita email/teléfono/NIF, transfiere a otro PC (mantiene Stripe activo), desbloquea HWID.</dd>
+  <dt>Solicitudes</dt><dd>Formularios <code>/request-license</code> recibidos. Aprobar genera JWT + envía email al cliente con la clave.</dd>
+  <dt>Estadísticas</dt><dd>MRR, ARR, clientes activos por plan, tasa de conversión, top 5 clientes.</dd>
+  <dt>Instalaciones</dt><dd>God-mode: TODAS las apps del mundo con MediCar Plus abierto (activadas o no). Filtros, búsqueda, revoca, notas privadas.</dd>
+  <dt>Inbox / Chat</dt><dd>Bandeja unificada de mensajes de clientes con adjuntos (bidireccional). Filtro por cliente.</dd>
+  <dt>Notificaciones</dt><dd>Alertas de cliente inactivo, pagos fallidos, nuevos registros. Auto-limpia leídas >30d.</dd>
+  <dt>Tráfico</dt><dd>Buscar cualquier cliente DGT por nombre <b>o DNI</b> entre todos los negocios.</dd>
+</dl>
+
+<h2 class="orange">💻 App comercial (Electron · <code>MediCar Plus.exe</code>)</h2>
+<dl class="fn-table">
+  <dt>Caja del día</dt><dd>Registro diario de entradas + tasas DGT + gastos. Saldo anterior separado (caja / total).</dd>
+  <dt>Tráfico</dt><dd>Búsqueda por nombre o DNI, importación DGT (backfill de DNI no destructivo).</dd>
+  <dt>Revisiones</dt><dd>Recordatorios de renovaciones de carnet caducadas.</dd>
+  <dt>Contabilidad</dt><dd>Menú desplegable: Libreta · IRPF % · Reserva de cambio · Libro de Registro · Novedades.</dd>
+  <dt>Estadísticas</dt><dd>Menú separado: Facturación mensual · Autoescolas · Comparativa años (2-6 años).</dd>
+  <dt>Cites (Premium)</dt><dd>Integra Google Calendar, Doctoralia, Calendly, Outlook via URL iCal. Badge de citas nuevas.</dd>
+  <dt>Avisos SMS</dt><dd>Recordatorios masivos vía Twilio (BYOA o Cloud). Historial 5000 mensajes.</dd>
+  <dt>Asesor IA (Premium)</dt><dd>Consultor GPT-4o para preguntas sobre contabilidad y gestión.</dd>
+  <dt>HWID Lock</dt><dd>Licencia se vincula al maquinario del PC. Anti-pirateo. Reset manual desde admin.</dd>
+  <dt>Auto-updater</dt><dd>Comprueba GitHub Releases al arrancar y descarga la nueva versión sola.</dd>
+</dl>
+
+<h2 class="blue">💳 Stripe (checkout + subscripciones)</h2>
+<dl class="fn-table">
+  <dt>Precios activos</dt><dd>Standard 29,90€/mes · 299,90€/año · Premium 39,90€/mes · 399,90€/año. Trial 60 días sin tarjeta.</dd>
+  <dt>Checkout desde landing</dt><dd>Modal de email → sesión Stripe → pago → webhook <code>checkout.session.completed</code> → JWT generada y enviada por email.</dd>
+  <dt>Checkout desde app</dt><dd>Botón "Millora el plan" en Configuración → mismo flujo.</dd>
+  <dt>Renovación auto</dt><dd>Cada <code>invoice.paid</code> extiende la fecha <code>expires_at</code> de la JWT automáticamente.</dd>
+  <dt>Portal cliente</dt><dd>Botón "Gestionar mi suscripción" → Stripe Billing Portal (cancelar, cambiar tarjeta, descargar facturas).</dd>
+  <dt>Recordatorios</dt><dd>Backend revisa cada 24h las licencias sin subscripción. Si caduca en ≤7d → email automático.</dd>
+</dl>
+
+<h2 class="purple">🔒 Sistema de licencias JWT</h2>
+<dl class="fn-table">
+  <dt>Formato</dt><dd>JWT firmado con <code>LICENSE_SECRET</code>. Payload: install_id, plan, expires_at, hwid, plan_type.</dd>
+  <dt>Verificación</dt><dd>App hace ping cada 15 días. Sin internet: 30 días grace period.</dd>
+  <dt>HWID binding</dt><dd>1ª activación guarda SHA-256(hostname+platform+arch+RAM+MAC) → si cambia, bloquea.</dd>
+  <dt>Transferencia</dt><dd>Admin puede transferir a otro install_id conservando Stripe subscription intacto.</dd>
+  <dt>Master key</dt><dd><code>MB-MASTER-BRUGULAT-2026-OWNER</code> funciona en cualquier PC del mundo (para ti).</dd>
+</dl>
+
+<h2 class="red">📱 SMS · Modo Dual (Premium)</h2>
+<dl class="fn-table">
+  <dt>BYOA (Bring Your Own Account)</dt><dd>Cliente crea su cuenta Twilio, paga a Twilio. Disponible ahora.</dd>
+  <dt>MediCar Cloud</dt><dd>Usa tu cuenta Twilio central, cobras 0,10€/SMS al cliente en la factura Stripe. Solo Premium. <b>Pendiente</b>: comprar número Twilio + configurar credenciales.</dd>
+</dl>
+
+</section>
+
+<!-- ============ ESTADO ============ -->
+<section class="panel" data-panel="estado">
+
+<div class="callout">
+  ✅ <b>Sistema operativo al 100%.</b> Estos son los componentes activos y los que quedan por activar para llegar al negocio 100% automático.
+</div>
+
+<h2>✅ Activos ahora</h2>
+<div class="status-grid">
+  <div class="status-card ok"><div class="st-icon">🌐</div><div class="st-title">Landing medicarplus.es</div><div class="st-desc">HTTPS + SEO + sitemap + checkout Stripe integrado.</div></div>
+  <div class="status-card ok"><div class="st-icon">💻</div><div class="st-title">App Electron</div><div class="st-desc">.exe con auto-updater vía GitHub Releases + HWID lock.</div></div>
+  <div class="status-card ok"><div class="st-icon">🎛️</div><div class="st-title">Panel Admin god-mode</div><div class="st-desc">Licencias, transferencias, chat, instalaciones, notificaciones.</div></div>
+  <div class="status-card ok"><div class="st-icon">💳</div><div class="st-title">Stripe TEST</div><div class="st-desc">Checkout + webhook + portal cliente + recordatorios email.</div></div>
+  <div class="status-card ok"><div class="st-icon">📧</div><div class="st-title">Correo IONOS</div><div class="st-desc">5 buzones activos · SMTP saliente configurado.</div></div>
+  <div class="status-card ok"><div class="st-icon">📱</div><div class="st-title">SMS BYOA</div><div class="st-desc">Clientes Premium usan su propio Twilio.</div></div>
+  <div class="status-card ok"><div class="st-icon">🤖</div><div class="st-title">Asesor IA</div><div class="st-desc">GPT-4o vía Emergent LLM Key en Premium.</div></div>
+  <div class="status-card ok"><div class="st-icon">💬</div><div class="st-title">Chat bidireccional</div><div class="st-desc">Cliente ↔ admin con adjuntos (imágenes, PDFs).</div></div>
+</div>
+
+<h2 class="orange">⏳ Pendientes (día D del lanzamiento)</h2>
+<div class="status-grid">
+  <div class="status-card wait"><div class="st-icon">💳</div><div class="st-title">Stripe LIVE</div><div class="st-desc">Activar cuenta con IBAN empresa · sustituir claves TEST por LIVE en <code>.env</code>.</div></div>
+  <div class="status-card wait"><div class="st-icon">🧾</div><div class="st-title">Verifacti (Verifactu AEAT)</div><div class="st-desc">Registrarse en verifacti.com/plugins/stripe (~2,90€/mes). Factura auto QR + envío AEAT.</div></div>
+  <div class="status-card wait"><div class="st-icon">📱</div><div class="st-title">Twilio Cloud (SMS central)</div><div class="st-desc">Comprar número + activar creds en backend. Cobra 0,10€/SMS al cliente Premium.</div></div>
+</div>
+
+<h2 class="blue">🔎 En observación</h2>
+<div class="status-grid">
+  <div class="status-card wait"><div class="st-icon">🔍</div><div class="st-title">Google indexación</div><div class="st-desc">Sitemap enviado 2026-02-XX. Google actualiza título/descripción en 3-7d.</div></div>
+</div>
+
+<h2 class="purple">📦 Backlog (para más adelante)</h2>
+<div class="status-grid">
+  <div class="status-card later"><div class="st-icon">🍎</div><div class="st-title">Instalador .dmg (Mac)</div><div class="st-desc">Solo si aparece cliente con iMac.</div></div>
+  <div class="status-card later"><div class="st-icon">📤</div><div class="st-title">Exportar Honorarios a Excel</div><div class="st-desc">Ampliar más allá del PDF actual.</div></div>
+  <div class="status-card later"><div class="st-icon">🎥</div><div class="st-title">Video demo landing</div><div class="st-desc">Grabar 30s de app funcionando para hero de la web.</div></div>
+</div>
+
+</section>
+
+<!-- ============ OPERATIVA ============ -->
+<section class="panel" data-panel="operativa">
+
+<h2>🚀 Publicar una nueva versión</h2>
+<div class="callout blue">
+  Solo <b>1 comando</b>. La versión sube sola (2.0.36 → 2.0.37 → 2.0.38...), compila el .exe, sube el instalador a GitHub Releases y los clientes lo reciben en cuanto abren el programa.
+</div>
+<pre>cd C:\medicarplus\electron
+npm run release</pre>
+<div class="callout orange">
+  ⚠️ Antes de <code>npm run release</code>: tanca la app <b>MediCar Plus</b> del PC (si está abierta bloquea la compilación).
+</div>
+
+<h2 class="orange">🔁 Actualizar la app en tu propio PC</h2>
+<ol>
+  <li>Descarga el ZIP nuevo: <code>medicarplus.es/downloads/medicar-plus-electron.zip</code></li>
+  <li>Cierra MediCar Plus.</li>
+  <li>PowerShell: <pre style="margin-top:6px">cd C:\medicarplus
+Remove-Item -Recurse -Force electron
+Expand-Archive "$HOME\Downloads\medicar-plus-electron.zip" -DestinationPath C:\medicarplus -Force
+cd C:\medicarplus\electron
+npm install</pre></li>
+</ol>
+
+<h2 class="red">🆘 Troubleshooting rápido</h2>
+<dl class="fn-table">
+  <dt>Cliente ve "Licencia bloqueada"</dt><dd>Ha cambiado de PC. Admin → busca su install_id → botón 🔓 <b>Desbloquear HWID</b>.</dd>
+  <dt>Cliente cambia de ordenador</dt><dd>Admin → busca licencia → botón <b>🔄 Transferir</b> → pega el nuevo install_id. Stripe sigue intacto.</dd>
+  <dt>Cliente cambia de email</dt><dd>Admin → detalle licencia → <b>📧 Cambiar email</b>. Actualiza en Mongo + Stripe Customer.</dd>
+  <dt>404 en SMS/Cites (raro)</dt><dd>El backend detecta y publica su URL sola en GitHub (<code>api-endpoint.json</code>). Si sigue → dile al cliente Configuración → 🔄 Comprobar última versión.</dd>
+  <dt>Google muestra info antigua</dt><dd>Normal. Google tarda 3-7d en actualizar tras enviar sitemap. Volver a "Solicitar indexación" NO acelera.</dd>
+  <dt>Popup bloqueado en Electron</dt><dd>Los botones "Panel Admin", "Panel Maestro" abren en navegador vía <code>shell.openExternal</code>. Si no abre: revisar <code>preload.js</code>.</dd>
+</dl>
+
+<h2 class="purple">🔒 Backup crítico</h2>
+<div class="callout red">
+  🚨 <b>Copia estas 3 cosas en un gestor de contraseñas</b> (Bitwarden, 1Password). Si las pierdes, las licencias existentes dejan de funcionar y hay que regenerarlas todas:
+  <ol style="margin:8px 0 0 20px;padding:0">
+    <li><code>LICENSE_SECRET</code> del backend (firma los JWT)</li>
+    <li><code>LICENSE_ADMIN_TOKEN</code> (acceso al panel admin)</li>
+    <li>Master Key <code>MB-MASTER-BRUGULAT-2026-OWNER</code></li>
+  </ol>
+</div>
+
+<h2>📅 Rutina semanal recomendada</h2>
+<ul>
+  <li>🗓️ <b>Lunes:</b> abrir Panel Admin → mirar MRR + solicitudes pendientes</li>
+  <li>📧 <b>Lunes:</b> revisar bandeja info@medicarplus.es</li>
+  <li>🔎 <b>Cada 2 semanas:</b> Google Search Console → mirar clics + páginas indexadas</li>
+  <li>💳 <b>Cada mes:</b> Stripe Dashboard → conciliar pagos con contabilidad</li>
+</ul>
+
+</section>
+
+<div class="footer">
+  MediCar Plus · Panel Maestro v3.0 · Documento confidencial<br>
+  Soporte técnico: <a href="mailto:info@medicarplus.es" style="color:#f5b301">info@medicarplus.es</a>
+</div>
+
+</div>
+
+<script>
+// Fecha actualizada
+document.getElementById('today').textContent = new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
+
+// Tabs
+document.querySelectorAll('.tab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const target=btn.dataset.panel;
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelector('.panel[data-panel="'+target+'"]').classList.add('active');
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+});
+
+// Copiar al portapapeles
+document.querySelectorAll('.btn-copy[data-copy]').forEach(btn=>{
+  btn.addEventListener('click',async(ev)=>{
+    ev.stopPropagation();
+    const text=btn.getAttribute('data-copy');
+    try{
+      await navigator.clipboard.writeText(text);
+      const original=btn.textContent;
+      btn.textContent='✓ Copiado';
+      btn.style.background='#22c55e';
+      setTimeout(()=>{btn.textContent=original;btn.style.background=''},1400);
+    }catch(e){alert('No se pudo copiar. Selecciona el valor y usa Ctrl+C.')}
+  });
+});
+
+// Revelar valor borroso al clic (además del hover)
+document.querySelectorAll('.value.masked').forEach(el=>{
+  el.addEventListener('click',()=>{
+    el.classList.toggle('revealed');
+  });
+});
+
+// Filtro rápido
+const filterInput=document.getElementById('filter');
+filterInput.addEventListener('input',()=>{
+  const q=filterInput.value.toLowerCase().trim();
+  const panels=document.querySelectorAll('.panel');
+  if(!q){
+    // Restaura todo visible dentro del tab activo
+    panels.forEach(p=>{
+      p.querySelectorAll('.card, .cred-row, .fn-table, .status-card, h2, h3, pre, .callout, ol, ul').forEach(el=>el.style.display='');
+    });
+    return;
+  }
+  // Muestra todos los paneles a la vez para buscar cross-tab
+  panels.forEach(p=>p.classList.add('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  panels.forEach(p=>{
+    p.querySelectorAll('.card, .cred-row, .status-card').forEach(el=>{
+      el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';
+    });
+  });
+});
+</script>
+
+</body>
+</html>
