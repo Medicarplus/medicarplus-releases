@@ -429,7 +429,7 @@ async function openSupportChat(licenseKey, clientEmail, clientName){
     </div>
   `).join('') : '<div style="text-align:center;color:#64748b;font-style:italic;padding:20px">Sin historial · este será tu primer mensaje al cliente</div>';
   
-  back.innerHTML = `<div class="modal" style="max-width:640px;padding:0;overflow:hidden">
+  back.innerHTML = `<div class="modal" style="max-width:640px;padding:0;overflow-y:auto;max-height:90vh">
     <div style="background:linear-gradient(135deg,#7c3aed,#a855f7);padding:18px 24px;display:flex;justify-content:space-between;align-items:center">
       <div>
         <div style="font-size:11px;color:#e9d5ff;text-transform:uppercase;letter-spacing:.5px;font-weight:600">💬 Chat de soporte</div>
@@ -961,7 +961,7 @@ async function openDetail(install_id){
   back.className='modal-back';
   const licKeyEsc = (l.license_key||'').replace(/'/g,"\\\\'");
   const emailEsc = (l.client_email||'').replace(/'/g,"\\\\'");
-  back.innerHTML = `<div class="modal" style="max-width:720px;padding:0;overflow:hidden">
+  back.innerHTML = `<div class="modal" style="max-width:720px;padding:0;overflow-y:auto;max-height:90vh;display:flex;flex-direction:column">
     <!-- Cabecera con nombre del cliente + estado -->
     <div style="background:linear-gradient(135deg,${stCfg.bg} 0%,#0b1121 100%);padding:22px 26px;border-bottom:2px solid ${stCfg.color}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px">
