@@ -87,6 +87,10 @@ class LicenseRecord(BaseModel):
     install_id: str
     client_name: str
     client_email: Optional[str] = None
+    # Datos extra del formulario público de solicitud (Feb 2026)
+    contact_name: Optional[str] = None
+    phone: Optional[str] = None
+    tax_id: Optional[str] = None
     plan: str = "STD"
     status: LicenseStatus = "active"
     duration_days: Optional[int] = None

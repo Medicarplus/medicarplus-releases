@@ -167,8 +167,40 @@ export default function RequestLicensePage() {
             borderRadius: 16,
             padding: 40,
             boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+            position: "relative",
           }}
         >
+          {/* Botón X para volver a la home / cancelar la operación */}
+          <a
+            href="/"
+            data-testid="close-request-license"
+            aria-label="Cerrar y volver a la portada"
+            title="Cerrar y volver a la portada"
+            style={{
+              position: "absolute",
+              top: 16,
+              right: 16,
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              background: "#0f172a",
+              border: "1px solid #475569",
+              color: "#94a3b8",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 20,
+              textDecoration: "none",
+              cursor: "pointer",
+              transition: "all .15s",
+              fontFamily: "system-ui, sans-serif",
+              lineHeight: 1,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "#dc2626"; e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = "#dc2626"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "#0f172a"; e.currentTarget.style.color = "#94a3b8"; e.currentTarget.style.borderColor = "#475569"; }}
+          >
+            ×
+          </a>
           <div style={{ textAlign: "center", marginBottom: 28 }}>
             <div style={{ fontSize: 48, marginBottom: 8 }}>📮</div>
             <h1 style={{ margin: 0, color: "#f5b301", fontSize: 26, letterSpacing: 1 }}>
@@ -269,8 +301,29 @@ export default function RequestLicensePage() {
             <div style={{ background: "#0f172a", border: "1px dashed #334155", borderRadius: 8, padding: 12 }}>
               {!showInstallId ? (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                  <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                    ¿Ya tienes la app instalada en tu ordenador?
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#94a3b8" }}>
+                    <span>¿Ya tienes la app instalada en tu ordenador?</span>
+                    <span
+                      title="Si ya has instalado MediCar Plus en tu ordenador y quieres mejorar tu plan o renovarlo, esta sección es para reconocerte automáticamente. Abre la app → verás un código CD-XXXX-XXXX-XXXX-XXXX en el modal de activación. Pégalo aquí y sabremos exactamente qué ordenador es. Si aún no tienes la app instalada, déjalo cerrado y descárgala después."
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        background: "#f5b30122",
+                        border: "1px solid #f5b301",
+                        color: "#f5b301",
+                        fontSize: 11,
+                        fontWeight: 800,
+                        cursor: "help",
+                        userSelect: "none",
+                      }}
+                      data-testid="install-id-help"
+                    >
+                      ?
+                    </span>
                   </div>
                   <button
                     type="button"

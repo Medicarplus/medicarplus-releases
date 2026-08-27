@@ -91,6 +91,9 @@ def _doc_to_record(doc: dict, include_key: bool = False) -> LicenseRecord:
         install_id=doc["install_id"],
         client_name=doc.get("client_name", ""),
         client_email=doc.get("client_email"),
+        contact_name=doc.get("contact_name"),
+        phone=doc.get("phone"),
+        tax_id=doc.get("tax_id"),
         plan=doc.get("plan", "STD"),
         status=doc.get("status", "active"),
         duration_days=doc.get("duration_days"),
@@ -162,6 +165,56 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
     req_coll = db[REQ_COLLECTION]
     audit_coll = db["audit_logs"]
 
+    # -------- Backfill lazy (Feb 2026): rellena contact_name/phone/tax_id en
+    # licencias existentes copiando desde la solicitud original. Se ejecuta
+    # una sola vez cuando se lista licencias por primera vez tras arrancar.
+    _backfill_done = {"v": False}
+
+    async def _backfill_contact_data() -> None:
+        if _backfill_done["v"]:
+            return
+        _backfill_done["v"] = True
+        try:
+            missing = coll.find(
+                {
+                    "$or": [
+                        {"contact_name": {"$exists": False}},
+                        {"phone": {"$exists": False}},
+                        {"tax_id": {"$exists": False}},
+                    ]
+                },
+                {"_id": 0, "id": 1, "install_id": 1, "client_email": 1, "contact_name": 1, "phone": 1, "tax_id": 1},
+            )
+            updated = 0
+            async for lic in missing:
+                # Busca la última solicitud que casa por install_id (preferido) o email
+                iid = lic.get("install_id")
+                email = (lic.get("client_email") or "").lower()
+                query = None
+                if iid and iid != "CD-TRIAL-PENDING-0000-0000":
+                    query = {"install_id": iid}
+                elif email:
+                    query = {"email": email}
+                if not query:
+                    continue
+                req = await req_coll.find_one(query, sort=[("created_at", -1)])
+                if not req:
+                    continue
+                patch: dict = {}
+                if not lic.get("contact_name") and req.get("contact_name"):
+                    patch["contact_name"] = req["contact_name"]
+                if not lic.get("phone") and req.get("phone"):
+                    patch["phone"] = req["phone"]
+                if not lic.get("tax_id") and req.get("tax_id"):
+                    patch["tax_id"] = req["tax_id"]
+                if patch:
+                    await coll.update_one({"id": lic["id"]}, {"$set": patch})
+                    updated += 1
+            if updated:
+                logger.info("licenses backfill: contactos rellenados en %d licencia(s)", updated)
+        except Exception:  # noqa: BLE001
+            logger.exception("licenses backfill failed")
+
     def _rate(spec: str):
         """No-op decorator. Global default limit (300/min) from server.py applies
         to all endpoints automatically. Per-route stricter limits can be added
@@ -191,6 +244,9 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         duration_days: Optional[int],
         plan: str,
         notes: Optional[str],
+        contact_name: Optional[str] = None,
+        phone: Optional[str] = None,
+        tax_id: Optional[str] = None,
     ) -> dict:
         """Reusable helper: revoca l'anterior + insereix una nova llicència."""
         existing = await coll.find_one({"install_id": install_id, "status": "active"})
@@ -221,6 +277,9 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             "install_id": install_id,
             "client_name": (client_name or "").strip(),
             "client_email": (client_email or "").strip() or None,
+            "contact_name": (contact_name or "").strip() or None,
+            "phone": (phone or "").strip() or None,
+            "tax_id": (tax_id or "").strip() or None,
             "plan": plan,
             "status": "active",
             "duration_days": duration_days,
@@ -1079,6 +1138,7 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         status_filter: Optional[str] = Query(None, alias="status"),
         limit: int = Query(200, ge=1, le=1000),
     ) -> LicenseListResponse:
+        await _backfill_contact_data()  # one-shot
         query: dict[str, Any] = {}
         if status_filter:
             query["status"] = status_filter
@@ -1374,6 +1434,9 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             install_id=install_id_final,
             client_name=doc.get("company_name", ""),
             client_email=doc.get("email"),
+            contact_name=doc.get("contact_name"),
+            phone=doc.get("phone"),
+            tax_id=doc.get("tax_id"),
             duration_days=body.duration_days,
             plan=plan,
             notes=f"Aprovada des de sol·licitud {req_id}. {doc.get('notes') or ''}".strip(),

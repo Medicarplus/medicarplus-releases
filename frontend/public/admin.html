@@ -858,6 +858,9 @@ function applyFilters(){
           <b style="font-size:14px;color:#f5b301;font-family:Georgia,serif">${clientName}</b>${flags}${unreadBadge}
         </div>
         <div style="font-size:11px;color:#cbd5e1;margin-top:3px">📧 ${(l.client_email||'—').replace(/</g,'&lt;')}</div>
+        ${l.contact_name?`<div style="font-size:11px;color:#cbd5e1;margin-top:2px">👤 ${l.contact_name.replace(/</g,'&lt;')}</div>`:''}
+        ${l.phone?`<div style="font-size:11px;color:#cbd5e1;margin-top:2px">📞 <a href="tel:${l.phone.replace(/[^0-9+]/g,'')}" style="color:#7ee3aa;text-decoration:none" onclick="event.stopPropagation()">${l.phone.replace(/</g,'&lt;')}</a></div>`:''}
+        ${l.tax_id?`<div style="font-size:11px;color:#94a3b8;margin-top:2px">🏛 ${l.tax_id.replace(/</g,'&lt;')}</div>`:''}
         <div style="margin-top:4px;display:flex;align-items:center;gap:6px">
           <span class="mono" style="font-size:10px;color:#94a3b8" title="${l.install_id||''}">🖥 ${installIdShort}</span>
           <button class="ghost" onclick="event.stopPropagation();copyVal(this,'${iidEsc}')" data-testid="btn-copy-iid-${l.install_id}" style="padding:1px 6px;font-size:9px;border-radius:4px;background:#1e293b;border:1px solid #475569" title="Copiar Install ID al portapapeles">📋</button>
@@ -940,6 +943,9 @@ async function openDetail(install_id){
           <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;font-weight:600">Ficha del cliente</div>
           <h2 style="margin:0;color:#f5b301;font-family:Georgia,serif;font-size:22px;word-break:break-word">${clientName}</h2>
           <div style="margin-top:6px;font-size:13px;color:#cbd5e1">📧 <a href="mailto:${email}" style="color:#7dd3fc;text-decoration:none">${email}</a></div>
+          ${l.contact_name?`<div style="margin-top:4px;font-size:13px;color:#cbd5e1">👤 <b>${l.contact_name.replace(/</g,'&lt;')}</b></div>`:''}
+          ${l.phone?`<div style="margin-top:4px;font-size:13px;color:#cbd5e1">📞 <a href="tel:${l.phone.replace(/[^0-9+]/g,'')}" style="color:#7ee3aa;text-decoration:none">${l.phone.replace(/</g,'&lt;')}</a></div>`:''}
+          ${l.tax_id?`<div style="margin-top:4px;font-size:12px;color:#94a3b8">🏛 NIF/CIF: <span class="mono">${l.tax_id.replace(/</g,'&lt;')}</span></div>`:''}
         </div>
         <div style="text-align:right">
           <div style="background:${stCfg.color};color:#0b1121;padding:6px 14px;border-radius:20px;font-weight:800;font-size:12px;display:inline-block">${stCfg.emo} ${stCfg.label}</div>
