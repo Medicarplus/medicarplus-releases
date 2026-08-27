@@ -660,6 +660,101 @@ async function markMsgUnread(msgId, btn){
 }
 window.markMsgRead = markMsgRead;
 window.markMsgUnread = markMsgUnread;
+
+// Modal para editar datos de contacto del cliente desde el admin
+async function openEditContactModal(install_id){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok){ alert('Sesión caducada'); return; }
+  const lic = (ALL_LICS||[]).find(x => x.install_id === install_id);
+  if(!lic){ alert('Cliente no encontrado'); return; }
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  const val = (v) => (v==null?'':String(v)).replace(/"/g,'&quot;');
+  back.innerHTML = `<div class="modal" style="max-width:520px;padding:0;overflow-y:auto;max-height:90vh">
+    <div style="background:linear-gradient(135deg,#f5b301,#d97706);padding:18px 22px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:10px;color:#78350f;text-transform:uppercase;letter-spacing:.8px;font-weight:800">Editar datos del cliente</div>
+        <div style="font-size:15px;color:#0f172a;font-weight:800;margin-top:2px">${(lic.client_name||'Sin nombre').replace(/</g,'&lt;')}</div>
+      </div>
+      <button onclick="this.closest('.modal-back').remove()" style="background:transparent;border:1px solid rgba(15,23,42,.4);color:#0f172a;padding:4px 10px;border-radius:5px;cursor:pointer;font-weight:700">✕</button>
+    </div>
+    <div style="padding:20px 22px;background:#0b1121;color:#e2e8f0;font-size:12px">
+      <div style="margin-bottom:14px;padding:8px 10px;background:#1e1b0a;border:1px solid #f59e0b33;border-radius:6px;font-size:11px;color:#fde68a;line-height:1.5">
+        💡 Estos cambios se guardan aquí. Si el cliente actualiza estos datos desde su app, prevalecerán los suyos.
+      </div>
+      <div style="display:grid;gap:12px">
+        <div>
+          <label style="font-size:10px;color:#94a3b8;letter-spacing:.5px;font-weight:700">EMPRESA / CENTRO</label>
+          <input data-testid="edit-client-name" id="editClientName" value="${val(lic.client_name)}" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;font-family:Georgia,serif;box-sizing:border-box;margin-top:4px" />
+        </div>
+        <div>
+          <label style="font-size:10px;color:#94a3b8;letter-spacing:.5px;font-weight:700">PERSONA DE CONTACTO</label>
+          <input data-testid="edit-contact-name" id="editContactName" value="${val(lic.contact_name)}" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box;margin-top:4px" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label style="font-size:10px;color:#94a3b8;letter-spacing:.5px;font-weight:700">EMAIL</label>
+            <input data-testid="edit-email" id="editEmail" type="email" value="${val(lic.client_email)}" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box;margin-top:4px" />
+          </div>
+          <div>
+            <label style="font-size:10px;color:#94a3b8;letter-spacing:.5px;font-weight:700">TELÉFONO</label>
+            <input data-testid="edit-phone" id="editPhone" value="${val(lic.phone)}" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box;margin-top:4px" />
+          </div>
+        </div>
+        <div>
+          <label style="font-size:10px;color:#94a3b8;letter-spacing:.5px;font-weight:700">NIF / CIF</label>
+          <input data-testid="edit-tax-id" id="editTaxId" value="${val(lic.tax_id)}" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box;margin-top:4px;font-family:Consolas,monospace" />
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">
+        <button onclick="this.closest('.modal-back').remove()" style="background:transparent;border:1px solid #334155;color:#94a3b8;padding:9px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">Cancelar</button>
+        <button data-testid="btn-save-contact" id="saveContactBtn" onclick="saveContactEdit('${install_id}',this)" style="background:linear-gradient(135deg,#f5b301,#d97706);border:none;color:#0f172a;padding:9px 20px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800;letter-spacing:.5px">💾 GUARDAR CAMBIOS</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(back);
+  back.addEventListener('click', e => { if(e.target===back) back.remove(); });
+}
+window.openEditContactModal = openEditContactModal;
+
+async function saveContactEdit(install_id, btn){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok){ alert('Sesión caducada'); return; }
+  const body = {
+    client_name: document.getElementById('editClientName').value,
+    contact_name: document.getElementById('editContactName').value,
+    client_email: document.getElementById('editEmail').value,
+    phone: document.getElementById('editPhone').value,
+    tax_id: document.getElementById('editTaxId').value,
+  };
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Guardando…'; }
+  try{
+    const r = await fetch(`${API_BASE}/api/licenses/${encodeURIComponent(install_id)}/contact`, {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json','X-Admin-Token':tok},
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if(!r.ok){
+      const msg = data.detail ? (typeof data.detail==='string'?data.detail:JSON.stringify(data.detail)) : 'error';
+      alert(`Error ${r.status}: ${msg}`);
+      if(btn){ btn.disabled=false; btn.textContent='💾 GUARDAR CAMBIOS'; }
+      return;
+    }
+    document.querySelector('.modal-back:last-of-type')?.remove();
+    // Cerrar TAMBIÉN el modal detalle padre para refrescar la vista
+    const details = document.querySelectorAll('.modal-back');
+    details.forEach(d => d.remove());
+    await loadLicenses();
+    // Reabre el detalle con los nuevos datos
+    setTimeout(()=>openDetail(install_id), 300);
+  }catch(e){
+    alert('Error de red: '+e.message);
+    if(btn){ btn.disabled=false; btn.textContent='💾 GUARDAR CAMBIOS'; }
+  }
+}
+window.saveContactEdit = saveContactEdit;
+
 window.refreshInboxBadge = refreshInboxBadge;
 
 async function doLogin(){
@@ -1046,6 +1141,35 @@ async function openDetail(install_id){
     <details style="background:#0b1121">
       <summary style="padding:14px 26px;cursor:pointer;font-size:12px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #1e293b">🏢 Empresas y datos del cliente</summary>
       <div style="padding:14px 26px">
+        <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;font-weight:700">📇 Datos del formulario de solicitud</div>
+            <button data-testid="btn-edit-contact" onclick="openEditContactModal('${l.install_id}')" style="background:transparent;border:1px solid #f5b301;color:#f5b301;padding:3px 10px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700;letter-spacing:.3px">✏️ Editar</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px">
+            <div>
+              <div style="font-size:10px;color:#64748b;letter-spacing:.3px;font-weight:600">EMPRESA</div>
+              <div style="color:${l.client_name?'#f5b301':'#475569'};font-weight:${l.client_name?'700':'400'};font-family:${l.client_name?'Georgia,serif':'inherit'};font-style:${l.client_name?'normal':'italic'}">${(l.client_name||'no proporcionado').replace(/</g,'&lt;')}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#64748b;letter-spacing:.3px;font-weight:600">PERSONA DE CONTACTO</div>
+              <div style="color:${l.contact_name?'#e2e8f0':'#475569'};font-weight:${l.contact_name?'700':'400'};font-style:${l.contact_name?'normal':'italic'}">${l.contact_name?l.contact_name.replace(/</g,'&lt;'):'no proporcionado'}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#64748b;letter-spacing:.3px;font-weight:600">EMAIL</div>
+              <div style="color:${l.client_email?'#7dd3fc':'#475569'};font-style:${l.client_email?'normal':'italic'}">${l.client_email?`<a href="mailto:${l.client_email}" style="color:#7dd3fc;text-decoration:none" onclick="event.stopPropagation()">${l.client_email.replace(/</g,'&lt;')}</a>`:'no proporcionado'}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#64748b;letter-spacing:.3px;font-weight:600">TELÉFONO</div>
+              <div style="color:${l.phone?'#7ee3aa':'#475569'};font-style:${l.phone?'normal':'italic'}">${l.phone?`<a href="tel:${l.phone.replace(/[^0-9+]/g,'')}" style="color:#7ee3aa;text-decoration:none" onclick="event.stopPropagation()">${l.phone.replace(/</g,'&lt;')}</a>`:'no proporcionado'}</div>
+            </div>
+            <div style="grid-column:span 2">
+              <div style="font-size:10px;color:#64748b;letter-spacing:.3px;font-weight:600">NIF / CIF</div>
+              <div style="color:${l.tax_id?'#e2e8f0':'#475569'};font-family:${l.tax_id?'Consolas,monospace':'inherit'};font-style:${l.tax_id?'normal':'italic'}">${l.tax_id?l.tax_id.replace(/</g,'&lt;'):'no proporcionado'}</div>
+            </div>
+          </div>
+          ${(!l.contact_name || !l.phone || !l.tax_id) ? `<div style="margin-top:10px;padding:8px 10px;background:#1e1b0a;border:1px solid #f59e0b33;border-radius:6px;font-size:10px;color:#fde68a;line-height:1.5">💡 Este cliente creó la licencia antes de que existiera el formulario ampliado, o rellenó solo los campos básicos. Los datos faltantes se rellenarán automáticamente si vuelve a solicitar/renovar por el portal público.</div>` : ''}
+        </div>
         ${(() => {
           const cm = l.client_meta || {};
           const c1 = cm.company1_name || '';

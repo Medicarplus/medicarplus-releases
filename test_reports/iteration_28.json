@@ -1,0 +1,19 @@
+{
+  "summary": "Verified 3 bug fixes on admin.html client detail modal: (1) modal internal scroll with overflow-y:auto + max-height:90vh, (2) '📇 Datos del formulario de solicitud' block always visible with 5 fields (EMPRESA/PERSONA DE CONTACTO/EMAIL/TELÉFONO/NIF-CIF) plus orange warning when data missing, (3) backfill from license_requests to licenses via install_id then email (case-insensitive) fallback. All three fixes work as specified.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "admin.html is 1974 lines — recommend splitting into modules (renderDetail, renderList, notif panel, inbox) for maintainability.",
+    "licenses.py is >1400 lines and mixes admin/public routes; consider splitting into licenses_admin.py + licenses_public.py.",
+    "Backfill runs only once per process (_backfill_done flag). If new mismatched licenses/requests appear after startup, they won't be backfilled until next restart. Consider running periodically or on-demand."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Created + deleted 1 test license + 1 test license_request pair (email TEST_BACKFILL@example.com vs test_backfill@example.com) to prove case-insensitive email backfill works. After GET /api/licenses, license was populated with contact_name='Backfill Tester', phone='+34123456789', tax_id='B12345678'. Cleaned up after test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Bug fixes verified working. Note: the DB no longer contains a 'VICTÒRIA LÓPEZ NAVAS' client (only 6 license_requests, none linked by install_id to existing licenses, and their emails don't match any current license's client_email). So the original visible symptom in the user's account is not reproducible in this preview environment — but the underlying backfill logic is correct and was proven by injecting a matching test pair. Login: password 'Mbrugulat24' in the single-input form; admin token in localStorage key 'admin.token.v1' also works.",
+  "rca of the issue": "Original bug had two facets: (a) admin modal was not scrolling internally (fixed by max-height:90vh + overflow-y:auto on line 984 of admin.html), (b) contact_name/phone/tax_id were absent from the detail view because the DB licenses were created before the extended form existed AND the initial backfill fallback used 'elif email' which skipped emails when install_id lookup returned None. Fix on lines 200-208 of licenses.py: separate 'if not req and email' plus case-insensitive regex match. Verified end-to-end with injected test data."
+}

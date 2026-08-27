@@ -1,0 +1,24 @@
+{
+  "summary": "Verified end-to-end the 3 new features of this round: (1) PATCH /api/licenses/{install_id}/contact updates only sent fields, empty string clears, returns updated license; (2) verify_license propagates client_meta English + Spanish + accented aliases (company_name/empresa, contact_name/persona_contacto, phone/telefono/teléfono, tax_id/nif/cif, email) to top-level license fields visible in GET list; (3) Admin frontend 'Editar' modal opens with prefilled data, saves via PATCH, closes both modals, refreshes list and re-opens detail with new data. 10/10 pytest tests pass, full Playwright e2e flow passes, no 5xx in backend logs.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter29_contact_edit_and_meta_sync.py",
+    "/app/test_reports/pytest/iter29_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "licenses.py > 1650 lines and admin.html > 2070 lines — recommend splitting (already noted in iter28).",
+    "PATCH endpoint correctly excludes None (exclude_none=True) so partial updates work; empty string sets field to None. Behaviour matches spec.",
+    "_CONTACT_MAP in verify_license (licenses.py:832) correctly lowercases the key before mapping so aliases work regardless of case; NOTE: keys are truncated to 64 chars (str(k)[:64]) but aliases are short so unaffected.",
+    "PATCH endpoint is correctly registered as body-model at module scope (UpdateContactBody at line 29) — the previous FastAPI query-param bug is confirmed fixed.",
+    "Minor UX: after saveContactEdit closes ALL modal-back nodes via querySelectorAll — if any other unrelated modal were open it would also close (low risk in current UI)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter29_contact_edit_and_meta_sync.py"],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100%"},
+  "seed_data_creation": "Test cases create ephemeral licenses (CD-XXXX-XXXX-XXXX-XXXX pattern) and delete them in teardown_method / finally block. No residual data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 3 new features verified working: PATCH contact endpoint (module-scope Pydantic body model fix effective), client_meta alias propagation on /verify (both EN and ES aliases including 'teléfono' with accent and 'cif'), and admin.html 'Editar' modal (data-testid attributes present: edit-client-name, edit-contact-name, edit-email, edit-phone, edit-tax-id, btn-save-contact). Playwright login flow: sessionStorage['mcp.admin.token'] = admin token. Verify endpoint field name is 'key' (not 'license_key'). Generate endpoint returns 201 (not 200). install_id must match CD-XXXX-XXXX-XXXX-XXXX (4 groups of 4 alnum uppercase).",
+  "rca of the issue": "N/A — no bugs found in this iteration."
+}

@@ -21,8 +21,17 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import jwt
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from pydantic import BaseModel
+
+
+class UpdateContactBody(BaseModel):
+    client_name: Optional[str] = None
+    client_email: Optional[str] = None
+    contact_name: Optional[str] = None
+    phone: Optional[str] = None
+    tax_id: Optional[str] = None
 
 from models.license import (
     LicenseCreate,
@@ -177,29 +186,35 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             return
         _backfill_done["v"] = True
         try:
+            import re as _re
             missing = coll.find(
                 {
                     "$or": [
                         {"contact_name": {"$exists": False}},
+                        {"contact_name": None},
+                        {"contact_name": ""},
                         {"phone": {"$exists": False}},
+                        {"phone": None},
                         {"tax_id": {"$exists": False}},
+                        {"tax_id": None},
                     ]
                 },
-                {"_id": 0, "id": 1, "install_id": 1, "client_email": 1, "contact_name": 1, "phone": 1, "tax_id": 1},
+                {"_id": 0, "id": 1, "install_id": 1, "client_email": 1, "client_name": 1, "contact_name": 1, "phone": 1, "tax_id": 1},
             )
             updated = 0
             async for lic in missing:
-                # Busca la última solicitud que casa por install_id (preferido) o email
                 iid = lic.get("install_id")
-                email = (lic.get("client_email") or "").lower()
-                query = None
+                email = (lic.get("client_email") or "").strip()
+                # 1º intento: match exacto por install_id
+                req = None
                 if iid and iid != "CD-TRIAL-PENDING-0000-0000":
-                    query = {"install_id": iid}
-                elif email:
-                    query = {"email": email}
-                if not query:
-                    continue
-                req = await req_coll.find_one(query, sort=[("created_at", -1)])
+                    req = await req_coll.find_one({"install_id": iid}, sort=[("created_at", -1)])
+                # 2º intento: fallback por email (case-insensitive) si el 1º no encontró nada
+                if not req and email:
+                    req = await req_coll.find_one(
+                        {"email": {"$regex": f"^{_re.escape(email)}$", "$options": "i"}},
+                        sort=[("created_at", -1)],
+                    )
                 if not req:
                     continue
                 patch: dict = {}
@@ -209,6 +224,9 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
                     patch["phone"] = req["phone"]
                 if not lic.get("tax_id") and req.get("tax_id"):
                     patch["tax_id"] = req["tax_id"]
+                # Si la licencia tiene client_name vacío pero la solicitud tiene company_name, usarlo
+                if not lic.get("client_name") and req.get("company_name"):
+                    patch["client_name"] = req["company_name"]
                 if patch:
                     await coll.update_one({"id": lic["id"]}, {"$set": patch})
                     updated += 1
@@ -808,6 +826,29 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             if _clean_meta:
                 _upd_set["client_meta"] = _clean_meta
                 _upd_set["client_meta_updated_at"] = _now().isoformat()
+                # Propaga datos de contacto que el cliente cambie en su app a los
+                # campos top-level de la licencia (aparecerán en el panel admin).
+                # Los campos aceptados están mapeados a un alias del cliente.
+                _CONTACT_MAP = {
+                    "client_name": "client_name",
+                    "company_name": "client_name",  # alias
+                    "empresa": "client_name",
+                    "contact_name": "contact_name",
+                    "persona_contacto": "contact_name",
+                    "phone": "phone",
+                    "telefono": "phone",
+                    "teléfono": "phone",
+                    "tax_id": "tax_id",
+                    "nif": "tax_id",
+                    "cif": "tax_id",
+                    "client_email": "client_email",
+                    "email": "client_email",
+                }
+                for k, v in list(_clean_meta.items()):
+                    lic_field = _CONTACT_MAP.get(str(k).lower().strip())
+                    if lic_field and isinstance(v, str) and v.strip():
+                        _upd_set[lic_field] = v.strip()
+                        _upd_set["contact_updated_at"] = _now().isoformat()
         await coll.update_one(
             {"_id": doc["_id"]},
             {
@@ -1109,6 +1150,30 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         r2 = await req_coll.delete_many({"install_id": install_id})
         await _audit(request, "license.delete", install_id, extra={"licenses_removed": r1.deleted_count, "requests_removed": r2.deleted_count})
         return {"deleted": True, "licenses_removed": r1.deleted_count, "requests_removed": r2.deleted_count}
+
+    # ---------- Editar datos de contacto (admin) ----------
+    @router.patch(
+        "/{install_id}/contact",
+        dependencies=[Depends(require_admin)],
+    )
+    async def update_license_contact(install_id: str, request: Request, body: UpdateContactBody) -> dict:
+        """Actualiza los datos de contacto de una licencia desde el panel admin.
+        Solo actualiza los campos enviados; None = no cambiar. Cadena vacía = borrar."""
+        install_id = install_id.strip().upper()
+        patch: dict = {}
+        # Trata cadena vacía como "borrar" (None → no tocar)
+        for field, value in body.model_dump(exclude_none=True).items():
+            v = str(value).strip() if value is not None else ""
+            patch[field] = v or None
+        if not patch:
+            raise HTTPException(status_code=400, detail="no_fields_to_update")
+        patch["contact_updated_at"] = _now().isoformat()
+        result = await coll.update_one({"install_id": install_id}, {"$set": patch})
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="license_not_found")
+        await _audit(request, "license.contact_update", install_id, extra={"fields": list(patch.keys())})
+        doc = await coll.find_one({"install_id": install_id}, {"_id": 0})
+        return {"ok": True, "modified": result.modified_count, "license": _doc_to_record(doc).model_dump() if doc else None}
 
     # ---------- Export (RGPD C5) ----------
     @router.get(

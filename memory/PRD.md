@@ -1160,3 +1160,16 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 3. **Nueva feature "📈 Estadísticas avanzadas"**: mockup SVG completo con gráfico de barras por mes (JUL 448 / AGO 164), gráfico de tipos (EXPED 251, RENOV 351, PERIO 1, PRORR 3, RECUP 6), 4 KPIs (612 entradas, 37.250€, 5.727,19€ tasas, 42.977,19€ total) y tabla mensual. Marca "MEDICAR" como pidió el usuario.
 4. **Nueva feature "📅 Calendario de citas integrado"**: mockup con 4 citas del día (Joan García 09:00 CONFIRMADA, Marta Serra 09:30 EN CURSO, etc), tabs (Hoy/Semana/Calendarios), buscador por DNI, y badge "🔔 4 citas hoy · Al importar CSV se marca quién vino".
 
+
+### ✨ Editar datos cliente + sync automático (Feb 26, 2026)
+**Backend `licenses.py`**:
+- Nuevo modelo top-level `UpdateContactBody` con 5 campos opcionales (client_name, client_email, contact_name, phone, tax_id).
+- `PATCH /api/licenses/{install_id}/contact` (admin): actualiza solo campos enviados, cadena vacía borra, None no toca. Guarda `contact_updated_at`. Audit log. Devuelve licencia completa.
+- `verify_license` extendido con `_CONTACT_MAP` (12 aliases ES+EN): cuando el cliente envía `client_meta` con `company_name/empresa`, `contact_name/persona_contacto`, `phone/telefono/teléfono`, `tax_id/nif/cif`, `email/client_email` → se propaga a campos top-level de la licencia automáticamente.
+
+**Frontend `admin.html`**:
+- Botón "✏️ Editar" en el bloque "📇 Datos del formulario" de la ficha detalle.
+- Modal custom (max-width 520px, gradient dorado, overflow-y auto) con inputs para 5 campos + botón "💾 GUARDAR CAMBIOS" con feedback disabled+"⏳" + cierre automático y refresh de la ficha.
+
+**Test iteration_29.json**: 10/10 backend + 100% frontend · Confirmado: PATCH funciona, cadena vacía borra, propagación de client_meta con aliases funciona, modal frontend guarda y refresca correctamente. 0 issues.
+
