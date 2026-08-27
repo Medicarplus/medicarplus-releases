@@ -3,28 +3,54 @@
 
 User-agent: *
 Allow: /
+# ═══ App comercial (interna) ═══
+Disallow: /v2.html
 Disallow: /admin.html
 Disallow: /admin
 Disallow: /api/
+# ═══ App personal antigua (NO debe salir en Google) ═══
+Disallow: /caja_del_dia.html
 Disallow: /caja_del_dia_electron.zip
-Disallow: /downloads/
-Disallow: /preview-*.html
-Disallow: /link-healer.html
+# ═══ Panel maestro + guías privadas del dueño ═══
+Disallow: /panel-maestro.html
+Disallow: /index-guies.html
+Disallow: /guia-medicar-plus.html
 Disallow: /guia-deploy.html
 Disallow: /guia-publicar-versions.html
 Disallow: /guia-github-releases.html
 Disallow: /guia-stripe-setup.html
+Disallow: /guia-ai-widget.html
+Disallow: /link-healer.html
+# ═══ Descargas y previews ═══
+Disallow: /downloads/
+Disallow: /preview-*.html
+Disallow: /subscription-success.html
 
 # Google-specific
 User-agent: Googlebot
 Allow: /
+Disallow: /v2.html
 Disallow: /admin.html
+Disallow: /admin
 Disallow: /api/
+Disallow: /caja_del_dia.html
+Disallow: /panel-maestro.html
+Disallow: /index-guies.html
+Disallow: /guia-medicar-plus.html
+Disallow: /guia-deploy.html
+Disallow: /guia-publicar-versions.html
+Disallow: /guia-github-releases.html
+Disallow: /guia-stripe-setup.html
+Disallow: /link-healer.html
+Disallow: /subscription-success.html
 
 # Bing
 User-agent: Bingbot
 Allow: /
+Disallow: /v2.html
 Disallow: /admin.html
+Disallow: /caja_del_dia.html
+Disallow: /panel-maestro.html
 
 # Bloquea scrapers de IA sin consentimiento
 User-agent: GPTBot

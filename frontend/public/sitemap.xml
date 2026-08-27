@@ -26,13 +26,7 @@
     <priority>0.8</priority>
   </url>
 
-  <!-- ═══════ GUÍAS PRINCIPALES ═══════ -->
-  <url>
-    <loc>https://medicarplus.es/guia-medicar-plus.html</loc>
-    <lastmod>2026-02-27</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
+  <!-- ═══════ GUÍAS PRINCIPALES (públicas) ═══════ -->
   <url>
     <loc>https://medicarplus.es/manual-usuari.html</loc>
     <lastmod>2026-02-27</lastmod>
@@ -50,12 +44,6 @@
     <lastmod>2026-02-27</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://medicarplus.es/index-guies.html</loc>
-    <lastmod>2026-02-27</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
   </url>
 
   <!-- ═══════ LEGAL ═══════ -->
