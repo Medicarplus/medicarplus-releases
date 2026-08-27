@@ -223,6 +223,10 @@ app.include_router(build_sms_router(db), prefix="/api")
 from routes.electron_manifest import router as electron_manifest_router
 app.include_router(electron_manifest_router, prefix="/api")
 
+# Descarga directa del último instalador (redirect 302, evita GitHub UI confusa)
+from routes.download_installer import router as download_installer_router
+app.include_router(download_installer_router, prefix="/api")
+
 # Electron update channel — KILL SWITCH remot per bloquejar versions dolentes
 from routes.electron_channel import router as electron_channel_router
 app.include_router(electron_channel_router, prefix="/api")

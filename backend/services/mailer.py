@@ -111,7 +111,7 @@ def _render_html(
     public_base = (os.environ.get("PUBLIC_APP_URL") or "https://project-helper-47.emergent.host").rstrip("/")
     manual_url = f"{public_base}/manual-usuari.html"
     guia_url = f"{public_base}/guia-client-installacio.html"
-    download_url = "https://github.com/Medicarplus/medicarplus-releases/releases/latest"
+    download_url = "https://medicarplus.es/api/download/latest-installer"
     # 🎁 Bloc referrals: només per a plans pagats (STD/PRM) — no mostrem res per a TRIAL
     plan_up = (plan or "").upper()
     is_paid = plan_up in ("STD", "STANDARD", "PRM", "PREMIUM") and referral_code

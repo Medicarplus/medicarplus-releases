@@ -397,7 +397,7 @@ async def subscription_status(session_id: str):
         "plan": plan,
         "expires_at": expires_at,
         "license_ready": bool(license_key),
-        "download_url": "https://github.com/Medicarplus/medicarplus-releases/releases/latest",
+        "download_url": "https://medicarplus.es/api/download/latest-installer",
     }
 
 

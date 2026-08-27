@@ -225,7 +225,7 @@ def build_trial_router(db: AsyncIOMotorDatabase) -> APIRouter:
             "email_sent": True,  # optimista · s'envia en background
             "email_pending": True,
             "email_info": None,
-            "download_url": "https://github.com/Medicarplus/medicarplus-releases/releases/latest",
+            "download_url": "https://medicarplus.es/api/download/latest-installer",
         }
 
     return router
