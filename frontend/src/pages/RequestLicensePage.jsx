@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { createLicenseRequest } from "@/lib/licenseApi";
 
 const INSTALL_ID_RE = /^CD-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+const apiBase = process.env.REACT_APP_BACKEND_URL || "";
 
 export default function RequestLicensePage() {
   const [form, setForm] = useState({
@@ -22,6 +23,46 @@ export default function RequestLicensePage() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [showInstallId, setShowInstallId] = useState(false);
+  const [lookupStatus, setLookupStatus] = useState(null); // null | 'searching' | 'found' | 'notfound'
+  const [recognizedInfo, setRecognizedInfo] = useState(null); // { company_name, current_plan, current_status, current_expires_at }
+  const INSTALL_ID_PATTERN = /^CD-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+
+  async function tryLookupInstallId(iid) {
+    const clean = String(iid || "").trim().toUpperCase();
+    if (!INSTALL_ID_PATTERN.test(clean)) {
+      setLookupStatus(null);
+      setRecognizedInfo(null);
+      return;
+    }
+    setLookupStatus("searching");
+    setRecognizedInfo(null);
+    try {
+      const res = await fetch(`${apiBase}/api/licenses/lookup/${encodeURIComponent(clean)}`);
+      const data = await res.json();
+      if (data.found) {
+        // Auto-relleno de los campos que estén vacíos (no pisa lo que el usuario haya escrito)
+        setForm((prev) => ({
+          ...prev,
+          company_name: prev.company_name || data.company_name || "",
+          contact_name: prev.contact_name || data.contact_name || "",
+          email: prev.email || data.email || "",
+          phone: prev.phone || data.phone || "",
+          tax_id: prev.tax_id || data.tax_id || "",
+        }));
+        setRecognizedInfo({
+          company_name: data.company_name,
+          current_plan: data.current_plan,
+          current_status: data.current_status,
+          current_expires_at: data.current_expires_at,
+        });
+        setLookupStatus("found");
+      } else {
+        setLookupStatus("notfound");
+      }
+    } catch (e) {
+      setLookupStatus(null);
+    }
+  }
 
   const submit = async (e) => {
     e.preventDefault();
@@ -341,12 +382,43 @@ export default function RequestLicensePage() {
                     data-testid="req-install-id"
                     placeholder="CD-XXXX-XXXX-XXXX-XXXX"
                     value={form.install_id}
-                    onChange={(e) => setForm({ ...form, install_id: e.target.value.toUpperCase() })}
+                    onChange={(e) => {
+                      const v = e.target.value.toUpperCase();
+                      setForm({ ...form, install_id: v });
+                      // Auto-lookup en cuanto el patrón sea válido
+                      if (INSTALL_ID_PATTERN.test(v)) tryLookupInstallId(v);
+                      else { setLookupStatus(null); setRecognizedInfo(null); }
+                    }}
+                    onBlur={(e) => tryLookupInstallId(e.target.value)}
                     style={inputStyle}
                   />
+                  {lookupStatus === "searching" && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: "#94a3b8" }}>🔎 Buscando tus datos…</div>
+                  )}
+                  {lookupStatus === "found" && recognizedInfo && (
+                    <div data-testid="lookup-found-banner" style={{ marginTop: 10, padding: "10px 12px", background: "#052e1a", border: "1px solid #22c55e", borderRadius: 8, fontSize: 12, color: "#bbf7d0", lineHeight: 1.5 }}>
+                      <div style={{ fontWeight: 700, color: "#22c55e", marginBottom: 4 }}>
+                        ✓ Te hemos reconocido
+                      </div>
+                      <div>
+                        <b style={{ color: "#fde68a" }}>{recognizedInfo.company_name || "(sin nombre)"}</b>
+                        {recognizedInfo.current_plan && (
+                          <> · Plan actual: <b style={{ color: "#fde68a" }}>{recognizedInfo.current_plan}</b></>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+                        Hemos rellenado tus datos automáticamente. Revísalos y modifica lo que necesites.
+                      </div>
+                    </div>
+                  )}
+                  {lookupStatus === "notfound" && (
+                    <div data-testid="lookup-notfound-banner" style={{ marginTop: 10, padding: "8px 12px", background: "#1e1b0a", border: "1px solid #f59e0b", borderRadius: 8, fontSize: 11, color: "#fde68a" }}>
+                      ℹ️ Este Install ID no está en nuestro sistema todavía. Rellena tus datos abajo como cliente nuevo.
+                    </div>
+                  )}
                   <button
                     type="button"
-                    onClick={() => { setShowInstallId(false); setForm({ ...form, install_id: "" }); }}
+                    onClick={() => { setShowInstallId(false); setForm({ ...form, install_id: "" }); setLookupStatus(null); setRecognizedInfo(null); }}
                     style={{ marginTop: 8, background: "transparent", border: "none", color: "#94a3b8", fontSize: 11, cursor: "pointer", textDecoration: "underline", padding: 0 }}
                   >
                     ↩ Aún no tengo la app instalada

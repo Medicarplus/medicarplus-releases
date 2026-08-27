@@ -34,6 +34,7 @@ TYPE_PAYMENT_RECOVERED = "payment_recovered"
 TYPE_SUBSCRIPTION_CANCELED = "subscription_canceled"
 TYPE_PLAN_UPGRADE = "plan_upgrade"
 TYPE_PLAN_DOWNGRADE = "plan_downgrade"
+TYPE_CLIENT_INACTIVE = "client_inactive"
 
 _TYPE_META = {
     TYPE_INSTALL_NEW: {"icon": "🆕", "sev": SEV_INFO, "label": "Nueva instalación"},
@@ -42,6 +43,7 @@ _TYPE_META = {
     TYPE_SUBSCRIPTION_CANCELED: {"icon": "🛑", "sev": SEV_WARNING, "label": "Suscripción cancelada"},
     TYPE_PLAN_UPGRADE: {"icon": "⬆️", "sev": SEV_INFO, "label": "Ampliación de plan"},
     TYPE_PLAN_DOWNGRADE: {"icon": "⬇️", "sev": SEV_WARNING, "label": "Bajada de plan"},
+    TYPE_CLIENT_INACTIVE: {"icon": "💤", "sev": SEV_WARNING, "label": "Cliente inactivo (seguimiento comercial)"},
 }
 
 
@@ -49,7 +51,7 @@ _TYPE_META = {
 _CATEGORY_TYPES = {
     "instalaciones": [TYPE_INSTALL_NEW],
     "pagos": [TYPE_PAYMENT_FAILED, TYPE_PAYMENT_RECOVERED],
-    "avisos": [TYPE_SUBSCRIPTION_CANCELED, TYPE_PLAN_UPGRADE, TYPE_PLAN_DOWNGRADE],
+    "avisos": [TYPE_SUBSCRIPTION_CANCELED, TYPE_PLAN_UPGRADE, TYPE_PLAN_DOWNGRADE, TYPE_CLIENT_INACTIVE],
 }
 
 
@@ -138,6 +140,87 @@ def build_notifications_router(db):
         except Exception as e:
             logger.warning(f"[notifications] auto-cleanup falló: {e}")
 
+    # Alerta de inactividad comercial:
+    # Detecta clientes que llevan >30 días sin conectar Y ADEMÁS no están pagando
+    # (licencia revocada/cancelada, o TRIAL que caducó sin conversión). Se
+    # ejecuta lazily cada 24h desde el badge endpoint. Emite una notificación
+    # tipo `client_inactive` una sola vez por licencia (dedupe_key).
+    INACTIVE_DAYS_THRESHOLD = 30
+
+    async def _maybe_check_inactive_clients():
+        try:
+            now = datetime.now(timezone.utc)
+            meta = await db.notifications.find_one({"_id": "_meta"})
+            last_iso = (meta or {}).get("last_inactive_check_at")
+            if last_iso:
+                try:
+                    last = datetime.fromisoformat(last_iso.replace("Z", "+00:00"))
+                    if (now - last).total_seconds() < 24 * 3600:
+                        return
+                except Exception:
+                    pass
+            cutoff_iso = (now - timedelta(days=INACTIVE_DAYS_THRESHOLD)).isoformat()
+            # Query: licencias que
+            #  1. status == 'revoked' (canceladas, revocadas por admin)
+            #     OR status == 'active' pero con expires_at ya pasado (trial caducado sin renovación)
+            #  2. Y (last_verified_at es null O más antiguo de 30 días)
+            #  3. Y NO son MASTER
+            cursor = db.licenses.find({
+                "plan": {"$ne": "MASTER"},
+                "$or": [
+                    {"status": "revoked"},
+                    {"$and": [
+                        {"status": "active"},
+                        {"expires_at": {"$ne": None, "$lt": now.isoformat()}},
+                    ]},
+                ],
+                "$and": [
+                    {"$or": [
+                        {"last_verified_at": None},
+                        {"last_verified_at": {"$lt": cutoff_iso}},
+                    ]}
+                ],
+            })
+            alerted = 0
+            async for lic in cursor:
+                iid = lic.get("install_id")
+                email = lic.get("client_email") or ""
+                if not iid:
+                    continue
+                dedupe = f"client_inactive:{iid}"
+                # Días sin conexión (para el mensaje)
+                lv = lic.get("last_verified_at")
+                if lv:
+                    try:
+                        lv_dt = datetime.fromisoformat(lv.replace("Z", "+00:00"))
+                        days = int((now - lv_dt).total_seconds() // 86400)
+                    except Exception:
+                        days = INACTIVE_DAYS_THRESHOLD
+                else:
+                    days = INACTIVE_DAYS_THRESHOLD
+                status_txt = "revocada" if lic.get("status") == "revoked" else "expirada sin renovar"
+                title = f"Cliente inactivo: {lic.get('client_name') or email or iid}"
+                message = f"Licencia {status_txt}. Sin conectar hace {days}+ días. Contacta para seguimiento comercial."
+                await create_notification(
+                    db,
+                    ntype=TYPE_CLIENT_INACTIVE,
+                    title=title,
+                    message=message,
+                    email=email,
+                    install_id=iid,
+                    dedupe_key=dedupe,
+                )
+                alerted += 1
+            await db.notifications.update_one(
+                {"_id": "_meta"},
+                {"$set": {"last_inactive_check_at": now.isoformat(), "last_inactive_alerted": alerted}},
+                upsert=True,
+            )
+            if alerted:
+                logger.info(f"[notifications] check_inactive: creadas {alerted} alertas comerciales")
+        except Exception as e:
+            logger.warning(f"[notifications] check_inactive falló: {e}")
+
     @router.get("")
     async def list_notifications(
         unread_only: bool = False,
@@ -183,6 +266,8 @@ def build_notifications_router(db):
         _admin_ok(x_admin_token)
         # Dispara auto-cleanup silencioso (throttle 24h, borra leídas > 30 días)
         await _maybe_auto_cleanup()
+        # Dispara check de clientes inactivos (throttle 24h, alerta comercial)
+        await _maybe_check_inactive_clients()
         unread = await db.notifications.count_documents({"read": False, "type": {"$exists": True}})
         critical = await db.notifications.count_documents({"read": False, "severity": SEV_CRITICAL, "type": {"$exists": True}})
         # Last critical (for tooltip)

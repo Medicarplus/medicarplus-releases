@@ -2523,9 +2523,31 @@ $('#btnImport').onclick=()=>$('#fileInput').click();
 $('#fileInput').onchange=async ev=>{const f=ev.target.files[0];if(!f)return;try{const name=(f.name||'').toLowerCase();const buf=await f.arrayBuffer();if(name.endsWith('.xlsx')||name.endsWith('.xls')){if(typeof XLSX==='undefined'){toast('❌ Lector Excel no disponible — usa CSV');return}const wb=XLSX.read(buf,{type:'array'});const sheet=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:false,defval:''});importTrafficRows(rows)}else{let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){text=new TextDecoder('windows-1252').decode(buf)}if(/Ã[©±¡³]/.test(text)){text=new TextDecoder('windows-1252').decode(buf)}const rows=parseCSV(text);importTrafficRows(rows)}}catch(err){toast('Error al importar: '+err.message,3500)}ev.target.value=''};
 function parseCSV(text){const out=[];let row=[],cell='',inQ=false;for(let i=0;i<text.length;i++){const c=text[i];if(inQ){if(c==='"'){if(text[i+1]==='"'){cell+='"';i++}else inQ=false}else cell+=c}else{if(c==='"')inQ=true;else if(c===';'){row.push(cell);cell=''}else if(c==='\n'){row.push(cell);out.push(row);row=[];cell=''}else if(c==='\r'){}else cell+=c}}if(cell.length||row.length){row.push(cell);out.push(row)}return out.filter(r=>r.some(x=>x&&x.trim()!==''))}
 async function importTrafficRows(rows){if(!rows.length){toast('Archivo vacío');return}const header=rows[0].map(s=>String(s).trim().toUpperCase());const idx=name=>header.findIndex(h=>h===name||h.startsWith(name));const iFecha=idx('FECHA'),iNombre=idx('NOMBRE'),iAp1=idx('APELLIDO1'),iAp2=idx('APELLIDO2'),iTipo=idx('TIPO'),iGrupo=idx('GRUPO'),iImporte=idx('IMPORTE');
-  // Detecta columna DNI/NIE/Documento (para búsqueda por DNI en el buscador del panel Tráfico)
-  const DNI_NAMES=['DNI','NIE','NIF','DOCUMENTO','DOC','DOC.IDENTIDAD','DOCUMENTO_IDENTIDAD','IDENTIFICACION','IDENTIFICACIÓN'];
-  let iDni=-1;for(const n of DNI_NAMES){const i=idx(n);if(i>=0){iDni=i;break}}
+  // Detecta columna DNI/NIE/Documento (para búsqueda por DNI en el buscador del panel Tráfico).
+  // Usamos .includes() (no startsWith) para captar variantes como "Nº DOCUMENTO", "NIF/DNI", "DNI/NIE", etc.
+  const DNI_KEYWORDS=['DNI','NIE','NIF','DOCUMENTO','IDENTIFICACION','IDENTIFICACIÓN','IDENTIDAD','PASAPORTE'];
+  let iDni=-1;
+  // 1r intent: header que contingui un keyword de DNI (case-insensitive, ja majúscules)
+  for(let c=0;c<header.length;c++){
+    if(c===iNombre||c===iAp1||c===iAp2||c===iTipo||c===iGrupo||c===iFecha||c===iImporte)continue;
+    const h=header[c]||'';
+    if(DNI_KEYWORDS.some(k=>h.includes(k))){iDni=c;break}
+  }
+  // 2n intent (auto-detecció): si no hi ha header clar, escaneja valors buscant patró DNI/NIE
+  if(iDni<0&&rows.length>1){
+    const dniRe=/^[XYZxyz]?\d{5,8}[A-Za-z]?$/;
+    for(let c=0;c<header.length;c++){
+      if(c===iNombre||c===iAp1||c===iAp2||c===iTipo||c===iGrupo||c===iFecha||c===iImporte)continue;
+      let matches=0,checked=0;
+      for(let r=1;r<Math.min(rows.length,25);r++){
+        const raw=String((rows[r]||[])[c]||'').replace(/[\s\-\.\/]/g,'').trim();
+        if(!raw)continue;
+        checked++;
+        if(dniRe.test(raw))matches++;
+      }
+      if(checked>=3&&matches/checked>=0.7){iDni=c;break}
+    }
+  }
   // Detecta la columna del sufix (Normal/Profesional/Classe) — busca noms coneguts o
   // examina si alguna columna té valors reconeguts (Profesional / classes C, D, C+E, etc.)
   const CATEG_NAMES=['CATEGORIA','CATEGORÍA','CLASE','PERMISO','TIPO_CARNET','CATEGORIA_CARNET','CLASE_CARNET','CARNET','PROFESIONAL'];
@@ -3794,6 +3816,9 @@ function generateLedgerEntries(dateFrom,dateTo,company){
         const acct=fpToAccount[e.fp]||'570 Caja';
         const acctT=fpToAccount[e.fpTasa||e.fp]||acct;
         if(e.kind==='DH'){
+          // Filtro anti-basura: entradas de 0€ no aportan nada al libro contable
+          // (ej: visita sin cobro porque ya se pagó otro día, cliente que solo pasa a recoger papeles).
+          if(!e.importe || Math.abs(e.importe) < 0.005) return;
           // Els DEBE/HABER manuals apareixen com a LÍNIES SEPARADES (no s'agrupen amb els ingressos del programa DGT)
           if(e.tipo==='HABER'){
             expenseRows.push({date,concepto:`Ingreso manual: ${e.nombre||'—'}`,debeAcct:acct,debeAmt:e.importe,haberAcct:'705 Ingresos servicios',haberAmt:e.importe});
@@ -3847,6 +3872,8 @@ function generateLedgerEntries(dateFrom,dateTo,company){
         const acct=fpToAccount[e.fp]||'570 Caja';
         const acctT=fpToAccount[e.fpTasa||e.fp]||acct;
         if(e.kind==='DH'){
+          // Filtro anti-basura: entradas de 0€ no aportan nada al libro contable.
+          if(!e.importe || Math.abs(e.importe) < 0.005) return;
           if(e.tipo==='HABER'){
             rows.push({date,concepto:e.nombre||'Ingreso',debeAcct:acct,debeAmt:e.importe,haberAcct:'705 Ingresos servicios',haberAmt:e.importe});
           }else{

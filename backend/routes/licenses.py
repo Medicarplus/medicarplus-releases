@@ -113,6 +113,8 @@ def _doc_to_record(doc: dict, include_key: bool = False) -> LicenseRecord:
         referred_by=doc.get("referred_by"),
         referral_reward_count=int(doc.get("referral_reward_count", 0) or 0),
         abuse_flags=doc.get("abuse_flags") if isinstance(doc.get("abuse_flags"), list) else None,
+        message_count=int(doc.get("message_count", 0) or 0),
+        last_message_at=_to_dt(doc.get("last_message_at")),
         license_key=doc.get("license_key") if include_key else None,
     )
 
@@ -1144,6 +1146,23 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             query["status"] = status_filter
         cursor = coll.find(query, {"_id": 0}).sort("created_at", -1).limit(limit)
         docs = await cursor.to_list(limit)
+        # Enriquece cada licencia con message_count agregado desde support_messages
+        try:
+            iids = [d.get("install_id") for d in docs if d.get("install_id")]
+            if iids:
+                pipeline = [
+                    {"$match": {"install_id": {"$in": iids}, "direction": "inbound"}},
+                    {"$group": {"_id": "$install_id", "count": {"$sum": 1}, "last_at": {"$max": "$sent_at"}}},
+                ]
+                counts_map: dict = {}
+                async for row in db["support_messages"].aggregate(pipeline):
+                    counts_map[row["_id"]] = {"count": row.get("count", 0), "last": row.get("last_at")}
+                for d in docs:
+                    stats = counts_map.get(d.get("install_id"), {})
+                    d["message_count"] = stats.get("count", 0)
+                    d["last_message_at"] = stats.get("last")
+        except Exception:  # noqa: BLE001
+            logger.exception("failed to enrich message counts")
         return LicenseListResponse(
             total=len(docs),
             items=[_doc_to_record(d) for d in docs],
@@ -1324,6 +1343,56 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             email_sent=bool(doc.get("email_sent", False)),
             email_error=doc.get("email_error"),
         )
+
+    # ---------- Public: lookup Install ID → devuelve datos del cliente para auto-rellenar
+    # No es sensible: solo devuelve info que ya está en manos del propietario (empresa, contacto).
+    # Si el Install ID no existe, devolvemos found:false (sin exponer si es un guess).
+    @router.get("/lookup/{install_id}")
+    async def lookup_install_id(install_id: str) -> dict:
+        """Devuelve datos del cliente asociados a un install_id para auto-rellenar el
+        formulario público de solicitud. Rate-limited a través del limit global del server."""
+        install_id = (install_id or "").strip().upper()
+        # Validación básica de formato para evitar consultas basura
+        import re
+        if not re.match(r"^CD-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$", install_id):
+            return {"found": False, "reason": "invalid_format"}
+        # 1) Primero busca en licencias (fuente autoritativa)
+        lic = await coll.find_one(
+            {"install_id": install_id},
+            sort=[("created_at", -1)],
+        )
+        if lic:
+            return {
+                "found": True,
+                "source": "license",
+                "company_name": lic.get("client_name") or "",
+                "contact_name": lic.get("contact_name") or "",
+                "email": lic.get("client_email") or "",
+                "phone": lic.get("phone") or "",
+                "tax_id": lic.get("tax_id") or "",
+                "current_plan": lic.get("plan") or "",
+                "current_status": lic.get("status") or "",
+                "current_expires_at": lic.get("expires_at"),
+            }
+        # 2) Fallback: solicitud pendiente (aún sin licencia)
+        req = await req_coll.find_one(
+            {"install_id": install_id},
+            sort=[("created_at", -1)],
+        )
+        if req:
+            return {
+                "found": True,
+                "source": "request",
+                "company_name": req.get("company_name") or "",
+                "contact_name": req.get("contact_name") or "",
+                "email": req.get("email") or "",
+                "phone": req.get("phone") or "",
+                "tax_id": req.get("tax_id") or "",
+                "current_plan": req.get("plan_requested") or "",
+                "current_status": req.get("status") or "pending",
+                "current_expires_at": None,
+            }
+        return {"found": False}
 
     # ---------- Public: create a request (rate-limited + honeypot) ----------
     @router.post(

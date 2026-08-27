@@ -116,6 +116,9 @@ class LicenseRecord(BaseModel):
     # mateixa empresa en 90 dies). No bloqueja el trial, només notifica Discord
     # i queda registrat. El panell admin ho mostra amb badge taronja.
     abuse_flags: Optional[list[str]] = None
+    # Stats agregados (Feb 2026 · Panel admin)
+    message_count: Optional[int] = 0
+    last_message_at: Optional[datetime] = None
     # La clau JWT — es retorna només al moment de generar-la. En verificar
     # només retornem metadades.
     license_key: Optional[str] = None

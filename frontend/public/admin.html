@@ -147,6 +147,14 @@
             <option value="inactive">🔴 Inactivo (>72h)</option>
             <option value="never">⚪ Sin conexiones</option>
           </select>
+          <select id="sortBy" data-testid="sort-licenses" onchange="applyFilters()">
+            <option value="recent">🕒 Más recientes primero</option>
+            <option value="msgs_desc">💬 Más mensajes primero</option>
+            <option value="last_conn_desc">🟢 Última conexión reciente</option>
+            <option value="last_conn_asc">⚪ Sin conexión / más antiguo</option>
+            <option value="expires_asc">⏰ Próximos a expirar</option>
+            <option value="name_asc">🔤 Nombre A-Z</option>
+          </select>
         </div>
         <div style="font-size:11px;color:var(--muted)"><span id="resultCount">0</span> resultados</div>
       </div>
@@ -802,6 +810,19 @@ function applyFilters(){
     }
     return true;
   });
+  // Ordenación
+  const sortBy = (document.getElementById('sortBy')||{}).value || 'recent';
+  const tsOrZero = v => v ? new Date(v).getTime() : 0;
+  const tsOrInf = v => v ? new Date(v).getTime() : Infinity; // "sin conexión" al final por desc
+  items.sort((a,b)=>{
+    if(sortBy==='msgs_desc') return (b.message_count||0) - (a.message_count||0);
+    if(sortBy==='last_conn_desc') return tsOrZero(b.last_verified_at) - tsOrZero(a.last_verified_at);
+    if(sortBy==='last_conn_asc') return tsOrInf(a.last_verified_at) - tsOrInf(b.last_verified_at);
+    if(sortBy==='expires_asc') return tsOrInf(a.expires_at) - tsOrInf(b.expires_at);
+    if(sortBy==='name_asc') return (a.client_name||'').localeCompare(b.client_name||'', 'es', {sensitivity:'base'});
+    // default 'recent': por fecha de creación desc
+    return tsOrZero(b.created_at) - tsOrZero(a.created_at);
+  });
   document.getElementById('resultCount').textContent = items.length;
   const rows = items.map(l=>{
     const p = (l.plan_family||l.plan||'').toUpperCase();
@@ -861,6 +882,11 @@ function applyFilters(){
         ${l.contact_name?`<div style="font-size:11px;color:#cbd5e1;margin-top:2px">👤 ${l.contact_name.replace(/</g,'&lt;')}</div>`:''}
         ${l.phone?`<div style="font-size:11px;color:#cbd5e1;margin-top:2px">📞 <a href="tel:${l.phone.replace(/[^0-9+]/g,'')}" style="color:#7ee3aa;text-decoration:none" onclick="event.stopPropagation()">${l.phone.replace(/</g,'&lt;')}</a></div>`:''}
         ${l.tax_id?`<div style="font-size:11px;color:#94a3b8;margin-top:2px">🏛 ${l.tax_id.replace(/</g,'&lt;')}</div>`:''}
+        <div style="font-size:10px;color:#64748b;margin-top:6px;padding-top:4px;border-top:1px dashed #1e293b;display:flex;gap:8px;flex-wrap:wrap">
+          ${(l.message_count||0)>0?`<span title="Mensajes recibidos del cliente">💬 ${l.message_count} msg</span>`:''}
+          ${l.last_verified_at?`<span title="Última verificación de licencia (indica actividad reciente)">🟢 ${new Date(l.last_verified_at).toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'})}</span>`:'<span style="color:#475569">⚪ nunca conectado</span>'}
+          ${l.last_message_at?`<span title="Último mensaje del cliente">📩 ${new Date(l.last_message_at).toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'})}</span>`:''}
+        </div>
         <div style="margin-top:4px;display:flex;align-items:center;gap:6px">
           <span class="mono" style="font-size:10px;color:#94a3b8" title="${l.install_id||''}">🖥 ${installIdShort}</span>
           <button class="ghost" onclick="event.stopPropagation();copyVal(this,'${iidEsc}')" data-testid="btn-copy-iid-${l.install_id}" style="padding:1px 6px;font-size:9px;border-radius:4px;background:#1e293b;border:1px solid #475569" title="Copiar Install ID al portapapeles">📋</button>
@@ -946,6 +972,12 @@ async function openDetail(install_id){
           ${l.contact_name?`<div style="margin-top:4px;font-size:13px;color:#cbd5e1">👤 <b>${l.contact_name.replace(/</g,'&lt;')}</b></div>`:''}
           ${l.phone?`<div style="margin-top:4px;font-size:13px;color:#cbd5e1">📞 <a href="tel:${l.phone.replace(/[^0-9+]/g,'')}" style="color:#7ee3aa;text-decoration:none">${l.phone.replace(/</g,'&lt;')}</a></div>`:''}
           ${l.tax_id?`<div style="margin-top:4px;font-size:12px;color:#94a3b8">🏛 NIF/CIF: <span class="mono">${l.tax_id.replace(/</g,'&lt;')}</span></div>`:''}
+          <div style="margin-top:10px;padding:8px 12px;background:#0f172a;border-radius:8px;display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:#94a3b8">
+            <div title="Mensajes recibidos del cliente"><b style="color:#a855f7;font-size:14px">${l.message_count||0}</b> mensaje${(l.message_count||0)===1?'':'s'}</div>
+            <div title="Última verificación de licencia (indica actividad reciente)"><b style="color:#7ee3aa;font-size:13px">${l.last_verified_at?new Date(l.last_verified_at).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—'}</b> última conexión</div>
+            ${l.last_message_at?`<div title="Último mensaje del cliente"><b style="color:#fde68a;font-size:13px">${new Date(l.last_message_at).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</b> último msg</div>`:''}
+            <div title="Total de verificaciones de licencia realizadas"><b style="color:#e2e8f0;font-size:13px">${l.verify_count||0}</b> verificaciones</div>
+          </div>
         </div>
         <div style="text-align:right">
           <div style="background:${stCfg.color};color:#0b1121;padding:6px 14px;border-radius:20px;font-weight:800;font-size:12px;display:inline-block">${stCfg.emo} ${stCfg.label}</div>
