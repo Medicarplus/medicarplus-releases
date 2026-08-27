@@ -108,19 +108,18 @@ const PriceCard = ({ plan, monthlyPrice, annualPrice, period, features, highligh
     : null;
   const isTrial = plan === "Trial";
   const [loading, setLoading] = useState(false);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [emailInput, setEmailInput] = useState("");
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.trim());
+
+  const openCheckoutModal = () => {
+    if (isTrial || !packageId) return;
+    setEmailInput("");
+    setEmailModalOpen(true);
+  };
 
   const handleStripeCheckout = async () => {
-    if (isTrial || !packageId) return;
-    // Stripe exige email para crear el Customer. Lo pedimos aquí para no romper el flujo.
-    const email = window.prompt(
-      "📧 Para crear tu suscripción necesitamos tu email de facturación:\n\n(Recibirás la factura y podrás gestionar la suscripción desde este email)"
-    );
-    if (!email) return;
-    const trimmed = String(email).trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      alert("El email no parece válido. Vuelve a intentarlo.");
-      return;
-    }
+    if (!emailValid) return;
     setLoading(true);
     try {
       const res = await fetch(`${apiBase}/api/payments/create-subscription`, {
@@ -129,7 +128,7 @@ const PriceCard = ({ plan, monthlyPrice, annualPrice, period, features, highligh
         body: JSON.stringify({
           package_id: packageId,
           origin_url: window.location.origin,
-          customer_email: trimmed,
+          customer_email: emailInput.trim(),
         }),
       });
       const data = await res.json();
@@ -139,10 +138,12 @@ const PriceCard = ({ plan, monthlyPrice, annualPrice, period, features, highligh
         const detail = data.detail ? (typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail)) : "";
         alert(`Error creando la sesión de pago${detail ? `:\n\n${detail}` : ""}\n\nSi persiste, contacta con info@medicarplus.es`);
         setLoading(false);
+        setEmailModalOpen(false);
       }
     } catch (e) {
       alert("Error de conexión. Intenta de nuevo.");
       setLoading(false);
+      setEmailModalOpen(false);
     }
   };
   return (
@@ -255,7 +256,7 @@ const PriceCard = ({ plan, monthlyPrice, annualPrice, period, features, highligh
       ) : (
         <>
           <button
-            onClick={handleStripeCheckout}
+            onClick={openCheckoutModal}
             disabled={loading}
             data-testid={`price-cta-stripe-${plan.toLowerCase()}`}
             style={{
@@ -297,6 +298,126 @@ const PriceCard = ({ plan, monthlyPrice, annualPrice, period, features, highligh
             🏦 O paga por transferencia bancaria
           </a>
         </>
+      )}
+
+      {/* Modal de email para checkout Stripe */}
+      {emailModalOpen && (
+        <div
+          onClick={() => !loading && setEmailModalOpen(false)}
+          data-testid="checkout-email-modal"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(3,7,18,.85)",
+            backdropFilter: "blur(6px)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+            color: "#e2e8f0",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#0b1121",
+              border: `2px solid ${C.gold}`,
+              borderRadius: 16,
+              maxWidth: 460,
+              width: "100%",
+              padding: 28,
+              boxShadow: "0 30px 80px rgba(0,0,0,.6)",
+              fontFamily: "'Segoe UI', system-ui, sans-serif",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 11, color: C.gold, letterSpacing: 1.5, fontWeight: 700, marginBottom: 4 }}>
+                  PASO 1 DE 2
+                </div>
+                <h3 style={{ margin: 0, fontFamily: "Georgia,serif", fontSize: 22, color: "#fff" }}>
+                  Tu email de facturación
+                </h3>
+              </div>
+              {!loading && (
+                <button
+                  onClick={() => setEmailModalOpen(false)}
+                  aria-label="Cerrar"
+                  style={{ background: "transparent", border: "none", color: "#94a3b8", fontSize: 24, cursor: "pointer", lineHeight: 1, padding: 0 }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            <div style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 10, padding: "12px 14px", marginBottom: 18 }}>
+              <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: 1, fontWeight: 700 }}>PLAN SELECCIONADO</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                <div style={{ color: C.gold, fontWeight: 700, fontFamily: "Georgia,serif", fontSize: 16 }}>{plan} {period === "annual" ? "Anual" : "Mensual"}</div>
+                <div style={{ color: "#fff", fontWeight: 700, fontSize: 16 }}>
+                  {price.toFixed(2).replace(".", ",")} €{suffix}
+                </div>
+              </div>
+            </div>
+
+            <label style={{ display: "block", fontSize: 12, color: "#94a3b8", marginBottom: 6, fontWeight: 700, letterSpacing: .5 }}>
+              📧 Tu email
+            </label>
+            <input
+              type="email"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && emailValid && !loading) handleStripeCheckout(); }}
+              placeholder="tu@centromedico.es"
+              autoFocus
+              data-testid="checkout-email-input"
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                background: "#0f172a",
+                border: `2px solid ${emailInput.length === 0 ? "#334155" : emailValid ? "#22c55e" : "#dc2626"}`,
+                borderRadius: 10,
+                color: "#e2e8f0",
+                fontSize: 15,
+                fontFamily: "inherit",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 6, lineHeight: 1.5 }}>
+              Recibirás la factura y podrás gestionar tu suscripción desde este email.
+            </div>
+
+            <button
+              onClick={handleStripeCheckout}
+              disabled={!emailValid || loading}
+              data-testid="checkout-email-submit"
+              style={{
+                width: "100%",
+                marginTop: 20,
+                padding: "14px 18px",
+                background: emailValid && !loading ? C.gold : "#334155",
+                color: emailValid && !loading ? "#0f172a" : "#64748b",
+                border: "none",
+                borderRadius: 10,
+                fontWeight: 700,
+                fontSize: 15,
+                cursor: emailValid && !loading ? "pointer" : "not-allowed",
+                letterSpacing: .5,
+                fontFamily: "inherit",
+              }}
+            >
+              {loading ? "⏳ Redirigiendo al pago seguro…" : "💳 Continuar al pago seguro"}
+            </button>
+
+            <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 14, fontSize: 11, color: "#64748b" }}>
+              <span>🔒 Pago seguro con Stripe</span>
+              <span>·</span>
+              <span>Cancela cuando quieras</span>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
