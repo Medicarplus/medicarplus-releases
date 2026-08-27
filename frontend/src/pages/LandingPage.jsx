@@ -111,6 +111,16 @@ const PriceCard = ({ plan, monthlyPrice, annualPrice, period, features, highligh
 
   const handleStripeCheckout = async () => {
     if (isTrial || !packageId) return;
+    // Stripe exige email para crear el Customer. Lo pedimos aquí para no romper el flujo.
+    const email = window.prompt(
+      "📧 Para crear tu suscripción necesitamos tu email de facturación:\n\n(Recibirás la factura y podrás gestionar la suscripción desde este email)"
+    );
+    if (!email) return;
+    const trimmed = String(email).trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      alert("El email no parece válido. Vuelve a intentarlo.");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch(`${apiBase}/api/payments/create-subscription`, {
@@ -119,13 +129,15 @@ const PriceCard = ({ plan, monthlyPrice, annualPrice, period, features, highligh
         body: JSON.stringify({
           package_id: packageId,
           origin_url: window.location.origin,
+          customer_email: trimmed,
         }),
       });
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
       } else {
-        alert("Error creando la sesión de pago. Intenta de nuevo o contacta con info@medicarplus.es");
+        const detail = data.detail ? (typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail)) : "";
+        alert(`Error creando la sesión de pago${detail ? `:\n\n${detail}` : ""}\n\nSi persiste, contacta con info@medicarplus.es`);
         setLoading(false);
       }
     } catch (e) {
@@ -238,7 +250,7 @@ const PriceCard = ({ plan, monthlyPrice, annualPrice, period, features, highligh
             letterSpacing: 0.5,
           }}
         >
-          COMENZAR PROVA GRATIS
+          COMENZAR PRUEBA GRATIS
         </a>
       ) : (
         <>
@@ -408,6 +420,96 @@ export default function LandingPage() {
       <tr style="border-bottom:1px solid #1e293b"><td style="padding:4px 8px;font-family:Consolas;color:#94a3b8">v2.14.0</td><td style="padding:4px 8px;text-align:center;color:#94a3b8">18/08/2026</td><td style="padding:4px 8px;color:#94a3b8">Import CSV DGT rediseñado</td></tr>
       <tr><td style="padding:4px 8px;font-family:Consolas;color:#94a3b8">v2.13.0</td><td style="padding:4px 8px;text-align:center;color:#94a3b8">02/08/2026</td><td style="padding:4px 8px;color:#94a3b8">Campañas SMS + WhatsApp</td></tr>
     </tbody></table>
+  </div>`;
+
+  const MOCKUP_STATS = `<div style="background:#0a0f1a;border:1px solid #1e293b;border-radius:8px;padding:14px;font-family:'Segoe UI',system-ui;color:#e2e8f0;font-size:12px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="color:#f5b301;font-weight:700;font-size:13px">📊 Estadísticas · <span style="color:#22d3ee">MEDICAR</span></div>
+      <div style="margin-left:auto;display:flex;gap:6px">
+        <span style="background:#0f172a;padding:3px 10px;border-radius:6px;font-size:10px;color:#94a3b8">Autoescuelas</span>
+        <span style="background:#f5b30122;border:1px solid #f5b301;padding:3px 10px;border-radius:6px;font-size:10px;color:#f5b301;font-weight:700">🚦 Tráfico</span>
+        <span style="background:#0f172a;padding:3px 10px;border-radius:6px;font-size:10px;color:#94a3b8">Avisos SMS</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:10px">
+      <div style="background:#0f172a;border-radius:6px;padding:10px">
+        <div style="color:#94a3b8;font-size:10px;font-weight:700;letter-spacing:.5px;margin-bottom:6px">📊 ENTRADAS DE TRÁFICO POR MES · 2026</div>
+        <svg viewBox="0 0 300 90" style="width:100%;height:80px">
+          <text x="180" y="10" fill="#7ee3aa" font-size="9" text-anchor="middle" font-weight="700">448</text>
+          <rect x="170" y="14" width="20" height="60" fill="url(#g1)" rx="2"/>
+          <text x="210" y="34" fill="#7ee3aa" font-size="9" text-anchor="middle" font-weight="700">164</text>
+          <rect x="200" y="38" width="20" height="36" fill="url(#g1)" rx="2"/>
+          <line x1="0" y1="74" x2="300" y2="74" stroke="#334155" stroke-width=".5"/>
+          <text x="15" y="85" fill="#64748b" font-size="7" text-anchor="middle">ENE</text><text x="45" y="85" fill="#64748b" font-size="7" text-anchor="middle">FEB</text><text x="75" y="85" fill="#64748b" font-size="7" text-anchor="middle">MAR</text><text x="105" y="85" fill="#64748b" font-size="7" text-anchor="middle">ABR</text><text x="135" y="85" fill="#64748b" font-size="7" text-anchor="middle">MAY</text><text x="165" y="85" fill="#64748b" font-size="7" text-anchor="middle">JUN</text><text x="182" y="85" fill="#22d3ee" font-size="7" text-anchor="middle" font-weight="700">JUL</text><text x="212" y="85" fill="#22d3ee" font-size="7" text-anchor="middle" font-weight="700">AGO</text><text x="240" y="85" fill="#64748b" font-size="7" text-anchor="middle">SEP</text><text x="265" y="85" fill="#64748b" font-size="7" text-anchor="middle">OCT</text><text x="285" y="85" fill="#64748b" font-size="7" text-anchor="middle">NOV</text>
+          <defs><linearGradient id="g1" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#7ee3aa"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+        </svg>
+      </div>
+      <div style="background:#0f172a;border-radius:6px;padding:10px">
+        <div style="color:#94a3b8;font-size:10px;font-weight:700;letter-spacing:.5px;margin-bottom:6px">🏷️ TIPOS · 2026</div>
+        <svg viewBox="0 0 120 90" style="width:100%;height:80px">
+          <text x="12" y="18" fill="#7ee3aa" font-size="9" text-anchor="middle" font-weight="700">251</text>
+          <rect x="6" y="22" width="12" height="52" fill="#7ee3aa" rx="2"/>
+          <text x="12" y="86" fill="#64748b" font-size="6" text-anchor="middle">EXPED</text>
+          <rect x="30" y="70" width="12" height="4" fill="#94a3b8" rx="1"/>
+          <text x="36" y="86" fill="#64748b" font-size="6" text-anchor="middle">PERIO</text>
+          <rect x="54" y="66" width="12" height="8" fill="#f5b301" rx="1"/>
+          <text x="60" y="86" fill="#64748b" font-size="6" text-anchor="middle">PRORR</text>
+          <rect x="78" y="60" width="12" height="14" fill="#a855f7" rx="1"/>
+          <text x="84" y="86" fill="#64748b" font-size="6" text-anchor="middle">RECUP</text>
+          <text x="108" y="8" fill="#f472b6" font-size="9" text-anchor="middle" font-weight="700">351</text>
+          <rect x="102" y="12" width="12" height="62" fill="url(#g2)" rx="2"/>
+          <text x="108" y="86" fill="#f472b6" font-size="6" text-anchor="middle" font-weight="700">RENOV</text>
+          <defs><linearGradient id="g2" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#f472b6"/><stop offset="1" stop-color="#c026d3"/></linearGradient></defs>
+        </svg>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">
+      <div style="background:#0f172a;border:1px solid #7ee3aa33;border-radius:6px;padding:8px 10px"><div style="font-size:9px;color:#94a3b8">Total entradas</div><div style="font-size:15px;color:#7ee3aa;font-weight:700;font-family:Consolas">612</div></div>
+      <div style="background:#0f172a;border:1px solid #22d3ee33;border-radius:6px;padding:8px 10px"><div style="font-size:9px;color:#94a3b8">Total importes</div><div style="font-size:15px;color:#22d3ee;font-weight:700;font-family:Consolas">37.250,00 €</div></div>
+      <div style="background:#0f172a;border:1px solid #f5b30133;border-radius:6px;padding:8px 10px"><div style="font-size:9px;color:#94a3b8">Total tasas DGT</div><div style="font-size:15px;color:#f5b301;font-weight:700;font-family:Consolas">5.727,19 €</div></div>
+      <div style="background:#0f172a;border:1px solid #a855f733;border-radius:6px;padding:8px 10px"><div style="font-size:9px;color:#94a3b8">Facturado + Tasas</div><div style="font-size:15px;color:#a855f7;font-weight:700;font-family:Consolas">42.977,19 €</div></div>
+    </div>
+    <table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:#0f172a;color:#94a3b8"><th style="padding:5px 6px;text-align:left">MES 2026</th><th style="padding:5px 6px;text-align:right;color:#7ee3aa">TOTAL</th><th style="padding:5px 6px;text-align:right;color:#22d3ee">EXPED</th><th style="padding:5px 6px;text-align:right;color:#f472b6">RENOV</th><th style="padding:5px 6px;text-align:right;color:#f5b301">IMPORTE</th><th style="padding:5px 6px;text-align:right;color:#a855f7">TASAS</th></tr></thead><tbody>
+      <tr><td style="padding:4px 6px;color:#e2e8f0">Julio</td><td style="padding:4px 6px;text-align:right;color:#7ee3aa;font-weight:700">448</td><td style="padding:4px 6px;text-align:right;color:#22d3ee">197</td><td style="padding:4px 6px;text-align:right;color:#f472b6">242</td><td style="padding:4px 6px;text-align:right;color:#f5b301;font-family:Consolas">27.109,50 €</td><td style="padding:4px 6px;text-align:right;color:#a855f7;font-family:Consolas">4.198,30 €</td></tr>
+      <tr><td style="padding:4px 6px;color:#e2e8f0">Agosto</td><td style="padding:4px 6px;text-align:right;color:#7ee3aa;font-weight:700">164</td><td style="padding:4px 6px;text-align:right;color:#22d3ee">54</td><td style="padding:4px 6px;text-align:right;color:#f472b6">109</td><td style="padding:4px 6px;text-align:right;color:#f5b301;font-family:Consolas">10.140,50 €</td><td style="padding:4px 6px;text-align:right;color:#a855f7;font-family:Consolas">1.528,89 €</td></tr>
+    </tbody></table>
+  </div>`;
+
+  const MOCKUP_CAL = `<div style="background:#0a0f1a;border:1px solid #1e293b;border-radius:8px;padding:14px;font-family:'Segoe UI',system-ui;color:#e2e8f0;font-size:12px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="color:#22d3ee;font-weight:700;font-size:13px">📅 Citas del día</div>
+      <div style="font-size:10px;color:#94a3b8">Sincronizado con Google Calendar</div>
+      <span style="margin-left:auto;background:#22c55e;color:#0b1121;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700">EN VIVO</span>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <span style="background:#22d3ee;color:#0b1121;padding:4px 10px;border-radius:6px;font-size:10px;font-weight:700">📆 Hoy</span>
+      <span style="background:#0f172a;padding:4px 10px;border-radius:6px;font-size:10px;color:#94a3b8">📅 Semana</span>
+      <span style="background:#0f172a;padding:4px 10px;border-radius:6px;font-size:10px;color:#94a3b8">⚙️ Calendarios</span>
+    </div>
+    <div style="background:#0f172a;padding:8px 10px;border-radius:6px;margin-bottom:10px;color:#64748b;font-size:11px">🔎 Buscar por nombre o DNI…</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="background:#0f172a;border-left:3px solid #22d3ee;border-radius:6px;padding:9px 12px;display:flex;align-items:center;gap:10px">
+        <div style="font-family:Consolas;color:#22d3ee;font-weight:700;min-width:52px">09:00</div>
+        <div style="flex:1"><div style="color:#e2e8f0;font-weight:700;font-size:12px">Joan García Martí</div><div style="font-size:10px;color:#94a3b8">Renovación carnet · Grupo B</div></div>
+        <span style="background:#22c55e22;border:1px solid #22c55e;color:#22c55e;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700">CONFIRMADA</span>
+      </div>
+      <div style="background:#0f172a;border-left:3px solid #f5b301;border-radius:6px;padding:9px 12px;display:flex;align-items:center;gap:10px">
+        <div style="font-family:Consolas;color:#f5b301;font-weight:700;min-width:52px">09:30</div>
+        <div style="flex:1"><div style="color:#e2e8f0;font-weight:700;font-size:12px">Marta Serra López</div><div style="font-size:10px;color:#94a3b8">Certificado embarcaciones · PER</div></div>
+        <span style="background:#f5b30122;border:1px solid #f5b301;color:#f5b301;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700">EN CURSO</span>
+      </div>
+      <div style="background:#0f172a;border-left:3px solid #94a3b8;border-radius:6px;padding:9px 12px;display:flex;align-items:center;gap:10px">
+        <div style="font-family:Consolas;color:#94a3b8;font-weight:700;min-width:52px">10:00</div>
+        <div style="flex:1"><div style="color:#e2e8f0;font-weight:700;font-size:12px">Carles Puig Font</div><div style="font-size:10px;color:#94a3b8">Reconocimiento armas · Escopeta</div></div>
+        <span style="background:#0f172a;border:1px solid #334155;color:#94a3b8;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700">PENDIENTE</span>
+      </div>
+      <div style="background:#0f172a;border-left:3px solid #94a3b8;border-radius:6px;padding:9px 12px;display:flex;align-items:center;gap:10px">
+        <div style="font-family:Consolas;color:#94a3b8;font-weight:700;min-width:52px">10:30</div>
+        <div style="flex:1"><div style="color:#e2e8f0;font-weight:700;font-size:12px">Laura Vidal Roca</div><div style="font-size:10px;color:#94a3b8">Renovación carnet · Grupo A2</div></div>
+        <span style="background:#0f172a;border:1px solid #334155;color:#94a3b8;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700">PENDIENTE</span>
+      </div>
+    </div>
+    <div style="margin-top:10px;padding:8px 10px;background:#065f4622;border:1px solid #22c55e33;border-radius:6px;font-size:11px;color:#6ee7b7;display:flex;align-items:center;gap:8px">🔔 <b>4 citas hoy</b> · Próxima en 12 min · Al importar el CSV se marca automáticamente quién vino</div>
   </div>`;
 
 
@@ -705,6 +807,14 @@ export default function LandingPage() {
               Envío automático de recordatorios de renovación DGT y avisos de certificados
               expirados. Ideal para fidelizar clientes.
             </Feature>
+            <Feature icon="📈" title="Estadísticas avanzadas" mockup={MOCKUP_STATS} onOpen={setOpenFeature}>
+              Panel completo con gráficos por mes, tipos de trámite y facturación. Comparativa
+              anual, KPIs en vivo y exportación a PDF con un clic.
+            </Feature>
+            <Feature icon="📅" title="Calendario de citas integrado" mockup={MOCKUP_CAL} onOpen={setOpenFeature}>
+              Sincroniza tu Google Calendar (o cualquier servicio externo) y trabaja con las citas
+              del día dentro del programa. Al importar el CSV se marca automáticamente quién vino.
+            </Feature>
             <Feature icon="🖨️" title="Informes profesionales" mockup={MOCKUP_PRINT} onOpen={setOpenFeature}>
               Cierre diario, resumen mensual, informe anual, ledger de libreta y export IRPF.
               Impresión directa o PDF.
@@ -742,7 +852,7 @@ export default function LandingPage() {
               Precios transparentes, sin sorpresas
             </h2>
             <p style={{ color: C.textDim, fontSize: 16, margin: 0 }}>
-              30 días gratis · Sin tarjeta · Cancela cuando quieras
+              60 días gratis · Sin tarjeta · Cancela cuando quieras
             </p>
           </div>
 
@@ -826,7 +936,7 @@ export default function LandingPage() {
               apiBase={apiBase}
               ctaHref="/request-license?plan=TRIAL"
               features={[
-                "Programa completo 30 días",
+                "Programa completo 60 días",
                 "Todas las características",
                 "Sin tarjeta de crédito",
                 "Soporte por email",
@@ -927,8 +1037,8 @@ export default function LandingPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {[
               {
-                q: "¿Cómo funciona la prueba gratuita de 30 días?",
-                a: "Rellenas el formulario con los datos de tu centro, recibes en el email la clave de licencia, la introduces en el programa y ya tienes 30 días completos con todas las funcionalidades. No pedimos tarjeta de crédito ni ningún compromiso. Al finalizar los 30 días, si te interesa, contratas el plan que prefieras. Si no, simplemente el programa deja de funcionar.",
+                q: "¿Cómo funciona la prueba gratuita de 60 días?",
+                a: "Rellenas el formulario con los datos de tu centro, recibes en el email la clave de licencia, la introduces en el programa y ya tienes 60 días completos con todas las funcionalidades. No pedimos tarjeta de crédito ni ningún compromiso. Al finalizar los 60 días, si te interesa, contratas el plan que prefieras. Si no, simplemente el programa deja de funcionar.",
               },
               {
                 q: "¿El programa funciona sin internet?",
@@ -994,7 +1104,7 @@ export default function LandingPage() {
             Empieza gratis hoy mismo
           </h2>
           <p style={{ color: C.textDim, fontSize: 17, marginBottom: 24 }}>
-            30 días completos · Sin tarjeta · Sin compromiso
+            60 días completos · Sin tarjeta · Sin compromiso
           </p>
           <a
             href="/request-license?plan=TRIAL"
@@ -1012,7 +1122,7 @@ export default function LandingPage() {
               boxShadow: "0 20px 60px rgba(245,179,1,.4)",
             }}
           >
-            🚀 EMPEZAR PROVA GRATIS
+            🚀 EMPEZAR PRUEBA GRATIS
           </a>
         </div>
       </section>

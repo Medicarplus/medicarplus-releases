@@ -182,10 +182,10 @@ export default function RequestLicensePage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 24 }}>
             <PricingCard
               title="TRIAL"
-              subtitle="Prova"
+              subtitle="Prueba"
               price="0€"
-              period="30 dies"
-              features={["✓ Totes les funcions", "✓ Sense targeta", "✓ 30 dies gratis"]}
+              period="60 días"
+              features={["✓ Todas las funciones", "✓ Sin tarjeta", "✓ 60 días gratis"]}
               accent="#64748b"
               selected={form.plan_requested === "TRIAL"}
               onClick={() => setForm({ ...form, plan_requested: "TRIAL" })}
@@ -330,7 +330,7 @@ export default function RequestLicensePage() {
             <div>
               <label style={labelStyle}>PLAN SELECCIONAT</label>
               <div style={{ padding: "10px 14px", background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#f5b301", fontFamily: "Georgia,serif", fontSize: 13 }}>
-                {form.plan_requested === "TRIAL" && "🆓 TRIAL — Prova gratuïta 30 dies"}
+                {form.plan_requested === "TRIAL" && "🆓 TRIAL — Prueba gratuita 60 días"}
                 {form.plan_requested === "STD_MES" && "📦 STD Mensual — 29,90€/mes"}
                 {form.plan_requested === "STD_ANY" && "📦 STD Anual — 299,90€/any (estalvies 16%)"}
                 {form.plan_requested === "PREMIUM_MES" && "⭐ PREMIUM Mensual — 39,90€/mes"}

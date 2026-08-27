@@ -1148,3 +1148,15 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - Curl: `msg_id` presente ✓ · mark-unread eleva `total_unread` a 1 ✓ · mark-read revierte ✓ · invalid ID → HTTP 400 ✓.
 - Playwright: 3 opciones en el filtro (correcto, agrupa por install_id) · seleccionar cliente reduce items 4→2 ✓ · click "Marcar no leído" actualiza badge 0→🔔 1 ✓ · click "Marcar leído" revierte.
 
+
+### 🐛 FIX: Stripe checkout falla ("Error creando la sesión de pago")
+**Causa raíz**: el backend (`payments.py:177`) tenía `customer_email: str` (obligatorio) en el modelo `CreateSubscriptionBody`, pero el frontend `LandingPage.jsx` NO enviaba ese campo. Respuesta 422 → `data.url` undefined → alerta genérica.
+**Fix**: `handleStripeCheckout()` ahora hace `window.prompt("📧 email de facturación")` antes del POST, con validación regex de email. También muestra `data.detail` cuando hay error del backend (mejor debug para el cliente). Backend intacto.
+**Test**: curl con email → sesión Stripe creada correctamente, `checkout.stripe.com/...` URL válida devuelta.
+
+### ✨ Landing page: 4 mejoras
+1. **PROVA → PRUEBA**: 2 CTAs de la landing (`COMENZAR PRUEBA GRATIS`, `EMPEZAR PRUEBA GRATIS`) + RequestLicensePage.
+2. **Trial 30 → 60 días**: sincronizado con backend `TRIAL_DAYS=60`. Ubicaciones actualizadas: cabecera precios, features del plan TRIAL, FAQ, CTA final, RequestLicensePage (subtitle + period + summary).
+3. **Nueva feature "📈 Estadísticas avanzadas"**: mockup SVG completo con gráfico de barras por mes (JUL 448 / AGO 164), gráfico de tipos (EXPED 251, RENOV 351, PERIO 1, PRORR 3, RECUP 6), 4 KPIs (612 entradas, 37.250€, 5.727,19€ tasas, 42.977,19€ total) y tabla mensual. Marca "MEDICAR" como pidió el usuario.
+4. **Nueva feature "📅 Calendario de citas integrado"**: mockup con 4 citas del día (Joan García 09:00 CONFIRMADA, Marta Serra 09:30 EN CURSO, etc), tabs (Hoy/Semana/Calendarios), buscador por DNI, y badge "🔔 4 citas hoy · Al importar CSV se marca quién vino".
+
