@@ -2,39 +2,74 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
 
-  <!-- Landing principal -->
+  <!-- ═══════ LANDING PRINCIPAL ═══════ -->
   <url>
     <loc>https://medicarplus.es/</loc>
+    <lastmod>2026-02-27</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
 
-  <!-- Términos y condiciones -->
+  <!-- ═══════ CONVERSIÓN · Solicitar licencia ═══════ -->
   <url>
-    <loc>https://medicarplus.es/terminos-uso.html</loc>
+    <loc>https://medicarplus.es/request-license</loc>
+    <lastmod>2026-02-27</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.3</priority>
+    <priority>0.9</priority>
   </url>
 
-  <!-- Guía de uso -->
+  <!-- ═══════ CONVERSIÓN · Descargas ═══════ -->
+  <url>
+    <loc>https://medicarplus.es/downloads/</loc>
+    <lastmod>2026-02-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- ═══════ GUÍAS PRINCIPALES ═══════ -->
   <url>
     <loc>https://medicarplus.es/guia-medicar-plus.html</loc>
+    <lastmod>2026-02-27</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
-
-  <!-- Manual usuario -->
   <url>
     <loc>https://medicarplus.es/manual-usuari.html</loc>
+    <lastmod>2026-02-27</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://medicarplus.es/guia-client-installacio.html</loc>
+    <lastmod>2026-02-27</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
-
-  <!-- Guía de instalación cliente -->
   <url>
-    <loc>https://medicarplus.es/guia-client-installacio.html</loc>
+    <loc>https://medicarplus.es/guia-client-installacio-ca.html</loc>
+    <lastmod>2026-02-27</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://medicarplus.es/index-guies.html</loc>
+    <lastmod>2026-02-27</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
+  </url>
+
+  <!-- ═══════ LEGAL ═══════ -->
+  <url>
+    <loc>https://medicarplus.es/privacy</loc>
+    <lastmod>2026-02-27</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://medicarplus.es/terminos-uso.html</loc>
+    <lastmod>2026-02-27</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
   </url>
 
 </urlset>
