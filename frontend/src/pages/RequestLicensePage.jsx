@@ -21,15 +21,16 @@ export default function RequestLicensePage() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [showInstallId, setShowInstallId] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
     setErr("");
     const installId = form.install_id.trim().toUpperCase();
-    // Install ID is now OPTIONAL. Si el client encara no té l'app, deixa-ho buit.
+    // Install ID is now OPTIONAL. Si el cliente aún no tiene la app, déjalo vacío.
     if (installId && !INSTALL_ID_RE.test(installId)) {
       setErr(
-        "El format de l'Install ID no és vàlid. Ha de ser CD-XXXX-XXXX-XXXX-XXXX o deixa'l buit si encara no tens l'app.",
+        "El formato del Install ID no es válido. Debe ser CD-XXXX-XXXX-XXXX-XXXX o déjalo vacío si aún no tienes la app.",
       );
       return;
     }
@@ -48,16 +49,16 @@ export default function RequestLicensePage() {
         website: form.website, // honeypot; humans leave empty
       });
       setDone(true);
-      toast.success("Sol·licitud enviada");
+      toast.success("Solicitud enviada");
     } catch (ex) {
       const msg = ex?.response?.data?.detail;
-      let humanMsg = ex.message || "Error enviant la sol·licitud";
+      let humanMsg = ex.message || "Error enviando la solicitud";
       if (Array.isArray(msg)) {
         // Pydantic error blob → convert to human message
         const first = msg[0];
         if (first) {
-          const field = (first.loc || []).slice(1).join(".") || "camp";
-          humanMsg = `Error al camp "${field}": ${first.msg || "no vàlid"}`;
+          const field = (first.loc || []).slice(1).join(".") || "campo";
+          humanMsg = `Error en el campo "${field}": ${first.msg || "no válido"}`;
         }
       } else if (typeof msg === "string") {
         humanMsg = msg;
@@ -117,24 +118,24 @@ export default function RequestLicensePage() {
         >
           <div style={{ fontSize: 64, marginBottom: 12 }}>✓</div>
           <h1 style={{ color: "#22c55e", margin: "0 0 12px 0", fontSize: 26 }}>
-            Sol·licitud enviada!
+            ¡Solicitud enviada!
           </h1>
           <p style={{ color: "#cbd5e1", lineHeight: 1.6, fontSize: 15 }}>
-            Hem rebut la teva sol·licitud correctament. Et contactarem al teu email amb els <b>detalls de pagament</b>.
+            Hemos recibido tu solicitud correctamente. Te contactaremos a tu email con los <b>detalles de pago</b>.
           </p>
 
           <div style={{ background: "#0f172a", border: "1px solid #f5b301", borderRadius: 10, padding: 18, margin: "22px 0", textAlign: "left" }}>
-            <div style={{ color: "#f5b301", fontSize: 11, letterSpacing: 1.5, fontWeight: 700, marginBottom: 10 }}>📋 PROPERS PASSOS</div>
+            <div style={{ color: "#f5b301", fontSize: 11, letterSpacing: 1.5, fontWeight: 700, marginBottom: 10 }}>📋 PRÓXIMOS PASOS</div>
             <ol style={{ color: "#cbd5e1", fontSize: 13, lineHeight: 1.8, margin: 0, paddingLeft: 20 }}>
-              <li>Revisarem la teva sol·licitud en <b>menys de 24h</b></li>
-              <li>T'enviarem un email amb la <b>factura proforma</b> i les dades de transferència bancària</li>
-              <li>Un cop <b>rebem el pagament</b>, t'enviem la clau d'activació i el link de descàrrega de l'app</li>
-              <li>Instal·les l'app, enganxes la clau i ja pots començar a treballar</li>
+              <li>Revisaremos tu solicitud en <b>menos de 24h</b></li>
+              <li>Te enviaremos un email con la <b>factura proforma</b> y los datos de transferencia bancaria</li>
+              <li>Una vez <b>recibamos el pago</b>, te enviamos la clave de activación y el enlace de descarga de la app</li>
+              <li>Instalas la app, pegas la clave y ya puedes empezar a trabajar</li>
             </ol>
           </div>
 
           <p style={{ color: "#94a3b8", fontSize: 11, marginTop: 8 }}>
-            💬 Dubtes? Escriu a <a href="mailto:info@medicarplus.es" style={{ color: "#f5b301" }}>info@medicarplus.es</a>
+            💬 ¿Dudas? Escribe a <a href="mailto:info@medicarplus.es" style={{ color: "#f5b301" }}>info@medicarplus.es</a>
           </p>
           <p style={{ color: "#94a3b8", fontSize: 12, marginTop: 24 }}>
             MediCar Plus
@@ -171,7 +172,7 @@ export default function RequestLicensePage() {
           <div style={{ textAlign: "center", marginBottom: 28 }}>
             <div style={{ fontSize: 48, marginBottom: 8 }}>📮</div>
             <h1 style={{ margin: 0, color: "#f5b301", fontSize: 26, letterSpacing: 1 }}>
-              Sol·licitar llicència
+              Solicitar licencia
             </h1>
             <p style={{ color: "#94a3b8", fontSize: 13, margin: "8px 0 0" }}>
               MediCar Plus · Software comercial
@@ -192,12 +193,12 @@ export default function RequestLicensePage() {
             />
             <PricingCard
               title="STD"
-              subtitle="Estàndard"
+              subtitle="Estándar"
               price="29,90€"
               period="/mes"
-              altPrice="299,90€/any"
-              savings="16% descompte"
-              features={["✓ Caixa del dia", "✓ IRPF + Llibreta", "✓ Estadístiques", "✓ Suport email"]}
+              altPrice="299,90€/año"
+              savings="16% descuento"
+              features={["✓ Caja del día", "✓ IRPF + Libreta", "✓ Estadísticas", "✓ Soporte email"]}
               accent="#f5b301"
               hasBillingToggle
               billingValue={form.plan_requested}
@@ -208,12 +209,12 @@ export default function RequestLicensePage() {
             />
             <PricingCard
               title="PREMIUM"
-              subtitle="Ampliat"
+              subtitle="Ampliado"
               price="39,90€"
               period="/mes"
-              altPrice="399,90€/any"
-              savings="17% descompte"
-              features={["✓ Tot STD +", "✓ SMS / WhatsApp", "✓ Cercador clients", "✓ Suport prioritari"]}
+              altPrice="399,90€/año"
+              savings="17% descuento"
+              features={["✓ Todo STD +", "✓ SMS / WhatsApp", "✓ Calendario de citas", "✓ Auditoría interna", "✓ Soporte prioritario"]}
               accent="#3ddc97"
               badge="POPULAR"
               hasBillingToggle
@@ -237,9 +238,9 @@ export default function RequestLicensePage() {
               lineHeight: 1.55,
             }}
           >
-            <b style={{ color: "#f5b301" }}>ℹ️ Sobre l'Install ID:</b> és un codi únic que identifica la teva instal·lació.
-            Si <b>encara no tens l'app</b>, deixa aquest camp buit — quan aprovem la teva sol·licitud t'enviarem l'app perquè el generi.
-            Si <b>ja tens l'app instal·lada</b>, obre-la, ves al modal d'activació i copia el codi{" "}
+            <b style={{ color: "#f5b301" }}>ℹ️ Sobre el Install ID:</b> es un código único que identifica tu instalación.
+            Si <b>aún no tienes la app</b>, deja este campo vacío — cuando aprobemos tu solicitud te enviaremos la app para que lo genere.
+            Si <b>ya tienes la app instalada</b>, ábrela, ve al modal de activación y copia el código{" "}
             <code style={{ color: "#e2e8f0" }}>CD-XXXX-XXXX-XXXX-XXXX</code>.
           </div>
 
@@ -255,12 +256,12 @@ export default function RequestLicensePage() {
               lineHeight: 1.55,
             }}
           >
-            <b style={{ color: "#7ee3aa", fontSize: 13 }}>💰 Forma de pagament: Transferència bancària</b>
+            <b style={{ color: "#7ee3aa", fontSize: 13 }}>💰 Forma de pago: Transferencia bancaria</b>
             <div style={{ marginTop: 6 }}>
-              Un cop rebem la teva sol·licitud, t'enviarem un <b>email amb la factura proforma</b> i les dades bancàries per fer la transferència. Un cop confirmat el pagament, rebràs la clau d'activació.
+              Una vez recibamos tu solicitud, te enviaremos un <b>email con la factura proforma</b> y los datos bancarios para hacer la transferencia. Una vez confirmado el pago, recibirás la clave de activación.
             </div>
             <div style={{ marginTop: 6, fontSize: 11, color: "#94a3b8", fontStyle: "italic" }}>
-              Sense compromís: només pagues si acceptes l'oferta que et fem.
+              Sin compromiso: solo pagas si aceptas la oferta que te hagamos.
             </div>
           </div>
 
