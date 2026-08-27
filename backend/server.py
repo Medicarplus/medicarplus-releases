@@ -274,9 +274,10 @@ app.include_router(build_downloads_router(db), prefix="/api")
 
 # Admin support messages (Feb 2026 · Chat interno con clientes via email + endpoint público del cliente)
 from routes.admin_support import build_support_router
-_support_admin_router, _support_public_router = build_support_router(db)
+_support_admin_router, _support_public_router, _support_msg_router = build_support_router(db)
 app.include_router(_support_admin_router, prefix="/api")
 app.include_router(_support_public_router, prefix="/api")
+app.include_router(_support_msg_router, prefix="/api")
 
 # Stripe webhook (obligatori per playbook: /api/webhook/stripe)
 # Gestiona tant one-off (via emergentintegrations) com subscriptions (via stripe SDK)

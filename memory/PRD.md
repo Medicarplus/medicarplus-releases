@@ -1127,3 +1127,24 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 
 **Test E2E**: insertados 4 docs sintéticos (2 leídas+45d, 1 no-leída+45d, 1 leída+5d), forzado `last_cleanup_at` a -48h, disparado badge → resultado: las 2 leídas viejas borradas, las otras 2 preservadas, `meta.last_cleanup_deleted=2`. Throttle validado: segundo badge no re-dispara.
 
+
+### ✨ Bandeja Unificada: filtro por cliente + Marcar No Leído
+**Backend** `admin_support.py`:
+- `/inbox-unified` ahora incluye `msg_id` (string ObjectId) en cada mensaje.
+- Nuevo sub-router `POST /admin/support/messages/{msg_id}/mark-unread` (limpia `read_by_admin_at` con `$unset`).
+- Nuevo `POST /admin/support/messages/{msg_id}/mark-read` (individual, distinto del bulk por licencia). Ambos con validación ObjectId → 400 si malformado.
+- `server.py`: `build_support_router` ahora devuelve 3 routers, montados con prefix `/api`.
+
+**Frontend** `admin.html`:
+- Cabecera del modal Bandeja: nuevo `<select id="inboxClientFilter">` populado dinámicamente desde los mensajes cargados (`install_id → client_name (count)`), ordenado alfabéticamente.
+- Filtro por cliente es 100% client-side (no re-fetch, filtra el cache `lastMessages`) → respuesta instantánea.
+- Cada item ahora tiene su acción abajo-derecha:
+  - Si unread → `✔ Marcar leído` (verde)
+  - Si read → `📬 Marcar no leído` (borde púrpura)
+- Funciones `markMsgRead(msgId, btn)` y `markMsgUnread(msgId, btn)` con feedback visual (disabled + '…') y refresh del badge inbox.
+- Empty state contextual cuando hay cliente filtrado sin mensajes.
+
+**Tests E2E**:
+- Curl: `msg_id` presente ✓ · mark-unread eleva `total_unread` a 1 ✓ · mark-read revierte ✓ · invalid ID → HTTP 400 ✓.
+- Playwright: 3 opciones en el filtro (correcto, agrupa por install_id) · seleccionar cliente reduce items 4→2 ✓ · click "Marcar no leído" actualiza badge 0→🔔 1 ✓ · click "Marcar leído" revierte.
+

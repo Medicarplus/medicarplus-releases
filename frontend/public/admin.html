@@ -497,6 +497,8 @@ async function openUnifiedInbox(){
   if(!tok){ alert('Sesión caducada, vuelve a entrar'); return; }
   // Carga inicial: solo no leídos
   let currentFilter = 'unread';
+  let currentClient = ''; // install_id filtrado (vacío = todos)
+  let lastMessages = [];  // cache para filtrar client-side
   const back = document.createElement('div');
   back.className = 'modal-back';
   back.innerHTML = `<div class="modal" style="max-width:900px;padding:0;overflow:hidden;max-height:85vh;display:flex;flex-direction:column">
@@ -507,10 +509,13 @@ async function openUnifiedInbox(){
       </div>
       <button class="ghost" onclick="this.closest('.modal-back').remove()" style="padding:6px 12px">✕</button>
     </div>
-    <div style="padding:12px 24px;background:#0f172a;border-bottom:1px solid #1e293b;flex-shrink:0;display:flex;gap:8px">
+    <div style="padding:12px 24px;background:#0f172a;border-bottom:1px solid #1e293b;flex-shrink:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button data-testid="inbox-tab-unread" data-filter="unread" style="background:linear-gradient(135deg,#f5b301,#eab308);color:#0b1121;border:none;padding:6px 14px;border-radius:6px;font-weight:800;font-size:12px;cursor:pointer">🔔 No leídos</button>
       <button data-testid="inbox-tab-all" data-filter="all" style="background:#334155;color:#e5e7eb;border:none;padding:6px 14px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer">📋 Todos los recibidos</button>
-      <button data-testid="inbox-refresh" onclick="this.closest('.modal-back').querySelector('#inboxList').innerText='Cargando…';loadInbox()" style="background:#334155;color:#e5e7eb;border:none;padding:6px 14px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;margin-left:auto">↻ Refrescar</button>
+      <select id="inboxClientFilter" data-testid="inbox-client-filter" style="background:#0e1a2e;color:#e5e7eb;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;min-width:200px">
+        <option value="">👥 Todos los clientes</option>
+      </select>
+      <button data-testid="inbox-refresh" onclick="loadInbox()" style="background:#334155;color:#e5e7eb;border:none;padding:6px 14px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;margin-left:auto">↻ Refrescar</button>
     </div>
     <div id="inboxList" data-testid="inbox-list" style="padding:14px 24px;overflow-y:auto;background:#0b1121;flex:1">Cargando…</div>
   </div>`;
@@ -518,20 +523,28 @@ async function openUnifiedInbox(){
   back.addEventListener('click', e => { if(e.target===back) back.remove(); });
   const list = back.querySelector('#inboxList');
   const title = back.querySelector('#inboxTitle');
-  
-  async function loadInbox(){
-    const unreadOnly = currentFilter === 'unread';
-    try{
-      const r = await fetch(`/api/admin/licenses/inbox-unified?unread_only=${unreadOnly}&limit=100`, { headers:{'X-Admin-Token':tok} });
-      const j = await r.json();
-      const msgs = j.messages || [];
-      title.textContent = `${msgs.length} mensaje${msgs.length===1?'':'s'} ${unreadOnly?'no leídos':'recibidos'} · Total no leídos: ${j.total_unread||0}`;
-      if(!msgs.length){
-        list.innerHTML = `<div style="text-align:center;padding:40px;color:#64748b;font-style:italic">${unreadOnly?'🎉 No hay mensajes pendientes':'Sin mensajes en la bandeja'}</div>`;
-        return;
-      }
-      list.innerHTML = msgs.map(m => `
-        <div class="inbox-item" style="background:${m.unread?'#0f172a':'#0b1121'};border-left:4px solid ${m.unread?'#a855f7':'#334155'};border:1px solid #1e293b;border-left-width:4px;border-radius:8px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:background .15s" onclick="event.stopPropagation();openSupportChat('${(m.license_key||m.install_id||'').replace(/'/g,"\\\\'")}','${(m.client_email||'').replace(/'/g,"\\\\'")}','${(m.client_name||'').replace(/'/g,"\\\\'")}')" onmouseenter="this.style.background='#1e293b'" onmouseleave="this.style.background='${m.unread?'#0f172a':'#0b1121'}'">
+  const clientSel = back.querySelector('#inboxClientFilter');
+
+  function renderList(msgs, unreadOnly, totalUnread){
+    if(!msgs.length){
+      const emptyMsg = currentClient
+        ? '🔍 Este cliente no tiene mensajes con los filtros actuales'
+        : (unreadOnly ? '🎉 No hay mensajes pendientes' : 'Sin mensajes en la bandeja');
+      list.innerHTML = `<div style="text-align:center;padding:40px;color:#64748b;font-style:italic">${emptyMsg}</div>`;
+      title.textContent = `0 mensajes ${unreadOnly?'no leídos':'recibidos'} · Total no leídos: ${totalUnread||0}`;
+      return;
+    }
+    title.textContent = `${msgs.length} mensaje${msgs.length===1?'':'s'} ${unreadOnly?'no leídos':'recibidos'}${currentClient?' (filtrado)':''} · Total no leídos: ${totalUnread||0}`;
+    list.innerHTML = msgs.map(m => {
+      const licEsc = (m.license_key||m.install_id||'').replace(/'/g,"\\'");
+      const emailEsc = (m.client_email||'').replace(/'/g,"\\'");
+      const nameEsc = (m.client_name||'').replace(/'/g,"\\'");
+      const midEsc = (m.msg_id||'').replace(/'/g,"\\'");
+      const actionBtn = m.unread
+        ? `<button data-testid="btn-msg-mark-read" onclick="event.stopPropagation();markMsgRead('${midEsc}',this)" style="background:#22c55e;border:none;color:#fff;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700">✔ Marcar leído</button>`
+        : `<button data-testid="btn-msg-mark-unread" onclick="event.stopPropagation();markMsgUnread('${midEsc}',this)" style="background:transparent;border:1px solid #a855f7;color:#a855f7;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700">📬 Marcar no leído</button>`;
+      return `
+        <div class="inbox-item" style="background:${m.unread?'#0f172a':'#0b1121'};border-left:4px solid ${m.unread?'#a855f7':'#334155'};border:1px solid #1e293b;border-left-width:4px;border-radius:8px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:background .15s" onclick="openSupportChat('${licEsc}','${emailEsc}','${nameEsc}')" onmouseenter="this.style.background='#1e293b'" onmouseleave="this.style.background='${m.unread?'#0f172a':'#0b1121'}'">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
             <div style="flex:1;min-width:0">
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -543,12 +556,44 @@ async function openUnifiedInbox(){
               <div style="font-size:13px;color:#e5e7eb;font-weight:700;margin-top:6px">${(m.subject||'').replace(/</g,'&lt;')}${m.has_attachments?` <span title="${m.attachments_count} imagen${m.attachments_count===1?'':'es'} adjunta${m.attachments_count===1?'':'s'}" style="color:#3ddc97;font-size:11px;margin-left:4px">📎 ${m.attachments_count}</span>`:''}</div>
               <div style="font-size:12px;color:#cbd5e1;margin-top:4px;line-height:1.5">${(m.body||'').replace(/</g,'&lt;').substring(0,180)}${(m.body||'').length>180?'…':''}</div>
             </div>
-            <div style="font-size:10px;color:#94a3b8;text-align:right;flex-shrink:0">
-              ${m.sent_at?new Date(m.sent_at).toLocaleString('es-ES'):''}
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+              <div style="font-size:10px;color:#94a3b8">${m.sent_at?new Date(m.sent_at).toLocaleString('es-ES'):''}</div>
+              ${actionBtn}
             </div>
           </div>
         </div>
-      `).join('');
+      `;
+    }).join('');
+  }
+
+  function refreshClientSelect(msgs){
+    // Extrae clientes únicos (install_id → nombre/email) ordenados por nombre
+    const seen = new Map();
+    msgs.forEach(m => {
+      const iid = m.install_id || '';
+      if(!iid || seen.has(iid)) return;
+      const label = (m.client_name || m.client_email || iid.slice(0,14)+'…').replace(/</g,'&lt;');
+      seen.set(iid, label);
+    });
+    const options = [...seen.entries()].sort((a,b)=>a[1].localeCompare(b[1]));
+    const prev = currentClient;
+    clientSel.innerHTML = `<option value="">👥 Todos los clientes (${msgs.length})</option>` +
+      options.map(([iid,lbl]) => {
+        const count = msgs.filter(m=>m.install_id===iid).length;
+        return `<option value="${iid}" ${iid===prev?'selected':''}>${lbl} (${count})</option>`;
+      }).join('');
+  }
+
+  async function loadInbox(){
+    const unreadOnly = currentFilter === 'unread';
+    list.innerHTML = 'Cargando…';
+    try{
+      const r = await fetch(`/api/admin/licenses/inbox-unified?unread_only=${unreadOnly}&limit=200`, { headers:{'X-Admin-Token':tok} });
+      const j = await r.json();
+      lastMessages = j.messages || [];
+      refreshClientSelect(lastMessages);
+      const filtered = currentClient ? lastMessages.filter(m=>m.install_id===currentClient) : lastMessages;
+      renderList(filtered, unreadOnly, j.total_unread);
     }catch(e){
       list.innerHTML = `<div style="color:#ef4444;padding:20px;text-align:center">Error: ${e.message}</div>`;
     }
@@ -564,10 +609,44 @@ async function openUnifiedInbox(){
       loadInbox();
     };
   });
+  // Filtro por cliente (client-side, no requiere refetch)
+  clientSel.onchange = () => {
+    currentClient = clientSel.value;
+    const unreadOnly = currentFilter === 'unread';
+    const filtered = currentClient ? lastMessages.filter(m=>m.install_id===currentClient) : lastMessages;
+    renderList(filtered, unreadOnly, null);
+    // Actualiza título con total unread desde el último fetch (no lo tenemos cacheado aquí, se refresca en próxima carga)
+  };
   window.loadInbox = loadInbox;
   loadInbox();
 }
 window.openUnifiedInbox = openUnifiedInbox;
+
+async function markMsgRead(msgId, btn){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok) return;
+  if(btn){ btn.disabled = true; btn.textContent = '…'; }
+  try{
+    const r = await fetch(`/api/admin/support/messages/${encodeURIComponent(msgId)}/mark-read`, {method:'POST', headers:{'X-Admin-Token':tok}});
+    if(!r.ok){ alert(`Error ${r.status}`); if(btn){ btn.disabled=false; btn.textContent='✔ Marcar leído'; } return; }
+    refreshInboxBadge();
+    if(typeof loadInbox === 'function') loadInbox();
+  }catch(e){ alert('Error de red: '+e.message); if(btn){ btn.disabled=false; btn.textContent='✔ Marcar leído'; } }
+}
+
+async function markMsgUnread(msgId, btn){
+  const tok = sessionStorage.getItem('mcp.admin.token');
+  if(!tok) return;
+  if(btn){ btn.disabled = true; btn.textContent = '…'; }
+  try{
+    const r = await fetch(`/api/admin/support/messages/${encodeURIComponent(msgId)}/mark-unread`, {method:'POST', headers:{'X-Admin-Token':tok}});
+    if(!r.ok){ alert(`Error ${r.status}`); if(btn){ btn.disabled=false; btn.textContent='📬 Marcar no leído'; } return; }
+    refreshInboxBadge();
+    if(typeof loadInbox === 'function') loadInbox();
+  }catch(e){ alert('Error de red: '+e.message); if(btn){ btn.disabled=false; btn.textContent='📬 Marcar no leído'; } }
+}
+window.markMsgRead = markMsgRead;
+window.markMsgUnread = markMsgUnread;
 window.refreshInboxBadge = refreshInboxBadge;
 
 async function doLogin(){

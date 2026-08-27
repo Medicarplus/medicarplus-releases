@@ -174,6 +174,7 @@ def build_support_router(db):
             iid = m.get("install_id") or ""
             lic = lic_map.get(iid) or {}
             messages.append({
+                "msg_id": str(m.get("_id")),
                 "install_id": iid,
                 "license_key": lic.get("license_key"),
                 "client_name": lic.get("client_name") or m.get("client_name") or "",
@@ -206,6 +207,49 @@ def build_support_router(db):
             {"$set": {"read_by_admin_at": datetime.now(timezone.utc).isoformat()}},
         )
         return {"ok": True, "marked_read": res.modified_count}
+
+    # ---------- Bandeja unificada: acciones por mensaje individual ----------
+    msg_router = APIRouter(prefix="/admin/support/messages", tags=["admin-support"])
+
+    @msg_router.post("/{msg_id}/mark-unread")
+    async def mark_single_unread(
+        msg_id: str,
+        x_admin_token: Optional[str] = Header(None),
+    ):
+        """Devuelve un mensaje inbound al estado NO leído (limpia read_by_admin_at)."""
+        _admin_ok(x_admin_token)
+        try:
+            from bson import ObjectId
+            oid = ObjectId(msg_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="invalid_msg_id")
+        r = await coll.update_one(
+            {"_id": oid, "direction": "inbound"},
+            {"$unset": {"read_by_admin_at": ""}},
+        )
+        if r.matched_count == 0:
+            raise HTTPException(status_code=404, detail="message_not_found")
+        return {"ok": True, "modified": r.modified_count}
+
+    @msg_router.post("/{msg_id}/mark-read")
+    async def mark_single_read(
+        msg_id: str,
+        x_admin_token: Optional[str] = Header(None),
+    ):
+        """Marca un mensaje individual como leído."""
+        _admin_ok(x_admin_token)
+        try:
+            from bson import ObjectId
+            oid = ObjectId(msg_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="invalid_msg_id")
+        r = await coll.update_one(
+            {"_id": oid, "direction": "inbound"},
+            {"$set": {"read_by_admin_at": datetime.now(timezone.utc).isoformat()}},
+        )
+        if r.matched_count == 0:
+            raise HTTPException(status_code=404, detail="message_not_found")
+        return {"ok": True, "modified": r.modified_count}
 
     # ---------- Endpoint público (autenticado por license_key) ----------
     # El cliente escribe desde la app y el mensaje entra en el historial como "inbound"
@@ -272,4 +316,4 @@ def build_support_router(db):
 
         return {"ok": True, "received_at": now.isoformat()}
 
-    return router, public_router
+    return router, public_router, msg_router
