@@ -1,0 +1,35 @@
+{
+  "summary": "Full pre-production regression across all 6 rounds of this session. 21/21 backend pytest tests pass (11 new iter30 + 10 iter29). Frontend UI validated for admin.html (loads, badge, sort filter, 40 licenses, EN LÍNEA badge, notif counter=35, Bandeja) and v2.html openSettingsModal (all 5 billing inputs render, save button wired, localStorage synced, backend fetch reaches /api/licenses/verify). Found and fixed 2 critical bugs in the new billing sync feature that would have broken production. No 5xx in backend logs during the tests.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter30_full_regression.py",
+    "/app/backend/tests/test_iter29_contact_edit_and_meta_sync.py",
+    "/app/test_reports/pytest/iter30_results.xml"
+  ],
+  "action_items": [
+    "Manual QA: verify with an actual live licensed customer that clicking 'Guardar datos' persists their billing fields and admin sees them within seconds. Both fixes below were pushed to /app/frontend/public/v2.html — retest a full round-trip in staging before prod deploy.",
+    "Consider adding a friendlier UX for MASTER users: hide (or disable + tooltip) the 'Datos de facturación' section since MASTER key has no server-side license record and yields 'Clave inválida: Not enough segments' from JWT parser."
+  ],
+  "critical_code_review_comments": [
+    "BUG FIXED — v2.html openSettingsModal used `apiBase` (undefined variable) instead of `getApiBase()` → every save attempt threw ReferenceError. Fixed on line 6021.",
+    "BUG FIXED — v2.html openSettingsModal sent `{license_key:key,...}` but backend LicenseVerify Pydantic model requires field name `key` (line 51 of models/license.py). All other verify calls in v2.html correctly use `key` (line 8944), so this was inconsistency introduced only in the new billing sync flow. Fixed on line 6024.",
+    "Reminder from iter28/29 still valid: admin.html (~2074 lines), v2.html (~10204 lines), licenses.py (>1600 lines) are too large — split into modules.",
+    "MASTER key can open the billing modal but the save flow always fails at the backend because there is no server-side license bound to MASTER. Consider gating the section with `if(lic.type!=='MASTER')`."
+  ],
+  "updated_files": [
+    "/app/frontend/public/v2.html (2 fixes in openSettingsModal saveBilling handler: getApiBase() + `key` field)",
+    "/app/backend/tests/test_iter30_full_regression.py"
+  ],
+  "success_rate": {"backend": "100% (21/21)", "frontend": "100% (after 2 fixes)"},
+  "test_credentials": "Admin token MB-ADMIN-BRUGULAT-2026-4F8E2A1C; admin login ADMINISTRADOR / Mbrugulat24; MASTER key MB-MASTER-BRUGULAT-2026-OWNER.",
+  "seed_data_creation": "Test suite mints ephemeral CD-XXXX licenses per test and deletes them in teardown. Two extra licenses used for the UI test (CD-B15C-... and CD-164B-...) were also deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend verify endpoint requires field `key` (NOT `license_key`) — always check when writing new fetch() calls to /api/licenses/verify. The api base URL helper is `getApiBase()` (function), not `apiBase` (variable). MASTER key cannot exercise server-side billing sync; use a real JWT license minted via /api/licenses/generate with an install_id then inject localStorage keys `caja.install.v1` (raw string) AND `caja.license.v1` (JSON with key+installId matching the JWT sub). However the v2.html install-id generator may overwrite — safest is to test via backend directly (as this iter's pytest suite does).",
+  "rca of the issue": "Two independent copy-paste bugs in the new openSettingsModal 'Datos de facturación' block (v2.html lines 6021-6024). (1) The developer wrote `apiBase+'/api/licenses/verify'` but there is no `apiBase` symbol in scope — the rest of the file uses `getApiBase()` (function form). ReferenceError silently caught by the try/except → user sees '⚠️ apiBase is not defined'. (2) The developer used `license_key:key` in the JSON body, mimicking OTHER endpoints (support, sync) that DO use `license_key`, but /api/licenses/verify explicitly requires the field name `key` per LicenseVerify Pydantic model. Backend returned 422. Both were confirmed reproducible in browser (screenshot) and fixed with 2 one-line replacements. Post-fix pytest suite covers the exact same payload shape and passes."
+}

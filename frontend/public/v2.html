@@ -5926,6 +5926,45 @@ function openSettingsModal(){
           <div style="text-align:center;font-size:11px;color:#86efac;margin-top:8px;font-weight:600">${isCA ? SUPPORT_HOURS_CA : SUPPORT_HOURS_ES}</div>
         </div>
 
+        <!-- Datos de facturación (se sincronizan con el admin automáticamente) -->
+        <div class="settings-section" style="background:linear-gradient(135deg,#052e1a 0%,#031f12 100%);border:1px solid #16a34a;border-radius:10px;padding:14px">
+          <div style="font-size:13px;font-weight:700;color:#86efac;letter-spacing:.5px;margin-bottom:4px">${isCA?'📇 Dades de facturació':'📇 Datos de facturación'}</div>
+          <div style="font-size:12px;color:#bbf7d0;opacity:.85;margin-bottom:10px">${isCA?'Modifica les teves dades. Es sincronitzen automàticament amb el nostre sistema.':'Modifica tus datos. Se sincronizan automáticamente con nuestro sistema.'}</div>
+          <div style="display:grid;gap:8px;font-size:12px">
+            <div>
+              <label style="font-size:10px;color:#86efac;letter-spacing:.3px;font-weight:600;text-transform:uppercase">${isCA?'Empresa / Centre':'Empresa / Centro'}</label>
+              <input id="setBillCompany" data-testid="bill-company" value="${(lic.centre||lic.client_name||'').replace(/"/g,'&quot;')}" style="width:100%;padding:8px 10px;background:#0f172a;border:1px solid #16a34a55;border-radius:6px;color:#e2e8f0;font-size:12px;font-family:Georgia,serif;box-sizing:border-box;margin-top:3px" />
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div>
+                <label style="font-size:10px;color:#86efac;letter-spacing:.3px;font-weight:600;text-transform:uppercase">${isCA?'Persona contacte':'Persona contacto'}</label>
+                <input id="setBillContact" data-testid="bill-contact" value="${(lic.contact_name||'').replace(/"/g,'&quot;')}" style="width:100%;padding:8px 10px;background:#0f172a;border:1px solid #16a34a55;border-radius:6px;color:#e2e8f0;font-size:12px;box-sizing:border-box;margin-top:3px" />
+              </div>
+              <div>
+                <label style="font-size:10px;color:#86efac;letter-spacing:.3px;font-weight:600;text-transform:uppercase">NIF / CIF</label>
+                <input id="setBillTaxId" data-testid="bill-tax" value="${(lic.tax_id||'').replace(/"/g,'&quot;')}" style="width:100%;padding:8px 10px;background:#0f172a;border:1px solid #16a34a55;border-radius:6px;color:#e2e8f0;font-size:12px;font-family:Consolas,monospace;box-sizing:border-box;margin-top:3px" />
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div>
+                <label style="font-size:10px;color:#86efac;letter-spacing:.3px;font-weight:600;text-transform:uppercase">Email</label>
+                <input id="setBillEmail" data-testid="bill-email" type="email" value="${(lic.email||'').replace(/"/g,'&quot;')}" style="width:100%;padding:8px 10px;background:#0f172a;border:1px solid #16a34a55;border-radius:6px;color:#e2e8f0;font-size:12px;box-sizing:border-box;margin-top:3px" />
+              </div>
+              <div>
+                <label style="font-size:10px;color:#86efac;letter-spacing:.3px;font-weight:600;text-transform:uppercase">${isCA?'Telèfon':'Teléfono'}</label>
+                <input id="setBillPhone" data-testid="bill-phone" value="${(lic.phone||'').replace(/"/g,'&quot;')}" style="width:100%;padding:8px 10px;background:#0f172a;border:1px solid #16a34a55;border-radius:6px;color:#e2e8f0;font-size:12px;box-sizing:border-box;margin-top:3px" />
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+            <button id="setBillSave" data-testid="btn-save-billing" class="btn" style="flex:1;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;font-weight:700;padding:10px">${isCA?'💾 Desar dades':'💾 Guardar datos'}</button>
+            <div id="setBillStatus" style="font-size:11px;color:#86efac;min-height:14px;flex:0 0 auto"></div>
+          </div>
+          <div style="margin-top:8px;padding:8px 10px;background:#0f172a;border:1px dashed #16a34a55;border-radius:6px;font-size:10px;color:#bbf7d0;line-height:1.4">
+            💳 ${isCA?'Per canviar la targeta o mètode de pagament, utilitza el botó "Gestionar subscripció" més avall (Portal Stripe).':'Para cambiar la tarjeta o método de pago, usa el botón "Gestionar suscripción" más abajo (Portal Stripe).'}
+          </div>
+        </div>
+
         <!-- Millora de pla / Suscripció -->
         <div class="settings-section" style="background:linear-gradient(135deg,#4c1d95 0%,#1e1b4b 100%);border:1px solid #7c3aed;border-radius:10px;padding:14px">
           <div style="font-size:13px;font-weight:700;color:#c4b5fd;letter-spacing:.5px;margin-bottom:4px">${isCA?'💎 Millora el teu pla':'💎 Mejora tu plan'}</div>
@@ -5952,6 +5991,51 @@ function openSettingsModal(){
   // Idioma
   document.getElementById('setLangCa').onclick=()=>{if(currentLang!=='ca'){toggleLang();}back.remove();openSettingsModal()};
   document.getElementById('setLangEs').onclick=()=>{if(currentLang!=='es'){toggleLang();}back.remove();openSettingsModal()};
+
+  // 📇 Datos de facturación — se sincronizan con admin via verify_license + client_meta aliases
+  const billSaveBtn=document.getElementById('setBillSave');
+  if(billSaveBtn){
+    billSaveBtn.onclick=async()=>{
+      const status=document.getElementById('setBillStatus');
+      const oldTxt=billSaveBtn.textContent;
+      billSaveBtn.disabled=true;billSaveBtn.textContent=isCA?'⏳ Desant…':'⏳ Guardando…';
+      status.textContent='';
+      try{
+        const payload={
+          company_name:document.getElementById('setBillCompany').value.trim(),
+          contact_name:document.getElementById('setBillContact').value.trim(),
+          email:document.getElementById('setBillEmail').value.trim(),
+          phone:document.getElementById('setBillPhone').value.trim(),
+          tax_id:document.getElementById('setBillTaxId').value.trim(),
+        };
+        // Guarda localmente en la licencia por si se pierde red
+        try{
+          const cur=JSON.parse(localStorage.getItem('caja.license.v1')||'{}');
+          Object.assign(cur,{centre:payload.company_name,contact_name:payload.contact_name,email:payload.email,phone:payload.phone,tax_id:payload.tax_id});
+          localStorage.setItem('caja.license.v1',JSON.stringify(cur));
+        }catch(e){}
+        // Sync con backend vía verify_license con client_meta (backend propaga aliases)
+        const licNow=(()=>{try{return JSON.parse(localStorage.getItem('caja.license.v1')||'{}')}catch(e){return{}}})();
+        const key=licNow.license_key||licNow.key;
+        if(!key){throw new Error('No hay clave de licencia local. Reactiva la app primero.')}
+        const r=await fetch(getApiBase()+'/api/licenses/verify',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({key:key,install_id:licNow.installId||licNow.install_id||'',client_meta:payload}),
+        });
+        const j=await r.json();
+        if(!r.ok||j.ok===false){throw new Error(j.reason||j.detail||('error '+r.status))}
+        // Actualiza la key si el backend devolvió una nueva (sync JWT)
+        if(j.new_key){try{const c=JSON.parse(localStorage.getItem('caja.license.v1')||'{}');c.license_key=j.new_key;localStorage.setItem('caja.license.v1',JSON.stringify(c));}catch(e){}}
+        status.innerHTML='<span style="color:#22c55e">✓ '+(isCA?'Desat i sincronitzat':'Guardado y sincronizado')+'</span>';
+      }catch(e){
+        status.innerHTML='<span style="color:#ef4444">⚠️ '+(e.message||'error').substring(0,60)+'</span>';
+      }finally{
+        billSaveBtn.disabled=false;billSaveBtn.textContent=oldTxt;
+        setTimeout(()=>{status.textContent=''},4000);
+      }
+    };
+  }
 
   // Comprovar actualitzacions
   document.getElementById('setCheckUpd').onclick=async()=>{
