@@ -6169,7 +6169,7 @@ function openUpgradeModal(){
 
   const back=document.createElement('div');
   back.className='modal-back';
-  back.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto';
+  back.style.cssText='position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto';
   back.innerHTML=`
     <div class="modal" style="background:linear-gradient(160deg,#0f172a,#020617);color:#e2e8f0;max-width:900px;width:100%;border-radius:16px;padding:28px;border:1px solid #334155;box-shadow:0 25px 60px rgba(0,0,0,.6)">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
@@ -6278,6 +6278,8 @@ function openUpgradeModal(){
     };
   });
 }
+// Expone openUpgradeModal en window para que sea accesible desde el modal de bloqueo
+try{ window.openUpgradeModal = openUpgradeModal; }catch(e){}
 if($('#btnSettings')){$('#btnSettings').onclick=openSettingsModal}
 
 // ============================================================================
@@ -8901,6 +8903,9 @@ function showActivationModal(){
     +'<div id="licStatus" style="color:#38bdf8;font-size:12px;margin-top:8px;display:none"></div>'
     +'</div>'
     +'<button id="licBtn" style="width:100%;padding:14px;background:linear-gradient(135deg,#f5b301,#d97706);color:#0f172a;border:none;border-radius:10px;font-family:Georgia,serif;font-size:16px;font-weight:700;letter-spacing:2px;cursor:pointer;text-transform:uppercase">'+L('✓ Activar Llicència','✓ Activar Licencia')+'</button>'
+    +'<div style="display:flex;align-items:center;gap:10px;margin:16px 0;color:#64748b;font-size:11px"><div style="flex:1;height:1px;background:#334155"></div><span>'+L('O si encara no tens llicència','O si aún no tienes licencia')+'</span><div style="flex:1;height:1px;background:#334155"></div></div>'
+    +'<button id="licUpgradeBtn" data-testid="lic-upgrade-btn" style="width:100%;padding:14px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border:none;border-radius:10px;font-family:Georgia,serif;font-size:15px;font-weight:700;letter-spacing:1.5px;cursor:pointer;text-transform:uppercase;box-shadow:0 8px 20px rgba(168,85,247,.35)">💎 '+L('Contractar / Renovar ara','Contratar / Renovar ahora')+'</button>'
+    +'<div style="font-size:10px;color:#94a3b8;text-align:center;margin-top:6px;font-style:italic">'+L('Pagament amb targeta segur via Stripe · Reps la clau al moment','Pago con tarjeta seguro vía Stripe · Recibes la clave al momento')+'</div>'
     +'<div style="text-align:center;margin-top:14px">'
     +'<a href="#" id="showAdminLogin" data-testid="admin-login-toggle" style="color:#a855f7;font-size:12px;text-decoration:underline;cursor:pointer">🔐 ¿Eres administrador?</a>'
     +'</div>'
@@ -8951,6 +8956,23 @@ function showActivationModal(){
   };
   btn.onclick=tryActivate;
   inp.onkeydown=(e)=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();tryActivate()}};
+  // 💎 Botón "Contratar / Renovar ahora" — abre el flow completo de Stripe checkout
+  // aunque el usuario esté bloqueado por licencia expirada/inexistente.
+  const upgradeBtn=back.querySelector('#licUpgradeBtn');
+  if(upgradeBtn){
+    upgradeBtn.onclick=()=>{
+      try{
+        if(typeof window.openUpgradeModal==='function'){
+          window.openUpgradeModal();
+        }else{
+          // Fallback: link a la landing
+          window.open(LIC.REQUEST_URL||'https://medicarplus.es','_blank');
+        }
+      }catch(e){
+        window.open(LIC.REQUEST_URL||'https://medicarplus.es','_blank');
+      }
+    };
+  }
   // 🔐 Admin login (usuario + contraseña) — segunda vía para entrar como MASTER
   const admToggle=back.querySelector('#showAdminLogin');
   const admBox=back.querySelector('#adminLoginBox');
