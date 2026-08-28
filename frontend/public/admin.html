@@ -1022,6 +1022,7 @@ function applyFilters(){
       <td style="padding:12px 10px" onclick="event.stopPropagation()">
         <button class="ghost" onclick="openDetail('${iidEsc}')" data-testid="btn-detail-${l.install_id}" style="background:linear-gradient(135deg,#f5b301,#eab308);color:#0b1121;border:none;padding:8px 14px;border-radius:6px;font-weight:800;font-size:12px;cursor:pointer">👁 Detalle</button>
         ${isTrial && isActive ? `<button class="green" onclick="adjustTrial('${iidEsc}', 7)" style="margin-top:4px;background:linear-gradient(135deg,#22c55e,#16a34a);border:none;color:#fff;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">+7d</button>` : ''}
+        ${(l.status||'').toLowerCase()==='revoked' ? `<button class="green" onclick="reactivateClient('${iidEsc}', this)" data-testid="btn-reactivate-${l.install_id}" style="margin-top:4px;background:linear-gradient(135deg,#22c55e,#15803d);border:none;color:#fff;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">↻ Reactivar</button>` : ''}
       </td>
     </tr>`;
   }).join('');
@@ -1075,6 +1076,29 @@ async function sendTestEmails(){
       alert('Error: '+(d.detail||JSON.stringify(d)));
     }
   }catch(e){alert('Error de red: '+e.message)}
+}
+
+// ↻ Reactivar una licencia previamente bloqueada
+async function reactivateClient(install_id, btn){
+  if(!confirm('¿Reactivar esta licencia?\n\nEl cliente volverá a tener acceso a la aplicación de inmediato.')) return;
+  if(btn){btn.disabled=true;btn.textContent='Reactivando…'}
+  try{
+    const r = await fetch(API_BASE+'/api/licenses/unrevoke',{
+      method:'POST',
+      headers:{'X-Admin-Token':ADMIN_TOKEN,'Content-Type':'application/json'},
+      body:JSON.stringify({install_id:install_id})
+    });
+    const d = await r.json();
+    if(r.ok){
+      alert('✅ Cliente reactivado. Ya puede volver a usar la app.');
+      const modal = document.querySelector('.modal-back'); if(modal) modal.remove();
+      delete ENRICHED_CACHE[install_id];
+      loadLicenses();
+    } else {
+      alert('Error: '+(d.detail||JSON.stringify(d)));
+      if(btn){btn.disabled=false;btn.innerHTML='↻ Reactivar'}
+    }
+  }catch(e){alert('Error de red: '+e.message);if(btn){btn.disabled=false;btn.innerHTML='↻ Reactivar'}}
 }
 
 // 🚫 Bloquear acceso (revoke): el cliente ya no puede usar la app, pero
@@ -1215,6 +1239,7 @@ async function openDetail(install_id){
         ${l.license_key?`<button class="ghost" style="background:#1e293b;border:1px solid #475569;color:#e2e8f0;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer" onclick="copyVal(this,\`${(l.license_key||'').replace(/\`/g,'\\\\\`')}\`)">🔑 Copiar clave</button>`:''}
         <button class="ghost" style="background:#1e293b;border:1px solid #475569;color:#e2e8f0;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer" onclick="copyVal(this,'${(l.install_id||'').replace(/'/g,"\\\\'")}')">🖥 Copiar Install ID</button>
         ${st==='active'?`<button data-testid="btn-block-client" style="background:linear-gradient(135deg,#7c2d12,#dc2626);border:1px solid #ef4444;color:#fff;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer" onclick="blockClient('${(l.install_id||'').replace(/'/g,"\\\\'")}',this)">🚫 Bloquear acceso</button>`:''}
+        ${st==='revoked'?`<button data-testid="btn-reactivate-modal" style="background:linear-gradient(135deg,#15803d,#22c55e);border:1px solid #4ade80;color:#fff;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer" onclick="reactivateClient('${(l.install_id||'').replace(/'/g,"\\\\'")}',this)">↻ Reactivar cliente</button>`:''}
         <button data-testid="btn-hard-delete" style="background:#0b1121;border:1px solid #7f1d1d;color:#fecaca;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer" onclick="hardDeleteClient('${(l.install_id||'').replace(/'/g,"\\\\'")}','${clientName.replace(/'/g,"\\\\'")}',this)">🗑 Borrar de la lista</button>
       </div>
     </div>

@@ -916,6 +916,42 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         updated = await coll.find_one({"_id": doc["_id"]})
         return _doc_to_record(updated)
 
+    # ---------- Unrevoke (reactivar licencia bloqueada) ----------
+    @router.post(
+        "/unrevoke",
+        response_model=LicenseRecord,
+        dependencies=[Depends(require_admin)],
+    )
+    async def unrevoke_license(request: Request) -> LicenseRecord:
+        """Reactiva una licencia previamente revocada (bloqueada por admin).
+
+        Solo funciona si `status == "revoked"`. No toca `expires_at`, así que
+        si la licencia ya caducó el cliente verá el mismo estado que antes de
+        bloquearla (deberá renovar). Idempotente vía audit_logs.
+        """
+        payload = await request.json()
+        install_id = (payload.get("install_id") or "").strip()
+        if not install_id:
+            raise HTTPException(status_code=400, detail="install_id requerido")
+        doc = await coll.find_one({"install_id": install_id, "status": "revoked"},
+                                  sort=[("revoked_at", -1)])
+        if not doc:
+            raise HTTPException(status_code=404, detail="No hay licencia revocada para este install_id")
+        await coll.update_one(
+            {"_id": doc["_id"]},
+            {"$set": {
+                "status": "active",
+                "revoked_at": None,
+                "revoked_reason": None,
+                "reactivated_at": _now().isoformat(),
+                "reactivated_by": "admin_ui",
+            }},
+        )
+        await _audit(request, "license.unrevoke", install_id,
+                     extra={"prev_revoked_reason": doc.get("revoked_reason")})
+        updated = await coll.find_one({"_id": doc["_id"]})
+        return _doc_to_record(updated)
+
     # ---------- Hard Delete (borra TODO histórico del cliente) ----------
     @router.post(
         "/hard-delete",
