@@ -402,6 +402,13 @@ async def _sync_license_from_subscription(sub: dict, install_id: str | None,
             prev_plan = str(existing.get("plan") or "").upper()
             new_plan = str(plan_family or "").upper()
             plan_changed = prev_plan != new_plan
+            # 🔒 Idempotencia · Evita enviar múltiples emails cuando Stripe dispara
+            # varios webhooks para el mismo periodo (checkout.session.completed +
+            # customer.subscription.updated + invoice.paid). Solo enviamos email
+            # cuando `expires_at` avanza a un valor NUEVO respecto al último email.
+            last_email_exp = existing.get("last_email_expires_at")
+            new_exp_iso = expires_at.isoformat() if expires_at else None
+            should_send_email = bool(client_email) and (last_email_exp != new_exp_iso or plan_changed)
             # 🔁 Si el pla canvia (trial → paid, standard → premium…), NO fem UPDATE
             # in-place perquè trencaríem la generació de referral_code i l'aplicació
             # de recompenses del referrer. En comptes d'això, revoquem l'antic i
@@ -450,44 +457,27 @@ async def _sync_license_from_subscription(sub: dict, install_id: str | None,
                             )
                     except Exception as _ref:  # noqa: BLE001
                         logger.exception("Referral reward (upgrade path) failed: %s", _ref)
-                # Envia email amb la nova clau
-                if client_email:
-                    try:
-                        from services import mailer as _mailer
-                        sent, info = await _mailer.send_license_email(
-                            to_email=client_email,
-                            client_name=company_name or client_email,
-                            install_id=install_id,
-                            license_key=jwt_key,
-                            plan=plan_family,
-                            expires_at=expires_at,
-                            subject_prefix=f"Plan actualizado a {new_plan}",
-                            referral_code=doc.get("referral_code"),
-                        )
-                        logger.info("Upgrade email (%s → %s) → %s: sent=%s info=%s",
-                                    prev_plan, new_plan, client_email, sent, info)
-                    except Exception as _em:  # noqa: BLE001
-                        logger.exception("Upgrade email failed: %s", _em)
+                # 🔕 REGLA DEL DUEÑO: cliente NO recibe email en cambios de plan.
+                # Stripe manda automáticamente el recibo de la nueva factura, con
+                # eso basta. Solo hacemos log interno para trazabilidad.
+                logger.info("Plan change (%s → %s) for %s (install=%s) · client email SKIPPED by policy",
+                            prev_plan, new_plan, client_email, install_id)
                 return
             # No canvi de pla → simple $set (renovació, canvi de període…)
             await db.licenses.update_one({"id": license_id}, {"$set": doc})
+            # 🔕 REGLA DEL DUEÑO: cliente NO recibe email en renovaciones mensuales/anuales.
+            # Stripe envía automáticamente la factura al email del cliente al cobrar.
+            # Solo hacemos log interno + marcamos idempotencia por si el flag se lee
+            # desde otro sitio.
             if client_email:
-                try:
-                    from services import mailer as _mailer
-                    sent, info = await _mailer.send_license_email(
-                        to_email=client_email,
-                        client_name=company_name or client_email,
-                        install_id=install_id,
-                        license_key=jwt_key,
-                        plan=plan_family,
-                        expires_at=expires_at,
-                        subject_prefix=f"Renovación suscripción {new_plan}",
-                        referral_code=doc.get("referral_code") or (existing or {}).get("referral_code"),
-                    )
-                    logger.info("Stripe subscription UPDATE email → %s (plan=%s): sent=%s info=%s",
-                                client_email, new_plan, sent, info)
-                except Exception as _em:
-                    logger.exception("Stripe update email failed: %s", _em)
+                await db.licenses.update_one(
+                    {"id": license_id},
+                    {"$set": {"last_email_expires_at": new_exp_iso,
+                              "last_email_reason": "renewed_no_email",
+                              "last_email_sent_at": _dt.now(_tz.utc).isoformat()}},
+                )
+                logger.info("Renewal detected → %s (plan=%s) · client email SKIPPED by policy (Stripe sends invoice)",
+                            client_email, new_plan)
         else:
             # Revoca llicències actives anteriors d'aquest install_id
             await db.licenses.update_many(
@@ -525,7 +515,8 @@ async def _sync_license_from_subscription(sub: dict, install_id: str | None,
                         logger.warning("Referral code %s is invalid or inactive", referred_by)
                 except Exception as _ref:  # noqa: BLE001
                     logger.exception("Referral reward processing failed: %s", _ref)
-            # 🆕 Envia email automàtic al client amb la llicència + guia
+            # 🆕 Envia email automàtic al client amb la llicència + guia (con idempotencia)
+            new_exp_iso = expires_at.isoformat() if expires_at else None
             if client_email:
                 try:
                     from services import mailer as _mailer
@@ -536,12 +527,20 @@ async def _sync_license_from_subscription(sub: dict, install_id: str | None,
                         license_key=jwt_key,
                         plan=plan_family,
                         expires_at=expires_at,
+                        reason="activated",
                         referral_code=doc.get("referral_code"),
                     )
-                    logger.info("Stripe subscription email → %s: sent=%s info=%s",
+                    # Marca para no duplicar en webhooks posteriores del mismo periodo
+                    await db.licenses.update_one(
+                        {"id": license_id},
+                        {"$set": {"last_email_expires_at": new_exp_iso,
+                                  "last_email_reason": "activated",
+                                  "last_email_sent_at": _dt.now(_tz.utc).isoformat()}},
+                    )
+                    logger.info("Activation email → %s: sent=%s info=%s",
                                 client_email, sent, info)
                 except Exception as _em:
-                    logger.exception("Stripe subscription email failed: %s", _em)
+                    logger.exception("Activation email failed: %s", _em)
         logger.info("License synced from subscription %s → install_id=%s exp=%s",
                     sub["id"], install_id, expires_at)
 
@@ -791,6 +790,29 @@ async def stripe_webhook(request: _FastReq):
                         except Exception as ex_notify:
                             logger.warning(f"[stripe] admin notify (failed) error: {ex_notify}")
 
+                        # 💌 Aviso al CLIENTE: "actualiza tu tarjeta" (idempotente por invoice)
+                        try:
+                            pay_doc2 = await db.payments.find_one({"_id": inv.get("id")}) or {}
+                            if cust_email and not pay_doc2.get("client_notified_failed"):
+                                from services import mailer as _mailer
+                                ok_cli, info_cli = await _mailer.send_payment_failed_email(
+                                    to_email=cust_email,
+                                    client_name=(lic or {}).get("client_name") or cust_email,
+                                    plan=(lic or {}).get("plan") or "MediCar Plus",
+                                    hosted_invoice_url=inv.get("hosted_invoice_url"),
+                                    amount_eur=(amount_due or 0) / 100.0,
+                                )
+                                if ok_cli:
+                                    await db.payments.update_one(
+                                        {"_id": inv.get("id")},
+                                        {"$set": {"client_notified_failed": True,
+                                                  "client_notified_failed_at": datetime.now(timezone.utc).isoformat()}},
+                                    )
+                                logger.info("Payment-failed email → %s: sent=%s info=%s",
+                                            cust_email, ok_cli, info_cli)
+                        except Exception as ex_client_mail:
+                            logger.warning(f"[stripe] client payment_failed email error: {ex_client_mail}")
+
                         # 🔔 Notificación al feed del admin (idempotente por invoice)
                         try:
                             from routes.admin_notifications import create_notification, TYPE_PAYMENT_FAILED
@@ -868,6 +890,37 @@ async def stripe_webhook(request: _FastReq):
                             dedupe_key=f"subscription_canceled:{sub_id_notif}",
                             extra={"stripe_subscription_id": sub_id_notif, "final_status": sub.get("status")},
                         )
+                        # 💌 Aviso al CLIENTE: email de despedida (idempotente por sub_id)
+                        try:
+                            lic_cancel = await db.licenses.find_one({"stripe_subscription_id": sub_id_notif})
+                            if cust_email_notif and lic_cancel and not lic_cancel.get("cancel_email_sent"):
+                                # Fecha "hasta cuando tiene acceso" = current_period_end si aún queda
+                                access_until_dt = None
+                                cpe = sub.get("current_period_end")
+                                if cpe:
+                                    try:
+                                        access_until_dt = datetime.fromtimestamp(int(cpe), tz=timezone.utc)
+                                        if access_until_dt <= datetime.now(timezone.utc):
+                                            access_until_dt = None
+                                    except Exception:
+                                        access_until_dt = None
+                                from services import mailer as _mailer
+                                ok_cli, info_cli = await _mailer.send_subscription_canceled_email(
+                                    to_email=cust_email_notif,
+                                    client_name=lic_cancel.get("client_name") or cust_email_notif,
+                                    plan=lic_cancel.get("plan") or "MediCar Plus",
+                                    access_until=access_until_dt,
+                                )
+                                if ok_cli:
+                                    await db.licenses.update_one(
+                                        {"id": lic_cancel["id"]},
+                                        {"$set": {"cancel_email_sent": True,
+                                                  "cancel_email_sent_at": datetime.now(timezone.utc).isoformat()}},
+                                    )
+                                logger.info("Cancel email → %s: sent=%s info=%s",
+                                            cust_email_notif, ok_cli, info_cli)
+                        except Exception as ex_cancel_mail:
+                            logger.warning(f"[stripe] cancel email error: {ex_cancel_mail}")
                     else:
                         # Cambio de plan: comparamos precio actual con precio anterior si lo tenemos
                         items = (sub.get("items", {}) or {}).get("data", []) or []

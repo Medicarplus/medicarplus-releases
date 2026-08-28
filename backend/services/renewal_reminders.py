@@ -24,41 +24,36 @@ SWEEP_INTERVAL_SECONDS = 24 * 3600
 def _render_reminder_html(*, client_name: str, plan: str, expires_at: datetime, days_left: int) -> str:
     expiry_txt = expires_at.strftime("%d/%m/%Y")
     days_txt = "mañana" if days_left <= 1 else f"en {days_left} días"
+    plan_up = (plan or "").upper()
+    plan_nice = {"TRIAL": "Prueba gratuita", "STD": "Standard", "STANDARD": "Standard",
+                 "PRM": "Premium", "PREMIUM": "Premium"}.get(plan_up, plan_up or "MediCar Plus")
     return f"""
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 0;font-family:Georgia,serif">
-  <tr><td align="center">
-    <table width="600" cellpadding="0" cellspacing="0" style="background:#1e293b;border:2px solid #f5b301;border-radius:14px;padding:32px;color:#e2e8f0">
-      <tr><td>
-        <h1 style="margin:0 0 6px 0;color:#f5b301;font-size:24px;letter-spacing:1px">MediCar Plus · Tu licencia caduca {days_txt}</h1>
-        <p style="margin:0 0 20px 0;color:#94a3b8;font-size:13px">Software comercial · Marc Brugulat Lopez</p>
+<!doctype html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:24px">
+<div style="max-width:560px;margin:auto;background:#1e293b;border-radius:14px;padding:32px;border:2px solid #f5b301">
+  <div style="text-align:center;font-size:52px;line-height:1">⏰</div>
+  <h1 style="text-align:center;color:#f5b301;font-size:22px;margin:12px 0 8px;font-weight:800">Tu licencia caduca {days_txt}</h1>
+  <p style="text-align:center;color:#94a3b8;font-size:12px;margin:0 0 24px;letter-spacing:.5px;text-transform:uppercase">MediCar Plus · Software profesional</p>
 
-        <p style="color:#e2e8f0;font-size:15px;line-height:1.55">Hola <b>{client_name}</b>,<br>
-        Tu licencia de MediCar Plus (plan <b>{plan}</b>) caduca el <b style="color:#f5b301">{expiry_txt}</b>.<br>
-        Para no perder el acceso a la aplicación ni a tus copias de seguridad, renueva antes de esa fecha.</p>
+  <p style="color:#cbd5e1;font-size:15px;line-height:1.65;margin:0 0 10px">Hola <b>{client_name}</b>,</p>
+  <p style="color:#cbd5e1;font-size:14.5px;line-height:1.65;margin:0 0 18px">
+    Tu plan <b>{plan_nice}</b> caduca el <b style="color:#f5b301">{expiry_txt}</b>. Para no perder el acceso a MediCar Plus ni a tus copias de seguridad, renueva antes de esa fecha.
+  </p>
 
-        <table width="100%" cellpadding="12" cellspacing="0" style="margin-top:20px">
-          <tr>
-            <td style="background:#0f172a;border:1px solid #22c55e;border-radius:8px;padding:16px;text-align:center">
-              <a href="https://medicarplus.es/#pricing" style="color:#22c55e;text-decoration:none;font-size:15px;font-weight:700">
-                💳 Renovar ahora — pago seguro con tarjeta
-              </a>
-            </td>
-          </tr>
-        </table>
+  <div style="text-align:center;margin:26px 0">
+    <a href="https://medicarplus.es/#pricing" style="display:inline-block;padding:16px 32px;background:#22c55e;color:#0f172a;text-decoration:none;font-weight:800;font-size:15px;border-radius:10px;letter-spacing:.3px">💳 Renovar mi licencia</a>
+  </div>
 
-        <p style="color:#cbd5e1;font-size:13px;margin-top:18px;line-height:1.6">
-          💡 <b style="color:#f5b301">Consejo:</b> si eliges la <b>suscripción</b> (mensual o anual), la renovación
-          será automática y no volverás a recibir este aviso: tu licencia se renueva sola cada periodo.
-        </p>
+  <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.35);border-radius:10px;padding:14px 16px;margin:20px 0 0;color:#bbf7d0;font-size:13px;line-height:1.6">
+    💡 Si eliges la <b>suscripción</b> (mensual o anual), a partir de ahora se renueva sola cada periodo y no volverás a recibir avisos como este.
+  </div>
 
-        <p style="color:#64748b;font-size:12px;margin-top:26px;padding-top:18px;border-top:1px solid #334155;line-height:1.5">
-          ¿Dudas? Escríbenos a info@medicarplus.es · Marc Brugulat Lopez<br>
-          Si ya has renovado, ignora este mensaje.
-        </p>
-      </td></tr>
-    </table>
-  </td></tr>
-</table>
+  <p style="color:#64748b;font-size:11px;margin-top:24px;padding-top:16px;border-top:1px solid #334155;line-height:1.6;text-align:center">
+    ¿Ya has renovado? Ignora este mensaje.<br>
+    ¿Dudas? Escribe a <a href="mailto:suport@medicarplus.es" style="color:#f5b301">suport@medicarplus.es</a><br>
+    <span style="color:#475569">MediCar Plus · Marc Brugulat Lopez · <a href="https://medicarplus.es" style="color:#475569">medicarplus.es</a></span>
+  </p>
+</div>
+</body></html>
 """.strip()
 
 

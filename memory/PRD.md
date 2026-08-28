@@ -1,5 +1,19 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-27 (parte 2) · Sistema de emails cliente refactorizado
+- **Bug arreglado**: cliente ya no recibe 3 emails duplicados por cada suscripción Stripe (checkout + subscription.updated + invoice.paid disparaban 1 email cada uno).
+- **Regla del dueño aplicada**: cliente SOLO recibe email en estos casos, cada uno con cabecera clara que explica el motivo:
+  1. **Activación inicial** (🎉 `reason=activated`) — al comprar/aprobar. Único email con la clave JWT.
+  2. **Aviso de caducidad** (⏰ `renewal_reminders.py`) — 7 días antes si NO tiene subscripción activa (Trial o compra puntual).
+  3. **Fallo de pago** (⚠️ nuevo `send_payment_failed_email`) — cuando Stripe no puede cobrar. CTA único: "Actualizar mi tarjeta" → hosted_invoice_url de Stripe.
+  4. **Cancelación / expiración** (👋 nuevo `send_subscription_canceled_email`) — despedida amable con "hasta cuándo tienes acceso" + link para volver.
+- **NO se envía email al cliente** en: renovaciones mensuales (Stripe manda factura), upgrades, downgrades, reactivaciones automáticas.
+- **Rediseño visual**: cabecera con emoji grande + título del MOTIVO en primer lugar; datos clave (Plan/Fecha) en formato humano; JWT movido al final en sección "Datos técnicos"; sin Georgia serif, con font system nativo; asunto corregido (era `PREMIUM (PREMIUM)` duplicado).
+- **Idempotencia**: campo `last_email_expires_at` en cada licencia. Se marca al enviar cualquier email → cualquier webhook posterior con mismo `expires_at` se salta.
+- Archivos tocados: `backend/services/mailer.py`, `backend/services/renewal_reminders.py`, `backend/server.py` (webhook Stripe).
+- **Acción manual pendiente del dueño**: activar en Stripe Dashboard → Settings → Emails → "Successful payments" y "Failed payments" para que Stripe mande recibos oficiales automáticos (nosotros solo mandamos avisos amables, no facturas fiscales).
+
+
 ## 2026-02-27 · Panel Maestro unificado (chuleta admin)
 - Creado `/app/frontend/public/panel-maestro.html`: 1 solo panel en castellano con 5 tabs (Credenciales · Links · Funciones · Estado · Operativa), buscador cross-tab, credenciales borrosas con hover-to-reveal, botones "Copiar" al portapapeles con feedback visual.
 - Sustituye a los 2 antiguos ficheros obsoletos `index-guies.html` y `guia-medicar-plus.html` (última actualización 15/07/2026, en catalán, con URL preview muerta que provocaba pantalla en blanco).
