@@ -916,6 +916,70 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         updated = await coll.find_one({"_id": doc["_id"]})
         return _doc_to_record(updated)
 
+    # ---------- Hard Delete (borra TODO histórico del cliente) ----------
+    @router.post(
+        "/hard-delete",
+        dependencies=[Depends(require_admin)],
+    )
+    async def hard_delete_license(request: Request) -> dict:
+        """Borra por completo todas las licencias asociadas a un install_id.
+
+        Uso: cuando el admin quiere QUITAR a alguien de la lista definitivamente
+        (no solo bloquearle el acceso). Deja el registro en `audit_logs` para
+        trazabilidad. También cancela suscripción Stripe si existe.
+        """
+        payload = await request.json()
+        install_id = (payload.get("install_id") or "").strip()
+        confirm = payload.get("confirm") == True
+        reason = (payload.get("reason") or "hard_deleted_by_admin").strip()
+        if not install_id:
+            raise HTTPException(status_code=400, detail="install_id requerido")
+        if not confirm:
+            raise HTTPException(status_code=400, detail="Debe confirmar el borrado (confirm=true)")
+
+        # 1) Cancela suscripciones Stripe activas asociadas
+        docs_to_delete = await coll.find({"install_id": install_id}).to_list(length=None)
+        cancelled_subs = []
+        try:
+            import os as _os
+            import stripe as _stripe_sdk  # type: ignore
+            stripe_key = (_os.environ.get("STRIPE_API_KEY") or "").strip()
+            if stripe_key:
+                _stripe_sdk.api_key = stripe_key
+                for d in docs_to_delete:
+                    sub_id = d.get("stripe_subscription_id")
+                    if sub_id and sub_id not in cancelled_subs:
+                        try:
+                            _stripe_sdk.Subscription.delete(sub_id)
+                            cancelled_subs.append(sub_id)
+                        except Exception as ex:
+                            logger.warning("Stripe cancel failed for %s: %s", sub_id, ex)
+        except Exception as ex:  # noqa: BLE001
+            logger.warning("Stripe SDK unavailable during hard-delete: %s", ex)
+
+        # 2) Borra todas las licencias con ese install_id
+        result = await coll.delete_many({"install_id": install_id})
+        deleted_count = result.deleted_count
+
+        # 3) Borra también instalaciones tracking
+        try:
+            db_ref = coll.database
+            await db_ref.installations.delete_many({"install_id": install_id})
+        except Exception as ex:  # noqa: BLE001
+            logger.warning("installations cleanup failed: %s", ex)
+
+        await _audit(request, "license.hard_delete", install_id,
+                     extra={"deleted_licenses": deleted_count,
+                            "cancelled_stripe_subs": cancelled_subs,
+                            "reason": reason})
+        return {
+            "ok": True,
+            "install_id": install_id,
+            "deleted_licenses": deleted_count,
+            "cancelled_stripe_subs": cancelled_subs,
+        }
+
+
     # ---------- Current active license (public, per polling d'auto-upgrade) ----------
     @router.get("/current")
     @_rate("60/minute")

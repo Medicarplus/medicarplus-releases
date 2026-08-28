@@ -78,6 +78,7 @@
       <span style="font-size:11px;color:var(--muted)">Env: <span id="envLabel" style="color:var(--green);font-weight:700">—</span></span>
       <button id="btnNotifs" onclick="toggleNotifPanel()" style="position:relative;padding:8px 14px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700" title="Notificaciones · pagos fallidos, cancelaciones, altas">🔔 Notificaciones <span id="notifBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:#dc2626;color:#fff;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:800;box-shadow:0 0 0 2px var(--bg)">0</span></button>
       <button class="ghost" onclick="loadLicenses()" data-testid="btn-reload">🔄 Recarregar</button>
+      <button class="ghost" onclick="sendTestEmails()" data-testid="btn-test-emails" title="Envía los 4 tipos de emails de cliente a un email de prueba (para ver cómo llegan)" style="background:#1e293b;border:1px solid #7c3aed;color:#c4b5fd;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">📧 Test emails</button>
       <button class="red" onclick="logout()">🚪 Salir</button>
       <button id="btnUnifiedInbox" data-testid="btn-unified-inbox" onclick="openUnifiedInbox()" style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:800;cursor:pointer;position:relative;margin-left:8px">📨 Bandeja <span id="inboxBadge" data-testid="inbox-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:800;margin-left:6px;animation:_pulse 1.5s ease-in-out infinite"></span></button>
     </div>
@@ -1053,6 +1054,84 @@ function adjustTrialCustom(install_id){
   adjustTrial(install_id, n);
 }
 
+// 📧 Test Email Suite: envía los 4 emails de cliente a un email de prueba
+async function sendTestEmails(){
+  const defaultEmail = localStorage.getItem('caja.admin.testEmail.v1') || 'marcbrugulat@hotmail.com';
+  const to = prompt('¿A qué email enviar los 4 emails de prueba?\n\nRecibirás:\n1. 🎉 Activación (con clave demo)\n2. 🔄 Renovación\n3. ⚠️ Pago fallido\n4. 👋 Cancelación', defaultEmail);
+  if(!to || to.indexOf('@')<0) return;
+  localStorage.setItem('caja.admin.testEmail.v1', to);
+  if(!confirm(`Enviar 4 emails de prueba a:\n${to}\n\n¿Continuar?`)) return;
+  try{
+    const r = await fetch(API_BASE+'/api/admin/emails/preview',{
+      method:'POST',
+      headers:{'X-Admin-Token':ADMIN_TOKEN,'Content-Type':'application/json'},
+      body:JSON.stringify({to_email:to, reasons:['activated','renewed','payment_failed','canceled']})
+    });
+    const d = await r.json();
+    if(r.ok && d.ok){
+      const lines = (d.results||[]).map(x=>`  ${x.sent?'✅':'❌'} ${x.reason} · ${x.info}`).join('\n');
+      alert(`Enviados a ${to}:\n\n${lines}\n\nRevisa tu bandeja (puede tardar 1-2 min).`);
+    } else {
+      alert('Error: '+(d.detail||JSON.stringify(d)));
+    }
+  }catch(e){alert('Error de red: '+e.message)}
+}
+
+// 🚫 Bloquear acceso (revoke): el cliente ya no puede usar la app, pero
+// permanece en la lista por si más tarde se le quiere reactivar.
+async function blockClient(install_id, btn){
+  const reason = prompt('Motivo del bloqueo (opcional):', 'blocked_by_admin');
+  if(reason===null) return; // canceló
+  if(!confirm('¿BLOQUEAR el acceso de este cliente?\n\nEl cliente no podrá usar la app.\nSigue en tu lista y puedes reactivarlo cuando quieras.')) return;
+  if(btn){btn.disabled=true;btn.textContent='Bloqueando…'}
+  try{
+    const r = await fetch(API_BASE+'/api/licenses/revoke',{
+      method:'POST',
+      headers:{'X-Admin-Token':ADMIN_TOKEN,'Content-Type':'application/json'},
+      body:JSON.stringify({install_id:install_id, reason:(reason||'blocked_by_admin')})
+    });
+    const d = await r.json();
+    if(r.ok){
+      alert('✅ Cliente bloqueado. Sigue en tu lista con estado REVOCADA.');
+      const modal = document.querySelector('.modal-back'); if(modal) modal.remove();
+      delete ENRICHED_CACHE[install_id];
+      loadLicenses();
+    } else {
+      alert('Error: '+(d.detail||JSON.stringify(d)));
+      if(btn){btn.disabled=false;btn.innerHTML='🚫 Bloquear acceso'}
+    }
+  }catch(e){alert('Error de red: '+e.message);if(btn){btn.disabled=false;btn.innerHTML='🚫 Bloquear acceso'}}
+}
+
+// 🗑 Borrar de la lista (hard-delete): revoca + elimina el registro completo,
+// cancela la suscripción Stripe activa si existe. ACCIÓN IRREVERSIBLE.
+async function hardDeleteClient(install_id, clientName, btn){
+  const msg = `⚠ ACCIÓN IRREVERSIBLE ⚠\n\nEsto va a:\n• Cancelar su suscripción de Stripe (si tiene)\n• Borrar TODAS sus licencias del sistema\n• Sacar a "${clientName}" de tu lista para siempre\n\n¿Estás SEGURO?`;
+  if(!confirm(msg)) return;
+  const typed = prompt('Escribe BORRAR (en mayúsculas) para confirmar:', '');
+  if(typed !== 'BORRAR'){alert('Cancelado.');return}
+  if(btn){btn.disabled=true;btn.textContent='Borrando…'}
+  try{
+    const r = await fetch(API_BASE+'/api/licenses/hard-delete',{
+      method:'POST',
+      headers:{'X-Admin-Token':ADMIN_TOKEN,'Content-Type':'application/json'},
+      body:JSON.stringify({install_id:install_id, confirm:true, reason:'hard_deleted_by_admin_ui'})
+    });
+    const d = await r.json();
+    if(r.ok && d.ok){
+      let extra = '';
+      if((d.cancelled_stripe_subs||[]).length) extra = `\n\n💳 Suscripciones Stripe canceladas: ${d.cancelled_stripe_subs.length}`;
+      alert(`✅ "${clientName}" borrado del sistema.\n\nLicencias eliminadas: ${d.deleted_licenses}${extra}`);
+      const modal = document.querySelector('.modal-back'); if(modal) modal.remove();
+      delete ENRICHED_CACHE[install_id];
+      loadLicenses();
+    } else {
+      alert('Error: '+(d.detail||JSON.stringify(d)));
+      if(btn){btn.disabled=false;btn.innerHTML='🗑 Borrar de la lista'}
+    }
+  }catch(e){alert('Error de red: '+e.message);if(btn){btn.disabled=false;btn.innerHTML='🗑 Borrar de la lista'}}
+}
+
 async function openDetail(install_id){
   const enP = ENRICHED_CACHE[install_id] || await fetchEnriched(install_id);
   if(!enP){alert('Error obteniendo datos');return}
@@ -1135,6 +1214,8 @@ async function openDetail(install_id){
         ${l.client_email?`<button class="ghost" style="background:linear-gradient(135deg,#7c3aed,#a855f7);border:1px solid #c084fc;color:#fff;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;position:relative" onclick="openSupportChat('${(l.license_key||l.id||l.install_id||'').replace(/'/g,"\\\\'")}','${emailEsc}','${clientName.replace(/'/g,"\\\\'")}')" data-testid="btn-support-chat">💬 Enviar mensaje ${(SUPPORT_UNREAD_CACHE[l.install_id]||0)>0?`<span style="background:#ef4444;color:#fff;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:800;margin-left:6px" data-testid="badge-unread-detail">🔔 ${SUPPORT_UNREAD_CACHE[l.install_id]}</span>`:''}</button>`:''}
         ${l.license_key?`<button class="ghost" style="background:#1e293b;border:1px solid #475569;color:#e2e8f0;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer" onclick="copyVal(this,\`${(l.license_key||'').replace(/\`/g,'\\\\\`')}\`)">🔑 Copiar clave</button>`:''}
         <button class="ghost" style="background:#1e293b;border:1px solid #475569;color:#e2e8f0;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer" onclick="copyVal(this,'${(l.install_id||'').replace(/'/g,"\\\\'")}')">🖥 Copiar Install ID</button>
+        ${st==='active'?`<button data-testid="btn-block-client" style="background:linear-gradient(135deg,#7c2d12,#dc2626);border:1px solid #ef4444;color:#fff;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer" onclick="blockClient('${(l.install_id||'').replace(/'/g,"\\\\'")}',this)">🚫 Bloquear acceso</button>`:''}
+        <button data-testid="btn-hard-delete" style="background:#0b1121;border:1px solid #7f1d1d;color:#fecaca;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer" onclick="hardDeleteClient('${(l.install_id||'').replace(/'/g,"\\\\'")}','${clientName.replace(/'/g,"\\\\'")}',this)">🗑 Borrar de la lista</button>
       </div>
     </div>
 

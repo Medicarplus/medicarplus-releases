@@ -1087,6 +1087,74 @@ async def run_sms_monthly_billing_now(request: _FastReq):
     return await bill_all_pending_sms_monthly(db, _stripe_sdk)
 
 
+@app.post("/api/admin/emails/preview")
+async def send_preview_emails(request: _FastReq):
+    """Admin: envía los 4 tipos de emails al cliente (activated, renewed,
+    payment_failed, subscription_canceled) a la dirección indicada para poder
+    comprobar cómo llegan antes de que un cliente real los reciba.
+
+    Body: {to_email: str, reasons?: [str] = ["activated","renewed","payment_failed","canceled"]}
+    Requiere cabecera X-Admin-Token.
+    """
+    from fastapi import HTTPException as _HTTPExc
+    token = request.headers.get("X-Admin-Token", "")
+    if not token or token != os.environ.get("LICENSE_ADMIN_TOKEN", ""):
+        raise _HTTPExc(status_code=401, detail="Admin token invàlid o absent")
+
+    body = await request.json()
+    to_email = (body.get("to_email") or "").strip()
+    if not to_email or "@" not in to_email:
+        raise _HTTPExc(status_code=400, detail="to_email inválido")
+    reasons = body.get("reasons") or ["activated", "renewed", "payment_failed", "canceled"]
+
+    from services import mailer as _mailer
+    from datetime import datetime as _dtm, timezone as _tzz, timedelta as _td
+
+    fake_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJURVNULVBSRVZJRVctS0VZIiwiaWF0IjoxNzM4OTgyNDAwLCJleHAiOjE3NzA1MTg0MDAsImluc3RhbGxfaWQiOiJDRC1QUkVWLTEyMzQtVEVTVCJ9.SIGNATURE_DEMO_ONLY_NOT_REAL_JUST_FOR_EMAIL_PREVIEW_1234567890"
+    fake_install_id = "CD-PREVIEW-1234-TEST"
+    fake_expires = _dtm.now(_tzz.utc) + _td(days=365)
+    client_name = "Cliente de Prueba"
+    plan = "PREMIUM"
+
+    results = []
+    # 1) activated / renewed (usan send_license_email)
+    for r in reasons:
+        try:
+            if r in ("activated", "renewed", "upgraded", "downgraded", "reactivated"):
+                sent, info = await _mailer.send_license_email(
+                    to_email=to_email,
+                    client_name=client_name,
+                    install_id=fake_install_id,
+                    license_key=fake_key,
+                    plan=plan,
+                    expires_at=fake_expires,
+                    reason=r,
+                    referral_code="MC-DEMO-9999",
+                )
+            elif r == "payment_failed":
+                sent, info = await _mailer.send_payment_failed_email(
+                    to_email=to_email,
+                    client_name=client_name,
+                    plan=plan,
+                    hosted_invoice_url="https://invoice.stripe.com/i/preview_demo",
+                    amount_eur=39.90,
+                )
+            elif r in ("canceled", "cancelled", "subscription_canceled"):
+                sent, info = await _mailer.send_subscription_canceled_email(
+                    to_email=to_email,
+                    client_name=client_name,
+                    plan=plan,
+                    access_until=_dtm.now(_tzz.utc) + _td(days=15),
+                )
+            else:
+                sent, info = False, f"unknown reason: {r}"
+            results.append({"reason": r, "sent": sent, "info": info})
+        except Exception as ex:  # noqa: BLE001
+            results.append({"reason": r, "sent": False, "info": f"error: {ex}"})
+
+    return {"ok": True, "to_email": to_email, "results": results}
+
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
