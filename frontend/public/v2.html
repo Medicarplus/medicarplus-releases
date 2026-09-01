@@ -10773,25 +10773,49 @@ setTimeout(()=>{
     };
     back.querySelector('#bkLater').onclick = () => back.remove();
   }
+  // 🛡️ Carga el script sync-client.js on-demand si aún no está en la página.
+  // Esto blinda contra caches obsoletos de v2.html que no incluyen el <script>.
+  function _ensureSyncClient(){
+    return new Promise((resolve) => {
+      if(window.mcSync) return resolve(true);
+      // Elimina el tag existente (si lo hay) para forzar re-fetch y re-ejecución
+      document.querySelectorAll('script[src*="sync-client.js"]').forEach(s => s.remove());
+      const s = document.createElement('script');
+      s.src = '/sync-client.js?v=' + Date.now();
+      s.async = false;
+      s.onload = () => setTimeout(() => resolve(!!window.mcSync), 50);
+      s.onerror = () => resolve(false);
+      document.head.appendChild(s);
+    });
+  }
   window.openSyncSettings = async function(){
-    // 🛡️ Auto-init defensivo: si mcSync todavía no arrancó (o falló en background),
-    // reintenta la inicialización aquí en lugar de reventar al pulsar el botón.
+    // 🛡️ Auto-recuperación total: si el script no está cargado, lo carga on-demand.
+    if(!window.mcSync){
+      const okLoaded = await _ensureSyncClient();
+      if(!okLoaded){
+        alert('No se pudo cargar el módulo de sincronización.\n\nPor favor recarga la página con Ctrl+Shift+R (o Cmd+Shift+R en Mac).');
+        return;
+      }
+    }
+    // Si mcSync existe pero no inicializado (cfg.apiBase null), corre initSync
     try{
-      if(!window.mcSync){ alert('Sync no disponible: recarga la página.'); return; }
-      const st0 = await window.mcSync.getStatus().catch(()=>null);
-      if(!st0){
-        // No hay init previo, hacemos init ahora
+      const testMode = window.mcSync.getMode && window.mcSync.getMode();
+      if(!testMode){
         if(typeof initSync === 'function') await initSync();
       }
-    }catch(e){ /* ignoramos, el getStatus siguiente decidirá */ }
+    }catch(e){ /* ignoramos, siguiente check decidirá */ }
     let st;
     try{ st = await window.mcSync.getStatus(); }
     catch(e){
-      alert('No se pudo conectar con el servicio de sincronización.\n\n' +
-            '• Comprueba tu conexión a internet.\n' +
-            '• Si acabas de abrir la app, espera 3 segundos y vuelve a intentarlo.\n\n' +
-            'Detalles técnicos: ' + e.message);
-      return;
+      // Un intento más: reinit y reintentar
+      try{ if(typeof initSync === 'function') await initSync(); st = await window.mcSync.getStatus(); }
+      catch(e2){
+        alert('No se pudo conectar con el servicio de sincronización.\n\n' +
+              '• Comprueba tu conexión a internet.\n' +
+              '• Recarga con Ctrl+Shift+R.\n\n' +
+              'Detalles técnicos: ' + e2.message);
+        return;
+      }
     }
     const back = document.createElement('div'); back.className='modal-back'; back.style.zIndex='100010';
     const mode = st.my_mode || 'independent';
