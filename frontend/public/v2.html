@@ -286,6 +286,7 @@
         <button class="btn" id="btnExport" style="background:#1a3a2a;border-color:#3ddc97;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-testid="btn-save-backup">💾 Guardar copia</button>
         <button class="btn" id="btnImportJson" style="background:#3a2f1a;border-color:#f5b301;color:#fed7aa;font-weight:600;width:100%;text-align:left" data-testid="btn-restore-backup">📂 Restaurar copia</button>
         <button class="btn" id="btnHistory" style="background:#1f3a2e;border-color:#2a5e44;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-testid="btn-history">🛡️ Historial de copias</button>
+        <button class="btn" id="btnSendSyncCopy" style="background:#2a1f3a;border-color:#f5b301;color:#fed7aa;font-weight:600;width:100%;text-align:left" data-testid="btn-send-sync-copy">📤 Enviar copia al otro PC</button>
       </div>
     </div>
     <div class="btn-dropdown" id="btnAccounting" style="position:relative;display:inline-block">
@@ -3327,6 +3328,11 @@ function openEditEntryModal(e, ownerDate){
 }
 function confirmModal(title,message,onYes,yesLabel='Sí, borrar',danger=true,extraBtn=null){const back=document.createElement('div');back.className='modal-back';let extraHTML=extraBtn?`<button class="btn btn-primary" data-extra>${extraBtn.label}</button>`:'';back.innerHTML=`<div class="modal"><h3>${title}</h3><p>${message}</p><div class="row"><button class="btn" data-no>Cancelar</button>${extraHTML}<button class="btn ${danger?'btn-danger':'btn-primary'}" data-yes>${yesLabel}</button></div></div>`;document.body.appendChild(back);back.querySelector('[data-no]').focus();back.addEventListener('click',ev=>{if(ev.target===back)back.remove();if(ev.target.matches('[data-no]'))back.remove();if(ev.target.matches('[data-yes]')){back.remove();onYes()}if(ev.target.matches('[data-extra]')&&extraBtn){back.remove();extraBtn.onClick()}});document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){back.remove();document.removeEventListener('keydown',esc)}})}
 $('#btnHistory').onclick=()=>{$('#btnBackupMenu').style.display='none';openBackupHistory()};
+// 📤 Enviar copia al otro PC (acceso directo, en cualquier momento del día)
+$('#btnSendSyncCopy').onclick=()=>{
+  $('#btnBackupMenu').style.display='none';
+  if(typeof window.openSyncSettings === 'function') window.openSyncSettings();
+};
 // 🪗 Accordion top-menu: solo uno de los 4 desplegables superiores (Copias de seguridad,
 // Contabilidad, Estadísticas, Utilidades) puede estar abierto a la vez. Al abrir uno,
 // se cierran automáticamente los otros 3.
@@ -10773,18 +10779,27 @@ setTimeout(()=>{
     };
     back.querySelector('#bkLater').onclick = () => back.remove();
   }
-  // 🛡️ Carga el script sync-client.js on-demand si aún no está en la página.
-  // Esto blinda contra caches obsoletos de v2.html que no incluyen el <script>.
-  function _ensureSyncClient(){
+  // 🛡️ Carga el script sync-client.js on-demand y espera hasta que mcSync exista.
+  // Si el tag ya está pero mcSync es undefined (raro), fuerza recarga con cache-bust.
+  function _ensureSyncClient(maxWaitMs){
+    maxWaitMs = maxWaitMs || 8000;
     return new Promise((resolve) => {
       if(window.mcSync) return resolve(true);
-      // Elimina el tag existente (si lo hay) para forzar re-fetch y re-ejecución
+      // Elimina tag existente y añade uno nuevo con cache-busting
       document.querySelectorAll('script[src*="sync-client.js"]').forEach(s => s.remove());
       const s = document.createElement('script');
       s.src = '/sync-client.js?v=' + Date.now();
       s.async = false;
-      s.onload = () => setTimeout(() => resolve(!!window.mcSync), 50);
-      s.onerror = () => resolve(false);
+      let done = false;
+      const finish = (ok) => { if(!done){ done = true; resolve(ok); } };
+      // Polling activo: comprobar cada 100ms si mcSync ya existe
+      const t0 = Date.now();
+      const poll = setInterval(() => {
+        if(window.mcSync){ clearInterval(poll); finish(true); }
+        else if(Date.now() - t0 > maxWaitMs){ clearInterval(poll); finish(false); }
+      }, 100);
+      s.onload = () => { /* poll ya está mirando */ };
+      s.onerror = () => { clearInterval(poll); finish(false); };
       document.head.appendChild(s);
     });
   }
