@@ -3020,13 +3020,14 @@ function getSaldoInicial(){
 }
 function setSaldoInicial(obj){
   if(!obj || obj._delete){ localStorage.removeItem(_saldoInicialKey()); return; }
-  // Guardamos solo los 3 campos limpios
+  // Guardamos solo los 3 campos limpios + _mtime para sync LWW multi-PC
   const clean = {
     fecha: obj.fecha,
     efectivo: +obj.efectivo || 0,
     banco:    +obj.banco    || 0,
     cambio:   +obj.cambio   || 0,
-    nota:     obj.nota      || ''
+    nota:     obj.nota      || '',
+    _mtime:   Date.now()
   };
   localStorage.setItem(_saldoInicialKey(), JSON.stringify(clean));
 }
@@ -5452,6 +5453,8 @@ function saveCambio(o){
     o._bulk = restante;
     if(restante === 0){ delete o._bulk_seed; delete o._bulk; }
   }
+  // 🔗 _mtime para sync multi-PC (last-write-wins entre 2 ordenadores)
+  o._mtime = Date.now();
   localStorage.setItem(CAMBIO_KEY,JSON.stringify(o));
 }
 function cambioSubtotal(d,o){
