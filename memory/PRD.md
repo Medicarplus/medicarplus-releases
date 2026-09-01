@@ -1235,3 +1235,8 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - Favoritos se guardan en localStorage `caja.sync.admfavs.v1` (solo local: excluido de ambos motores de sync — prefijo caja.sync. en el cliente inline + añadido a NON_SYNCABLE del motor heartbeat 60s).
 - Render con optgroups: "⭐ FAVORITOS" arriba, "TODOS LOS CLIENTES" debajo. Selección se mantiene al marcar/quitar.
 - Testeado E2E en simulación file:// (como el .exe): añadir → optgroup arriba → persiste al reabrir modal → quitar → limpio. Todo OK.
+
+### ✅ Deploy a producción verificado + limpieza slots · Jun 2026
+- Producción (project-helper-47.emergent.host) confirmada con el fix _apiBase() y Favoritos Admin.
+- Slots MASTER liberados en producción vía reset-devices (removed:2 — incluía TESTPC1 fantasma). Los PCs reales del usuario se re-registran solos al abrir la app.
+- list-licenses en producción devuelve 15 clientes reales para el desplegable admin.
