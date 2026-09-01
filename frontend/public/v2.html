@@ -1944,11 +1944,14 @@ function openStats(initialSection){
   const TRAF_COLOR_PALETTE = ['#3ddc97','#7ec8ff','#f5b301','#c084fc','#f472b6','#22d3ee','#fb923c','#a3e635','#e879f9','#fca5a5','#60a5fa','#facc15','#4ade80','#f87171','#818cf8','#94a3b8'];
   function _trafNormalizeCat(raw){
     // Retorna la categoria "canònica" (només normalitza majúscules i sinònims coneguts).
-    // Preserva tota la resta de valors del CSV.
+    // Preserva tota la resta de valors del CSV. IMPORTANT: Prórroga i Periódica es
+    // mantenen separades de Renovación perquè al món DGT/certificats són tipus distints.
     const t = String(raw||'').split(',')[0].trim();
     if(!t) return 'Otro';
     const lc = t.toLowerCase();
-    if(lc.startsWith('renov') || lc.startsWith('prorrog') || lc.startsWith('próroga') || lc.startsWith('proroga')) return 'Renovación';
+    if(lc.startsWith('renov')) return 'Renovación';
+    if(lc.startsWith('prorrog') || lc.startsWith('próroga') || lc.startsWith('proroga')) return 'Prórroga';
+    if(lc.startsWith('period') || lc.startsWith('periód') || lc.startsWith('periodic')) return 'Periódica';
     if(lc.startsWith('exped') || lc.startsWith('obten')) return 'Expedición';
     if(lc.startsWith('dupl'))  return 'Duplicado';
     if(lc.startsWith('canj'))  return 'Canje';
@@ -1988,15 +1991,15 @@ function openStats(initialSection){
   const TRAF_CATS = _trafDetectedCats();
   const TRAF_COLORS = TRAF_CATS.reduce((o,c) => { o[c] = _trafColorFor(c, TRAF_CATS); return o; }, {});
   // Agrega totes les entrades CSV DGT (kind:'TRAF' && _csv:true) del state.byDate
-  // Filtre opcional per any i mes. Retorna { count, byCat:{Renovación:n,...}, importe, tasas, dailyMap? }
+  // Filtre opcional per any i mes. Retorna { count, byCat:{...}, byCatGroup:{cat:{group:n,...}}, importe, tasas, monthly, daily }
   function _trafAggregate(filterYear, filterMonth){
     let src = {};
     try{ src = (JSON.parse(localStorage.getItem(KEYS['trafic']))||{}).byDate || {} }catch(e){ src = {} }
     // 🚫 Excluye entradas con importe=0 y tasa=0 SALVO que el usuario active "Contar 0€"
     // (sincronizado con el toggle del panel principal y del Libro de Registro)
     const countZero = (typeof getCountZero === 'function') ? getCountZero() : (localStorage.getItem('caja.count_zero') === '1');
-    const out = { count:0, byCat:{}, importe:0, tasas:0, daily:{}, monthly:{} };
-    TRAF_CATS.forEach(c => out.byCat[c] = 0);
+    const out = { count:0, byCat:{}, byCatGroup:{}, importe:0, tasas:0, daily:{}, monthly:{} };
+    TRAF_CATS.forEach(c => { out.byCat[c] = 0; out.byCatGroup[c] = {}; });
     for(const iso of Object.keys(src)){
       const dt = new Date(iso + 'T00:00:00');
       if(isNaN(dt)) continue;
@@ -2012,26 +2015,63 @@ function openStats(initialSection){
         // Exclusión 0€: si subtotal (importe - descuento + tasa) es 0 → NO cuenta como certificado
         if(!countZero && (imp - desc + ta) <= 0) continue;
         const cat = _trafBaseCat(e.tipo);
+        const grp = String(e.grupo || 'Sin grupo').trim() || 'Sin grupo';
         out.count++;
         out.byCat[cat] = (out.byCat[cat] || 0) + 1;
+        // Desglose por grupo para tooltips (Marina, Armas, Náutica, Conducir, etc.)
+        if(!out.byCatGroup[cat]) out.byCatGroup[cat] = {};
+        out.byCatGroup[cat][grp] = (out.byCatGroup[cat][grp] || 0) + 1;
         out.importe += imp;
         out.tasas += ta;
         // Monthly bucket
         const mk = `${y}-${String(m).padStart(2,'0')}`;
-        if(!out.monthly[mk]) out.monthly[mk] = { count:0, byCat:{}, importe:0, tasas:0 };
+        if(!out.monthly[mk]) out.monthly[mk] = { count:0, byCat:{}, byCatGroup:{}, importe:0, tasas:0 };
         out.monthly[mk].count++;
         out.monthly[mk].byCat[cat] = (out.monthly[mk].byCat[cat] || 0) + 1;
+        if(!out.monthly[mk].byCatGroup[cat]) out.monthly[mk].byCatGroup[cat] = {};
+        out.monthly[mk].byCatGroup[cat][grp] = (out.monthly[mk].byCatGroup[cat][grp] || 0) + 1;
         out.monthly[mk].importe += imp;
         out.monthly[mk].tasas += ta;
         // Daily bucket (only used in monthly view)
-        if(!out.daily[iso]) out.daily[iso] = { count:0, byCat:{}, importe:0, tasas:0 };
+        if(!out.daily[iso]) out.daily[iso] = { count:0, byCat:{}, byCatGroup:{}, importe:0, tasas:0 };
         out.daily[iso].count++;
         out.daily[iso].byCat[cat] = (out.daily[iso].byCat[cat] || 0) + 1;
+        if(!out.daily[iso].byCatGroup[cat]) out.daily[iso].byCatGroup[cat] = {};
+        out.daily[iso].byCatGroup[cat][grp] = (out.daily[iso].byCatGroup[cat][grp] || 0) + 1;
         out.daily[iso].importe += imp;
         out.daily[iso].tasas += ta;
       }
     }
     return out;
+  }
+  // 📝 Overrides manuales por (año-mes | categoría). Persisten en localStorage.
+  // Permiten al usuario ajustar cifras "a mano" cuando algo no cuadra (p.ej. una
+  // Prórroga contada de más). Se muestran con borde amarillo + ✏️ en la celda.
+  const TRAF_OVR_KEY = 'caja.stats.traffic.overrides.v1';
+  function _trafGetOverrides(){
+    try{ return JSON.parse(localStorage.getItem(TRAF_OVR_KEY)) || {} }catch(e){ return {} }
+  }
+  function _trafSetOverride(monthKey, cat, value){
+    const ovr = _trafGetOverrides();
+    if(!ovr[monthKey]) ovr[monthKey] = {};
+    if(value === null || value === undefined || value === '' || Number.isNaN(+value)){
+      delete ovr[monthKey][cat];
+      if(Object.keys(ovr[monthKey]).length === 0) delete ovr[monthKey];
+    } else {
+      ovr[monthKey][cat] = +value;
+    }
+    localStorage.setItem(TRAF_OVR_KEY, JSON.stringify(ovr));
+  }
+  function _trafGetOverride(monthKey, cat){
+    const ovr = _trafGetOverrides();
+    return (ovr[monthKey] && ovr[monthKey][cat] !== undefined) ? +ovr[monthKey][cat] : null;
+  }
+  // Renderiza el tooltip HTML con el desglose por grupo de una categoría
+  function _trafTooltipHtml(cat, groupMap){
+    if(!groupMap || !Object.keys(groupMap).length) return '';
+    const parts = Object.entries(groupMap).sort((a,b)=>b[1]-a[1])
+      .map(([g,n]) => `${n}× ${g}`).join(' · ');
+    return `${cat}: ${parts}`;
   }
   function _fmtEur(n){ n = +n || 0; return n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €' }
   function _barChartHtml(labels, values, colors, height){
@@ -2049,6 +2089,54 @@ function openStats(initialSection){
     }).join('');
     return `<div style="display:flex;align-items:flex-end;gap:6px;height:${H}px;padding:8px;background:#0e1117;border:1px solid #2a3040;border-radius:8px">${bars}</div>`;
   }
+  // 🖊 Edición inline de celdas de la tabla Tráfico. Guarda overrides.
+  function _trafBindCellEditing(root){
+    const cells = root.querySelectorAll('.traf-cell');
+    cells.forEach(td => {
+      td.addEventListener('click', () => {
+        if(td.querySelector('input')) return; // ya editando
+        const mk = td.dataset.mk;
+        const cat = td.dataset.cat;
+        const csv = +td.dataset.csv || 0;
+        const cur = (td.textContent || '').replace(/[^\d\-]/g,'').trim();
+        const original = td.innerHTML;
+        td.innerHTML = `<input type="number" min="0" step="1" value="${cur||''}" style="width:100%;background:#0e1117;color:#fbbf24;border:2px solid #fbbf24;border-radius:4px;padding:3px 5px;font-size:12px;text-align:center;font-family:'Consolas',monospace;font-weight:700;box-sizing:border-box"/>`;
+        const inp = td.querySelector('input');
+        inp.focus(); inp.select();
+        let committed = false;
+        const commit = () => {
+          if(committed) return; committed = true;
+          const raw = inp.value.trim();
+          if(raw === '' || +raw === csv){
+            // Vacío o igual al CSV → borra override
+            _trafSetOverride(mk, cat, null);
+          } else {
+            _trafSetOverride(mk, cat, +raw);
+          }
+          renderTrafficTable();
+          try{ if(typeof toast === 'function') toast('✏️ Cifra actualizada'); }catch(e){}
+        };
+        const cancel = () => { if(committed) return; committed = true; td.innerHTML = original; };
+        inp.addEventListener('blur', commit);
+        inp.addEventListener('keydown', (ev) => {
+          if(ev.key === 'Enter'){ ev.preventDefault(); inp.blur(); }
+          else if(ev.key === 'Escape'){ ev.preventDefault(); cancel(); }
+        });
+      });
+      // Doble clic → reset override (solo si tenía)
+      td.addEventListener('dblclick', (ev) => {
+        ev.preventDefault(); ev.stopPropagation();
+        const mk = td.dataset.mk;
+        const cat = td.dataset.cat;
+        const ov = _trafGetOverride(mk, cat);
+        if(ov === null) return; // no había override
+        _trafSetOverride(mk, cat, null);
+        renderTrafficTable();
+        try{ if(typeof toast === 'function') toast('↺ Valor CSV restaurado'); }catch(e){}
+      });
+    });
+  }
+
   function renderTrafficTable(){
     const year = +$('#stYear').value;
     const mode = $('#stMode').value;
@@ -2071,14 +2159,102 @@ function openStats(initialSection){
       const catValues = CATS.map(c => agg.byCat[c] || 0);
       const catColors = CATS.map(c => COLORS[c]);
       const catChart = _barChartHtml(CATS, catValues, catColors, 140);
-      // Table: monthly breakdown by category
+      // Table: monthly breakdown by category (con edición inline + tooltip por grupo)
+      const ovrAll = _trafGetOverrides();
+      // Pre-calcula totales considerando overrides para KPIs superiores + totales fila
+      const displayByCat = {}; CATS.forEach(c => displayByCat[c] = 0);
+      let displayCount = 0;
       const rows = MESOS.map((mName, mi) => {
         const k = `${year}-${String(mi+1).padStart(2,'0')}`;
-        const md = agg.monthly[k] || { count:0, byCat:{}, importe:0, tasas:0 };
-        const catCells = CATS.map(c => `<td style="padding:6px 8px;border:1px solid #2a3040;text-align:center;font-family:'Consolas',monospace;color:${COLORS[c]}">${md.byCat[c] || ''}</td>`).join('');
-        return `<tr><td style="padding:6px 10px;border:1px solid #2a3040;font-weight:600;background:#141821;text-transform:capitalize">${mName}</td><td style="padding:6px 10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff">${md.count || ''}</td>${catCells}<td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;font-family:'Consolas',monospace;color:#3ddc97">${md.importe ? _fmtEur(md.importe) : ''}</td><td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;font-family:'Consolas',monospace;color:#f5b301">${md.tasas ? _fmtEur(md.tasas) : ''}</td></tr>`;
+        const md = agg.monthly[k] || { count:0, byCat:{}, byCatGroup:{}, importe:0, tasas:0 };
+        const rowOvr = ovrAll[k] || {};
+        // Calcula el valor a mostrar por cada categoría (override si existe, si no CSV)
+        const dispCat = {}; let rowTotal = 0;
+        CATS.forEach(c => {
+          const csvVal = md.byCat[c] || 0;
+          const ov = (rowOvr[c] !== undefined) ? +rowOvr[c] : null;
+          const val = (ov !== null) ? ov : csvVal;
+          dispCat[c] = { val, ov, csv: csvVal, groups: (md.byCatGroup && md.byCatGroup[c]) || {} };
+          rowTotal += val;
+          displayByCat[c] += val;
+        });
+        displayCount += rowTotal;
+        const catCells = CATS.map(c => {
+          const d = dispCat[c];
+          const isOv = d.ov !== null;
+          const tip = _trafTooltipHtml(c, d.groups) || `${c}: sin datos`;
+          const pencil = isOv ? '<span style="position:absolute;top:1px;right:3px;font-size:9px;color:#fbbf24">✏️</span>' : '';
+          const borderExtra = isOv ? 'border:2px solid #fbbf24;' : 'border:1px solid #2a3040;';
+          return `<td class="traf-cell" data-mk="${k}" data-cat="${c}" data-csv="${d.csv}" title="${tip.replace(/"/g,'&quot;')}${isOv?'\\n(Editado a mano · doble clic para volver al CSV)':''}" style="padding:6px 8px;${borderExtra}text-align:center;font-family:'Consolas',monospace;color:${COLORS[c]};cursor:cell;position:relative;user-select:none">${d.val || ''}${pencil}</td>`;
+        }).join('');
+        return `<tr><td style="padding:6px 10px;border:1px solid #2a3040;font-weight:600;background:#141821;text-transform:capitalize">${mName}</td><td style="padding:6px 10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff">${rowTotal || ''}</td>${catCells}<td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;font-family:'Consolas',monospace;color:#3ddc97">${md.importe ? _fmtEur(md.importe) : ''}</td><td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;font-family:'Consolas',monospace;color:#f5b301">${md.tasas ? _fmtEur(md.tasas) : ''}</td></tr>`;
       }).join('');
-      const catTotCells = CATS.map(c => `<td style="padding:8px;border:1px solid #2a3040;background:#1f2530;text-align:center;font-weight:700;color:${COLORS[c]}">${agg.byCat[c] || ''}</td>`).join('');
+      const catTotCells = CATS.map(c => `<td style="padding:8px;border:1px solid #2a3040;background:#1f2530;text-align:center;font-weight:700;color:${COLORS[c]}">${displayByCat[c] || ''}</td>`).join('');
+      // Sobreescribe agg con los valores mostrados (para las KPIs de arriba)
+      agg._displayCount = displayCount;
+      agg._displayByCat = displayByCat;
+
+      // 📋 Desglose profesional por Tipo + Grupo + Precio (como tu Excel de cierre de mes)
+      // Agrupa todas las entradas del año por combinación única "Tipo|Grupo|Precio unitario"
+      // y calcula cantidad + total facturado. Ideal para conciliar contabilidad al fin de mes.
+      const detailMap = {}; // key: "Tipo|Grupo|precio" → {tipo, grupo, precio, count, total, color}
+      try{
+        const src = (JSON.parse(localStorage.getItem(KEYS['trafic'])) || {}).byDate || {};
+        const countZero = (typeof getCountZero === 'function') ? getCountZero() : (localStorage.getItem('caja.count_zero') === '1');
+        for(const iso of Object.keys(src)){
+          const dt = new Date(iso + 'T00:00:00');
+          if(isNaN(dt) || dt.getFullYear() !== +year) continue;
+          for(const e of (src[iso] || [])){
+            if(e.kind !== 'TRAF' || !e._csv) continue;
+            const imp = +e.importe || 0;
+            const ta = +e.tasa || 0;
+            const desc = +e.descuento || 0;
+            if(!countZero && (imp - desc + ta) <= 0) continue;
+            const tipo = _trafBaseCat(e.tipo);
+            const grupo = String(e.grupo || 'Sin grupo').trim() || 'Sin grupo';
+            const precio = +imp || 0;
+            const k = `${tipo}||${grupo}||${precio.toFixed(2)}`;
+            if(!detailMap[k]) detailMap[k] = { tipo, grupo, precio, count:0, total:0, tasa:0 };
+            detailMap[k].count++;
+            detailMap[k].total += imp;
+            detailMap[k].tasa += ta;
+          }
+        }
+      }catch(err){ console.warn('desglose error', err); }
+      const detailRows = Object.values(detailMap)
+        .sort((a,b) => a.tipo.localeCompare(b.tipo) || a.grupo.localeCompare(b.grupo) || b.precio - a.precio)
+        .map(d => {
+          const color = COLORS[d.tipo] || '#94a3b8';
+          return `<tr>
+            <td style="padding:6px 10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff">${d.count}</td>
+            <td style="padding:6px 10px;border:1px solid #2a3040;color:${color};font-weight:700">${d.tipo}</td>
+            <td style="padding:6px 10px;border:1px solid #2a3040;color:#e2e8f0">${d.grupo}</td>
+            <td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;color:#94a3b8">${d.precio ? _fmtEur(d.precio) : '—'}</td>
+            <td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;color:#3ddc97;font-weight:700">${d.total ? _fmtEur(d.total) : '—'}</td>
+          </tr>`;
+        }).join('');
+      const detailTotalCount = Object.values(detailMap).reduce((s,d) => s + d.count, 0);
+      const detailTotalAmount = Object.values(detailMap).reduce((s,d) => s + d.total, 0);
+      const detailBlock = detailRows ? `
+        <div style="margin-top:16px">
+          <div class="small" style="margin-bottom:8px;color:#94a3b8;font-weight:600;letter-spacing:.5px">📋 DESGLOSE PROFESIONAL · ${year} · agrupado por Tipo + Grupo + Precio</div>
+          <table style="border-collapse:collapse;font-size:12px;font-family:'Consolas','Menlo',monospace;width:100%">
+            <thead><tr style="background:#1a1e26">
+              <th style="padding:8px;border:1px solid #2a3040;color:#7ec8ff">CANTIDAD</th>
+              <th style="padding:8px;border:1px solid #2a3040;color:#f5b301;text-align:left">TIPO</th>
+              <th style="padding:8px;border:1px solid #2a3040;color:#c084fc;text-align:left">GRUPO</th>
+              <th style="padding:8px;border:1px solid #2a3040;color:#94a3b8">PRECIO UNIT.</th>
+              <th style="padding:8px;border:1px solid #2a3040;color:#3ddc97">TOTAL</th>
+            </tr></thead>
+            <tbody>${detailRows}</tbody>
+            <tfoot><tr style="background:#1f2530">
+              <td style="padding:8px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff;font-size:14px">${detailTotalCount}</td>
+              <td colspan="3" style="padding:8px;border:1px solid #2a3040;font-weight:700;color:#e2e8f0">TOTAL FACTURACIÓN</td>
+              <td style="padding:8px;border:1px solid #2a3040;text-align:right;font-weight:700;color:#3ddc97;font-size:14px">${_fmtEur(detailTotalAmount)}</td>
+            </tr></tfoot>
+          </table>
+          <div class="small" style="color:#64748b;margin-top:6px;font-style:italic">💡 Este bloque replica tu Excel de cierre de mes: cada combinación única de Tipo·Grupo·Precio aparece como una fila con su cantidad y facturación total.</div>
+        </div>` : '';
       body.innerHTML = `
         <div data-testid="traffic-stats-year" style="display:flex;flex-direction:column;gap:14px">
           <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
@@ -2094,7 +2270,7 @@ function openStats(initialSection){
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
             <div style="padding:10px 12px;background:#0e1117;border:1px solid #2a3040;border-left:3px solid #7ec8ff;border-radius:6px">
               <div class="small" style="color:#94a3b8;letter-spacing:.4px">Total entradas</div>
-              <div style="font-size:20px;font-weight:700;color:#7ec8ff;font-family:'Consolas',monospace">${agg.count || 0}</div>
+              <div id="_traf_kpi_count" style="font-size:20px;font-weight:700;color:#7ec8ff;font-family:'Consolas',monospace">${agg.count || 0}</div>
             </div>
             <div style="padding:10px 12px;background:#0e1117;border:1px solid #2a3040;border-left:3px solid #3ddc97;border-radius:6px">
               <div class="small" style="color:#94a3b8;letter-spacing:.4px">Total importes</div>
@@ -2120,13 +2296,19 @@ function openStats(initialSection){
             <tbody>${rows}</tbody>
             <tfoot><tr style="background:#1f2530">
               <td style="padding:10px;border:1px solid #2a3040;font-weight:700">TOTAL ${year}</td>
-              <td style="padding:10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff;font-size:14px">${agg.count || ''}</td>
+              <td style="padding:10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff;font-size:14px">${displayCount || ''}</td>
               ${catTotCells}
               <td style="padding:10px;border:1px solid #2a3040;text-align:right;font-weight:700;color:#3ddc97">${agg.importe ? _fmtEur(agg.importe) : ''}</td>
               <td style="padding:10px;border:1px solid #2a3040;text-align:right;font-weight:700;color:#f5b301">${agg.tasas ? _fmtEur(agg.tasas) : ''}</td>
             </tr></tfoot>
           </table>
+          <div class="small" style="color:#fbbf24;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:6px;padding:8px 12px;line-height:1.5">
+            ✏️ <b>Corrección manual</b> · Haz clic en cualquier celda de tipo (Renovación, Prórroga, Periódica, etc.) para ajustar el número a mano si algo no cuadra. <b>Pasa el ratón por encima</b> para ver el desglose por grupo (Marina, Armas, Conducir…). Doble clic sobre una celda editada (borde amarillo) para volver al valor original del CSV.
+          </div>
+          ${detailBlock}
         </div>`;
+      // Inicializa handlers de edición inline (después de inyectar el HTML)
+      setTimeout(() => _trafBindCellEditing(body), 0);
     }else{
       // Monthly detail view: aggregate + daily breakdown
       const agg = _trafAggregate(year, monthSel);
