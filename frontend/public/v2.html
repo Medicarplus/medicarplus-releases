@@ -10774,7 +10774,25 @@ setTimeout(()=>{
     back.querySelector('#bkLater').onclick = () => back.remove();
   }
   window.openSyncSettings = async function(){
-    const st = await window.mcSync.getStatus();
+    // 🛡️ Auto-init defensivo: si mcSync todavía no arrancó (o falló en background),
+    // reintenta la inicialización aquí en lugar de reventar al pulsar el botón.
+    try{
+      if(!window.mcSync){ alert('Sync no disponible: recarga la página.'); return; }
+      const st0 = await window.mcSync.getStatus().catch(()=>null);
+      if(!st0){
+        // No hay init previo, hacemos init ahora
+        if(typeof initSync === 'function') await initSync();
+      }
+    }catch(e){ /* ignoramos, el getStatus siguiente decidirá */ }
+    let st;
+    try{ st = await window.mcSync.getStatus(); }
+    catch(e){
+      alert('No se pudo conectar con el servicio de sincronización.\n\n' +
+            '• Comprueba tu conexión a internet.\n' +
+            '• Si acabas de abrir la app, espera 3 segundos y vuelve a intentarlo.\n\n' +
+            'Detalles técnicos: ' + e.message);
+      return;
+    }
     const back = document.createElement('div'); back.className='modal-back'; back.style.zIndex='100010';
     const mode = st.my_mode || 'independent';
     const peersHtml = (st.peers||[]).length
