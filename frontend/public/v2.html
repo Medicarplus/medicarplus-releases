@@ -10728,9 +10728,10 @@ setTimeout(()=>{
   function _apiBase(){ return window.REACT_APP_BACKEND_URL || location.origin; }
   async function initSync(){
     const lic = _lic(); const iid = _installId();
-    if(!lic || !lic.license_key || !iid || !window.mcSync) return;
+    const licKey = lic && (lic.license_key || lic.key);
+    if(!licKey || !iid || !window.mcSync) return;
     const r = await window.mcSync.init({
-      apiBase: _apiBase(), licenseKey: lic.license_key, installId: iid,
+      apiBase: _apiBase(), licenseKey: licKey, installId: iid,
       onModeChange: (mode) => { const el=document.getElementById('syncBadge'); if(el){el.textContent=mode==='linked'?'🔗 Fusionado':'🔒 Independiente';el.style.color=mode==='linked'?'#22c55e':'#94a3b8';} },
       onIncoming: (merged) => { Object.entries(merged||{}).forEach(([k,v])=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}); try{if(typeof render==='function')render();if(typeof update==='function')update();}catch(e){} }
     });

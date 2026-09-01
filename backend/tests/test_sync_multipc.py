@@ -94,6 +94,23 @@ async def setup_standard_license(db):
     return test_key
 
 
+async def setup_trial_license(db):
+    test_key = f"TEST-TRIAL-SYNC-{uuid.uuid4().hex[:12]}"
+    doc = {
+        "id": str(uuid.uuid4()),
+        "install_id": "TEST-TRIAL-BASE",
+        "license_key": test_key,
+        "plan": "TRIAL",
+        "plan_family": "TRIAL",
+        "status": "active",
+        "client_email": "sync-trial-test@medicarplus.es",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(days=60)).isoformat(),
+    }
+    await db.licenses.insert_one(doc)
+    return test_key
+
+
 async def cleanup(db, license_keys, install_ids):
     """Limpieza: borra licencias de test + sync_states + sync_devices."""
     import hashlib
@@ -124,8 +141,12 @@ async def main():
 
     KEY_PRM = await setup_premium_license(db)
     KEY_STD = await setup_standard_license(db)
+    KEY_TRIAL = await setup_trial_license(db)
     print(f"License Premium test: {KEY_PRM}")
     print(f"License Standard test: {KEY_STD}")
+    print(f"License Trial test:    {KEY_TRIAL}")
+    PC_TR1 = f"PCTR1-{uuid.uuid4().hex[:8]}"
+    PC_TR2 = f"PCTR2-{uuid.uuid4().hex[:8]}"
     print(f"PCs: {PC1}, {PC2}, {PC3}, {PC_STD}\n")
 
     async with httpx.AsyncClient(base_url=API_URL, timeout=10.0) as ac:
@@ -373,9 +394,109 @@ async def main():
         })
         check(r.status_code == 403, f"Standard backup/send rechazado (got {r.status_code})")
 
+        # ──────────────────────────────────────────────────────────────────
+        print(f"\n{Colors.Y}▸ Escenario 16: TRIAL SÍ permite sync (mismo comportamiento que Premium){Colors.E}")
+        r = await ac.post("/api/sync/heartbeat", json={"license_key": KEY_TRIAL, "install_id": PC_TR1})
+        d = r.json()
+        check(d.get("is_premium") is True, "TRIAL is_premium=True (permite sync)")
+        check(d.get("max_devices") == 2, f"TRIAL max_devices=2 (got {d.get('max_devices')})")
+        r = await ac.post("/api/sync/heartbeat", json={"license_key": KEY_TRIAL, "install_id": PC_TR2})
+        check(r.json().get("authorized") is True, "TRIAL PC2 autorizado")
+
+        # Modo linked funciona
+        r = await ac.post("/api/sync/mode", json={"license_key": KEY_TRIAL, "install_id": PC_TR1, "mode": "linked"})
+        check(r.status_code == 200, "TRIAL mode/linked OK (no 403)")
+        r = await ac.post("/api/sync/mode", json={"license_key": KEY_TRIAL, "install_id": PC_TR2, "mode": "linked"})
+        check(r.status_code == 200, "TRIAL PC2 mode/linked OK")
+
+        # Push funciona
+        now = datetime.now(timezone.utc).isoformat()
+        r = await ac.post("/api/sync/push", json={
+            "license_key": KEY_TRIAL, "install_id": PC_TR1,
+            "entries": {"trial.test": {"value": {"a": 1}, "updated_at": now}}
+        })
+        check(r.status_code == 200, f"TRIAL push OK (got {r.status_code})")
+
+        # Pull funciona
+        r = await ac.get(f"/api/sync/pull?license_key={KEY_TRIAL}&install_id={PC_TR2}")
+        val = r.json().get("entries", {}).get("trial.test", {}).get("value")
+        check(val == {"a": 1}, f"TRIAL PC2 recibe datos de PC1 (got {val})")
+
+        # Backup manual funciona
+        r = await ac.post("/api/sync/backup/send", json={
+            "license_key": KEY_TRIAL, "install_id": PC_TR1,
+            "data": {"trial.snap": [{"id": "T1"}]}, "label": "TRIAL backup"
+        })
+        check(r.status_code == 200, "TRIAL backup/send OK")
+        r = await ac.get(f"/api/sync/backup/pending?license_key={KEY_TRIAL}&install_id={PC_TR2}")
+        check(r.json().get("count") == 1, "TRIAL PC2 ve la copia pendiente")
+
+        # ──────────────────────────────────────────────────────────────────
+        print(f"\n{Colors.Y}▸ Escenario 17: Flujo completo end-to-end simulando 2 secretarias{Colors.E}")
+        # Reset a modo independent, empezamos de cero
+        await ac.post("/api/sync/mode", json={"license_key": KEY_PRM, "install_id": PC1, "mode": "linked"})
+        await ac.post("/api/sync/mode", json={"license_key": KEY_PRM, "install_id": PC2, "mode": "linked"})
+
+        # Secretaria (PC1) mete revisiones día 6
+        rev_pc1 = {"caja.byDate.v1": {"value": {"2026-04-06": [
+            {"id": "rev-001", "kind": "REV", "amount": 50, "updated_at": now},
+            {"id": "rev-002", "kind": "REV", "amount": 75, "updated_at": now}
+        ]}, "updated_at": now}}
+        r = await ac.post("/api/sync/push", json={"license_key": KEY_PRM, "install_id": PC1, "entries": rev_pc1})
+        check(r.status_code == 200, "Secretaria PC1 sube 2 revisiones")
+
+        # Gerente (PC2) hace pull y añade gastos día 6 (mismo día!) SIN sobrescribir revisiones
+        r = await ac.get(f"/api/sync/pull?license_key={KEY_PRM}&install_id={PC2}")
+        cloud = r.json().get("entries", {}).get("caja.byDate.v1", {}).get("value", {})
+        cloud_day6 = cloud.get("2026-04-06", [])
+        check(len(cloud_day6) == 2, f"Gerente PC2 pull → ve 2 revisiones (got {len(cloud_day6)})")
+
+        # Gerente añade 2 gastos al mismo día
+        gerente_day6 = cloud_day6 + [
+            {"id": "gasto-001", "kind": "GAS", "amount": -20, "updated_at": now},
+            {"id": "gasto-002", "kind": "GAS", "amount": -35, "updated_at": now}
+        ]
+        r = await ac.post("/api/sync/push", json={
+            "license_key": KEY_PRM, "install_id": PC2,
+            "entries": {"caja.byDate.v1": {"value": {"2026-04-06": gerente_day6}, "updated_at": now}}
+        })
+        check(r.status_code == 200, "Gerente PC2 sube 2 gastos en el mismo día")
+
+        # Secretaria hace pull y ve TODO (revisiones + gastos, sin duplicados)
+        r = await ac.get(f"/api/sync/pull?license_key={KEY_PRM}&install_id={PC1}")
+        final_day6 = r.json().get("entries", {}).get("caja.byDate.v1", {}).get("value", {}).get("2026-04-06", [])
+        ids = [e.get("id") for e in final_day6]
+        check(len(final_day6) == 4, f"PC1 final ve 4 entradas del mismo día (got {len(final_day6)})")
+        check("rev-001" in ids and "rev-002" in ids, "revisiones preservadas")
+        check("gasto-001" in ids and "gasto-002" in ids, "gastos añadidos")
+        check(len(set(ids)) == 4, "IDs únicos (sin duplicados)")
+
+        # ──────────────────────────────────────────────────────────────────
+        print(f"\n{Colors.Y}▸ Escenario 18: Backup manual → aplicar → sin duplicados{Colors.E}")
+        # PC1 cambia a independiente y envía backup con datos nuevos + repetidos
+        await ac.post("/api/sync/mode", json={"license_key": KEY_PRM, "install_id": PC1, "mode": "independent"})
+        await ac.post("/api/sync/mode", json={"license_key": KEY_PRM, "install_id": PC2, "mode": "independent"})
+        backup_data = {
+            "caja.byDate.v1": {"2026-04-06": [
+                {"id": "rev-001", "kind": "REV", "amount": 50},  # REPETIDO
+                {"id": "rev-003", "kind": "REV", "amount": 88},  # NUEVO
+            ]}
+        }
+        r = await ac.post("/api/sync/backup/send", json={
+            "license_key": KEY_PRM, "install_id": PC1, "data": backup_data, "label": "Backup con repetidos"
+        })
+        check(r.status_code == 200, "backup con repetidos enviado")
+        r = await ac.get(f"/api/sync/backup/pending?license_key={KEY_PRM}&install_id={PC2}")
+        pending = r.json().get("pending", [])
+        check(len(pending) == 1, "PC2 ve 1 copia pendiente con contenido")
+        # Comprobamos que los datos llegan tal cual (el merge cliente-side ocurre en frontend)
+        if pending:
+            got_ids = [e.get("id") for e in pending[0]["data"].get("caja.byDate.v1", {}).get("2026-04-06", [])]
+            check("rev-001" in got_ids and "rev-003" in got_ids, "backup transporta rev-001 (repetido) + rev-003 (nuevo)")
+
     # Cleanup
     print(f"\n{Colors.B}▸ Cleanup{Colors.E}")
-    await cleanup(db, [KEY_PRM, KEY_STD], [PC1, PC2, PC3, PC_STD])
+    await cleanup(db, [KEY_PRM, KEY_STD, KEY_TRIAL], [PC1, PC2, PC3, PC_STD, PC_TR1, PC_TR2])
     client.close()
 
     # Summary

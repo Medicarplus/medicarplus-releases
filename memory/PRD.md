@@ -1195,3 +1195,29 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 
 **Test iteration_29.json**: 10/10 backend + 100% frontend · Confirmado: PATCH funciona, cadena vacía borra, propagación de client_meta con aliases funciona, modal frontend guarda y refresca correctamente. 0 issues.
 
+
+
+### 🔗 Sync Multi-PC · E2E validado (Feb 2026)
+**Feature completa y probada exhaustivamente**. Permite hasta 2 ordenadores por licencia (Premium/Trial/MASTER) compartiendo datos en tiempo real (linked · autosync 30s) o vía copia manual (independent). La fusión es **siempre aditiva**: nunca sustituye ni borra los datos del receptor. Ideal para gerente (revisa/ve) + secretaria (introduce datos).
+
+**Bugs resueltos en esta iteración**:
+- FIX #1 · `v2.html:10729-10733` — initSync ahora acepta `lic.license_key || lic.key` (antes fallaba silenciosamente para MASTER, dejando `mcSync` sin inicializar).
+- FIX #2 · `backend/routes/sync.py:38-56` — MASTER key sintética (`MASTER_KEY = "MB-MASTER-BRUGULAT-2026-OWNER"`) reconocida como Premium sin necesidad de estar en DB. Mismo bypass que en cliente `isPremiumLicense()`.
+
+**Resultados de test**:
+- Backend API (`test_sync_multipc.py`): **71/71 pasa** (18 escenarios: 2 PCs Premium, TRIAL con 2 PCs, PC3 rechazado, cambio de modo, push/pull con merge, last-write-wins, backup upsert, backup consumido, Standard bloqueado, flujo Secretaria+Gerente mismo día sin duplicados, multi-empresa preservada).
+- Merge cliente (`test_sync_client_merge.js`): **29/29 pasa** (10 escenarios: byDate mismo día IDs distintos, IDs repetidos con updated_at, multi-empresa con `_mtime`, arrays sin id, byDate anidado, idempotencia, volumen 1000 entradas <100ms).
+- UI E2E (`iteration_34.json`): **7/7 pasa** (getStatus sin TypeError, heartbeat MASTER HTTP 200, modal Sync abre, sync-btn-linked toast, sync-btn-independent toast, sync-send-backup con label, simulación PC2 detecta peers + pending backup).
+
+**Comportamiento verificado clave**:
+- ✅ La copia manual (`Enviar Copia` desde Configuración) siempre **FUSIONA** en el receptor, nunca sustituye. Texto en modal receptor: "Se hará fusión sin duplicados: solo se añadirá lo que TÚ no tengas. Nada se sobrescribe."
+- ✅ Multi-empresa: cada key `caja.byDate.empresa{N}.v1` y `caja.config.empresa{N}.v1` se fusiona por su cuenta sin mezclar datos entre empresas.
+- ✅ Datos que sólo están en un PC → se conservan tras merge.
+- ✅ IDs duplicados → gana el `updated_at` más reciente (LWW por entrada, no por array entero).
+
+**Archivos clave**:
+- `/app/backend/routes/sync.py` (~400 líneas) — endpoints `/api/sync/{heartbeat,push,pull,mode,status,backup/send,backup/pending,backup/consume}`.
+- `/app/frontend/public/sync-client.js` (~205 líneas) — cliente completo con `_mergeSnapshots`, `_mergeArrays`, `_mergeByDate`, autosync polling.
+- `/app/frontend/public/v2.html:10723-10800` — integración UI (onboarding modal, badge, `openSyncSettings`, banner de copia pendiente).
+- `/app/backend/tests/test_sync_multipc.py` + `/app/backend/tests/test_sync_client_merge.js` — 100/100 tests unit.
+

@@ -1,0 +1,41 @@
+{
+  "summary": "Frontend E2E testing of Sync Multi-PC UI in v2.html BLOCKED by two critical bugs. Activation (MASTER key), Wizard, dashboard render, tabs regression (Copias/Contabilidad/Estadísticas/Utilidades/Configuración) and static pages (/panel-maestro.html, /admin.html HTTP 200) all work correctly. However, the actual Sync feature — the goal of this test — is 100% non-functional for MASTER users because (a) initSync() reads the wrong license field so window.mcSync never initializes, and (b) even after patching that, the backend /api/sync/status returns 404 for the MASTER key because it is not a real license in the DB. All Sync-related test cases (mode toggle, send backup, PC1↔PC2 flow, peers detection, pending backup) could NOT be executed end-to-end.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "/api/sync/status?license_key=MB-MASTER-BRUGULAT-2026-OWNER&install_id=...", "issue": "Returns HTTP 404 for MASTER key. The MASTER offline key is not registered as a real license in Mongo, so sync endpoints reject it. Multi-PC sync therefore cannot be exercised at all with the only test credential documented in /app/memory/test_credentials.md.", "priority": "CRITICAL"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "initSync() in v2.html:10731", "issue": "Guard reads lic.license_key which does NOT exist for MASTER license. saveLicense() at v2.html:9591 stores the MASTER key as lic.key (see stored payload: {\"key\":\"MB-MASTER-BRUGULAT-2026-OWNER\",\"type\":\"MASTER\",...}). Because of the mismatch, initSync returns immediately, window.mcSync.init() is never called, cfg.apiBase stays null, and every subsequent call (getStatus, openSyncSettings, setMode, sendBackup) throws `TypeError: Cannot read properties of null (reading 'replace')` at sync-client.js:25. The top-bar badge shows '👑 Owner · Sin sync' as a visible symptom.", "selector": "n/a - JS logic", "priority": "CRITICAL"},
+      {"component": "openSyncSettings() error handling", "issue": "openSyncSettings() throws an unhandled exception when mcSync is not initialized, freezing the flow. Should either lazy-init or show a clear toast 'Sync unavailable' instead of crashing.", "selector": "window.openSyncSettings", "priority": "MEDIUM"},
+      {"component": "/admin.html", "issue": "body.innerText length is only 88 chars — page appears near-empty (probably requires #token= fragment). Verify it renders meaningful content when opened via the '🎛️ Panel Licencias' button in the license modal.", "selector": "/admin.html", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Full Sync UI end-to-end", "issue": "Cannot verify sync-btn-linked / sync-btn-independent / sync-send-backup toasts, mode switching, PC2 simulation, sendBackup, getPendingBackup — all blocked upstream by BUG #1 (client) and BUG #2 (backend 404 on MASTER key)", "affected_selectors": ["[data-testid=sync-btn-linked]","[data-testid=sync-btn-independent]","[data-testid=sync-send-backup]","#bkLabel"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "FIX #1 (client, 1-liner): In v2.html line 10731 change `if(!lic || !lic.license_key || !iid || !window.mcSync) return;` to accept either field, e.g. `const key = lic && (lic.license_key || lic.key); if(!key || !iid || !window.mcSync) return;` and pass `licenseKey: key` on line 10733. Aligns with how the rest of the file already reads `lic.key` (lines 10451, 10455, 10459, 10558). Without this fix Sync is dead for every MASTER user.",
+    "FIX #2 (backend or seeding): /api/sync/status must recognize MASTER key as premium (special-case it in sync router the same way isPremiumLicense() special-cases MB-MASTER-BRUGULAT-2026-OWNER on the client) OR seed a real PREMIUM license in the DB for testing and add it to /app/memory/test_credentials.md.",
+    "After #1 and #2 are fixed, retest full flow: modal open → sync-btn-linked toast → sync-btn-independent toast → PC2 simulation via localStorage swap → sendBackup on PC2 → getPendingBackup on PC1.",
+    "OPTIONAL (defensive): make openSyncSettings() detect uninitialized state and show a toast instead of throwing."
+  ],
+  "critical_code_review_comments": [
+    "Naming inconsistency across v2.html: mcSync init uses `license_key`; sync heartbeat/push/pull at 10451/10455/10459 use `lic.key`. Standardize on one field name or always normalize in a single getter.",
+    "sync-client.js:25 `_url` blindly calls `.replace` on `cfg.apiBase` without null check; wrap in guard and throw a clear 'mcSync not initialized' error to make debugging faster.",
+    "v2.html is 10.8k lines — split into smaller modules (license, sync, config, contabilidad, estadísticas, utilidades). File >>700 lines guideline violated by ~15x.",
+    "Multiple 404s in console (5x) suggest missing static resources referenced but not present in /app/frontend/public/. Audit and clean up."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only run; /api/sync/status returns 404 for the only available key)", "frontend": "40% (activation + wizard + dashboard + tabs regression + static pages OK; Sync UI 0% because upstream mcSync init fails)"},
+  "test_credentials": "MB-MASTER-BRUGULAT-2026-OWNER (only key documented). NOT sufficient for testing /api/sync/* — needs a real PREMIUM license or a backend special-case.",
+  "seed_data_creation": "None — could not proceed past init failure.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Two independent bugs block sync UI testing: (1) client-side field mismatch license_key vs key in initSync (v2.html:10731) → mcSync never initializes for MASTER; (2) backend /api/sync/status returns 404 for MASTER key. Reproduce via: activate MASTER on /v2.html → wizard EMPEZAR → open devtools → `await window.mcSync.getStatus()` throws. Patch demo: `const l=JSON.parse(localStorage.getItem('caja.license.v1'));l.license_key=l.key;localStorage.setItem('caja.license.v1',JSON.stringify(l));location.reload()` — after this, mcSync init runs but backend returns 404. Both must be fixed before UI flow (sync-btn-linked/independent/send-backup) can be exercised. Everything else in v2.html (activation, wizard, tabs, static pages panel-maestro.html and admin.html) works fine.",
+  "rca_of_the_issue": "BUG #1 root cause: v2.html:9591 (`saveLicense({key: LIC.MASTER_KEY, type:'MASTER',...})`) stores the field as `key`, but the new Sync integration at v2.html:10731 (`if(!lic || !lic.license_key || !iid || !window.mcSync) return;`) reads `license_key`. Result: guard fails, `mcSync.init()` never runs, `cfg.apiBase` remains null, and later calls crash at sync-client.js:25 (`cfg.apiBase.replace(/\\/$/,'')`). BUG #2 root cause: `/api/sync/status` endpoint validates license_key against the licenses collection in Mongo; the offline MASTER key is not persisted there, only special-cased client-side in isPremiumLicense(). Same special-case needs to be replicated on backend, or the test must use a real PREMIUM license generated via /api/licenses/generate."
+}

@@ -33,6 +33,22 @@ MAX_DEVICES_PREMIUM = 2
 MAX_DEVICES_OTHER = 1
 PREMIUM_PLANS = {"PRM", "PREMIUM", "TRIAL", "MASTER"}
 
+# 👑 Offline MASTER key (owner) — bypass DB, always treated as Premium.
+# Same key that the client uses in isPremiumLicense() (v2.html).
+MASTER_KEY = "MB-MASTER-BRUGULAT-2026-OWNER"
+
+
+def _synthetic_master_license() -> dict:
+    """Doc sintético que representa la MASTER key sin necesitar entrada en DB."""
+    return {
+        "license_key": MASTER_KEY,
+        "plan": "MASTER",
+        "plan_family": "MASTER",
+        "status": "active",
+        "client_email": "owner@medicarplus.es",
+        "_synthetic": True,
+    }
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -105,7 +121,11 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
     router = APIRouter()
 
     async def _find_license(license_key: str) -> Optional[dict]:
-        return await db.licenses.find_one({"license_key": license_key.strip()})
+        key = (license_key or "").strip()
+        # 👑 Bypass MASTER offline key: no está en DB pero siempre es Premium
+        if key == MASTER_KEY:
+            return _synthetic_master_license()
+        return await db.licenses.find_one({"license_key": key})
 
     async def _is_device_authorized(license_key_hash: str, install_id: str) -> bool:
         """Un dispositiu es considera autoritzat si ja té una entrada a sync_devices.

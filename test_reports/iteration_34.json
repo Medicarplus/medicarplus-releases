@@ -1,0 +1,24 @@
+{
+  "summary": "E2E UI regression run for Sync Multi-PC in v2.html. Both critical bugs from iteration_33 are FIXED and the full sync flow works end-to-end. TEST1 window.mcSync.getStatus() returns {is_premium:true, my_mode:'independent', peers:[]} with no TypeError (fix #1 verified). TEST2 direct POST /api/sync/heartbeat with MASTER key returns HTTP 200 {authorized:true, is_premium:true, plan:'MASTER', max_devices:2, current_devices:1} (fix #2 verified). Sync modal opens with both data-testid buttons; clicking sync-btn-linked shows toast '🔗 Fusionado activado' and modal closes; re-opening shows the Fusionado button in green with ✓. sync-btn-independent works. sync-send-backup with label 'Test Master Copia' works and the backup is retrievable from the second PC. PC2 simulation succeeds: no license re-ask, getStatus() shows peers with the previous install_id, getPendingBackup() returns count=1 with the correct label and 11 keys, and the onboarding modal 'Detectamos otro ordenador' auto-appears. Tab navigation (Contabilidad, Estadísticas, Configuración) works with 0 JS errors on the console.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_34.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "v2.html is now ~10.8k lines — still recommend splitting license/sync/config/contabilidad modules; not blocking but violates <700 line guideline.",
+    "Naming inconsistency (license_key vs key) is patched at the initSync call site but the underlying dual-field convention remains. Consider a single normalize helper e.g. getLicenseKey() to prevent this class of bug in the future.",
+    "One 403 on a background resource observed (Failed to load resource 403) — non-blocking but worth auditing which asset returns 403 for anonymous users."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only run, but heartbeat 200 verified)", "frontend": "100% on sync flow (7/7 test cases: getStatus, heartbeat, modal open, linked toggle, independent toggle, send-backup, PC2 peers+pending backup) + tabs regression OK"},
+  "test_credentials": "MB-MASTER-BRUGULAT-2026-OWNER (MASTER offline key, now recognized synthetically by backend /api/sync/*)",
+  "seed_data_creation": "Ran the cleanup snippet to purge sync_devices/sync_states/sync_backups for the MASTER key hash before the test (0 rows deleted — DB was already clean). During the test one PC1 device + one PC2 device + one backup were created and left in DB for inspection.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Both iteration_33 bugs are fixed. Sync Multi-PC UI is fully functional for MASTER key. Fix #1 lives at v2.html:10731 (`const licKey = lic && (lic.license_key || lic.key)`), Fix #2 lives at /app/backend/routes/sync.py:38-50 with a synthetic MASTER license (MASTER plan_family, treated as premium, bypasses DB lookup). If retesting, remember to purge sync_devices for the MASTER hash first to avoid hitting the 2-device cap.",
+  "rca_of_the_issue": "N/A — both bugs resolved and validated end-to-end."
+}
