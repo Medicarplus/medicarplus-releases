@@ -1240,3 +1240,12 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - Producción (project-helper-47.emergent.host) confirmada con el fix _apiBase() y Favoritos Admin.
 - Slots MASTER liberados en producción vía reset-devices (removed:2 — incluía TESTPC1 fantasma). Los PCs reales del usuario se re-registran solos al abrir la app.
 - list-licenses en producción devuelve 15 clientes reales para el desplegable admin.
+
+### 🗑️ Botón "Empezar de cero" en Configuración · Jun 2026
+- Nueva sección naranja en ⚙️ Configuración (antes de "Salir/Cambiar licencia"), botón data-testid=btn-reset-data. Bilingüe CA/ES.
+- Doble confirmación: confirm() + prompt escribiendo BORRAR (acepta minúsculas). Palabra incorrecta → no toca nada.
+- BORRA (solo este PC): caja.v1, caja.cempla.v1, caja.datafono, caja.cempla.datafono, caja.reserva.v1, caja.saldoInicial.* (prefijo), caja.stats.v1, caja.stats.traffic.overrides.v1, caja.irpf.v1, timestamps de sync (caja.__sync_*).
+- CONSERVA: licencia, config empresas (caja.config.v1), caja.company, idioma, twilio, notif, favoritos admin, flag seed stats (caja.stats.seed.2026.jan-may — NO borrar o re-seedearía datos demo).
+- Al ejecutar pasa el PC a modo Independiente (mcSync.setMode('independent') + stopAutosync + modeChosen) para que la nube/otro PC no devuelvan los datos viejos a ESTE PC (elección del usuario: solo borra local).
+- Nota: tras reload, loadCambio() re-crea caja.reserva.v1 como {"_v":2} (migración interna) — vacía, 0 €, benigno.
+- Testeado E2E en file:// (3 rondas Playwright): palabra incorrecta no borra; BORRAR borra todo; licencia/config/favoritos intactos; app arranca limpia con empresa conservada.

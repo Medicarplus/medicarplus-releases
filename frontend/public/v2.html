@@ -6427,7 +6427,14 @@ function openSettingsModal(){
     logoutSec:isCA?'🚪 Sortir / Canviar llicència':'🚪 Salir / Cambiar licencia',
     logoutDesc:isCA?'Desactiva aquesta llicència en aquest ordinador. Les dades locals NO s\'esborraran.':'Desactiva esta licencia en este ordenador. Los datos locales NO se borrarán.',
     logoutBtn:isCA?'Sortir ara':'Salir ahora',
-    logoutConfirm:isCA?'Vols desactivar la llicència i tornar a la pantalla d\'activació?\n\nLes teves dades locals (dies, entrades, IRPF, còpies) NO s\'esborraran.':'¿Desactivar la licencia y volver a la pantalla de activación?\n\nTus datos locales (días, entradas, IRPF, copias) NO se borrarán.'
+    logoutConfirm:isCA?'Vols desactivar la llicència i tornar a la pantalla d\'activació?\n\nLes teves dades locals (dies, entrades, IRPF, còpies) NO s\'esborraran.':'¿Desactivar la licencia y volver a la pantalla de activación?\n\nTus datos locales (días, entradas, IRPF, copias) NO se borrarán.',
+    resetSec:isCA?'🗑️ Començar de zero':'🗑️ Empezar de cero',
+    resetDesc:isCA?'Esborra TOTES les entrades diàries de tots els dies (honoraris, despeses, moviments), saldos inicials, reserva de canvi, estadístiques i IRPF d\'AQUEST ordinador. Es conserven: la llicència, les empreses i la configuració.':'Borra TODAS las entradas diarias de todos los días (honorarios, gastos, movimientos), saldos iniciales, reserva de cambio, estadísticas e IRPF de ESTE ordenador. Se conservan: la licencia, las empresas y la configuración.',
+    resetBtn:isCA?'Esborrar-ho tot i començar de zero':'Borrar todo y empezar de cero',
+    resetConfirm1:isCA?'⚠️ ATENCIÓ: esborraràs TOTES les entrades de TOTS els dies, saldos, reserva de canvi, estadístiques i IRPF d\'aquest ordinador.\n\nAixò NO es pot desfer. La llicència, empreses i configuració es conserven.\n\nVols continuar?':'⚠️ ATENCIÓN: vas a borrar TODAS las entradas de TODOS los días, saldos, reserva de cambio, estadísticas e IRPF de este ordenador.\n\nEsto NO se puede deshacer. La licencia, empresas y configuración se conservan.\n\n¿Quieres continuar?',
+    resetConfirm2:isCA?'Per confirmar, escriu la paraula:  BORRAR':'Para confirmar, escribe la palabra:  BORRAR',
+    resetCancelled:isCA?'Esborrat cancel·lat. No s\'ha tocat res.':'Borrado cancelado. No se ha tocado nada.',
+    resetDone:isCA?'✅ Fet! El programa queda a 0, com nou.\n\nAquest PC passa a mode Independent perquè el núvol o l\'altre ordinador no li retornin les dades antigues. Pots tornar a Fusionat quan vulguis des de la configuració de Sincronització.':'✅ ¡Hecho! El programa queda a 0, como nuevo.\n\nEste PC pasa a modo Independiente para que la nube o el otro ordenador no le devuelvan los datos antiguos. Puedes volver a Fusionado cuando quieras desde la configuración de Sincronización.'
   };
   back.innerHTML=`
     <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border:1px solid #334155;border-radius:14px;max-width:640px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,.6);color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif">
@@ -6583,6 +6590,13 @@ function openSettingsModal(){
           <button id="setUpgrade" class="btn" style="width:100%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:1px solid #a855f7;font-weight:700;padding:10px" data-testid="btn-upgrade-plan">${isCA?'Veure planes i pagar':'Ver planes y pagar'}</button>
           <button id="setManageSub" class="btn" style="display:none;width:100%;margin-top:8px;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e0e7ff;border:1px solid #6366f1;font-weight:700;padding:10px" data-testid="btn-manage-subscription">${isCA?'🧾 Gestionar subscripció / Cancel·lar':'🧾 Gestionar suscripción / Cancelar'}</button>
           <div id="setSubStatus" style="margin-top:8px;font-size:11px;color:#c4b5fd;text-align:center;min-height:14px"></div>
+        </div>
+
+        <!-- Empezar de cero -->
+        <div class="settings-section" style="background:linear-gradient(135deg,#431407 0%,#1c0a02 100%);border:1px solid #9a3412;border-radius:10px;padding:14px">
+          <div style="font-size:13px;font-weight:700;color:#fdba74;letter-spacing:.5px;margin-bottom:4px">${T.resetSec}</div>
+          <div style="font-size:12px;color:#fed7aa;opacity:.85;margin-bottom:10px">${T.resetDesc}</div>
+          <button id="setResetData" class="btn" style="width:100%;background:linear-gradient(135deg,#c2410c,#9a3412);color:#ffedd5;border:1px solid #ea580c;font-weight:700;padding:10px" data-testid="btn-reset-data">${T.resetBtn}</button>
         </div>
 
         <!-- Sortir -->
@@ -6805,6 +6819,21 @@ function openSettingsModal(){
       localStorage.removeItem('caja.license.lastcheck.v1');
       location.reload();
     }
+  };
+
+  // 🗑️ Empezar de cero · borra todas las entradas diarias de ESTE PC
+  document.getElementById('setResetData').onclick=async()=>{
+    if(!confirm(T.resetConfirm1)) return;
+    const word=prompt(T.resetConfirm2);
+    if(!word || word.trim().toUpperCase()!=='BORRAR'){ alert(T.resetCancelled); return; }
+    // Pasa a Independiente para que la nube / el otro PC no devuelvan los datos a ESTE PC
+    try{ if(window.mcSync){ window.mcSync.stopAutosync(); await window.mcSync.setMode('independent'); } }catch(e){}
+    try{ localStorage.setItem('caja.sync.modeChosen.v1','independent'); }catch(e){}
+    const WIPE_EXACT=['caja.v1','caja.cempla.v1','caja.datafono','caja.cempla.datafono','caja.reserva.v1','caja.stats.v1','caja.stats.traffic.overrides.v1','caja.irpf.v1','caja.__sync_ts','caja.__sync_last_push','caja.__sync_last_pull','caja.__sync_status'];
+    WIPE_EXACT.forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
+    for(let i=localStorage.length-1;i>=0;i--){ const k=localStorage.key(i); if(k && k.startsWith('caja.saldoInicial.')) try{localStorage.removeItem(k)}catch(e){} }
+    alert(T.resetDone);
+    location.reload();
   };
 
   // Millora de pla · obre modal amb els 4 plans i inicia Stripe
