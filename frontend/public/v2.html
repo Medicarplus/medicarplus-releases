@@ -293,6 +293,7 @@
         <button class="btn" id="btnLedger" style="background:#2a1f3a;border-color:#5e2a5e;color:#e0bff0;font-weight:600;width:100%;text-align:left" data-i18n="ledger">📖 Llibreta</button>
         <button class="btn" id="btnIrpf" style="background:#3a2a1f;border-color:#8b5e2a;color:#f0d6bf;font-weight:600;width:100%;text-align:left">📋 IRPF</button>
         <button class="btn" id="btnCambio" style="background:#1f3a2e;border-color:#22c55e;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-i18n="reserve" data-testid="btn-cambio">💰 Reserva de cambio</button>
+        <button class="btn" id="btnSaldoInicial" data-testid="btn-saldo-inicial" style="background:#152a3a;border-color:#38bdf8;color:#bfdbfe;font-weight:600;width:100%;text-align:left" title="Configura el saldo con el que empiezas a usar la app (no cuenta como facturación)">🏦 Saldo inicial</button>
         <button class="btn" id="btnLibroRegMenu" style="background:#152a3a;border-color:#7ec8ff;color:#7ec8ff;font-weight:600;width:100%;text-align:left">📖 Libro de Registro</button>
         <button class="btn" id="btnHonorarios" data-testid="btn-honorarios" style="background:#2a2015;border-color:#fbbf24;color:#fbbf24;font-weight:600;width:100%;text-align:left">💼 Honorarios</button>
         <button class="btn" id="btnGastos" data-testid="btn-gastos" style="background:#2a1515;border-color:#f472b6;color:#f472b6;font-weight:600;width:100%;text-align:left">🧾 Gastos (luz · agua · alquiler…)</button>
@@ -2997,10 +2998,167 @@ function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(
   }
 }
 function renderByConcept(list){const map={};list.forEach(e=>{if(e.retorno)return;const key=e.kind==='DH'?`[${e.tipo}] libre`:`${e.tipo}${e.grupo&&e.grupo!=='-'?' · '+e.grupo:''}`;map[key]||={n:0,total:0};map[key].n++;const signo=e.kind==='DH'&&e.tipo==='DEBE'?-1:1;map[key].total+=signo*((e.importe-(e.descuento||0))+(e.tasa||0))});const entries=Object.entries(map).sort((a,b)=>b[1].total-a[1].total);$('#byConcept').innerHTML=entries.length?`<table style="width:100%"><tbody>${entries.map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td class="num">${v.n}×</td><td class="num"><b>${fmt(v.total)}</b></td></tr>`).join('')}</tbody></table>`:`<div class="small">Sin datos</div>`}
-function saldoAnterior(date){const dates=Object.keys(state.byDate).filter(d=>d<date).sort();if(!dates.length)return 0;const prev=dates[dates.length-1];return computeTotals(entriesOf(prev)).neto+saldoAnterior(prev)}
+// 💰 Saldo inicial (opening balance) · Para clientes que empiezan a usar la app
+// a mediados de año y no quieren pasar todo el histórico día a día. Se guarda
+// por empresa. NUNCA entra en estadísticas (no es una entrada de facturación),
+// solo se suma al "saldo anterior" a partir de la fecha de arranque.
+function _saldoInicialKey(){ return 'caja.saldoInicial.'+(currentCompany||'main')+'.v1' }
+function getSaldoInicial(){
+  try{
+    const raw = localStorage.getItem(_saldoInicialKey());
+    if(!raw) return null;
+    const p = JSON.parse(raw);
+    if(!p || !p.fecha) return null;
+    return { fecha: p.fecha,
+             efectivo: +p.efectivo || 0,
+             tarjeta:  +p.tarjeta  || 0,
+             transf:   +p.transf   || 0,
+             bizum:    +p.bizum    || 0,
+             nota:     p.nota      || '' };
+  }catch(e){ return null }
+}
+function setSaldoInicial(obj){
+  if(!obj || obj._delete){ localStorage.removeItem(_saldoInicialKey()); return; }
+  localStorage.setItem(_saldoInicialKey(), JSON.stringify(obj));
+}
+// Devuelve {caja, banc} del saldo inicial si aplica a la fecha (fecha >= arranque)
+function saldoInicialAplicableACuenta(date){
+  const si = getSaldoInicial();
+  if(!si || date < si.fecha) return {caja:0, banc:0};
+  return { caja: si.efectivo, banc: si.tarjeta + si.transf + si.bizum };
+}
+function saldoInicialAplicable(date){
+  const s = saldoInicialAplicableACuenta(date);
+  return s.caja + s.banc;
+}
+
+// 🎨 Modal de configuración del Saldo inicial. Permite arrancar con dinero
+// que ya tenía el cliente antes de usar la app. NUNCA cuenta como facturación.
+function openSaldoInicial(){
+  const si = getSaldoInicial() || {fecha:'', efectivo:0, tarjeta:0, transf:0, bizum:0, nota:''};
+  const today = new Date().toISOString().slice(0,10);
+  const back = document.createElement('div'); back.className='modal-back';
+  back.innerHTML = `<div class="modal" style="max-width:560px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <h3 style="margin:0;color:#38bdf8;font-family:Georgia,serif">🏦 Saldo inicial</h3>
+      <button data-close style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">×</button>
+    </div>
+    <p style="color:#94a3b8;font-size:13px;margin:8px 0 18px;line-height:1.5">
+      ¿Empiezas a usar MediCar Plus a mediados de año y ya tenías dinero en caja o banco? Introduce aquí ese saldo de partida. <b style="color:#38bdf8">No se cuenta como facturación</b>: solo aparece en el "Saldo anterior" para que las cifras cuadren desde el día uno.
+    </p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <div style="grid-column:1/-1">
+        <label style="display:block;font-size:11px;color:#38bdf8;font-weight:800;letter-spacing:1px;margin-bottom:4px">📅 FECHA DE ARRANQUE</label>
+        <input id="siFecha" type="date" value="${si.fecha||today}" style="width:100%;padding:9px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:14px;box-sizing:border-box"/>
+        <div style="font-size:11px;color:#64748b;margin-top:3px">El saldo empieza a aplicarse desde este día en adelante.</div>
+      </div>
+
+      <div>
+        <label style="display:block;font-size:11px;color:#22c55e;font-weight:800;letter-spacing:1px;margin-bottom:4px">💵 EFECTIVO (CAJA)</label>
+        <input id="siEfectivo" type="number" step="0.01" min="0" value="${si.efectivo||''}" placeholder="0,00" style="width:100%;padding:9px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#22c55e;font-size:14px;font-weight:700;box-sizing:border-box"/>
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;color:#7ec8ff;font-weight:800;letter-spacing:1px;margin-bottom:4px">💳 TARJETA</label>
+        <input id="siTarjeta" type="number" step="0.01" min="0" value="${si.tarjeta||''}" placeholder="0,00" style="width:100%;padding:9px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#7ec8ff;font-size:14px;font-weight:700;box-sizing:border-box"/>
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;color:#a855f7;font-weight:800;letter-spacing:1px;margin-bottom:4px">🏦 TRANSFERENCIA / BANCO</label>
+        <input id="siTransf" type="number" step="0.01" min="0" value="${si.transf||''}" placeholder="0,00" style="width:100%;padding:9px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#a855f7;font-size:14px;font-weight:700;box-sizing:border-box"/>
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;color:#f5b301;font-weight:800;letter-spacing:1px;margin-bottom:4px">📱 BIZUM</label>
+        <input id="siBizum" type="number" step="0.01" min="0" value="${si.bizum||''}" placeholder="0,00" style="width:100%;padding:9px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#f5b301;font-size:14px;font-weight:700;box-sizing:border-box"/>
+      </div>
+
+      <div style="grid-column:1/-1">
+        <label style="display:block;font-size:11px;color:#94a3b8;font-weight:800;letter-spacing:1px;margin-bottom:4px">📝 NOTA (OPCIONAL)</label>
+        <input id="siNota" type="text" maxlength="120" value="${(si.nota||'').replace(/"/g,'&quot;')}" placeholder="Ej: saldo de arranque marzo 2026" style="width:100%;padding:9px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box"/>
+      </div>
+    </div>
+
+    <div id="siTotal" style="background:#0b1121;border:1px solid #38bdf8;border-radius:8px;padding:12px 14px;margin-bottom:14px;text-align:center">
+      <div style="font-size:11px;color:#7ec8ff;letter-spacing:1.5px;font-weight:700">TOTAL SALDO INICIAL</div>
+      <div id="siTotalNum" style="font-size:26px;font-weight:800;color:#38bdf8;font-family:'Consolas',monospace;letter-spacing:.5px;margin-top:4px">0,00 €</div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button id="siSave" data-testid="saldo-inicial-save" style="flex:1;padding:12px 16px;background:linear-gradient(135deg,#38bdf8,#0284c7);color:#0f172a;border:none;border-radius:8px;font-weight:800;font-size:14px;cursor:pointer">💾 Guardar saldo inicial</button>
+      ${si.fecha ? `<button id="siDelete" data-testid="saldo-inicial-delete" style="padding:12px 16px;background:#7f1d1d;color:#fecaca;border:1px solid #b91c1c;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">🗑 Borrar</button>` : ''}
+      <button data-close style="padding:12px 16px;background:#1e293b;color:#94a3b8;border:1px solid #475569;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer">Cancelar</button>
+    </div>
+
+    <div id="siWarn" style="display:none;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.35);border-radius:6px;padding:8px 12px;margin-top:12px;color:#fed7aa;font-size:12px;line-height:1.5"></div>
+  </div>`;
+  document.body.appendChild(back);
+  back.addEventListener('click',(ev)=>{ if(ev.target===back || ev.target.hasAttribute('data-close')) back.remove(); });
+
+  const fields = ['siEfectivo','siTarjeta','siTransf','siBizum'];
+  const recalc = ()=>{
+    const t = fields.reduce((s,id)=> s + (+back.querySelector('#'+id).value || 0), 0);
+    back.querySelector('#siTotalNum').textContent = t.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
+  };
+  fields.forEach(id => back.querySelector('#'+id).addEventListener('input', recalc));
+  recalc();
+
+  // Aviso si hay entradas anteriores a la fecha SI
+  const checkWarn = ()=>{
+    const f = back.querySelector('#siFecha').value;
+    if(!f) return;
+    const previas = Object.keys(state.byDate||{}).filter(d => d < f);
+    const w = back.querySelector('#siWarn');
+    if(previas.length){
+      w.style.display='block';
+      w.innerHTML = `⚠️ Tienes <b>${previas.length} día(s) con entradas</b> anteriores a esta fecha. Esas entradas se seguirán contando en las estadísticas. Si quieres empezar limpio, borra primero esos días o cambia la fecha al primer día que empezaste con la app.`;
+    } else {
+      w.style.display='none';
+    }
+  };
+  back.querySelector('#siFecha').addEventListener('change', checkWarn);
+  checkWarn();
+
+  back.querySelector('#siSave').onclick = ()=>{
+    const fecha = back.querySelector('#siFecha').value;
+    if(!fecha){ toast('Selecciona una fecha'); return }
+    const obj = {
+      fecha,
+      efectivo: +back.querySelector('#siEfectivo').value || 0,
+      tarjeta:  +back.querySelector('#siTarjeta').value  || 0,
+      transf:   +back.querySelector('#siTransf').value   || 0,
+      bizum:    +back.querySelector('#siBizum').value    || 0,
+      nota:     back.querySelector('#siNota').value.trim() || ''
+    };
+    setSaldoInicial(obj);
+    toast('🏦 Saldo inicial guardado');
+    back.remove();
+    // Refresca la pantalla
+    try{ if(typeof renderDay==='function') renderDay(); }catch(e){}
+    try{ if(typeof update==='function') update(); }catch(e){}
+  };
+  const delBtn = back.querySelector('#siDelete');
+  if(delBtn){
+    delBtn.onclick = ()=>{
+      if(!confirm('¿Borrar el saldo inicial? El saldo anterior volverá a calcularse solo desde las entradas del día.')) return;
+      setSaldoInicial({_delete:true});
+      toast('🗑 Saldo inicial borrado');
+      back.remove();
+      try{ if(typeof renderDay==='function') renderDay(); }catch(e){}
+      try{ if(typeof update==='function') update(); }catch(e){}
+    };
+  }
+}
+
+function saldoAnterior(date){
+  const dates=Object.keys(state.byDate).filter(d=>d<date).sort();
+  const base = saldoInicialAplicable(date);
+  if(!dates.length) return base;
+  const prev=dates[dates.length-1];
+  return computeTotals(entriesOf(prev)).neto+saldoAnterior(prev);
+}
 function saldoAnteriorPorCuenta(date){
   const dates=Object.keys(state.byDate).filter(d=>d<date).sort();
-  let caja=0,banc=0;
+  const si = saldoInicialAplicableACuenta(date);
+  let caja=si.caja, banc=si.banc;
   const isC=currentCompany==='cempla';
   let dfMap={};try{dfMap=JSON.parse(localStorage.getItem(dfKey())||'{}')}catch(e){}
   dates.forEach(d=>{
@@ -3160,6 +3318,7 @@ $('#btnImportJson').addEventListener('click',()=>{setTimeout(()=>{const m=$('#bt
 $('#btnLedger').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLedger()};
 $('#btnIrpf').onclick=()=>{$('#btnAccountingMenu').style.display='none';openIRPF()};
 $('#btnCambio').onclick=()=>{$('#btnAccountingMenu').style.display='none';openCambio()};
+$('#btnSaldoInicial').onclick=()=>{$('#btnAccountingMenu').style.display='none';openSaldoInicial()};
 $('#btnLibroRegMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLibroRegistro()};
 $('#btnHonorarios').onclick=()=>{$('#btnAccountingMenu').style.display='none';openHonorariosPanel()};
 $('#btnGastos').onclick=()=>{$('#btnAccountingMenu').style.display='none';openGastosPanel()};
