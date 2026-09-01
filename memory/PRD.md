@@ -1229,3 +1229,9 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 **Nuevo endpoint**: `POST /api/sync/admin/reset-devices` {admin_license_key, target_license_key, install_id?} — solo MASTER, libera slots de dispositivos (soporte a clientes que cambian de PC).
 **Testing (iteration_37)**: backend 7/7 pytest, frontend 3/3 Playwright (MASTER con bloque admin + 30 clientes en dropdown, cliente PREMIUM sin bloque admin + envío copia OK, modal amable sin licencia). Simulación file:// con Playwright validada por main agent (modal abre, dropdown carga).
 **⚠️ PENDIENTE POST-DEPLOY**: 1) El usuario debe REDESPLEGAR para que su .exe reciba el v2.html corregido. 2) Tras el deploy, limpiar dispositivo fantasma TESTPC1 de la licencia MASTER en producción: `curl -X POST https://project-helper-47.emergent.host/api/sync/admin/reset-devices -H "Content-Type: application/json" -d '{"admin_license_key":"MB-MASTER-BRUGULAT-2026-OWNER","target_license_key":"MB-MASTER-BRUGULAT-2026-OWNER","install_id":"TESTPC1"}'`
+
+### ⭐ Favoritos Admin en desplegable de clientes · Jun 2026
+- Botón estrella (☆/⭐, data-testid=admin-fav-toggle) junto al select admin (admTarget) en el modal Sync Multi-PC.
+- Favoritos se guardan en localStorage `caja.sync.admfavs.v1` (solo local: excluido de ambos motores de sync — prefijo caja.sync. en el cliente inline + añadido a NON_SYNCABLE del motor heartbeat 60s).
+- Render con optgroups: "⭐ FAVORITOS" arriba, "TODOS LOS CLIENTES" debajo. Selección se mantiene al marcar/quitar.
+- Testeado E2E en simulación file:// (como el .exe): añadir → optgroup arriba → persiste al reabrir modal → quitar → limpio. Todo OK.
