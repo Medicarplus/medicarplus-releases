@@ -228,6 +228,7 @@
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<script src="/sync-client.js"></script>
 </head>
 <body>
 <div id="planPreviewBanner" data-testid="plan-preview-banner" style="display:none;position:sticky;top:0;z-index:9999;background:linear-gradient(90deg,#a855f7,#7c3aed);color:#fff;padding:8px 16px;text-align:center;font-family:'Segoe UI',sans-serif;font-size:13px;font-weight:700;letter-spacing:.3px;box-shadow:0 2px 12px rgba(168,85,247,.4)">
@@ -10203,6 +10204,15 @@ function showConfigWizard(isFirstRun){
     +'<button id="cfgOpenSI" type="button" data-testid="cfg-open-saldo-inicial" style="padding:9px 14px;background:linear-gradient(135deg,#38bdf8,#0284c7);color:#0f172a;border:none;border-radius:8px;font-family:Georgia,serif;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap">'+L('Configurar-lo','Configurarlo')+'</button>'
     +'</div>'
     +'</div>'
+    +'<div style="background:#0b1a2e;border:1px solid #38bdf8;border-radius:10px;padding:14px;margin-bottom:22px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">'
+    +'<div>'
+    +'<label style="font-size:11px;color:#38bdf8;letter-spacing:1.5px;font-weight:700">🔗 '+L('SINCRONITZACIÓ MULTI-PC (Premium)','SINCRONIZACIÓN MULTI-PC (Premium)')+'</label>'
+    +'<div id="cfgSyncStatus" style="font-size:12px;color:#94a3b8;margin-top:6px;line-height:1.5">'+L('Si tens dos ordinadors amb la mateixa llicència Premium, tria si volen anar fusionats o independents.','Si tienes 2 ordenadores con la misma licencia Premium, elige si quieren ir fusionados o independientes.')+'</div>'
+    +'</div>'
+    +'<button id="cfgOpenSync" type="button" data-testid="cfg-open-sync" style="padding:9px 14px;background:linear-gradient(135deg,#38bdf8,#0284c7);color:#0f172a;border:none;border-radius:8px;font-family:Georgia,serif;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap">'+L('Configurar-la','Configurarla')+'</button>'
+    +'</div>'
+    +'</div>'
     +'<div id="cfgErr" style="color:#ef4444;font-size:12px;margin-bottom:12px;display:none"></div>'
     +'<div style="display:flex;gap:10px;justify-content:'+(isFirstRun?'center':'flex-end')+'">'
     +(!isFirstRun?'<button id="cfgCancel" style="padding:12px 22px;background:transparent;border:1.5px solid #64748b;border-radius:8px;color:#cbd5e1;cursor:pointer;font-family:Georgia,serif">'+L('Cancel·la','Cancelar')+'</button>':'')
@@ -10263,6 +10273,39 @@ function showConfigWizard(isFirstRun){
           }
         }, 300);
         setTimeout(()=>clearInterval(chk), 60000); // safety
+      }catch(e){ console.warn(e); }
+    };
+  }
+  // 🔗 Sincronización Multi-PC
+  const refreshSyncStatus = async ()=>{
+    try{
+      const st = window.mcSync && await window.mcSync.getStatus();
+      const box = back.querySelector('#cfgSyncStatus');
+      if(!box || !st) return;
+      if(!st.is_premium){
+        box.innerHTML = '⚠️ <span style="color:#f97316">Solo disponible con plan Premium.</span>';
+        return;
+      }
+      const mode = st.my_mode || 'independent';
+      const modeTxt = mode === 'linked' ? '<b style="color:#22c55e">🔗 Fusionado</b>' : '<b style="color:#94a3b8">🔒 Independiente</b>';
+      const peers = (st.peers||[]).length;
+      box.innerHTML = `Modo actual: ${modeTxt} · Otros PCs enlazados: <b>${peers}</b>`;
+    }catch(e){ /* silenciar si offline */ }
+  };
+  refreshSyncStatus();
+  const cfgOpenSync = back.querySelector('#cfgOpenSync');
+  if(cfgOpenSync){
+    cfgOpenSync.onclick = ()=>{
+      try{
+        if(window.openSyncSettings) window.openSyncSettings();
+        else alert('Sync no disponible. Reinicia la aplicación.');
+        const chk = setInterval(()=>{
+          if(!document.querySelector('.modal-back [data-testid="sync-btn-linked"]')){
+            clearInterval(chk);
+            refreshSyncStatus();
+          }
+        }, 300);
+        setTimeout(()=>clearInterval(chk), 60000);
       }catch(e){ console.warn(e); }
     };
   }
@@ -10674,6 +10717,85 @@ setTimeout(()=>{
   window.checkPlanUpgradeNow = pollAutoUpgrade;
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
+})();
+</script>
+
+<!-- 🔗 SYNC MULTI-PC · Fase 2 UI · integración con /sync-client.js -->
+<script>
+(function(){
+  function _lic(){ try{ return JSON.parse(localStorage.getItem('caja.license.v1')||'null'); }catch(e){return null} }
+  function _installId(){ return localStorage.getItem('caja.install.id.v1')||''; }
+  function _apiBase(){ return window.REACT_APP_BACKEND_URL || location.origin; }
+  async function initSync(){
+    const lic = _lic(); const iid = _installId();
+    if(!lic || !lic.license_key || !iid || !window.mcSync) return;
+    const r = await window.mcSync.init({
+      apiBase: _apiBase(), licenseKey: lic.license_key, installId: iid,
+      onModeChange: (mode) => { const el=document.getElementById('syncBadge'); if(el){el.textContent=mode==='linked'?'🔗 Fusionado':'🔒 Independiente';el.style.color=mode==='linked'?'#22c55e':'#94a3b8';} },
+      onIncoming: (merged) => { Object.entries(merged||{}).forEach(([k,v])=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}); try{if(typeof render==='function')render();if(typeof update==='function')update();}catch(e){} }
+    });
+    if(r && r.ok){
+      const st = r.status || {};
+      const alreadyChosen = localStorage.getItem('caja.sync.modeChosen.v1');
+      if(st.is_premium && (st.peers||[]).length >= 1 && !alreadyChosen){ setTimeout(() => showSyncOnboarding(st), 800); }
+      if(st.my_mode === 'linked'){ window.mcSync.startAutosync(30000); }
+      setTimeout(checkPendingBackups, 1500);
+    }
+  }
+  function showSyncOnboarding(st){
+    const back = document.createElement('div'); back.className='modal-back'; back.style.zIndex='100010';
+    const peers = (st.peers||[]).map(p => (p.install_id||'').slice(-6)).join(', ') || '—';
+    back.innerHTML = `<div class="modal" style="max-width:560px"><div style="text-align:center;margin-bottom:16px"><div style="font-size:52px">🔗</div><h3 style="margin:0;color:#38bdf8;font-family:Georgia,serif;font-size:22px">Detectamos otro ordenador</h3><p style="color:#94a3b8;margin:10px 0 0;font-size:13.5px;line-height:1.55">Tu licencia Premium está activa en <b>otro PC</b> (${peers}). ¿Quieres que trabajen fusionados o independientes?</p></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px"><button id="opFus" style="padding:16px 12px;background:linear-gradient(135deg,#22c55e,#15803d);color:#fff;border:none;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer">🔗 Fusionado<br><span style="font-size:11px;font-weight:400;opacity:.9">Datos compartidos<br>Cada 30s</span></button><button id="opInd" style="padding:16px 12px;background:linear-gradient(135deg,#64748b,#475569);color:#fff;border:none;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer">🔒 Independiente<br><span style="font-size:11px;font-weight:400;opacity:.9">Datos separados<br>Enviar copia manual</span></button></div><div style="font-size:11px;color:#64748b;margin-top:12px;font-style:italic;text-align:center">Puedes cambiar de modo en cualquier momento en <b>Configuración</b>.</div></div>`;
+    document.body.appendChild(back);
+    back.querySelector('#opFus').onclick = async () => { localStorage.setItem('caja.sync.modeChosen.v1','linked'); await window.mcSync.setMode('linked'); window.mcSync.startAutosync(30000); back.remove(); if(typeof toast==='function') toast('🔗 Modo fusionado activado'); };
+    back.querySelector('#opInd').onclick = async () => { localStorage.setItem('caja.sync.modeChosen.v1','independent'); await window.mcSync.setMode('independent'); window.mcSync.stopAutosync(); back.remove(); if(typeof toast==='function') toast('🔒 Modo independiente activado'); };
+  }
+  async function checkPendingBackups(){
+    try{ const r = await window.mcSync.getPendingBackup(); if(!r || !r.count) return; showBackupRestoreBanner(r.pending[0]); }catch(e){}
+  }
+  function showBackupRestoreBanner(backup){
+    const back = document.createElement('div'); back.className='modal-back'; back.style.zIndex='100005';
+    back.innerHTML = `<div class="modal" style="max-width:520px"><div style="text-align:center;margin-bottom:12px"><div style="font-size:44px">📨</div><h3 style="margin:8px 0 6px;color:#f5b301;font-family:Georgia,serif">Copia pendiente de restaurar</h3><p style="color:#94a3b8;font-size:13px;line-height:1.55;margin:0">Recibiste una copia del otro ordenador${backup.label?` (<i>${backup.label}</i>)`:''} enviada el <b>${new Date(backup.created_at).toLocaleString('es-ES')}</b>.</p></div><div style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35);border-radius:8px;padding:12px;color:#bfdbfe;font-size:12.5px;line-height:1.55;margin:14px 0">✅ Se hará <b>fusión sin duplicados</b>: solo se añadirá lo que TÚ no tengas. Nada se sobrescribe.</div><div style="display:flex;gap:8px"><button id="bkApply" style="flex:1;padding:12px;background:linear-gradient(135deg,#22c55e,#15803d);color:#fff;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">✅ Aplicar copia (fusionar)</button><button id="bkLater" style="padding:12px 18px;background:#1e293b;color:#94a3b8;border:1px solid #475569;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">Más tarde</button></div></div>`;
+    document.body.appendChild(back);
+    back.querySelector('#bkApply').onclick = async () => {
+      const merged = await window.mcSync.applyBackup(backup.data);
+      Object.entries(merged).forEach(([k,v])=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}});
+      await window.mcSync.consumeBackup(backup.backup_id);
+      back.remove(); if(typeof toast==='function') toast('✅ Copia aplicada (sin duplicados)');
+      setTimeout(() => location.reload(), 800);
+    };
+    back.querySelector('#bkLater').onclick = () => back.remove();
+  }
+  window.openSyncSettings = async function(){
+    const st = await window.mcSync.getStatus();
+    const back = document.createElement('div'); back.className='modal-back'; back.style.zIndex='100010';
+    const mode = st.my_mode || 'independent';
+    const peersHtml = (st.peers||[]).length
+      ? (st.peers).map(p => `<div style="padding:6px 10px;background:#0f172a;border-radius:6px;font-family:'Consolas',monospace;font-size:11.5px;margin-top:4px"><b style="color:${p.mode==='linked'?'#22c55e':'#94a3b8'}">${p.mode==='linked'?'🔗':'🔒'}</b> PC-${(p.install_id||'').slice(-8)} · última conexión: ${p.last_seen?new Date(p.last_seen).toLocaleString('es-ES'):'—'}</div>`).join('')
+      : '<div style="color:#64748b;font-size:12px;font-style:italic">No hay otros ordenadores activos con esta licencia todavía.</div>';
+    back.innerHTML = `<div class="modal" style="max-width:600px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><h3 style="margin:0;color:#38bdf8;font-family:Georgia,serif">🔗 Sincronización Multi-PC</h3><button data-close style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">×</button></div><p style="color:#94a3b8;font-size:13px;margin:8px 0 18px;line-height:1.5">Tu plan <b style="color:${st.is_premium?'#22c55e':'#94a3b8'}">${st.is_premium?'Premium':'Standard'}</b> permite ${st.is_premium?'2 ordenadores':'1 ordenador'}.</p><div style="margin-bottom:14px"><label style="font-size:11px;color:#38bdf8;font-weight:800;letter-spacing:1px">MODO DE ESTE ORDENADOR</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px"><button id="mFus" data-testid="sync-btn-linked" style="padding:12px;background:${mode==='linked'?'linear-gradient(135deg,#22c55e,#15803d)':'#1e293b'};color:${mode==='linked'?'#fff':'#94a3b8'};border:2px solid ${mode==='linked'?'#22c55e':'#475569'};border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">🔗 Fusionado ${mode==='linked'?'✓':''}</button><button id="mInd" data-testid="sync-btn-independent" style="padding:12px;background:${mode==='independent'?'linear-gradient(135deg,#64748b,#475569)':'#1e293b'};color:${mode==='independent'?'#fff':'#94a3b8'};border:2px solid ${mode==='independent'?'#94a3b8':'#475569'};border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">🔒 Independiente ${mode==='independent'?'✓':''}</button></div></div><div style="margin-bottom:14px"><label style="font-size:11px;color:#a855f7;font-weight:800;letter-spacing:1px">OTROS ORDENADORES DE ESTA LICENCIA</label><div style="margin-top:6px">${peersHtml}</div></div>${st.is_premium ? `<div style="border-top:1px dashed #475569;padding-top:14px;margin-top:14px"><label style="font-size:11px;color:#f5b301;font-weight:800;letter-spacing:1px">📨 ENVIAR COPIA AL OTRO ORDENADOR (manual)</label><p style="font-size:12px;color:#94a3b8;margin:6px 0 10px;line-height:1.4">Útil en modo Independiente. El otro PC verá un aviso al abrir la app y podrá fusionarla sin duplicar.</p><div style="display:flex;gap:8px"><input id="bkLabel" type="text" placeholder="Etiqueta (opcional) - ej: Cierre marzo" style="flex:1;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:13px"/><button id="bkSend" data-testid="sync-send-backup" style="padding:9px 18px;background:linear-gradient(135deg,#f5b301,#eab308);color:#0f172a;border:none;border-radius:6px;font-weight:800;font-size:13px;cursor:pointer">📤 Enviar</button></div></div>` : ''}<div style="display:flex;justify-content:flex-end;margin-top:16px"><button data-close style="padding:10px 16px;background:#1e293b;color:#94a3b8;border:1px solid #475569;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer">Cerrar</button></div></div>`;
+    document.body.appendChild(back);
+    back.addEventListener('click', ev => { if(ev.target===back || ev.target.hasAttribute('data-close')) back.remove(); });
+    const setModeBtn = async (m) => {
+      try{ await window.mcSync.setMode(m); localStorage.setItem('caja.sync.modeChosen.v1', m);
+        if(m==='linked'){ window.mcSync.startAutosync(30000); await window.mcSync.pushNow(); await window.mcSync.pullNow(); } else { window.mcSync.stopAutosync(); }
+        back.remove(); if(typeof toast==='function') toast(m==='linked'?'🔗 Fusionado activado':'🔒 Independiente activado');
+      } catch(e){ alert('Error: '+e.message); }
+    };
+    back.querySelector('#mFus').onclick = () => setModeBtn('linked');
+    back.querySelector('#mInd').onclick = () => setModeBtn('independent');
+    const bkBtn = back.querySelector('#bkSend');
+    if(bkBtn){
+      bkBtn.onclick = async () => {
+        const label = back.querySelector('#bkLabel').value.trim();
+        bkBtn.disabled = true; bkBtn.textContent = 'Enviando…';
+        try{ await window.mcSync.sendBackup(label); bkBtn.textContent = '✅ Enviada'; if(typeof toast==='function') toast('📤 Copia enviada al otro ordenador'); setTimeout(() => back.remove(), 1200); }
+        catch(e){ alert('Error: '+e.message); bkBtn.disabled=false; bkBtn.textContent='📤 Enviar'; }
+      };
+    }
+  };
+  if(document.readyState==='complete') setTimeout(initSync, 2500);
+  else window.addEventListener('load', () => setTimeout(initSync, 2500));
 })();
 </script>
 
