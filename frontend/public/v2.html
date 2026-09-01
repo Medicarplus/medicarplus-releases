@@ -10890,7 +10890,11 @@ setTimeout(()=>{
 (function(){
   function _lic(){ try{ return JSON.parse(localStorage.getItem('caja.license.v1')||'null'); }catch(e){return null} }
   function _installId(){ return localStorage.getItem('caja.install.id.v1')||''; }
-  function _apiBase(){ return window.REACT_APP_BACKEND_URL || location.origin; }
+  function _apiBase(){
+    try{ if(/^https?:$/.test(location.protocol) && location.origin && location.origin!=='null') return location.origin; }catch(e){}
+    try{ if(typeof getApiBase==='function'){ const b=getApiBase(); if(b) return b; } }catch(e){}
+    return window.API_BASE || 'https://project-helper-47.emergent.host';
+  }
   async function initSync(){
     const lic = _lic(); const iid = _installId();
     const licKey = lic && (lic.license_key || lic.key);
@@ -10997,7 +11001,7 @@ setTimeout(()=>{
         try{
           const lic = JSON.parse(localStorage.getItem('caja.license.v1')||'null');
           const adminKey = (lic && (lic.key || lic.license_key)) || '';
-          const base = (window.REACT_APP_BACKEND_URL || location.origin).replace(/\/$/, '');
+          const base = _apiBase().replace(/\/$/, '');
           const r = await fetch(`${base}/api/sync/admin/list-licenses?admin_license_key=${encodeURIComponent(adminKey)}`);
           if(!r.ok) throw new Error('HTTP '+r.status);
           const j = await r.json();
@@ -11032,7 +11036,7 @@ setTimeout(()=>{
                k.startsWith('caja.plan.preview.')) continue;
             try{ data[k] = JSON.parse(localStorage.getItem(k)); }catch(e){ data[k] = localStorage.getItem(k); }
           }
-          const base = (window.REACT_APP_BACKEND_URL || location.origin).replace(/\/$/, '');
+          const base = _apiBase().replace(/\/$/, '');
           const r = await fetch(`${base}/api/sync/admin/push-to-license`, {
             method:'POST', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({

@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 37 · Full verification of MediCar Plus Sync Multi-PC after _apiBase() fix + new POST /api/sync/admin/reset-devices endpoint. Backend: 7/7 pytest scenarios PASS covering (a) MASTER cycle: reset → PC1/PC2 authorized → PC3 rejected → reset frees slots (b) reset-devices 403 admin_only for wrong key (c) 404 target_not_found for inexistent license (d) admin/list-licenses returns real licenses (>=1) for MASTER and 403 for fake (e) full Premium 2-PC push/pull/backup round-trip (f) reset frees client license slots. Frontend: 3 scenarios verified in Playwright against the preview URL — (i) MASTER UI opens modal with all data-testids present (sync-btn-linked / sync-btn-independent / admin-target-select 30 options / admin-send-to-license / sync-send-backup) and admin purple block visible; (ii) PREMIUM client UI (real JWT of test29@example.com) shows 'Tu plan Premium permite 2 ordenadores', backup button visible, admin block ABSENT, backup send click → toast 'Enviada'; (iii) friendly error modal appears with 'Sincronización cargando' + Reintentar + Cerrar buttons (no alert()) when no license in localStorage. All test sync_devices cleaned up via reset-devices for MASTER and Premium client.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter37_admin_reset_and_master.py",
+    "/app/test_reports/pytest/pytest_iter37.xml",
+    "/app/backend/tests/test_sync_multipc.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "sync.py:504-518 admin_reset_devices correctly enforces MASTER_KEY check → 403 admin_only, and _find_license → 404 target_not_found. Removes by (license_key_hash, install_id) when install_id provided, else clears all devices for that license. Returns removed count. Clean, idempotent, safe.",
+    "sync.py:130-134 AdminResetDevicesBody uses Pydantic min_length=10 → very short fake keys get 422 (validation) instead of 403. Not a security issue (still rejected) but if you want a uniform 403 for wrong admin key, validate length after the MASTER_KEY check. Same note applies to admin_push_to_license.",
+    "v2.html _apiBase() fix confirmed: friendly error modal ('Sincronización cargando' + Reintentar/Cerrar) appears when no license — no crash, no alert(). Behavior matches iteration_35/36 fix.",
+    "Premium UI correctly hides the admin cross-license block when license is not MASTER (verified: sel_admin element does not exist in DOM for the PREMIUM JWT of test29@example.com).",
+    "The v2.html initial 'pull HTTP 409' console error observed when device is fresh (independent mode) is expected: /api/sync/pull returns 409 device_mode_independent by design until user opts into 'Fusionado'. Not an issue."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter37_admin_reset_and_master.py"],
+  "success_rate": {
+    "backend": "100% (7/7 pytest tests passing)",
+    "frontend": "100% (MASTER modal + PREMIUM client modal + friendly error modal all pass; every required data-testid present and functional; admin dropdown loads 30 licenses)"
+  },
+  "test_credentials": "MB-MASTER-BRUGULAT-2026-OWNER (MASTER); PREMIUM JWT of test29@example.com used (fetched dynamically from admin/list-licenses).",
+  "seed_data_creation": "Created TEST_-prefixed Premium license per test (auto-cleaned by fixture). All sync_devices created during MASTER and PREMIUM UI runs cleaned via /api/sync/admin/reset-devices at end.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iteration 37 confirmed: new admin/reset-devices endpoint fully functional; MASTER 2-PC + rejection + reset cycle works end-to-end; Premium client 2-PC flow (heartbeat/mode/push/pull/backup/consume) intact; friendly modal shows when no license. All data-testids used by admin dashboard remain in place. If future work touches the sync client inline (v2.html lines 232-380), re-run test_iter37_admin_reset_and_master.py + a quick Playwright pass with the same 3 scenarios above.",
+  "rca of the issue": "N/A — no new issues. The _apiBase() fix (v2.html:~10893) works correctly on https preview (location.origin used) as well as file:// (getApiBase() fallback used). Confirmed indirectly by the friendly error modal test which still uses _apiBase() to make the initial /sync/status call."
+}

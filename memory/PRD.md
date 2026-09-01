@@ -1221,3 +1221,11 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - `/app/frontend/public/v2.html:10723-10800` — integración UI (onboarding modal, badge, `openSyncSettings`, banner de copia pendiente).
 - `/app/backend/tests/test_sync_multipc.py` + `/app/backend/tests/test_sync_client_merge.js` — 100/100 tests unit.
 
+
+### 🐛 FIX CRÍTICO Sync en PC local (file://) · Jun 2026 (iteration_37)
+**Síntoma real del usuario**: En su PC (Electron/.exe carga v2.html vía file://) los botones "Configurar sync" y "Enviar copia" mostraban "Sincronización cargando · No se pudo conectar con el servidor", aunque todo funcionaba en preview.
+**Causa raíz**: `_apiBase()` (v2.html ~10893) devolvía `window.REACT_APP_BACKEND_URL || location.origin`. En file:// eso es `file://` → todas las llamadas /api/sync/* morían. En preview funcionaba porque location.origin ES el backend (por eso los tests anteriores no lo detectaron).
+**Fix**: `_apiBase()` ahora usa location.origin SOLO bajo http(s); si no, `getApiBase()` (window.API_BASE > override caja.apibase.override.v1 > caché > https://project-helper-47.emergent.host). Mismo fix en las 2 llamadas admin (list-licenses, push-to-license) líneas ~11000/~11039.
+**Nuevo endpoint**: `POST /api/sync/admin/reset-devices` {admin_license_key, target_license_key, install_id?} — solo MASTER, libera slots de dispositivos (soporte a clientes que cambian de PC).
+**Testing (iteration_37)**: backend 7/7 pytest, frontend 3/3 Playwright (MASTER con bloque admin + 30 clientes en dropdown, cliente PREMIUM sin bloque admin + envío copia OK, modal amable sin licencia). Simulación file:// con Playwright validada por main agent (modal abre, dropdown carga).
+**⚠️ PENDIENTE POST-DEPLOY**: 1) El usuario debe REDESPLEGAR para que su .exe reciba el v2.html corregido. 2) Tras el deploy, limpiar dispositivo fantasma TESTPC1 de la licencia MASTER en producción: `curl -X POST https://project-helper-47.emergent.host/api/sync/admin/reset-devices -H "Content-Type: application/json" -d '{"admin_license_key":"MB-MASTER-BRUGULAT-2026-OWNER","target_license_key":"MB-MASTER-BRUGULAT-2026-OWNER","install_id":"TESTPC1"}'`

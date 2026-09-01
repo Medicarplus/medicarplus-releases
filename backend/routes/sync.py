@@ -127,6 +127,12 @@ class AdminPushToLicenseBody(BaseModel):
     label: Optional[str] = Field(default=None, max_length=200)
 
 
+class AdminResetDevicesBody(BaseModel):
+    admin_license_key: str = Field(..., min_length=10, max_length=1500)
+    target_license_key: str = Field(..., min_length=10, max_length=1500)
+    install_id: Optional[str] = Field(default=None, max_length=200)
+
+
 COLL_BACKUPS = "sync_backups"
 
 
@@ -494,6 +500,22 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
             "target_client_name": target.get("client_name"),
             "created_at": _iso(now),
         }
+
+    @router.post("/sync/admin/reset-devices")
+    async def admin_reset_devices(body: AdminResetDevicesBody):
+        """👑 Libera los slots de dispositivos de una licencia (borra sync_devices)."""
+        if body.admin_license_key.strip() != MASTER_KEY:
+            raise HTTPException(status_code=403, detail="admin_only")
+        target = await _find_license(body.target_license_key)
+        if not target:
+            raise HTTPException(status_code=404, detail="target_license_not_found")
+        lkh = _key_hash(body.target_license_key)
+        if body.install_id:
+            res = await db[COLL_DEVICES].delete_many({"license_key_hash": lkh, "install_id": body.install_id})
+        else:
+            res = await db[COLL_DEVICES].delete_many({"license_key_hash": lkh})
+        logger.info("admin/reset-devices target=%s removed=%d", body.target_license_key[:20], res.deleted_count)
+        return {"ok": True, "removed": res.deleted_count}
 
     @router.get("/sync/admin/list-licenses")
     async def admin_list_licenses(admin_license_key: str):
