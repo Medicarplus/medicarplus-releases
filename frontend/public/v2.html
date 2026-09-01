@@ -293,7 +293,6 @@
         <button class="btn" id="btnLedger" style="background:#2a1f3a;border-color:#5e2a5e;color:#e0bff0;font-weight:600;width:100%;text-align:left" data-i18n="ledger">📖 Llibreta</button>
         <button class="btn" id="btnIrpf" style="background:#3a2a1f;border-color:#8b5e2a;color:#f0d6bf;font-weight:600;width:100%;text-align:left">📋 IRPF</button>
         <button class="btn" id="btnCambio" style="background:#1f3a2e;border-color:#22c55e;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-i18n="reserve" data-testid="btn-cambio">💰 Reserva de cambio</button>
-        <button class="btn" id="btnSaldoInicial" data-testid="btn-saldo-inicial" style="background:#152a3a;border-color:#38bdf8;color:#bfdbfe;font-weight:600;width:100%;text-align:left" title="Configura el saldo con el que empiezas a usar la app (no cuenta como facturación)">🏦 Saldo inicial</button>
         <button class="btn" id="btnLibroRegMenu" style="background:#152a3a;border-color:#7ec8ff;color:#7ec8ff;font-weight:600;width:100%;text-align:left">📖 Libro de Registro</button>
         <button class="btn" id="btnHonorarios" data-testid="btn-honorarios" style="background:#2a2015;border-color:#fbbf24;color:#fbbf24;font-weight:600;width:100%;text-align:left">💼 Honorarios</button>
         <button class="btn" id="btnGastos" data-testid="btn-gastos" style="background:#2a1515;border-color:#f472b6;color:#f472b6;font-weight:600;width:100%;text-align:left">🧾 Gastos (luz · agua · alquiler…)</button>
@@ -3318,7 +3317,6 @@ $('#btnImportJson').addEventListener('click',()=>{setTimeout(()=>{const m=$('#bt
 $('#btnLedger').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLedger()};
 $('#btnIrpf').onclick=()=>{$('#btnAccountingMenu').style.display='none';openIRPF()};
 $('#btnCambio').onclick=()=>{$('#btnAccountingMenu').style.display='none';openCambio()};
-$('#btnSaldoInicial').onclick=()=>{$('#btnAccountingMenu').style.display='none';openSaldoInicial()};
 $('#btnLibroRegMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLibroRegistro()};
 $('#btnHonorarios').onclick=()=>{$('#btnAccountingMenu').style.display='none';openHonorariosPanel()};
 $('#btnGastos').onclick=()=>{$('#btnAccountingMenu').style.display='none';openGastosPanel()};
@@ -10138,6 +10136,15 @@ function showConfigWizard(isFirstRun){
     +'<div id="cfgPartnersEmpty" style="color:#64748b;font-size:12px;font-style:italic;margin-top:4px">'+L('Sense socis configurats. Deixa-ho així si no reparteixes els ingressos amb ningú.','Sin socios configurados. Déjalo así si no repartes los ingresos con nadie.')+'</div>'
     +'<div style="color:#94a3b8;font-size:11px;margin-top:10px;line-height:1.5">'+L('Els % de tots els socis han de sumar 100. Si no vols usar aquest sistema, deixa la llista buida.','Los % de todos los socios deben sumar 100. Si no quieres usar este sistema, deja la lista vacía.')+'</div>'
     +'</div>'
+    +'<div style="background:#0b1a2e;border:1px solid #38bdf8;border-radius:10px;padding:14px;margin-bottom:22px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">'
+    +'<div>'
+    +'<label style="font-size:11px;color:#38bdf8;letter-spacing:1.5px;font-weight:700">🏦 '+L('SALDO INICIAL (opcional · només primera vegada)','SALDO INICIAL (opcional · solo primera vez)')+'</label>'
+    +'<div id="cfgSaldoStatus" style="font-size:12px;color:#94a3b8;margin-top:6px;line-height:1.5">'+L('Si empeces a fer servir l\'app a meitat d\'any i ja tenies diners a la caixa o al banc, posa\'l aquí perquè no compti com a facturació.','Si empiezas a usar la app a mediados de año y ya tenías dinero en caja o banco, ponlo aquí para que no cuente como facturación.')+'</div>'
+    +'</div>'
+    +'<button id="cfgOpenSI" type="button" data-testid="cfg-open-saldo-inicial" style="padding:9px 14px;background:linear-gradient(135deg,#38bdf8,#0284c7);color:#0f172a;border:none;border-radius:8px;font-family:Georgia,serif;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap">'+L('Configurar-lo','Configurarlo')+'</button>'
+    +'</div>'
+    +'</div>'
     +'<div id="cfgErr" style="color:#ef4444;font-size:12px;margin-bottom:12px;display:none"></div>'
     +'<div style="display:flex;gap:10px;justify-content:'+(isFirstRun?'center':'flex-end')+'">'
     +(!isFirstRun?'<button id="cfgCancel" style="padding:12px 22px;background:transparent;border:1.5px solid #64748b;border-radius:8px;color:#cbd5e1;cursor:pointer;font-family:Georgia,serif">'+L('Cancel·la','Cancelar')+'</button>':'')
@@ -10171,6 +10178,36 @@ function showConfigWizard(isFirstRun){
   };
   renderPartners();
   back.querySelector('#cfgC1').focus();
+  // 🏦 Botón Saldo inicial dentro del wizard Configuración
+  const refreshSIStatus = ()=>{
+    try{
+      const si = getSaldoInicial();
+      const st = back.querySelector('#cfgSaldoStatus');
+      const btn = back.querySelector('#cfgOpenSI');
+      if(si && st){
+        const total = (si.efectivo||0)+(si.tarjeta||0)+(si.transf||0)+(si.bizum||0);
+        st.innerHTML = '✅ <b style="color:#38bdf8">'+total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €</b> configurados desde <b>'+si.fecha+'</b>' + (si.nota?' · <i>'+si.nota+'</i>':'');
+        if(btn) btn.textContent = L('Editar','Editar');
+      }
+    }catch(e){}
+  };
+  refreshSIStatus();
+  const cfgOpenSI = back.querySelector('#cfgOpenSI');
+  if(cfgOpenSI){
+    cfgOpenSI.onclick = ()=>{
+      try{
+        openSaldoInicial();
+        // Al cerrar el modal SI (setTimeout para que la app pinte), refresca el estado
+        const chk = setInterval(()=>{
+          if(!document.querySelector('.modal-back input#siFecha')){
+            clearInterval(chk);
+            refreshSIStatus();
+          }
+        }, 300);
+        setTimeout(()=>clearInterval(chk), 60000); // safety
+      }catch(e){ console.warn(e); }
+    };
+  }
   const save=()=>{
     const n1=back.querySelector('#cfgC1').value.trim();
     const n2=back.querySelector('#cfgC2').value.trim();
