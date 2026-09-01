@@ -2073,6 +2073,101 @@ function openStats(initialSection){
       .map(([g,n]) => `${n}× ${g}`).join(' · ');
     return `${cat}: ${parts}`;
   }
+
+  // 📋 Construye el desglose "Tipo·Grupo·Precio" (Excel de cierre de mes).
+  // filterYear: obligatorio. filterMonth: opcional (1-12). Devuelve array de filas
+  // ordenadas y agrupadas por combinación única de tipo/grupo/precio.
+  function _trafBuildDetail(filterYear, filterMonth){
+    const detailMap = {};
+    try{
+      const src = (JSON.parse(localStorage.getItem(KEYS['trafic'])) || {}).byDate || {};
+      const countZero = (typeof getCountZero === 'function') ? getCountZero() : (localStorage.getItem('caja.count_zero') === '1');
+      for(const iso of Object.keys(src)){
+        const dt = new Date(iso + 'T00:00:00');
+        if(isNaN(dt) || dt.getFullYear() !== +filterYear) continue;
+        if(filterMonth != null && (dt.getMonth() + 1) !== +filterMonth) continue;
+        for(const e of (src[iso] || [])){
+          if(e.kind !== 'TRAF' || !e._csv) continue;
+          const imp = +e.importe || 0;
+          const ta = +e.tasa || 0;
+          const desc = +e.descuento || 0;
+          if(!countZero && (imp - desc + ta) <= 0) continue;
+          const tipo = _trafBaseCat(e.tipo);
+          const grupo = String(e.grupo || 'Sin grupo').trim() || 'Sin grupo';
+          const precio = +imp || 0;
+          const k = `${tipo}||${grupo}||${precio.toFixed(2)}`;
+          if(!detailMap[k]) detailMap[k] = { tipo, grupo, precio, count:0, total:0, tasa:0 };
+          detailMap[k].count++;
+          detailMap[k].total += imp;
+          detailMap[k].tasa += ta;
+        }
+      }
+    }catch(err){ console.warn('_trafBuildDetail error', err); }
+    return Object.values(detailMap)
+      .sort((a,b) => a.tipo.localeCompare(b.tipo) || a.grupo.localeCompare(b.grupo) || b.precio - a.precio);
+  }
+  // Renderiza el HTML del bloque desglose (vista pantalla · con colores por tipo)
+  function _trafDetailBlockHtml(rows, year, monthLabel, colorMap){
+    if(!rows.length) return '';
+    const label = monthLabel ? `${monthLabel} ${year}` : `${year}`;
+    const bodyRows = rows.map(d => {
+      const color = (colorMap && colorMap[d.tipo]) || '#94a3b8';
+      return `<tr>
+        <td style="padding:6px 10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff">${d.count}</td>
+        <td style="padding:6px 10px;border:1px solid #2a3040;color:${color};font-weight:700">${d.tipo}</td>
+        <td style="padding:6px 10px;border:1px solid #2a3040;color:#e2e8f0">${d.grupo}</td>
+        <td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;color:#94a3b8">${d.precio ? _fmtEur(d.precio) : '—'}</td>
+        <td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;color:#3ddc97;font-weight:700">${d.total ? _fmtEur(d.total) : '—'}</td>
+      </tr>`;
+    }).join('');
+    const totalCount = rows.reduce((s,d) => s + d.count, 0);
+    const totalAmount = rows.reduce((s,d) => s + d.total, 0);
+    return `
+      <div style="margin-top:16px">
+        <div class="small" style="margin-bottom:8px;color:#94a3b8;font-weight:600;letter-spacing:.5px">📋 DESGLOSE PROFESIONAL · ${label} · agrupado por Tipo + Grupo + Precio</div>
+        <table style="border-collapse:collapse;font-size:12px;font-family:'Consolas','Menlo',monospace;width:100%">
+          <thead><tr style="background:#1a1e26">
+            <th style="padding:8px;border:1px solid #2a3040;color:#7ec8ff">CANTIDAD</th>
+            <th style="padding:8px;border:1px solid #2a3040;color:#f5b301;text-align:left">TIPO</th>
+            <th style="padding:8px;border:1px solid #2a3040;color:#c084fc;text-align:left">GRUPO</th>
+            <th style="padding:8px;border:1px solid #2a3040;color:#94a3b8">PRECIO UNIT.</th>
+            <th style="padding:8px;border:1px solid #2a3040;color:#3ddc97">TOTAL</th>
+          </tr></thead>
+          <tbody>${bodyRows}</tbody>
+          <tfoot><tr style="background:#1f2530">
+            <td style="padding:8px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff;font-size:14px">${totalCount}</td>
+            <td colspan="3" style="padding:8px;border:1px solid #2a3040;font-weight:700;color:#e2e8f0">TOTAL FACTURACIÓN</td>
+            <td style="padding:8px;border:1px solid #2a3040;text-align:right;font-weight:700;color:#3ddc97;font-size:14px">${_fmtEur(totalAmount)}</td>
+          </tr></tfoot>
+        </table>
+        <div class="small" style="color:#64748b;margin-top:6px;font-style:italic">💡 Cada combinación única de Tipo·Grupo·Precio aparece como una fila con su cantidad y facturación total.</div>
+      </div>`;
+  }
+  // Versión PDF (colores neutros compatibles con impresión B/N)
+  function _trafDetailBlockPdfHtml(rows, year, monthLabel){
+    if(!rows.length) return '';
+    const label = monthLabel ? `${monthLabel} ${year}` : `${year}`;
+    const bodyRows = rows.map(d => `<tr>
+        <td style="text-align:center;font-weight:700">${d.count}</td>
+        <td style="text-align:left;font-weight:600">${d.tipo}</td>
+        <td style="text-align:left">${d.grupo}</td>
+        <td style="text-align:right">${d.precio ? _fmtEur(d.precio) : '—'}</td>
+        <td style="text-align:right;font-weight:700">${d.total ? _fmtEur(d.total) : '—'}</td>
+      </tr>`).join('');
+    const totalCount = rows.reduce((s,d) => s + d.count, 0);
+    const totalAmount = rows.reduce((s,d) => s + d.total, 0);
+    return `
+      <h2 style="margin-top:22px;font-size:14px;text-align:left">📋 DESGLOSE POR TIPO · GRUPO · PRECIO — ${label}</h2>
+      <table><thead><tr>
+        <th>CANTIDAD</th><th style="text-align:left">TIPO</th><th style="text-align:left">GRUPO</th><th>PRECIO UNIT.</th><th>TOTAL</th>
+      </tr></thead>
+      <tbody>${bodyRows}</tbody>
+      <tfoot><tr>
+        <td style="text-align:center">${totalCount}</td>
+        <td colspan="3" style="text-align:left">TOTAL FACTURACIÓN</td>
+        <td style="text-align:right">${_fmtEur(totalAmount)}</td>
+      </tr></tfoot></table>`;
+  }
   function _fmtEur(n){ n = +n || 0; return n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €' }
   function _barChartHtml(labels, values, colors, height){
     const H = height || 160;
@@ -2195,66 +2290,8 @@ function openStats(initialSection){
       agg._displayByCat = displayByCat;
 
       // 📋 Desglose profesional por Tipo + Grupo + Precio (como tu Excel de cierre de mes)
-      // Agrupa todas las entradas del año por combinación única "Tipo|Grupo|Precio unitario"
-      // y calcula cantidad + total facturado. Ideal para conciliar contabilidad al fin de mes.
-      const detailMap = {}; // key: "Tipo|Grupo|precio" → {tipo, grupo, precio, count, total, color}
-      try{
-        const src = (JSON.parse(localStorage.getItem(KEYS['trafic'])) || {}).byDate || {};
-        const countZero = (typeof getCountZero === 'function') ? getCountZero() : (localStorage.getItem('caja.count_zero') === '1');
-        for(const iso of Object.keys(src)){
-          const dt = new Date(iso + 'T00:00:00');
-          if(isNaN(dt) || dt.getFullYear() !== +year) continue;
-          for(const e of (src[iso] || [])){
-            if(e.kind !== 'TRAF' || !e._csv) continue;
-            const imp = +e.importe || 0;
-            const ta = +e.tasa || 0;
-            const desc = +e.descuento || 0;
-            if(!countZero && (imp - desc + ta) <= 0) continue;
-            const tipo = _trafBaseCat(e.tipo);
-            const grupo = String(e.grupo || 'Sin grupo').trim() || 'Sin grupo';
-            const precio = +imp || 0;
-            const k = `${tipo}||${grupo}||${precio.toFixed(2)}`;
-            if(!detailMap[k]) detailMap[k] = { tipo, grupo, precio, count:0, total:0, tasa:0 };
-            detailMap[k].count++;
-            detailMap[k].total += imp;
-            detailMap[k].tasa += ta;
-          }
-        }
-      }catch(err){ console.warn('desglose error', err); }
-      const detailRows = Object.values(detailMap)
-        .sort((a,b) => a.tipo.localeCompare(b.tipo) || a.grupo.localeCompare(b.grupo) || b.precio - a.precio)
-        .map(d => {
-          const color = COLORS[d.tipo] || '#94a3b8';
-          return `<tr>
-            <td style="padding:6px 10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff">${d.count}</td>
-            <td style="padding:6px 10px;border:1px solid #2a3040;color:${color};font-weight:700">${d.tipo}</td>
-            <td style="padding:6px 10px;border:1px solid #2a3040;color:#e2e8f0">${d.grupo}</td>
-            <td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;color:#94a3b8">${d.precio ? _fmtEur(d.precio) : '—'}</td>
-            <td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;color:#3ddc97;font-weight:700">${d.total ? _fmtEur(d.total) : '—'}</td>
-          </tr>`;
-        }).join('');
-      const detailTotalCount = Object.values(detailMap).reduce((s,d) => s + d.count, 0);
-      const detailTotalAmount = Object.values(detailMap).reduce((s,d) => s + d.total, 0);
-      const detailBlock = detailRows ? `
-        <div style="margin-top:16px">
-          <div class="small" style="margin-bottom:8px;color:#94a3b8;font-weight:600;letter-spacing:.5px">📋 DESGLOSE PROFESIONAL · ${year} · agrupado por Tipo + Grupo + Precio</div>
-          <table style="border-collapse:collapse;font-size:12px;font-family:'Consolas','Menlo',monospace;width:100%">
-            <thead><tr style="background:#1a1e26">
-              <th style="padding:8px;border:1px solid #2a3040;color:#7ec8ff">CANTIDAD</th>
-              <th style="padding:8px;border:1px solid #2a3040;color:#f5b301;text-align:left">TIPO</th>
-              <th style="padding:8px;border:1px solid #2a3040;color:#c084fc;text-align:left">GRUPO</th>
-              <th style="padding:8px;border:1px solid #2a3040;color:#94a3b8">PRECIO UNIT.</th>
-              <th style="padding:8px;border:1px solid #2a3040;color:#3ddc97">TOTAL</th>
-            </tr></thead>
-            <tbody>${detailRows}</tbody>
-            <tfoot><tr style="background:#1f2530">
-              <td style="padding:8px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff;font-size:14px">${detailTotalCount}</td>
-              <td colspan="3" style="padding:8px;border:1px solid #2a3040;font-weight:700;color:#e2e8f0">TOTAL FACTURACIÓN</td>
-              <td style="padding:8px;border:1px solid #2a3040;text-align:right;font-weight:700;color:#3ddc97;font-size:14px">${_fmtEur(detailTotalAmount)}</td>
-            </tr></tfoot>
-          </table>
-          <div class="small" style="color:#64748b;margin-top:6px;font-style:italic">💡 Este bloque replica tu Excel de cierre de mes: cada combinación única de Tipo·Grupo·Precio aparece como una fila con su cantidad y facturación total.</div>
-        </div>` : '';
+      const detailRowsData = _trafBuildDetail(year);
+      const detailBlock = _trafDetailBlockHtml(detailRowsData, year, null, COLORS);
       body.innerHTML = `
         <div data-testid="traffic-stats-year" style="display:flex;flex-direction:column;gap:14px">
           <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
@@ -2334,6 +2371,9 @@ function openStats(initialSection){
         dailyRows.push(`<tr><td style="padding:5px 10px;border:1px solid #2a3040;font-weight:600;background:#141821">Día ${d}</td><td style="padding:5px 10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff">${dd.count}</td>${catCells}<td style="padding:5px 10px;border:1px solid #2a3040;text-align:right;color:#3ddc97">${dd.importe ? _fmtEur(dd.importe) : ''}</td><td style="padding:5px 10px;border:1px solid #2a3040;text-align:right;color:#f5b301">${dd.tasas ? _fmtEur(dd.tasas) : ''}</td></tr>`);
       }
       const dailyTableRows = dailyRows.length ? dailyRows.join('') : `<tr><td colspan="${3 + CATS.length}" style="padding:20px;text-align:center;color:#94a3b8;font-style:italic">No hay entradas de Tráfico en ${MESOS[monthSel-1]} ${year}</td></tr>`;
+      // 📋 Desglose profesional del mes (mismo bloque que en vista anual)
+      const monthDetailRows = _trafBuildDetail(year, monthSel);
+      const monthDetailBlock = _trafDetailBlockHtml(monthDetailRows, year, MESOS[monthSel-1], COLORS);
       body.innerHTML = `
         <div data-testid="traffic-stats-month" style="display:flex;flex-direction:column;gap:14px">
           <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
@@ -2374,6 +2414,7 @@ function openStats(initialSection){
             </tr></thead>
             <tbody>${dailyTableRows}</tbody>
           </table>
+          ${monthDetailBlock}
         </div>`;
     }
   }
@@ -2391,7 +2432,10 @@ function openStats(initialSection){
         return `<tr><td style="text-align:left;font-weight:600">${mName}</td><td>${md.count || ''}</td>${cells}<td style="text-align:right">${md.importe ? _fmtEur(md.importe) : ''}</td><td style="text-align:right">${md.tasas ? _fmtEur(md.tasas) : ''}</td></tr>`;
       }).join('');
       const totCells = TRAF_CATS.map(c => `<td>${agg.byCat[c] || ''}</td>`).join('');
-      html=`<html><head><title>Estadísticas Tráfico ${year}</title><style>@page{size:A4 landscape;margin:10mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Arial,sans-serif;padding:0;color:#000;font-size:12px}h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #333;padding:6px;text-align:center}th{background:#1e3a5f !important;color:#fff !important}td:first-child,th:first-child{text-align:left;padding-left:12px}tfoot td{background:#333 !important;color:#fff !important;font-weight:700}</style></head><body><h1>ESTADÍSTICAS TRÁFICO · ${year}</h1><table><thead><tr><th>MES</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS DGT</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL ${year}</td><td>${agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table></body></html>`;
+      // Desglose profesional (Tipo·Grupo·Precio) para incluir en el PDF anual
+      const detailRowsData = _trafBuildDetail(year);
+      const detailPdf = _trafDetailBlockPdfHtml(detailRowsData, year, null);
+      html=`<html><head><title>Estadísticas Tráfico ${year}</title><style>@page{size:A4 landscape;margin:10mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Arial,sans-serif;padding:0;color:#000;font-size:12px}h1{text-align:center;margin-bottom:20px}h2{margin-top:22px;font-size:14px;text-align:left;color:#1e3a5f;page-break-before:auto}table{width:100%;border-collapse:collapse;font-size:11px;page-break-inside:avoid}th,td{border:1px solid #333;padding:6px;text-align:center}th{background:#1e3a5f !important;color:#fff !important}td:first-child,th:first-child{text-align:left;padding-left:12px}tfoot td{background:#333 !important;color:#fff !important;font-weight:700}</style></head><body><h1>ESTADÍSTICAS TRÁFICO · ${year}</h1><table><thead><tr><th>MES</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS DGT</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL ${year}</td><td>${agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table>${detailPdf}</body></html>`;
     }else{
       const agg = _trafAggregate(year, monthSel);
       const daysInMonth = new Date(year, monthSel, 0).getDate();
@@ -2404,7 +2448,10 @@ function openStats(initialSection){
         rows.push(`<tr><td style="text-align:left;font-weight:600">Día ${d}</td><td>${dd.count}</td>${cells}<td style="text-align:right">${dd.importe ? _fmtEur(dd.importe) : ''}</td><td style="text-align:right">${dd.tasas ? _fmtEur(dd.tasas) : ''}</td></tr>`);
       }
       const totCells = TRAF_CATS.map(c => `<td>${agg.byCat[c] || ''}</td>`).join('');
-      html=`<html><head><title>Tráfico ${MESOS[monthSel-1]} ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #333;padding:6px;text-align:center}th{background:#1e3a5f;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:12px}tfoot td{background:#333;color:#fff;font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>TRÁFICO · ${MESOS[monthSel-1].toUpperCase()} ${year}</h1><table><thead><tr><th>DÍA</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS</th></tr></thead><tbody>${rows.length ? rows.join('') : `<tr><td colspan="${3 + TRAF_CATS.length}" style="text-align:center;font-style:italic;color:#666">Sin entradas en este mes</td></tr>`}</tbody><tfoot><tr><td>TOTAL</td><td>${agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table></body></html>`;
+      // Desglose profesional del mes en el PDF
+      const detailRowsMonth = _trafBuildDetail(year, monthSel);
+      const detailPdfMonth = _trafDetailBlockPdfHtml(detailRowsMonth, year, MESOS[monthSel-1]);
+      html=`<html><head><title>Tráfico ${MESOS[monthSel-1]} ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}h2{margin-top:22px;font-size:14px;text-align:left;color:#1e3a5f;page-break-before:auto}table{width:100%;border-collapse:collapse;font-size:12px;page-break-inside:avoid}th,td{border:1px solid #333;padding:6px;text-align:center}th{background:#1e3a5f;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:12px}tfoot td{background:#333;color:#fff;font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>TRÁFICO · ${MESOS[monthSel-1].toUpperCase()} ${year}</h1><table><thead><tr><th>DÍA</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS</th></tr></thead><tbody>${rows.length ? rows.join('') : `<tr><td colspan="${3 + TRAF_CATS.length}" style="text-align:center;font-style:italic;color:#666">Sin entradas en este mes</td></tr>`}</tbody><tfoot><tr><td>TOTAL</td><td>${agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table>${detailPdfMonth}</body></html>`;
     }
     printHtml(html);
   }
