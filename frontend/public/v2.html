@@ -9071,10 +9071,11 @@ try{setInterval(function(){try{window.updateTrialBadge()}catch(e){}}, 60000)}cat
 // Mostra la versió del programa a la cantonada superior dreta (des d'Electron via preload)
 (function initVersion(){
   try{
-    var v = (window.appInfo && window.appInfo.version) ? window.appInfo.version : '2.1.11';
+    var v = (window.appInfo && window.appInfo.version) ? window.appInfo.version : '2.1.12';
     var isElectron = !!(window.appInfo && window.appInfo.isDesktop);
+    var HTML_BUILD = '01.09'; // fecha de publicación de este v2.html (dd.mm) para diagnóstico
     var el = document.getElementById('appVersion');
-    if(el){ el.textContent = 'v' + v + (isElectron ? '' : ' (web)'); }
+    if(el){ el.textContent = 'v' + v + ' · ' + HTML_BUILD + (isElectron ? '' : ' (web)'); }
   }catch(e){}
 })();
 
