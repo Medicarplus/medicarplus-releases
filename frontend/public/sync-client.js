@@ -37,11 +37,30 @@
   }
 
   // ─── Snapshot completo del localStorage relevante (todas las keys 'caja.*') ─────
+  // 🔒 EXCLUSIONES (datos locales por PC, no se sincronizan):
+  //   - caja.saldoInicial.*   → cada PC configura su propio saldo de arranque
+  //                              cuando empieza a usar la app (fecha propia).
+  //   - caja.install.id.v1    → identificador único del PC.
+  //   - caja.sync.*           → estado interno del propio sync (modo elegido).
+  //   - caja.license.*        → licencia local (no debe sincronizarse).
+  //   - caja.plan.preview.*   → override de plan para previsualización local.
+  const SYNC_EXCLUDE_PREFIXES = [
+    'caja.saldoInicial.',
+    'caja.install.',
+    'caja.sync.',
+    'caja.license.',
+    'caja.plan.preview.'
+  ];
+  function _isSyncable(k){
+    if(!k || !k.startsWith('caja.')) return false;
+    for(const p of SYNC_EXCLUDE_PREFIXES){ if(k.startsWith(p)) return false; }
+    return true;
+  }
   function _snapshotLocalStorage(){
     const out = {};
     for(let i=0; i<localStorage.length; i++){
       const k = localStorage.key(i);
-      if(!k || !k.startsWith('caja.')) continue;
+      if(!_isSyncable(k)) continue;
       try { out[k] = JSON.parse(localStorage.getItem(k)); }
       catch(e){ out[k] = localStorage.getItem(k); }
     }

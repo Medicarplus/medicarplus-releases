@@ -3020,14 +3020,14 @@ function getSaldoInicial(){
 }
 function setSaldoInicial(obj){
   if(!obj || obj._delete){ localStorage.removeItem(_saldoInicialKey()); return; }
-  // Guardamos solo los 3 campos limpios + _mtime para sync LWW multi-PC
+  // Nota: el Saldo Inicial es LOCAL por ordenador (no se sincroniza vía Multi-PC).
+  // Cada PC lo configura una vez con la fecha en que empieza a usar la app.
   const clean = {
     fecha: obj.fecha,
     efectivo: +obj.efectivo || 0,
     banco:    +obj.banco    || 0,
     cambio:   +obj.cambio   || 0,
-    nota:     obj.nota      || '',
-    _mtime:   Date.now()
+    nota:     obj.nota      || ''
   };
   localStorage.setItem(_saldoInicialKey(), JSON.stringify(clean));
 }
@@ -3057,9 +3057,12 @@ function openSaldoInicial(){
       <h3 style="margin:0;color:#38bdf8;font-family:Georgia,serif">🏦 Saldo inicial</h3>
       <button data-close style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">×</button>
     </div>
-    <p style="color:#94a3b8;font-size:13px;margin:8px 0 18px;line-height:1.5">
+    <p style="color:#94a3b8;font-size:13px;margin:8px 0 12px;line-height:1.5">
       ¿Empiezas a usar MediCar Plus a mediados de año y ya tenías dinero en caja o banco? Introduce aquí ese saldo de partida. <b style="color:#38bdf8">No se cuenta como facturación</b>: solo aparece en el "Saldo anterior" para que las cifras cuadren desde el día uno.
     </p>
+    <div style="font-size:11.5px;color:#bfdbfe;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.35);border-radius:6px;padding:8px 12px;margin-bottom:16px;line-height:1.55">
+      🔒 <b>Este saldo es local a este ordenador</b> y no se sincroniza con el otro PC. Cada ordenador lo configura una única vez con la fecha en que empieza a usar el programa. A partir de ahí, todo lo demás (revisiones, gastos, cambio…) sí se sincroniza normalmente.
+    </div>
 
     <div style="margin-bottom:14px">
       <label style="display:block;font-size:11px;color:#38bdf8;font-weight:800;letter-spacing:1px;margin-bottom:4px">📅 FECHA DE ARRANQUE</label>
