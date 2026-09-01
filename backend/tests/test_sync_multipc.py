@@ -102,6 +102,7 @@ async def cleanup(db, license_keys, install_ids):
         h = hashlib.sha256(k.strip().encode()).hexdigest()
         await db.sync_states.delete_many({"_id": h})
         await db.sync_devices.delete_many({"license_key_hash": h})
+        await db.sync_backups.delete_many({"license_key_hash": h})
     for iid in install_ids:
         await db.sync_devices.delete_many({"install_id": iid})
 
@@ -300,6 +301,77 @@ async def main():
         r = await ac.get(f"/api/sync/pull?license_key={KEY_PRM}&install_id={PC2}")
         val = r.json().get("entries", {}).get("caja.saldo.v1", {}).get("value")
         check(val == 8000, f"PC2 recibe el estado actualizado (got {val})")
+
+        # ──────────────────────────────────────────────────────────────────
+        print(f"\n{Colors.Y}▸ Escenario 12: Backup manual · PC1 envía copia a PC2 (independent){Colors.E}")
+        # Ambos vuelven a independent
+        await ac.post("/api/sync/mode", json={"license_key": KEY_PRM, "install_id": PC1, "mode": "independent"})
+        await ac.post("/api/sync/mode", json={"license_key": KEY_PRM, "install_id": PC2, "mode": "independent"})
+
+        # PC1 envía copia
+        snapshot_pc1 = {
+            "caja.byDate.v1": {"2026-04-01": [{"id": "backup-1", "amount": 500}]},
+            "caja.saldoInicial.v1": {"fecha": "2026-04-01", "efectivo": 3500},
+        }
+        r = await ac.post("/api/sync/backup/send", json={
+            "license_key": KEY_PRM, "install_id": PC1,
+            "data": snapshot_pc1, "label": "Copia final de marzo"
+        })
+        d = r.json()
+        check(r.status_code == 200, f"backup/send OK (got {r.status_code})")
+        check("backup_id" in d, "backup_id devuelto")
+        backup_id_pc1 = d.get("backup_id")
+
+        # PC2 comprueba pending
+        r = await ac.get(f"/api/sync/backup/pending?license_key={KEY_PRM}&install_id={PC2}")
+        d = r.json()
+        check(d.get("count") == 1, f"PC2 ve 1 copia pendiente (got {d.get('count')})")
+        pending = d.get("pending", [])
+        if pending:
+            check(pending[0]["from_install_id"] == PC1, "copia viene de PC1")
+            check(pending[0]["label"] == "Copia final de marzo", "label correcto")
+            check("backup-1" in json.dumps(pending[0]["data"]), "data incluida en el payload")
+
+        # PC1 NO ve su propia copia (uno no restaura la suya)
+        r = await ac.get(f"/api/sync/backup/pending?license_key={KEY_PRM}&install_id={PC1}")
+        d = r.json()
+        check(d.get("count") == 0, f"PC1 no ve su propia copia (got {d.get('count')})")
+
+        # ──────────────────────────────────────────────────────────────────
+        print(f"\n{Colors.Y}▸ Escenario 13: Backup upsert · reenviar sobrescribe la anterior{Colors.E}")
+        r = await ac.post("/api/sync/backup/send", json={
+            "license_key": KEY_PRM, "install_id": PC1,
+            "data": {"caja.new.v1": {"foo": "bar"}}, "label": "Copia más reciente"
+        })
+        check(r.status_code == 200, "segundo backup/send OK")
+        r = await ac.get(f"/api/sync/backup/pending?license_key={KEY_PRM}&install_id={PC2}")
+        d = r.json()
+        check(d.get("count") == 1, f"sigue habiendo solo 1 pendiente (got {d.get('count')})")
+        if d.get("pending"):
+            check(d["pending"][0]["label"] == "Copia más reciente", "es la copia MÁS reciente")
+
+        # ──────────────────────────────────────────────────────────────────
+        print(f"\n{Colors.Y}▸ Escenario 14: PC2 consume la copia → deja de aparecer{Colors.E}")
+        r = await ac.get(f"/api/sync/backup/pending?license_key={KEY_PRM}&install_id={PC2}")
+        pending = r.json().get("pending", [])
+        if pending:
+            backup_id = pending[0]["backup_id"]
+            r = await ac.post("/api/sync/backup/consume", json={
+                "license_key": KEY_PRM, "install_id": PC2, "backup_id": backup_id
+            })
+            check(r.status_code == 200, "backup/consume OK")
+
+            # Ya no aparece para PC2
+            r = await ac.get(f"/api/sync/backup/pending?license_key={KEY_PRM}&install_id={PC2}")
+            d = r.json()
+            check(d.get("count") == 0, f"PC2 ya no ve la copia consumida (got {d.get('count')})")
+
+        # ──────────────────────────────────────────────────────────────────
+        print(f"\n{Colors.Y}▸ Escenario 15: Standard NO puede usar backup{Colors.E}")
+        r = await ac.post("/api/sync/backup/send", json={
+            "license_key": KEY_STD, "install_id": PC_STD, "data": {"x": 1}
+        })
+        check(r.status_code == 403, f"Standard backup/send rechazado (got {r.status_code})")
 
     # Cleanup
     print(f"\n{Colors.B}▸ Cleanup{Colors.E}")

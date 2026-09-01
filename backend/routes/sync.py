@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -82,6 +83,22 @@ class ModeBody(BaseModel):
     license_key: str = Field(..., min_length=10, max_length=1500)
     install_id: str = Field(..., min_length=4, max_length=200)
     mode: str = Field(..., pattern="^(linked|independent)$")
+
+
+class BackupSendBody(BaseModel):
+    license_key: str = Field(..., min_length=10, max_length=1500)
+    install_id: str = Field(..., min_length=4, max_length=200)
+    data: dict[str, Any] = Field(default_factory=dict, description="Snapshot completo localStorage")
+    label: Optional[str] = Field(default=None, max_length=200)
+
+
+class BackupConsumeBody(BaseModel):
+    license_key: str = Field(..., min_length=10, max_length=1500)
+    install_id: str = Field(..., min_length=4, max_length=200)
+    backup_id: str
+
+
+COLL_BACKUPS = "sync_backups"
 
 
 def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
@@ -290,5 +307,96 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
             "peers": peers,
             "cloud_updated_at": _iso((state or {}).get("last_updated_at")),
         }
+
+    # ────────────────────────────────────────────────────────────────────
+    # 📨 ENVÍO DE COPIA MANUAL (funciona en modo Independiente)
+    # ────────────────────────────────────────────────────────────────────
+    # El PC1 envía su snapshot al PC2 pulsando un botón. En el PC2, al
+    # arrancar la app, aparece un desplegable "Hay una copia pendiente
+    # para restaurar". Solo se guarda la ÚLTIMA copia por remitente
+    # (upsert), así que si envías 3 veces solo queda la última.
+    # ────────────────────────────────────────────────────────────────────
+
+    @router.post("/sync/backup/send")
+    async def backup_send(body: BackupSendBody):
+        """PC1 envía una copia completa de sus datos al buzón del grupo.
+
+        Funciona en cualquier modo (linked o independent). No sobrescribe
+        automáticamente los datos del receptor; solo se guarda pendiente y
+        el receptor decide si aplicar cuando abra la app.
+        """
+        lic = await _find_license(body.license_key)
+        if not lic:
+            raise HTTPException(status_code=404, detail="license_not_found")
+        if not _is_premium(lic):
+            raise HTTPException(status_code=403, detail="backup_requires_premium")
+        lkh = _key_hash(body.license_key)
+        if not await _is_device_authorized(lkh, body.install_id):
+            raise HTTPException(status_code=403, detail="device_not_authorized")
+        now = _now()
+        backup_id = str(uuid.uuid4())
+        doc = {
+            "backup_id": backup_id,
+            "license_key_hash": lkh,
+            "from_install_id": body.install_id,
+            "label": (body.label or "").strip() or None,
+            "data": body.data or {},
+            "created_at": now,
+            "consumed_by": [],  # lista de install_ids que ya lo aplicaron
+        }
+        # Upsert: solo mantenemos la ÚLTIMA copia por remitente
+        await db[COLL_BACKUPS].replace_one(
+            {"license_key_hash": lkh, "from_install_id": body.install_id},
+            doc,
+            upsert=True,
+        )
+        logger.info("backup/send from=%s size=%d keys", body.install_id, len(body.data or {}))
+        return {"ok": True, "backup_id": backup_id, "created_at": _iso(now)}
+
+    @router.get("/sync/backup/pending")
+    async def backup_pending(license_key: str, install_id: str):
+        """Devuelve las copias pendientes que este install_id AÚN NO ha aplicado.
+
+        Excluye las propias (uno no restaura su propia copia). Ordenadas por
+        más reciente primero.
+        """
+        lic = await _find_license(license_key)
+        if not lic:
+            raise HTTPException(status_code=404, detail="license_not_found")
+        lkh = _key_hash(license_key)
+        cursor = db[COLL_BACKUPS].find({
+            "license_key_hash": lkh,
+            "from_install_id": {"$ne": install_id},
+            "consumed_by": {"$nin": [install_id]},
+        }).sort("created_at", -1)
+        out = []
+        async for d in cursor:
+            out.append({
+                "backup_id": d["backup_id"],
+                "from_install_id": d["from_install_id"],
+                "label": d.get("label"),
+                "created_at": _iso(d["created_at"]),
+                "keys_count": len(d.get("data") or {}),
+                "data": d.get("data") or {},
+            })
+        return {"pending": out, "count": len(out)}
+
+    @router.post("/sync/backup/consume")
+    async def backup_consume(body: BackupConsumeBody):
+        """Marca una copia como aplicada por este install_id (así ya no vuelve
+        a mostrarse en /pending). NO borra la copia (puede haber otro device
+        del grupo que aún no la haya aplicado)."""
+        lic = await _find_license(body.license_key)
+        if not lic:
+            raise HTTPException(status_code=404, detail="license_not_found")
+        lkh = _key_hash(body.license_key)
+        result = await db[COLL_BACKUPS].update_one(
+            {"license_key_hash": lkh, "backup_id": body.backup_id},
+            {"$addToSet": {"consumed_by": body.install_id},
+             "$set": {"last_consumed_at": _now()}},
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="backup_not_found")
+        return {"ok": True, "backup_id": body.backup_id}
 
     return router
