@@ -78,6 +78,12 @@ class PushBody(BaseModel):
     entries: dict[str, Any] = Field(default_factory=dict)
 
 
+class ModeBody(BaseModel):
+    license_key: str = Field(..., min_length=10, max_length=1500)
+    install_id: str = Field(..., min_length=4, max_length=200)
+    mode: str = Field(..., pattern="^(linked|independent)$")
+
+
 def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
     router = APIRouter()
 
@@ -89,6 +95,13 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
         S'insereix a heartbeat quan encara hi ha slots lliures. Push/Pull no obren slots nous."""
         d = await db[COLL_DEVICES].find_one({"license_key_hash": license_key_hash, "install_id": install_id})
         return d is not None
+
+    async def _is_device_linked(license_key_hash: str, install_id: str) -> bool:
+        """Un dispositiu participa en sync només si el seu mode = 'linked'.
+        Per defecte tots els dispositius nous són 'independent' (el client decideix).
+        """
+        d = await db[COLL_DEVICES].find_one({"license_key_hash": license_key_hash, "install_id": install_id})
+        return bool(d and d.get("sync_mode") == "linked")
 
     @router.post("/sync/heartbeat")
     async def heartbeat(body: HeartbeatBody):
@@ -152,6 +165,9 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
         lkh = _key_hash(body.license_key)
         if not await _is_device_authorized(lkh, body.install_id):
             raise HTTPException(status_code=403, detail="device_not_authorized")
+        # 🔗 Solo dispositivos en modo "linked" participan en sync
+        if not await _is_device_linked(lkh, body.install_id):
+            raise HTTPException(status_code=409, detail="device_mode_independent")
         now = _now()
         state = await db[COLL_STATE].find_one({"_id": lkh}) or {
             "_id": lkh,
@@ -197,6 +213,9 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
         lkh = _key_hash(license_key)
         if not await _is_device_authorized(lkh, install_id):
             raise HTTPException(status_code=403, detail="device_not_authorized")
+        # 🔗 Solo dispositivos en modo "linked" participan en sync
+        if not await _is_device_linked(lkh, install_id):
+            raise HTTPException(status_code=409, detail="device_mode_independent")
         state = await db[COLL_STATE].find_one({"_id": lkh})
         if not state:
             return {"entries": {}, "cloud_updated_at": None}
@@ -213,5 +232,63 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
                 }
         last_updated = state.get("last_updated_at")
         return {"entries": entries, "cloud_updated_at": _iso(last_updated)}
+
+    @router.post("/sync/mode")
+    async def set_mode(body: ModeBody):
+        """Cambia el modo del dispositivo entre 'linked' (fusionado) e 'independent'.
+
+        Al cambiar a linked: el próximo push/pull sincronizará con el otro PC.
+        Al cambiar a independent: este PC deja de participar en sync (sus datos
+        locales siguen intactos y no se ven afectados por el otro PC).
+        """
+        lic = await _find_license(body.license_key)
+        if not lic:
+            raise HTTPException(status_code=404, detail="license_not_found")
+        if not _is_premium(lic):
+            raise HTTPException(status_code=403, detail="mode_requires_premium")
+        lkh = _key_hash(body.license_key)
+        if not await _is_device_authorized(lkh, body.install_id):
+            raise HTTPException(status_code=403, detail="device_not_authorized")
+        now = _now()
+        await db[COLL_DEVICES].update_one(
+            {"license_key_hash": lkh, "install_id": body.install_id},
+            {"$set": {"sync_mode": body.mode, "mode_changed_at": now}},
+        )
+        # Cuenta cuántos devices en 'linked' hay ahora
+        linked_count = await db[COLL_DEVICES].count_documents(
+            {"license_key_hash": lkh, "sync_mode": "linked"}
+        )
+        logger.info("sync/mode install=%s → %s (linked_devices=%d)",
+                    body.install_id, body.mode, linked_count)
+        return {"ok": True, "mode": body.mode, "linked_devices": linked_count,
+                "server_time": _iso(now)}
+
+    @router.get("/sync/status")
+    async def status(license_key: str, install_id: str):
+        """Devuelve el estado de vinculación del dispositivo y del grupo."""
+        lic = await _find_license(license_key)
+        if not lic:
+            raise HTTPException(status_code=404, detail="license_not_found")
+        lkh = _key_hash(license_key)
+        me = await db[COLL_DEVICES].find_one({"license_key_hash": lkh, "install_id": install_id})
+        my_mode = (me or {}).get("sync_mode") or "independent"
+        all_devices = await db[COLL_DEVICES].find({"license_key_hash": lkh}).to_list(length=10)
+        peers = []
+        for d in all_devices:
+            if d.get("install_id") == install_id:
+                continue
+            peers.append({
+                "install_id": d.get("install_id"),
+                "mode": d.get("sync_mode") or "independent",
+                "last_seen": _iso(d.get("last_seen")),
+            })
+        state = await db[COLL_STATE].find_one({"_id": lkh})
+        return {
+            "linked": my_mode == "linked",
+            "my_mode": my_mode,
+            "is_premium": _is_premium(lic),
+            "peers": peers,
+            "cloud_updated_at": _iso((state or {}).get("last_updated_at")),
+        }
 
     return router
