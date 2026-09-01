@@ -3037,6 +3037,8 @@ function openSaldoInicial(){
   const si = getSaldoInicial() || {fecha:'', efectivo:0, tarjeta:0, transf:0, bizum:0, nota:''};
   const today = new Date().toISOString().slice(0,10);
   const back = document.createElement('div'); back.className='modal-back';
+  // z-index alto para aparecer por encima del wizard de Configuración (99998)
+  back.style.zIndex = '99999';
   back.innerHTML = `<div class="modal" style="max-width:560px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
       <h3 style="margin:0;color:#38bdf8;font-family:Georgia,serif">🏦 Saldo inicial</h3>
