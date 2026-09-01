@@ -10780,7 +10780,10 @@ setTimeout(()=>{
     const peersHtml = (st.peers||[]).length
       ? (st.peers).map(p => `<div style="padding:6px 10px;background:#0f172a;border-radius:6px;font-family:'Consolas',monospace;font-size:11.5px;margin-top:4px"><b style="color:${p.mode==='linked'?'#22c55e':'#94a3b8'}">${p.mode==='linked'?'🔗':'🔒'}</b> PC-${(p.install_id||'').slice(-8)} · última conexión: ${p.last_seen?new Date(p.last_seen).toLocaleString('es-ES'):'—'}</div>`).join('')
       : '<div style="color:#64748b;font-size:12px;font-style:italic">No hay otros ordenadores activos con esta licencia todavía.</div>';
-    back.innerHTML = `<div class="modal" style="max-width:600px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><h3 style="margin:0;color:#38bdf8;font-family:Georgia,serif">🔗 Sincronización Multi-PC</h3><button data-close style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">×</button></div><p style="color:#94a3b8;font-size:13px;margin:8px 0 18px;line-height:1.5">Tu plan <b style="color:${st.is_premium?'#22c55e':'#94a3b8'}">${st.is_premium?'Premium':'Standard'}</b> permite ${st.is_premium?'2 ordenadores':'1 ordenador'}.</p><div style="margin-bottom:14px"><label style="font-size:11px;color:#38bdf8;font-weight:800;letter-spacing:1px">MODO DE ESTE ORDENADOR</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px"><button id="mFus" data-testid="sync-btn-linked" style="padding:12px;background:${mode==='linked'?'linear-gradient(135deg,#22c55e,#15803d)':'#1e293b'};color:${mode==='linked'?'#fff':'#94a3b8'};border:2px solid ${mode==='linked'?'#22c55e':'#475569'};border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">🔗 Fusionado ${mode==='linked'?'✓':''}</button><button id="mInd" data-testid="sync-btn-independent" style="padding:12px;background:${mode==='independent'?'linear-gradient(135deg,#64748b,#475569)':'#1e293b'};color:${mode==='independent'?'#fff':'#94a3b8'};border:2px solid ${mode==='independent'?'#94a3b8':'#475569'};border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">🔒 Independiente ${mode==='independent'?'✓':''}</button></div></div><div style="margin-bottom:14px"><label style="font-size:11px;color:#a855f7;font-weight:800;letter-spacing:1px">OTROS ORDENADORES DE ESTA LICENCIA</label><div style="margin-top:6px">${peersHtml}</div></div>${st.is_premium ? `<div style="border-top:1px dashed #475569;padding-top:14px;margin-top:14px"><label style="font-size:11px;color:#f5b301;font-weight:800;letter-spacing:1px">📨 ENVIAR COPIA AL OTRO ORDENADOR (manual)</label><p style="font-size:12px;color:#94a3b8;margin:6px 0 10px;line-height:1.4">Útil en modo Independiente. El otro PC verá un aviso al abrir la app y podrá fusionarla sin duplicar.</p><div style="display:flex;gap:8px"><input id="bkLabel" type="text" placeholder="Etiqueta (opcional) - ej: Cierre marzo" style="flex:1;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:13px"/><button id="bkSend" data-testid="sync-send-backup" style="padding:9px 18px;background:linear-gradient(135deg,#f5b301,#eab308);color:#0f172a;border:none;border-radius:6px;font-weight:800;font-size:13px;cursor:pointer">📤 Enviar</button></div></div>` : ''}<div style="display:flex;justify-content:flex-end;margin-top:16px"><button data-close style="padding:10px 16px;background:#1e293b;color:#94a3b8;border:1px solid #475569;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer">Cerrar</button></div></div>`;
+    // 👑 Detecta si el usuario es el ADMIN MASTER para mostrar el bloque especial
+    const _isMaster = (function(){ try{ const lic=JSON.parse(localStorage.getItem('caja.license.v1')||'null'); return !!(lic && (lic.key==='MB-MASTER-BRUGULAT-2026-OWNER' || lic.license_key==='MB-MASTER-BRUGULAT-2026-OWNER' || lic.type==='MASTER')); }catch(e){ return false; } })();
+    const adminHtml = _isMaster ? `<div style="border-top:1px dashed #7c3aed;padding-top:14px;margin-top:14px;background:rgba(124,58,237,.06);border-radius:8px;padding:14px;border:1px dashed rgba(124,58,237,.35)"><label style="font-size:11px;color:#c4b5fd;font-weight:800;letter-spacing:1px">👑 ADMIN · ENVIAR COPIA A OTRO CLIENTE</label><p style="font-size:12px;color:#c4b5fd;margin:6px 0 10px;line-height:1.4">Envía tus datos actuales al PC de un cliente <b>sin necesidad de vincular licencias</b>. El cliente verá el aviso al abrir su app y podrá fusionar sin perder sus datos.</p><div style="margin-bottom:8px"><select id="admTarget" data-testid="admin-target-select" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #7c3aed;border-radius:6px;color:#e2e8f0;font-size:13px"><option value="">Cargando clientes…</option></select></div><div style="display:flex;gap:8px"><input id="admLabel" type="text" placeholder="Etiqueta (ej: Datos actualizados desde el admin)" style="flex:1;padding:9px 12px;background:#0f172a;border:1px solid #7c3aed;border-radius:6px;color:#e2e8f0;font-size:13px"/><button id="admSend" data-testid="admin-send-to-license" style="padding:9px 18px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border:none;border-radius:6px;font-weight:800;font-size:13px;cursor:pointer">👑 Enviar</button></div></div>` : '';
+    back.innerHTML = `<div class="modal" style="max-width:600px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><h3 style="margin:0;color:#38bdf8;font-family:Georgia,serif">🔗 Sincronización Multi-PC</h3><button data-close style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">×</button></div><p style="color:#94a3b8;font-size:13px;margin:8px 0 18px;line-height:1.5">Tu plan <b style="color:${st.is_premium?'#22c55e':'#94a3b8'}">${st.is_premium?'Premium':'Standard'}</b> permite ${st.is_premium?'2 ordenadores':'1 ordenador'}.</p><div style="margin-bottom:14px"><label style="font-size:11px;color:#38bdf8;font-weight:800;letter-spacing:1px">MODO DE ESTE ORDENADOR</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px"><button id="mFus" data-testid="sync-btn-linked" style="padding:12px;background:${mode==='linked'?'linear-gradient(135deg,#22c55e,#15803d)':'#1e293b'};color:${mode==='linked'?'#fff':'#94a3b8'};border:2px solid ${mode==='linked'?'#22c55e':'#475569'};border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">🔗 Fusionado ${mode==='linked'?'✓':''}</button><button id="mInd" data-testid="sync-btn-independent" style="padding:12px;background:${mode==='independent'?'linear-gradient(135deg,#64748b,#475569)':'#1e293b'};color:${mode==='independent'?'#fff':'#94a3b8'};border:2px solid ${mode==='independent'?'#94a3b8':'#475569'};border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">🔒 Independiente ${mode==='independent'?'✓':''}</button></div></div><div style="margin-bottom:14px"><label style="font-size:11px;color:#a855f7;font-weight:800;letter-spacing:1px">OTROS ORDENADORES DE ESTA LICENCIA</label><div style="margin-top:6px">${peersHtml}</div></div>${st.is_premium ? `<div style="border-top:1px dashed #475569;padding-top:14px;margin-top:14px"><label style="font-size:11px;color:#f5b301;font-weight:800;letter-spacing:1px">📨 ENVIAR COPIA AL OTRO ORDENADOR (manual)</label><p style="font-size:12px;color:#94a3b8;margin:6px 0 10px;line-height:1.4">Útil en modo Independiente. El otro PC verá un aviso al abrir la app y podrá fusionarla sin duplicar.</p><div style="display:flex;gap:8px"><input id="bkLabel" type="text" placeholder="Etiqueta (opcional) - ej: Cierre marzo" style="flex:1;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:13px"/><button id="bkSend" data-testid="sync-send-backup" style="padding:9px 18px;background:linear-gradient(135deg,#f5b301,#eab308);color:#0f172a;border:none;border-radius:6px;font-weight:800;font-size:13px;cursor:pointer">📤 Enviar</button></div></div>` : ''}${adminHtml}<div style="display:flex;justify-content:flex-end;margin-top:16px"><button data-close style="padding:10px 16px;background:#1e293b;color:#94a3b8;border:1px solid #475569;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer">Cerrar</button></div></div>`;
     document.body.appendChild(back);
     back.addEventListener('click', ev => { if(ev.target===back || ev.target.hasAttribute('data-close')) back.remove(); });
     const setModeBtn = async (m) => {
@@ -10798,6 +10801,65 @@ setTimeout(()=>{
         bkBtn.disabled = true; bkBtn.textContent = 'Enviando…';
         try{ await window.mcSync.sendBackup(label); bkBtn.textContent = '✅ Enviada'; if(typeof toast==='function') toast('📤 Copia enviada al otro ordenador'); setTimeout(() => back.remove(), 1200); }
         catch(e){ alert('Error: '+e.message); bkBtn.disabled=false; bkBtn.textContent='📤 Enviar'; }
+      };
+    }
+    // 👑 ADMIN · Cargar lista de clientes + envío cross-license
+    const admSelect = back.querySelector('#admTarget');
+    const admSend = back.querySelector('#admSend');
+    if(admSelect && admSend){
+      (async () => {
+        try{
+          const lic = JSON.parse(localStorage.getItem('caja.license.v1')||'null');
+          const adminKey = (lic && (lic.key || lic.license_key)) || '';
+          const base = (window.REACT_APP_BACKEND_URL || location.origin).replace(/\/$/, '');
+          const r = await fetch(`${base}/api/sync/admin/list-licenses?admin_license_key=${encodeURIComponent(adminKey)}`);
+          if(!r.ok) throw new Error('HTTP '+r.status);
+          const j = await r.json();
+          const opts = ['<option value="">-- Selecciona un cliente --</option>'];
+          (j.licenses||[]).forEach(l => {
+            const name = l.client_name || l.client_email || '(sin nombre)';
+            const email = l.client_email ? ` · ${l.client_email}` : '';
+            const plan = l.plan ? ` [${l.plan}]` : '';
+            opts.push(`<option value="${l.license_key}">${name}${email}${plan}</option>`);
+          });
+          admSelect.innerHTML = opts.join('');
+        }catch(e){ admSelect.innerHTML = '<option value="">Error cargando clientes</option>'; console.warn('list-licenses', e); }
+      })();
+      admSend.onclick = async () => {
+        const targetKey = admSelect.value;
+        if(!targetKey){ alert('Selecciona un cliente destino'); return; }
+        const targetTxt = admSelect.options[admSelect.selectedIndex].text;
+        if(!confirm(`¿Enviar TODOS tus datos actuales a:\n\n${targetTxt}?\n\nEl cliente verá el aviso al abrir su app y podrá fusionar sin perder sus datos.`)) return;
+        const label = (back.querySelector('#admLabel').value||'').trim();
+        admSend.disabled = true; admSend.textContent = 'Enviando…';
+        try{
+          const lic = JSON.parse(localStorage.getItem('caja.license.v1')||'null');
+          const adminKey = (lic && (lic.key || lic.license_key)) || '';
+          const iid = localStorage.getItem('caja.install.id.v1') || '';
+          const data = {}; // reutiliza el snapshot público del cliente
+          for(let i=0;i<localStorage.length;i++){
+            const k = localStorage.key(i);
+            // Excluye claves locales (saldoInicial, install_id, sync, license, plan preview)
+            if(!k || !k.startsWith('caja.')) continue;
+            if(k.startsWith('caja.saldoInicial.') || k.startsWith('caja.install.') ||
+               k.startsWith('caja.sync.') || k.startsWith('caja.license.') ||
+               k.startsWith('caja.plan.preview.')) continue;
+            try{ data[k] = JSON.parse(localStorage.getItem(k)); }catch(e){ data[k] = localStorage.getItem(k); }
+          }
+          const base = (window.REACT_APP_BACKEND_URL || location.origin).replace(/\/$/, '');
+          const r = await fetch(`${base}/api/sync/admin/push-to-license`, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+              admin_license_key: adminKey, admin_install_id: iid,
+              target_license_key: targetKey, data, label: label || null
+            })
+          });
+          const j = await r.json();
+          if(!r.ok) throw new Error(j.detail || ('HTTP '+r.status));
+          admSend.textContent = '✅ Enviada';
+          if(typeof toast==='function') toast(`👑 Copia enviada a ${j.target_client_name||j.target_client_email||'cliente'}`);
+          setTimeout(() => back.remove(), 1500);
+        }catch(e){ alert('Error: '+e.message); admSend.disabled=false; admSend.textContent='👑 Enviar'; }
       };
     }
   };

@@ -210,7 +210,38 @@ console.log('\n▸ Escenario 10: Volumen grande (500 entradas)');
   ok(overwritten.amount === 99999, 'Los 50 IDs conflictivos → gana el updated_at más reciente');
 }
 
-// ══ Summary ══
+// ═════════ Regression test para bug crítico byDate {} (iteration_35) ═════════
+console.log('\n═══ REGRESIÓN BUG byDate vacío (iteration_35) ═══\n');
+{
+  // Caso EXACTO del bug reportado:
+  const local  = {'caja.byDate.v1': {}};
+  const remote = {'caja.byDate.v1': {'2026-09-01': [{id:'x', amount:100}]}};
+  const merged = window.mcSync._mergeSnapshots(local, remote);
+  ok(!!merged['caja.byDate.v1']['2026-09-01'], 'Local byDate={} + Remote lleno → recibe datos');
+  ok(merged['caja.byDate.v1']['2026-09-01'].length === 1, '1 entrada');
+  ok(merged['caja.byDate.v1']['2026-09-01'][0].id === 'x', 'ID x preservado');
+
+  // Al revés
+  const m2 = window.mcSync._mergeSnapshots(remote, local);
+  ok(!!m2['caja.byDate.v1']['2026-09-01'], 'Local lleno + Remote={} → mantiene datos locales');
+
+  // Ambos con datos, uno mismo día
+  const l3 = {'caja.byDate.v1': {'2026-09-01': [{id:'a'}]}};
+  const r3 = {'caja.byDate.v1': {'2026-09-01': [{id:'b'}], '2026-09-02': [{id:'c'}]}};
+  const m3 = window.mcSync._mergeSnapshots(l3, r3);
+  ok(m3['caja.byDate.v1']['2026-09-01'].length === 2, `Mismo día → 2 entradas (got ${m3['caja.byDate.v1']['2026-09-01'].length})`);
+  ok(m3['caja.byDate.v1']['2026-09-02'].length === 1, 'Día nuevo añadido');
+
+  // Ambos vacíos
+  const m4 = window.mcSync._mergeSnapshots({'caja.byDate.v1':{}}, {'caja.byDate.v1':{}});
+  ok(typeof m4['caja.byDate.v1'] === 'object' && !Array.isArray(m4['caja.byDate.v1']), 'Ambos {} → sigue siendo objeto');
+
+  // Con hint en el nombre pero shape ambigua (por si acaso)
+  const m5 = window.mcSync._mergeSnapshots({'caja.cierre.byDate.v1':{}}, {'caja.cierre.byDate.v1':{'2026-01-01':[{id:'z'}]}});
+  ok(!!m5['caja.cierre.byDate.v1']['2026-01-01'], 'byDate detectado por nombre de clave también');
+}
+
+// ══ Summary FINAL ══
 console.log(`\n═══════════════════════════════════`);
 if(fail === 0) console.log(`✅ TODOS PASAN · ${pass}/${pass+fail}`);
 else console.log(`❌ FALLAN ${fail}/${pass+fail}`);

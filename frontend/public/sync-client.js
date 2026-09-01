@@ -94,9 +94,17 @@
   }
   function _isByDateShape(v){
     if(!v || typeof v !== 'object' || Array.isArray(v)) return false;
-    const k = Object.keys(v)[0];
+    const keys = Object.keys(v);
+    if(keys.length === 0) return false;  // empty object → let caller decide
+    const k = keys[0];
     return typeof k === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(k);
   }
+  // Detecta claves cuyo VALOR SIEMPRE es un dict {ISO: [entries]}, aunque
+  // temporalmente esté a {}. Necesario porque `caja.byDate.v1` puede
+  // arrancar vacío en el ordenador que aún no tiene entradas y perderíamos
+  // los datos del otro PC si el shape-detector se basara solo en el contenido.
+  const BYDATE_KEY_HINT = /(^|\.)byDate\.|\.byDate$/;
+  function _isEmptyObj(v){ return v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0; }
   // Merge de 2 snapshots completos de localStorage
   function _mergeSnapshots(localSnap, remoteSnap){
     const out = {};
@@ -106,8 +114,15 @@
       const rv = (remoteSnap||{})[k];
       if(rv === undefined){ out[k] = lv; return; }
       if(lv === undefined){ out[k] = rv; return; }
-      // Detectar shape byDate
-      if(_isByDateShape(lv) && _isByDateShape(rv)){ out[k] = _mergeByDate(lv, rv); return; }
+      // 🔑 Detección robusta byDate: si el nombre de la clave contiene
+      // "byDate" o si CUALQUIERA de los dos lados tiene shape byDate, tratamos
+      // el otro (aunque sea {}) como byDate vacío para no perder datos.
+      const looksLikeByDate = BYDATE_KEY_HINT.test(k) || _isByDateShape(lv) || _isByDateShape(rv);
+      if(looksLikeByDate && !Array.isArray(lv) && !Array.isArray(rv)){
+        const l = _isEmptyObj(lv) || _isByDateShape(lv) ? lv : {};
+        const r = _isEmptyObj(rv) || _isByDateShape(rv) ? rv : {};
+        out[k] = _mergeByDate(l, r); return;
+      }
       // Detectar objetos con {byDate: {...}}
       if(lv && rv && lv.byDate && rv.byDate){
         out[k] = { ...lv, ...rv, byDate: _mergeByDate(lv.byDate, rv.byDate) }; return;

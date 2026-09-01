@@ -1,0 +1,57 @@
+{
+  "summary": "E2E Sync Multi-PC pre-deploy test. Verified saldo inicial LOCAL isolation (✅ works perfectly), copia pendiente modal UX (✅ works), linked mode push/pull (✅ works), reserva de cambio transfer with _mtime (✅ works). FOUND 1 CRITICAL BUG in client merge: when local has 'caja.byDate.v1' as empty object {} (a common state after PC has been opened but no entries added), the _mergeSnapshots function LOSES the remote byDate entries entirely — because _isByDateShape({}) returns false, and fallback config-merge with both sides missing _mtime chooses local (empty) over remote. This blocks the primary use case of transferring day entries from Secretario to Gerente.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "sync-client.js _mergeSnapshots / _isByDateShape",
+        "issue": "CRITICAL: byDate merge fails when local byDate is empty object {}. `_isByDateShape({})` returns false because Object.keys({})[0] is undefined, so merge falls into config path. Since neither side has _mtime, rts=0 > lts=0 is false → out[k]=lv (empty). REMOTE ENTRIES LOST. Reproduces: mcSync._mergeSnapshots({'caja.byDate.v1':{}}, {'caja.byDate.v1':{'2026-09-01':[{id:'x'}]}}) returns {} instead of the remote data.",
+        "selector": "/app/frontend/public/sync-client.js:95-99, 100-122",
+        "priority": "CRITICAL"
+      },
+      {
+        "component": "Configuración modal",
+        "issue": "No visible 'Saldo inicial' button in the main Configuración modal — user has to go via Wizard's 'Empresas → Abrir configurador' → 'Configurarlo'. Task description says 'Configuración → 🏦 Saldo inicial' which is misleading; UI works, but path is not direct.",
+        "selector": "Configuración modal (Empresas / Datos facturación sections)",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "PC2 receives backup → Aplicar copia (fusionar) → byDate transfer",
+        "issue": "After clicking 'Aplicar copia (fusionar)' the merged snapshot is written to localStorage, but caja.byDate.v1 remains {} because the merge function has the empty-object edge-case bug. Result: sec-r-01, sec-r-02, sec-g-01 do NOT appear on PC2. Saldo isolation and reserva transfer both work correctly.",
+        "affected_selectors": ["#bkApply", "window.mcSync.applyBackup"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/tmp/e2e_v3.json"
+  ],
+  "action_items": [
+    "FIX CRITICAL: In /app/frontend/public/sync-client.js, either (a) make _isByDateShape return true also for empty {} that lives at a known byDate key, OR (b) in _mergeSnapshots, check the KEY name (if key ends with 'byDate' or matches known byDate key patterns like 'caja.byDate.v1', 'caja.cierre.byDate.v1') and force byDate merge regardless of shape detection; OR (c) if _isByDateShape(remote) is true and local is a non-array object without _mtime, treat local as an empty byDate ({}) and do byDate merge. Recommended (b) or (c). Add unit test: _mergeSnapshots({'caja.byDate.v1':{}}, {'caja.byDate.v1':{'2026-09-01':[{id:'x'}]}}) must produce {'caja.byDate.v1':{'2026-09-01':[{id:'x'}]}}.",
+    "Verify same bug does not affect other object-shaped keys such as caja.cierre.byDate.v1 or others that may temporarily hold {}.",
+    "Consider adding _mtime to byDate wrapper if kept as flat dict; or moving to a canonical {byDate:{...}, _mtime} shape.",
+    "After fix, re-run this E2E test end-to-end (paso 1 → paso 13)."
+  ],
+  "critical_code_review_comments": [
+    "sync-client.js:95-99 _isByDateShape: returns false for empty {} — sole detection means byDate merge is skipped when local is initialized empty. This is fragile.",
+    "sync-client.js:117-120 fallback config merge uses `rts > lts` (strict). If both are 0 (missing _mtime), local wins by default. For semantically 'container' objects (dictionaries), this is wrong — should union.",
+    "v2.html:10767 bkApply.onclick writes merged result back to localStorage using JSON.stringify(v) — but if merged[k] was already a string/primitive, this double-stringifies. For byDate={} it stringifies to '{}' which is fine, but worth checking.",
+    "v2.html:10804 initSync fires on 'load' but is wrapped only in setTimeout(2500) — if the load event fires later, could double-fire. Not blocking."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (all sync endpoints /api/sync/heartbeat, /status, /mode, /push, /pull, /backup/send, /backup/pending, /backup/consume responded correctly)",
+    "frontend": "85% (13/13 pasos executed, but critical bug found in step 8 — byDate not transferred after Aplicar copia). Saldo isolation ✅, Reserva transfer ✅, linked push/pull ✅, no duplicates ✅, but byDate transfer via backup ❌."
+  },
+  "test_credentials": "MB-MASTER-BRUGULAT-2026-OWNER (works fine)",
+  "seed_data_creation": "During test, on PC1 seeded: caja.saldoInicial.main.v1 (efectivo 2000, banco 5000, cambio 800, fecha 2026-01-15), caja.byDate.v1 with 3 entries (sec-r-01, sec-r-02, sec-g-01), caja.reserva.v1 with e1:20,e2:10,c50:15,b10:8,b20:5. On PC2 (Gerente) seeded: caja.saldoInicial.main.v1 (efectivo 3500, banco 6200, fecha 2026-02-01). Backend Mongo cleaned (sync_devices, sync_states, sync_backups for MASTER license hash) before test start.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Bug is deterministic and reproducible: on PC2 fresh install, after receiving backup from PC1 with byDate entries, clicking 'Aplicar copia (fusionar)' does NOT transfer byDate entries to PC2's localStorage. Root cause is `_isByDateShape({})` returning false. To re-test after fix: (1) clean Mongo (see other_misc_info), (2) run same E2E flow, (3) MUST assert that on step 8 byDate contains sec-r-01, sec-r-02, sec-g-01. Also test that the linked-mode pull (step 11) correctly delivers all 4 entries to PC2. Everything ELSE works — do NOT retest saldo isolation, reserva transfer, or linked push/pull (all confirmed working).",
+  "rca of the issue": "In /app/frontend/public/sync-client.js: `_isByDateShape(v)` checks the first key of the object with `/^\\d{4}-\\d{2}-\\d{2}$/`. For empty object `{}`, `Object.keys({})[0]` is undefined, so the regex test throws / returns false. In `_mergeSnapshots`, if BOTH sides are non-empty objects but only one is detected as byDate-shape (e.g. remote has real entries, local is empty {}), the code falls through the byDate branch, then arrays branch, and lands on the config branch: `const lts = (lv && lv._mtime) || 0; const rts = (rv && rv._mtime) || 0; out[k] = rts > lts ? rv : lv`. Both are 0 (no _mtime), so local `{}` wins and remote entries are silently dropped. FIX: In _mergeSnapshots, before falling through to config path, if either lv or rv passes _isByDateShape() (or if either is an object dictionary keyed by ISO dates), do _mergeByDate(lv||{}, rv||{}) — treating the non-shape side as {}. Alternative: hard-code merge behavior for known keys (caja.byDate.v1, caja.cierre.byDate.v1, etc.). Reproduction snippet in console: `window.mcSync._mergeSnapshots({'caja.byDate.v1': {}}, {'caja.byDate.v1': {'2026-09-01':[{id:'x'}]}})` returns `{'caja.byDate.v1': {}}` (bug); should return `{'caja.byDate.v1': {'2026-09-01':[{id:'x'}]}}`."
+}

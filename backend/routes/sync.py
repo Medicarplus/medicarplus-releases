@@ -114,6 +114,19 @@ class BackupConsumeBody(BaseModel):
     backup_id: str
 
 
+class AdminPushToLicenseBody(BaseModel):
+    """👑 Admin-only: enviar copia a la licencia de otro cliente sin estar vinculados.
+    Requiere autenticación como MASTER (license_key=MASTER_KEY) o X-Admin-Token.
+    """
+    admin_license_key: str = Field(..., min_length=10, max_length=1500,
+                                   description="Licencia MASTER del admin que envía")
+    admin_install_id: str = Field(..., min_length=4, max_length=200)
+    target_license_key: str = Field(..., min_length=10, max_length=1500,
+                                    description="Licencia del cliente que recibirá la copia")
+    data: dict[str, Any] = Field(default_factory=dict, description="Snapshot completo localStorage")
+    label: Optional[str] = Field(default=None, max_length=200)
+
+
 COLL_BACKUPS = "sync_backups"
 
 
@@ -418,5 +431,89 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="backup_not_found")
         return {"ok": True, "backup_id": body.backup_id}
+
+    # ────────────────────────────────────────────────────────────────────
+    # 👑 ADMIN-ONLY · Enviar copia a CUALQUIER cliente sin vincular licencias
+    # ────────────────────────────────────────────────────────────────────
+    # Uso: yo (admin MASTER) tengo datos en mi PC. Quiero enviarle una copia
+    # al PC de Victoria López Navas (otro cliente con licencia distinta).
+    # Este endpoint deposita la copia en el buzón de SU licencia. Cuando
+    # Victoria abra su app, verá el aviso "Copia pendiente de restaurar"
+    # como si le llegara de un compañero suyo.
+    # SEGURIDAD: solo la MASTER key puede llamar este endpoint.
+    # ────────────────────────────────────────────────────────────────────
+
+    @router.post("/sync/admin/push-to-license")
+    async def admin_push_to_license(body: AdminPushToLicenseBody):
+        # 1) Verificar que el que llama es el MASTER (única vía autorizada)
+        if body.admin_license_key.strip() != MASTER_KEY:
+            raise HTTPException(status_code=403, detail="admin_only")
+
+        # 2) Verificar que la licencia destino existe (permite MASTER→MASTER también)
+        target = await _find_license(body.target_license_key)
+        if not target:
+            raise HTTPException(status_code=404, detail="target_license_not_found")
+        if target.get("status") == "revoked":
+            raise HTTPException(status_code=403, detail="target_license_revoked")
+
+        # 3) Depositar en el buzón de la LICENCIA DESTINO (upsert por remitente)
+        target_lkh = _key_hash(body.target_license_key)
+        now = _now()
+        backup_id = str(uuid.uuid4())
+        # Etiqueta clara para el receptor: "Copia enviada por el administrador"
+        label = (body.label or "").strip() or "Copia enviada por MediCar Plus (admin)"
+        # Remitente sintético: identificable como admin en el buzón
+        admin_sender_id = f"admin:{body.admin_install_id}"
+        doc = {
+            "backup_id": backup_id,
+            "license_key_hash": target_lkh,
+            "from_install_id": admin_sender_id,
+            "from_admin": True,
+            "admin_license_key": body.admin_license_key.strip(),
+            "target_license_key": body.target_license_key.strip(),
+            "target_client_email": target.get("client_email"),
+            "target_client_name": target.get("client_name"),
+            "label": label,
+            "data": body.data or {},
+            "created_at": now,
+            "consumed_by": [],
+        }
+        # Reemplaza cualquier copia anterior del ADMIN al mismo cliente
+        await db[COLL_BACKUPS].replace_one(
+            {"license_key_hash": target_lkh, "from_install_id": admin_sender_id},
+            doc,
+            upsert=True,
+        )
+        logger.info("admin/push-to-license admin=%s → target=%s (%s) size=%d keys",
+                    body.admin_install_id, body.target_license_key[:20],
+                    target.get("client_email"), len(body.data or {}))
+        return {
+            "ok": True,
+            "backup_id": backup_id,
+            "target_client_email": target.get("client_email"),
+            "target_client_name": target.get("client_name"),
+            "created_at": _iso(now),
+        }
+
+    @router.get("/sync/admin/list-licenses")
+    async def admin_list_licenses(admin_license_key: str):
+        """👑 Lista licencias activas para el selector de destino en la UI admin."""
+        if (admin_license_key or "").strip() != MASTER_KEY:
+            raise HTTPException(status_code=403, detail="admin_only")
+        cursor = db.licenses.find(
+            {"status": {"$ne": "revoked"}},
+            {"license_key": 1, "client_email": 1, "client_name": 1,
+             "plan": 1, "install_id": 1, "created_at": 1, "_id": 0},
+        ).sort("created_at", -1).limit(500)
+        out = []
+        async for d in cursor:
+            out.append({
+                "license_key": d.get("license_key"),
+                "client_email": d.get("client_email"),
+                "client_name": d.get("client_name"),
+                "plan": d.get("plan"),
+                "install_id": d.get("install_id"),
+            })
+        return {"licenses": out, "count": len(out)}
 
     return router
