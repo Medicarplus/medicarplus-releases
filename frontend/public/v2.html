@@ -3135,7 +3135,8 @@ function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(
   const debeTotalCB=totalMovCB;
   // CAIXA FÍSICA = Efectiu auto − delta (el que va anar a targeta segons datàfon) + reserva de cambio (diner físic guardat).
   // COMPTE BANC = Efectiu auto de targeta + delta = df (si df>0) + Bizum + Transferència.
-  const resCambio=reservaCambio();
+  // resCambio = cajón de cambio + lo traspasado a caja (traspaso interno: no altera el total)
+  const resCambio=reservaCambio()+traspasoCambio();
   const cajaC=(efShown-delta_C)+saCC.caja+resCambio;
   const bbvaC=(autoT_C+delta_C)+(t.byFp.B||0)+(t.byFp.X||0)+saCC.banc;
   const cajaCB=(efShownCB-delta_CB)+saCC.caja+resCambio;
@@ -3390,7 +3391,7 @@ function cajaFisicaAcumulada(date){
 function renderSaldoAnterior(){
   // Saldo anterior = caja física + banc acumulats fins avui (exclusiu) + reserva de cambio (metàl·lic guardat)
   const saCC=saldoAnteriorPorCuenta(currentDate);
-  $('#saldoAntNum').textContent=fmt(saCC.caja+saCC.banc+reservaCambio());
+  $('#saldoAntNum').textContent=fmt(saCC.caja+saCC.banc+reservaCambio()+traspasoCambio());
 }
 function renderHistory(){const dates=Object.keys(state.byDate).filter(d=>entriesOf(d).length).sort().reverse();$('#histCount').textContent=`${dates.length} día(s)`;$('#histList').innerHTML=dates.length?dates.map(d=>{const t=computeTotals(entriesOf(d));const cls=d===currentDate?'style="background:#1a1e27"':'';return `<div class="history-item" ${cls} data-d="${d}"><div><div class="date">${d.split('-').reverse().join('/')}</div><div class="totals">${t.cnt} entrada(s) · ${fmt(t.neto)}</div></div><button class="icon-btn" data-delday="${d}" title="Borrar día">🗑️</button></div>`}).join(''):'<div class="empty">Sin histórico todavía</div>';$$('#histList .history-item').forEach(el=>el.onclick=e=>{if(e.target.dataset.delday){const day=e.target.dataset.delday;confirmModal('Borrar día',`¿Borrar TODOS los datos del día <b>${day.split('-').reverse().join('/')}</b>?`,()=>{delete state.byDate[day];saveState();render()},'Borrar día');e.stopPropagation();return}setDate(el.dataset.d)})}
 function actEntry(act,id){
@@ -5648,6 +5649,9 @@ function cambioTotal(o){
 }
 // Reserva de cambio = diner físic (metàl·lic) guardat com a fons. Repercuteix al saldo anterior (caja i total) i a la ${L('CAIXA FÍSICA','CAJA FÍSICA')}.
 function reservaCambio(){try{return cambioTotal(loadCambio())}catch(e){return 0}}
+// 🔁 Cambio traspasado a caja: dinero que salió del cajón de cambio HACIA la caja.
+// NO desaparece del saldo: sigue siendo efectivo físico, solo cambió de sitio.
+function traspasoCambio(){try{return +(loadCambio()._toCaja)||0}catch(e){return 0}}
 
 function openCambio(){
   const back=document.createElement('div');back.className='modal-back';
@@ -5661,6 +5665,7 @@ function openCambio(){
     <div id="cambioTotal" style="text-align:center;padding:16px;background:linear-gradient(135deg,#065f46,#0f172a);border:2px solid #22c55e;border-radius:12px;margin-bottom:14px">
       <div style="font-size:11px;color:#a7f3d0;letter-spacing:2px;text-transform:uppercase">Total guardat</div>
       <div id="cambioTotalNum" style="font-size:36px;color:#7ee3aa;font-weight:700;font-family:'Courier New',monospace;margin-top:4px">0,00 €</div>
+      <div id="cambioTraspaso" data-testid="cambio-traspaso-line" style="display:none;margin-top:8px;font-size:12px;color:#fdba74">🔁 Traspasado a caja: <b id="cambioTraspasoNum" style="font-family:'Courier New',monospace">0,00 €</b> <span style="color:#94a3b8">(sigue en tu CAJA FÍSICA, no se resta del saldo)</span></div>
     </div>
     <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" id="cambioAdd" style="background:#166534;color:#fff;border-color:#166534;flex:1;font-weight:700">➕ Añadir cambio (del banco)</button>
@@ -5714,6 +5719,11 @@ function openCambio(){
       </tr>`;
     }).join('');
     totalEl.textContent=fmt(cambioTotal(data));
+    // Línea de traspasos a caja (dinero que salió del cajón hacia la caja)
+    const trBox=back.querySelector('#cambioTraspaso');
+    const trNum=back.querySelector('#cambioTraspasoNum');
+    const tr=+(data&&data._toCaja)||0;
+    if(tr>0){trBox.style.display='block';trNum.textContent=fmt(tr);}else{trBox.style.display='none';}
     // Banner "Pendiente de repartir" del Saldo inicial
     const pendBox = back.querySelector('#cambioPendiente');
     const pendNum = back.querySelector('#cambioPendienteNum');
@@ -5735,7 +5745,8 @@ function openCambio(){
 
   back.querySelector('#cambioReset').onclick=()=>{
     if(!confirm('¿Vaciar la reserva de cambio? Se pondrán todas las cantidades a 0.'))return;
-    data={};saveCambio(data);render();
+    // Conserva el histórico de traspasos a caja (ese dinero sigue en la caja física)
+    data={_toCaja:+(data&&data._toCaja)||0};saveCambio(data);render();
   };
   back.querySelector('#cambioAdd').onclick=()=>_cambioBulkOp(data,render,'add');
   back.querySelector('#cambioRemove').onclick=()=>_cambioBulkOp(data,render,'remove');
@@ -5796,18 +5807,42 @@ function _cambioBulkOp(data,rerender,mode){
   back.querySelector('#bkOk').onclick=()=>{
     recalc();
     let changed=0;
+    let movedEur=0;   // € realmente movidos (retirar) o añadidos
+    let capped=false; // true si se pidió más de lo disponible en alguna denominación
     CAMBIO_DENOMS.forEach(d=>{
       const q=ops[d.k]||0;
-      if(q>0){
-        if(mode==='add'){data[d.k]=(data[d.k]||0)+q;changed++}
-        else{data[d.k]=Math.max(0,(data[d.k]||0)-q);changed++}
+      if(q<=0) return;
+      if(mode==='add'){
+        data[d.k]=(data[d.k]||0)+q;changed++;
+        movedEur+=q*(d.pack||d.val);
+      }else{
+        // RETIRAR en euros: primero de paquetes/unidades, después del € manual.
+        const unitVal=d.pack||d.val;
+        const wantEur=q*unitVal;
+        const packsEur=(Number(data[d.k])||0)*unitVal;
+        const manualEur=d.pack?(Number(data[d.k+'_m'])||0):0;
+        const available=packsEur+manualEur;
+        const takeEur=Math.min(wantEur,available);
+        if(takeEur<wantEur)capped=true;
+        if(takeEur<=0)return;
+        const fromPacks=Math.min(packsEur,takeEur);
+        data[d.k]=(packsEur-fromPacks)/unitVal;
+        const rest=takeEur-fromPacks;
+        if(d.pack&&rest>0)data[d.k+'_m']=Math.max(0,manualEur-rest);
+        movedEur+=takeEur;
+        changed++;
       }
     });
-    if(!changed){toast('No has indicado ninguna cantidad');return}
+    if(!changed||(mode==='remove'&&movedEur<=0)){toast(mode==='remove'?'No hay ese cambio disponible en la reserva':'No has indicado ninguna cantidad');return}
+    if(mode==='remove'){
+      // 🔁 TRASPASO, no resta: el dinero pasa del cajón de cambio a la CAJA FÍSICA.
+      data._toCaja=(+data._toCaja||0)+movedEur;
+    }
     saveCambio(data);
     back.remove();
     rerender();
-    toast(mode==='add'?'✓ Cambio añadido a la reserva':'✓ Cambio retirado de la reserva');
+    if(mode==='add')toast('✓ Cambio añadido a la reserva');
+    else toast(`🔁 ${fmt(movedEur)} traspasados a caja${capped?' (ajustado al disponible)':''} · el saldo total NO cambia`,4500);
   };
 }
 $('#btnClearDay').onclick=()=>{if(!entriesOf(currentDate).length){toast('No hay entradas que vaciar');return}const cnt=entriesOf(currentDate).length;confirmModal('🗑️ Vaciar día',`Se borrarán las <b>${cnt} entrada(s)</b> del día <b>${currentDate.split('-').reverse().join('/')}</b>.<br><br>✅ Se guardará una copia de seguridad automática antes de borrar.`,()=>{pushSnapshot('preClear');delete state.byDate[currentDate];saveState();render();toast('Día vaciado ✅ (copia de seguridad guardada en 🛡️ Historial)',3500)},'Sí, vaciar día')};

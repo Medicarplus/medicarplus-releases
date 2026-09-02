@@ -1295,3 +1295,11 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
   3. bkApply defensivo: try/catch, botón '⏳ Aplicando…', error visible (data-testid=backup-apply-error), consume tolerante a fallos (no bloquea la aplicación de datos). El botón nunca queda muerto en silencio.
 - REGLA: al escribir claves recibidas por sync usar SIEMPRE mcSync.safeWrite, nunca JSON.stringify directo.
 - Testing: iteration_38 100% (pytest 8/8: upsert por remitente, tz +00:00, consume, admin push x3, 403/404, reset-devices; Playwright: integridad post-aplicar 5/5 — company sin comillas, apibase intacta, saldo local 500 intacto, reserva LWW 350, fusión ambas fechas). Test file: /app/backend/tests/test_iter38_backup_pending_admin.py
+
+### 💰 Retirar cambio = TRASPASO a caja (no resta del saldo) + fix retirada · Jun 2026
+- Lógica de negocio confirmada por usuario: sacar dinero del cajón de cambio hacia la caja es un traspaso interno → reserva baja, CAJA FÍSICA/saldo NO cambian.
+- BUG arreglado: en _cambioBulkOp modo remove solo restaba de data[d.k] (paquetes); si el dinero estaba en '€ manual' (d.k+'_m', típico tras repartir Saldo Inicial) no restaba NADA. Ahora resta en euros: primero paquetes, luego € manual, con tope en lo disponible (capped → aviso 'ajustado al disponible').
+- Nuevo acumulador o._toCaja en caja.reserva.v1: € traspasados a caja. traspasoCambio() (v2.html ~5658) se suma en: resCambio de renderSummary (cajaC/cajaCB/Saldo anterior caja, línea ~3140) y #saldoAntNum (~3397). Sincroniza con el resto del objeto reserva (LWW _mtime).
+- UI: línea '🔁 Traspasado a caja: X € (sigue en tu CAJA FÍSICA, no se resta del saldo)' en el modal Reserva (data-testid=cambio-traspaso-line). 'Vaciar todo' conserva _toCaja. 'Empezar de cero' sí lo borra (reset completo).
+- Denominaciones clave: monedas c1,c2,c5,c10,c20,c50,e1,e2 (por PAQUETES, pack=€/paq; e2=50€/paq) + '_m' manual €; billetes b5,b10,b20,b50 (unidades).
+- Testeado E2E file:// (3 tests): retiro 50€ → reserva 300/caja 350 intacta; retiro 100€ del manual; retiro con tope. CAJA FÍSICA y saldo idénticos antes/después en todos.
