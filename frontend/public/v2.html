@@ -6434,7 +6434,7 @@ function openSettingsModal(){
     resetConfirm1:isCA?'⚠️ ATENCIÓ: esborraràs TOTES les entrades de TOTS els dies, saldos, reserva de canvi, estadístiques i IRPF d\'aquest ordinador.\n\nAixò NO es pot desfer. La llicència, empreses i configuració es conserven.\n\nVols continuar?':'⚠️ ATENCIÓN: vas a borrar TODAS las entradas de TODOS los días, saldos, reserva de cambio, estadísticas e IRPF de este ordenador.\n\nEsto NO se puede deshacer. La licencia, empresas y configuración se conservan.\n\n¿Quieres continuar?',
     resetConfirm2:isCA?'Per confirmar, escriu la paraula:  BORRAR':'Para confirmar, escribe la palabra:  BORRAR',
     resetCancelled:isCA?'Esborrat cancel·lat. No s\'ha tocat res.':'Borrado cancelado. No se ha tocado nada.',
-    resetDone:isCA?'✅ Fet! El programa queda a 0, com nou.\n\nAquest PC passa a mode Independent perquè el núvol o l\'altre ordinador no li retornin les dades antigues. Pots tornar a Fusionat quan vulguis des de la configuració de Sincronització.':'✅ ¡Hecho! El programa queda a 0, como nuevo.\n\nEste PC pasa a modo Independiente para que la nube o el otro ordenador no le devuelvan los datos antiguos. Puedes volver a Fusionado cuando quieras desde la configuración de Sincronización.'
+    resetDone:isCA?'✅ Fet! El programa queda a 0, com nou.\n\n🛡️ La propera còpia de seguretat es desarà com a FITXER NOU (no sobreescriurà la còpia antiga, que conserva les teves dades d\'abans de l\'esborrat).\n\nAquest PC passa a mode Independent perquè el núvol o l\'altre ordinador no li retornin les dades antigues. Pots tornar a Fusionat quan vulguis des de la configuració de Sincronització.':'✅ ¡Hecho! El programa queda a 0, como nuevo.\n\n🛡️ La próxima copia de seguridad se guardará como ARCHIVO NUEVO (no sobrescribirá la copia antigua, que conserva tus datos de antes del borrado).\n\nEste PC pasa a modo Independiente para que la nube o el otro ordenador no le devuelvan los datos antiguos. Puedes volver a Fusionado cuando quieras desde la configuración de Sincronización.'
   };
   back.innerHTML=`
     <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border:1px solid #334155;border-radius:14px;max-width:640px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,.6);color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif">
@@ -6852,6 +6852,9 @@ function openSettingsModal(){
     const WIPE_EXACT=['caja.v1','caja.cempla.v1','caja.datafono','caja.cempla.datafono','caja.reserva.v1','caja.stats.v1','caja.stats.traffic.overrides.v1','caja.irpf.v1','caja.__sync_ts','caja.__sync_last_push','caja.__sync_last_pull','caja.__sync_status'];
     WIPE_EXACT.forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
     for(let i=localStorage.length-1;i>=0;i--){ const k=localStorage.key(i); if(k && k.startsWith('caja.saldoInicial.')) try{localStorage.removeItem(k)}catch(e){} }
+    // 🛡️ Olvida el archivo de copia recordado: la próxima copia se guardará como ARCHIVO NUEVO
+    // (con la fecha de hoy) y NUNCA sobreescribirá la copia anterior al borrado.
+    try{ if(typeof clearStoredHandle==='function') await clearStoredHandle(); }catch(e){}
     alert(T.resetDone);
     location.reload();
   };

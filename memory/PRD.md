@@ -1257,3 +1257,9 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - Marcador de versión: la esquina superior derecha ahora muestra 'v{ver} · 01.09' (HTML_BUILD, línea ~9076) para diagnosticar caché vieja del bootstrap del .exe. Actualizar HTML_BUILD (dd.mm) en cambios importantes.
 - Nota bootstrap .exe: descarga v2.html fresco de producción al arrancar (api-endpoint.json en GitHub Medicarplus/medicarplus-releases apunta a project-helper-47.emergent.host); si falla la descarga usa caché localStorage medicar.boot.v2html.cache.v1 en silencio → siempre pedir al usuario cerrar/abrir la app tras un deploy.
 - Testeado E2E file:// con prompt() anulado (simulando Electron): diálogo aparece, palabra mal no borra, BORRAR+Enter borra todo conservando licencia/config.
+
+### 🛡️ Empezar de cero: nunca sobrescribir la copia anterior · Jun 2026
+- Contexto: btnExport (💾 Guardar copia) recuerda el archivo elegido en IndexedDB ('caja-io' → kv → 'backupHandle') y escribe SIEMPRE encima del mismo archivo.
+- Fix: el flujo "Empezar de cero" ahora llama clearStoredHandle() → la próxima copia abre el selector con nombre nuevo medicar_copia_<hoy>.json y NO toca la copia pre-borrado.
+- Mensaje resetDone actualizado avisando de ello (CA/ES).
+- Testeado E2E file://: handle 'MARC-COPIA-CAJA-2026-07-22.json' presente antes → None tras el borrado, datos wipeados OK.
