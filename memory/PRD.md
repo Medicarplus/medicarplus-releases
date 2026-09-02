@@ -1,5 +1,21 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-28 · Fusión de copia sin duplicados por CONTENIDO (max cLocal, cRemoto)
+- **Problema reportado por el usuario**: al pasar copia por 2ª vez desde un PC al otro, todas las entradas (Renovaciones/Obtenciones Tráfico, Revisiones, Fotos, ciclistas, etc.) se DUPLICABAN, teniendo el doble de todo. La regla acordada es: nunca duplicar lo que ya existe; sólo añadir lo que falta.
+- **Causa raíz**: el motor `_mergeArrays` sólo dedupeaba por `id`. Si la misma ficha (mismo cliente, importe, tipo, fp) se había escrito manualmente en los dos PCs con `uid()` distinto, quedaba duplicada en cada fusión.
+- **Solución**: dedup por **HUELLA DE CONTENIDO** (kind+tipo+grupo+nombre+DNI+importe+tasa+descuento+fp+fpTasa) con **conteo**: se conserva `max(cLocal, cRemoto)` por huella. Se aplica a los 3 caminos de fusión:
+  1. `_mergeArrays` en el motor sync (usado por `applyBackup` = banner "Aplicar copia" y por `pullNow` del modo Fusionado).
+  2. Camino de "Restaurar copia manual" desde fichero JSON (líneas ~6429/6434/6471 de `v2.html`, ahora vía helper local `_mergeArrDedup`).
+  3. Cubre Empresa 1 (`caja.v1`), Empresa 2 (`caja.cempla.v1`), entradas CSV DGT (mismo DNI ⇒ misma ficha) y todos los `kind` (TRAF, PRIV, DH).
+- **Ejemplos verificados con tests locales**:
+  - PC-B 2 fotos + PC-A 4 fotos → resultado **4** (añade 2).
+  - PC-B 4 fotos + PC-A 2 fotos → resultado **4** (no toca).
+  - Misma copia enviada 2 veces → **no acumula**.
+  - Misma Carla creada a mano en ambos PC con id distinto → **1**.
+- Archivo tocado: `frontend/public/v2.html` (bloque sync inline + `restoreAll`).
+- **Estado**: implementado y probado por agente con casos numéricos. Pendiente de confirmación del usuario tras Deploy y reinicio del `.exe`.
+
+
 ## 2026-02-27 (parte 2) · Sistema de emails cliente refactorizado
 - **Bug arreglado**: cliente ya no recibe 3 emails duplicados por cada suscripción Stripe (checkout + subscription.updated + invoice.paid disparaban 1 email cada uno).
 - **Regla del dueño aplicada**: cliente SOLO recibe email en estos casos, cada uno con cabecera clara que explica el motivo:

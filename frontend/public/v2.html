@@ -273,19 +273,63 @@
     }
     return out;
   }
+  // Huella de contenido para dedup 2º nivel: si dos entradas del mismo día tienen
+  // MISMOS datos (persona, importe, tasa, forma de pago…) las consideramos la misma
+  // aunque tengan id distinto (típico: ambas PCs escribieron la misma ficha a mano).
+  function _entryFingerprint(e){
+    if(!e || typeof e !== 'object') return null;
+    const norm = s => (s==null?'':String(s)).trim().toLowerCase().replace(/\s+/g,' ');
+    const n2 = v => { const x = Number(v); return isFinite(x) ? x.toFixed(2) : '0.00'; };
+    return [
+      e.kind||'', e.tipo||'', e.grupo||'',
+      norm(e.nombre), norm(e.dni),
+      n2(e.importe), n2(e.tasa), n2(e.descuento),
+      e.fp||'', e.fpTasa||''
+    ].join('|');
+  }
   function _mergeArrays(local, remote){
     const L = Array.isArray(local) ? local : [];
     const R = Array.isArray(remote) ? remote : [];
-    const map = new Map();
-    L.forEach(e => { if(e && e.id) map.set(e.id, e); else map.set(Symbol(), e); });
-    R.forEach(e => {
-      if(!e || !e.id) return map.set(Symbol(), e);
-      const cur = map.get(e.id);
-      const cur_ts = cur && cur.updated_at ? new Date(cur.updated_at).getTime() : 0;
-      const rem_ts = e.updated_at ? new Date(e.updated_at).getTime() : 0;
-      if(!cur || rem_ts >= cur_ts) map.set(e.id, e);
+    const out = [...L];
+    const idsInOut = new Set();
+    const fpCountOut = new Map();
+    const fpCountR = new Map();
+    L.forEach(e => {
+      if(e && e.id) idsInOut.add(e.id);
+      const f = _entryFingerprint(e);
+      if(f) fpCountOut.set(f, (fpCountOut.get(f)||0)+1);
     });
-    return Array.from(map.values());
+    R.forEach(e => {
+      const f = _entryFingerprint(e);
+      if(f) fpCountR.set(f, (fpCountR.get(f)||0)+1);
+    });
+    R.forEach(e => {
+      if(!e) return;
+      // 1) Mismo id ya presente → actualizar si trae timestamp más nuevo
+      if(e.id && idsInOut.has(e.id)){
+        const idx = out.findIndex(x => x && x.id === e.id);
+        if(idx >= 0){
+          const cur = out[idx];
+          const curTs = cur && cur.updated_at ? new Date(cur.updated_at).getTime() : 0;
+          const remTs = e.updated_at ? new Date(e.updated_at).getTime() : 0;
+          if(remTs > curTs) out[idx] = e;
+        }
+        return;
+      }
+      // 2) Dedup por CONTENIDO con conteo:
+      //    conservamos max(cL, cR) entradas por huella.
+      //    Si el receptor ya tiene ≥ las del emisor, no añade nada más → nunca se duplica.
+      const f = _entryFingerprint(e);
+      if(f){
+        const have = fpCountOut.get(f) || 0;
+        const want = fpCountR.get(f) || 0;
+        if(have >= want) return; // ya hay igual o más de este tipo
+        fpCountOut.set(f, have + 1);
+      }
+      out.push(e);
+      if(e.id) idsInOut.add(e.id);
+    });
+    return out;
   }
   function _mergeByDate(local, remote){
     const out = {};
@@ -6381,18 +6425,40 @@ $('#jsonInput').onchange=async ev=>{
   const cntDatafono=obj.datafono?Object.keys(obj.datafono).length:0;
   const cntStats=obj.stats&&obj.stats.data?Object.keys(obj.stats.data).length:0;
   const cntStatsAutos=obj.stats&&obj.stats.autoescoles?obj.stats.autoescoles.length:0;
-  // Snapshot ANTES de tocar nada
+  // Dedup por CONTENIDO con CONTEO: se conserva max(cLocal, cRemoto) por huella.
+  // Ejemplo: receptor tiene 2 fotos, emisor tiene 4 → resultado 4 (añade 2). Si receptor
+  // ya tiene 4 y emisor manda 2, no añade nada.
+  const _fp = e => { if(!e||typeof e!=='object') return null; const nm=s=>(s==null?'':String(s)).trim().toLowerCase().replace(/\s+/g,' '); const n2=v=>{const x=Number(v);return isFinite(x)?x.toFixed(2):'0.00'}; return [e.kind||'',e.tipo||'',e.grupo||'',nm(e.nombre),nm(e.dni),n2(e.importe),n2(e.tasa),n2(e.descuento),e.fp||'',e.fpTasa||''].join('|') };
+  const _mergeArrDedup = (curArr, incoming) => {
+    const ids = new Set();
+    const fpHave = new Map();
+    curArr.forEach(x => { if(x&&x.id) ids.add(x.id); const f=_fp(x); if(f) fpHave.set(f,(fpHave.get(f)||0)+1); });
+    const fpWant = new Map();
+    (incoming||[]).forEach(e => { const f=_fp(e); if(f) fpWant.set(f,(fpWant.get(f)||0)+1); });
+    for(const e of (incoming||[])){
+      if(!e) continue;
+      if(e.id && ids.has(e.id)) continue;
+      const f = _fp(e);
+      if(f){
+        const have = fpHave.get(f)||0, want = fpWant.get(f)||0;
+        if(have >= want) continue;
+        fpHave.set(f, have+1);
+      }
+      curArr.push(e);
+      if(e.id) ids.add(e.id);
+    }
+  };
   const restoreAll=(replace)=>{
     pushSnapshot('preRestore');
     const log=[];
     if(hasDual||hasOnlyCB){
       if(replace)localStorage.setItem('caja.v1',JSON.stringify(obj.cbTrafic));
-      else{const cur=JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}');for(const[d,arr]of Object.entries(obj.cbTrafic.byDate||{})){cur.byDate[d]=cur.byDate[d]||[];for(const e of arr){if(!cur.byDate[d].some(x=>x.id===e.id))cur.byDate[d].push(e)}}localStorage.setItem('caja.v1',JSON.stringify(cur))}
+      else{const cur=JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}');for(const[d,arr]of Object.entries(obj.cbTrafic.byDate||{})){cur.byDate[d]=cur.byDate[d]||[];_mergeArrDedup(cur.byDate[d],arr)}localStorage.setItem('caja.v1',JSON.stringify(cur))}
       log.push(`Tràfic (${cntCB} fitxes)`);
     }
     if(hasDual||hasOnlyCempla){
       if(replace)localStorage.setItem('caja.cempla.v1',JSON.stringify(obj.cempla));
-      else{const cur=JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}');for(const[d,arr]of Object.entries(obj.cempla.byDate||{})){cur.byDate[d]=cur.byDate[d]||[];for(const e of arr){if(!cur.byDate[d].some(x=>x.id===e.id))cur.byDate[d].push(e)}}localStorage.setItem('caja.cempla.v1',JSON.stringify(cur))}
+      else{const cur=JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}');for(const[d,arr]of Object.entries(obj.cempla.byDate||{})){cur.byDate[d]=cur.byDate[d]||[];_mergeArrDedup(cur.byDate[d],arr)}localStorage.setItem('caja.cempla.v1',JSON.stringify(cur))}
       log.push(`${(window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2'} (${cntCempla} fitxes)`);
     }
     if(obj.datafono){
@@ -6429,7 +6495,7 @@ $('#jsonInput').onchange=async ev=>{
     }
     if(hasSingle){
       if(replace)localStorage.setItem(KEYS[currentCompany],JSON.stringify(obj));
-      else{for(const[d,arr]of Object.entries(obj.byDate)){const list=entriesOf(d);for(const e of arr){if(!list.some(x=>x.id===e.id))list.push(e)}}saveState()}
+      else{for(const[d,arr]of Object.entries(obj.byDate)){const list=entriesOf(d);_mergeArrDedup(list,arr)}saveState()}
       log.push(isCA?`${cntSingle} fitxes (format antic)`:`${cntSingle} fichas (formato antiguo)`);
     }
     state=loadState();render();
