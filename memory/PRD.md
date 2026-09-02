@@ -1263,3 +1263,11 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - Fix: el flujo "Empezar de cero" ahora llama clearStoredHandle() → la próxima copia abre el selector con nombre nuevo medicar_copia_<hoy>.json y NO toca la copia pre-borrado.
 - Mensaje resetDone actualizado avisando de ello (CA/ES).
 - Testeado E2E file://: handle 'MARC-COPIA-CAJA-2026-07-22.json' presente antes → None tras el borrado, datos wipeados OK.
+
+### 🐛 FIX definitivo diálogo BORRAR (teclado muerto en Electron) · Jun 2026
+- Síntoma: en el .exe no se podía escribir en el input de BORRAR. Causa REAL: bug conocido de Electron — tras un confirm()/alert() NATIVO la ventana pierde el foco de teclado y los inputs no reciben teclas.
+- REGLA CRÍTICA: en el flujo de reset (y preferiblemente en toda la app) NO usar confirm(), alert() ni prompt() nativos. Usar overlays propios.
+- Nuevo flujo: UNA sola ventana propia (showResetDialog) con aviso + input + botones; error de palabra inline (#resetDlgErr) sin alert; éxito con modal verde propio (showResetDone → OK → reload). Input grande, cursor:text, foco con reintentos (60/250/600ms) y re-enfoque en pointerdown sobre cualquier zona del recuadro que no sea botón.
+- data-testids: reset-word-input, reset-word-confirm, reset-word-cancel, reset-word-error, reset-done-ok.
+- HTML_BUILD subido a '02.09' (esquina superior derecha) para verificar que el usuario recibe esta versión.
+- Testeado E2E file:// con window.confirm/alert/prompt anulados para lanzar excepción: tecleo real por teclado, clic en esquina del campo, clic fuera re-enfoca, palabra mal → error inline sin borrar, BORRAR+Enter → wipe + modal verde + reload limpio. 6/6 OK.

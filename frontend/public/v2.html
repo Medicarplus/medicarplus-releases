@@ -6822,30 +6822,55 @@ function openSettingsModal(){
   };
 
   // 🗑️ Empezar de cero · borra todas las entradas diarias de ESTE PC
-  // NOTA: window.prompt() NO funciona en Electron (lanza excepción) → usamos un diálogo propio.
-  const askResetWord=()=>new Promise(res=>{
+  // IMPORTANTE: cero diálogos nativos (confirm/alert/prompt) en este flujo.
+  // En Electron, tras un confirm() nativo la ventana pierde el teclado y no se puede escribir.
+  const showResetDialog=()=>new Promise(res=>{
+    const errTxt=isCA?'✗ Paraula incorrecta. Escriu exactament: BORRAR':'✗ Palabra incorrecta. Escribe exactamente: BORRAR';
     const ov=document.createElement('div');
-    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px';
-    ov.innerHTML='<div style="background:linear-gradient(135deg,#1e293b,#0f172a);border:2px solid #ea580c;border-radius:14px;padding:26px;max-width:440px;width:100%;font-family:Georgia,serif;box-shadow:0 20px 60px rgba(0,0,0,.6)">'
-      +'<div style="color:#fdba74;font-weight:700;font-size:15px;margin-bottom:12px;text-align:center">'+T.resetConfirm2+'</div>'
-      +'<input id="resetWordInput" data-testid="reset-word-input" type="text" autocomplete="off" spellcheck="false" placeholder="BORRAR" style="width:100%;box-sizing:border-box;padding:12px;background:#0f172a;border:1px solid #ea580c;border-radius:8px;color:#fff;font-size:18px;letter-spacing:3px;text-align:center;font-weight:700">'
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.innerHTML='<div id="resetDlgBox" style="background:linear-gradient(135deg,#1e293b,#0f172a);border:2px solid #ea580c;border-radius:14px;padding:26px;max-width:540px;width:100%;font-family:Georgia,serif;box-shadow:0 20px 60px rgba(0,0,0,.6);cursor:text">'
+      +'<div style="color:#fdba74;font-weight:700;font-size:16px;margin-bottom:10px">🗑️ '+T.resetSec.replace('🗑️ ','')+'</div>'
+      +'<div style="color:#fecaca;font-size:13px;line-height:1.6;margin-bottom:14px;white-space:pre-line">'+T.resetConfirm1+'</div>'
+      +'<div style="color:#fdba74;font-weight:700;font-size:14px;margin-bottom:8px;text-align:center">'+T.resetConfirm2+'</div>'
+      +'<input id="resetWordInput" data-testid="reset-word-input" type="text" autocomplete="off" spellcheck="false" placeholder="BORRAR" style="width:100%;box-sizing:border-box;padding:16px;background:#0f172a;border:2px solid #ea580c;border-radius:10px;color:#fff;font-size:22px;letter-spacing:4px;text-align:center;font-weight:700;cursor:text;display:block">'
+      +'<div id="resetDlgErr" data-testid="reset-word-error" style="display:none;color:#f87171;font-size:13px;font-weight:700;text-align:center;margin-top:8px">'+errTxt+'</div>'
       +'<div style="display:flex;gap:10px;margin-top:16px">'
-      +'<button id="resetWordCancel" data-testid="reset-word-cancel" style="flex:1;padding:11px;background:#334155;color:#e2e8f0;border:1px solid #475569;border-radius:8px;cursor:pointer;font-size:14px">'+(isCA?'Cancel·lar':'Cancelar')+'</button>'
-      +'<button id="resetWordOk" data-testid="reset-word-confirm" style="flex:1;padding:11px;background:linear-gradient(135deg,#c2410c,#9a3412);color:#ffedd5;border:1px solid #ea580c;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px">'+(isCA?'Confirmar i esborrar':'Confirmar y borrar')+'</button>'
+      +'<button id="resetWordCancel" data-testid="reset-word-cancel" style="flex:1;padding:13px;background:#334155;color:#e2e8f0;border:1px solid #475569;border-radius:8px;cursor:pointer;font-size:14px">'+(isCA?'Cancel·lar':'Cancelar')+'</button>'
+      +'<button id="resetWordOk" data-testid="reset-word-confirm" style="flex:1;padding:13px;background:linear-gradient(135deg,#c2410c,#9a3412);color:#ffedd5;border:1px solid #ea580c;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px">'+(isCA?'Confirmar i esborrar':'Confirmar y borrar')+'</button>'
       +'</div></div>';
     document.body.appendChild(ov);
     const inp=ov.querySelector('#resetWordInput');
-    setTimeout(()=>{try{inp.focus()}catch(e){}},60);
+    const err=ov.querySelector('#resetDlgErr');
+    // Foco robusto: al abrir (con reintentos) y al tocar CUALQUIER punto del recuadro que no sea un botón
+    const focusInp=()=>{try{inp.focus()}catch(e){}};
+    [60,250,600].forEach(ms=>setTimeout(focusInp,ms));
+    ov.addEventListener('pointerdown',e=>{ if(!e.target.closest('button')) setTimeout(focusInp,0); });
     const done=v=>{try{ov.remove()}catch(e){};res(v)};
-    ov.querySelector('#resetWordOk').onclick=()=>done(inp.value);
-    ov.querySelector('#resetWordCancel').onclick=()=>done(null);
-    inp.addEventListener('keydown',e=>{ if(e.key==='Enter')done(inp.value); if(e.key==='Escape')done(null); });
+    const tryOk=()=>{
+      const w=String(inp.value||'').trim().toUpperCase();
+      if(w==='BORRAR'){ done(true); return; }
+      err.style.display='block'; inp.value=''; inp.style.borderColor='#f87171';
+      setTimeout(()=>{inp.style.borderColor='#ea580c'},900);
+      focusInp();
+    };
+    ov.querySelector('#resetWordOk').onclick=tryOk;
+    ov.querySelector('#resetWordCancel').onclick=()=>done(false);
+    inp.addEventListener('keydown',e=>{ if(e.key==='Enter')tryOk(); if(e.key==='Escape')done(false); });
+    inp.addEventListener('input',()=>{ err.style.display='none'; });
   });
+  const showResetDone=()=>{
+    const ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100001;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.innerHTML='<div style="background:linear-gradient(135deg,#052e16,#0f172a);border:2px solid #22c55e;border-radius:14px;padding:26px;max-width:520px;width:100%;font-family:Georgia,serif;box-shadow:0 20px 60px rgba(0,0,0,.6)">'
+      +'<div style="color:#a7f3d0;font-size:13.5px;line-height:1.7;white-space:pre-line">'+T.resetDone+'</div>'
+      +'<div style="text-align:center;margin-top:18px"><button id="resetDoneOk" data-testid="reset-done-ok" style="padding:12px 40px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:1px solid #22c55e;border-radius:8px;font-weight:700;cursor:pointer;font-size:15px">OK</button></div>'
+      +'</div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#resetDoneOk').onclick=()=>location.reload();
+  };
   document.getElementById('setResetData').onclick=async()=>{
-    if(!confirm(T.resetConfirm1)) return;
-    const word=await askResetWord();
-    if(word===null) return;
-    if(String(word).trim().toUpperCase()!=='BORRAR'){ alert(T.resetCancelled); return; }
+    const go=await showResetDialog();
+    if(!go) return;
     // Pasa a Independiente para que la nube / el otro PC no devuelvan los datos a ESTE PC
     try{ if(window.mcSync){ window.mcSync.stopAutosync(); await window.mcSync.setMode('independent'); } }catch(e){}
     try{ localStorage.setItem('caja.sync.modeChosen.v1','independent'); }catch(e){}
@@ -6855,8 +6880,7 @@ function openSettingsModal(){
     // 🛡️ Olvida el archivo de copia recordado: la próxima copia se guardará como ARCHIVO NUEVO
     // (con la fecha de hoy) y NUNCA sobreescribirá la copia anterior al borrado.
     try{ if(typeof clearStoredHandle==='function') await clearStoredHandle(); }catch(e){}
-    alert(T.resetDone);
-    location.reload();
+    showResetDone();
   };
 
   // Millora de pla · obre modal amb els 4 plans i inicia Stripe
@@ -9096,7 +9120,7 @@ try{setInterval(function(){try{window.updateTrialBadge()}catch(e){}}, 60000)}cat
   try{
     var v = (window.appInfo && window.appInfo.version) ? window.appInfo.version : '2.1.12';
     var isElectron = !!(window.appInfo && window.appInfo.isDesktop);
-    var HTML_BUILD = '01.09'; // fecha de publicación de este v2.html (dd.mm) para diagnóstico
+    var HTML_BUILD = '02.09'; // fecha de publicación de este v2.html (dd.mm) para diagnóstico
     var el = document.getElementById('appVersion');
     if(el){ el.textContent = 'v' + v + ' · ' + HTML_BUILD + (isElectron ? '' : ' (web)'); }
   }catch(e){}
