@@ -6822,10 +6822,30 @@ function openSettingsModal(){
   };
 
   // 🗑️ Empezar de cero · borra todas las entradas diarias de ESTE PC
+  // NOTA: window.prompt() NO funciona en Electron (lanza excepción) → usamos un diálogo propio.
+  const askResetWord=()=>new Promise(res=>{
+    const ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.innerHTML='<div style="background:linear-gradient(135deg,#1e293b,#0f172a);border:2px solid #ea580c;border-radius:14px;padding:26px;max-width:440px;width:100%;font-family:Georgia,serif;box-shadow:0 20px 60px rgba(0,0,0,.6)">'
+      +'<div style="color:#fdba74;font-weight:700;font-size:15px;margin-bottom:12px;text-align:center">'+T.resetConfirm2+'</div>'
+      +'<input id="resetWordInput" data-testid="reset-word-input" type="text" autocomplete="off" spellcheck="false" placeholder="BORRAR" style="width:100%;box-sizing:border-box;padding:12px;background:#0f172a;border:1px solid #ea580c;border-radius:8px;color:#fff;font-size:18px;letter-spacing:3px;text-align:center;font-weight:700">'
+      +'<div style="display:flex;gap:10px;margin-top:16px">'
+      +'<button id="resetWordCancel" data-testid="reset-word-cancel" style="flex:1;padding:11px;background:#334155;color:#e2e8f0;border:1px solid #475569;border-radius:8px;cursor:pointer;font-size:14px">'+(isCA?'Cancel·lar':'Cancelar')+'</button>'
+      +'<button id="resetWordOk" data-testid="reset-word-confirm" style="flex:1;padding:11px;background:linear-gradient(135deg,#c2410c,#9a3412);color:#ffedd5;border:1px solid #ea580c;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px">'+(isCA?'Confirmar i esborrar':'Confirmar y borrar')+'</button>'
+      +'</div></div>';
+    document.body.appendChild(ov);
+    const inp=ov.querySelector('#resetWordInput');
+    setTimeout(()=>{try{inp.focus()}catch(e){}},60);
+    const done=v=>{try{ov.remove()}catch(e){};res(v)};
+    ov.querySelector('#resetWordOk').onclick=()=>done(inp.value);
+    ov.querySelector('#resetWordCancel').onclick=()=>done(null);
+    inp.addEventListener('keydown',e=>{ if(e.key==='Enter')done(inp.value); if(e.key==='Escape')done(null); });
+  });
   document.getElementById('setResetData').onclick=async()=>{
     if(!confirm(T.resetConfirm1)) return;
-    const word=prompt(T.resetConfirm2);
-    if(!word || word.trim().toUpperCase()!=='BORRAR'){ alert(T.resetCancelled); return; }
+    const word=await askResetWord();
+    if(word===null) return;
+    if(String(word).trim().toUpperCase()!=='BORRAR'){ alert(T.resetCancelled); return; }
     // Pasa a Independiente para que la nube / el otro PC no devuelvan los datos a ESTE PC
     try{ if(window.mcSync){ window.mcSync.stopAutosync(); await window.mcSync.setMode('independent'); } }catch(e){}
     try{ localStorage.setItem('caja.sync.modeChosen.v1','independent'); }catch(e){}

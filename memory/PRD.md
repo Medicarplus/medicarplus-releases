@@ -1249,3 +1249,11 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - Al ejecutar pasa el PC a modo Independiente (mcSync.setMode('independent') + stopAutosync + modeChosen) para que la nube/otro PC no devuelvan los datos viejos a ESTE PC (elección del usuario: solo borra local).
 - Nota: tras reload, loadCambio() re-crea caja.reserva.v1 como {"_v":2} (migración interna) — vacía, 0 €, benigno.
 - Testeado E2E en file:// (3 rondas Playwright): palabra incorrecta no borra; BORRAR borra todo; licencia/config/favoritos intactos; app arranca limpia con empresa conservada.
+
+### 🐛 FIX: prompt() no existe en Electron (botón Empezar de cero "no hacía nada") · Jun 2026
+- Síntoma: en el .exe, tras Aceptar el confirm(), no pasaba nada. Causa: window.prompt() lanza excepción en Electron (no soportado) → el handler async moría en silencio.
+- Fix: diálogo propio askResetWord() (overlay z-index 100000, input data-testid=reset-word-input, botones reset-word-confirm/reset-word-cancel, Enter/Escape). alert() y confirm() SÍ funcionan en Electron; SOLO prompt() no. No hay más usos de prompt() en v2.html (verificado con grep).
+- REGLA PARA FUTURO: NUNCA usar window.prompt() en esta app; usar diálogos propios.
+- Marcador de versión: la esquina superior derecha ahora muestra 'v{ver} · 01.09' (HTML_BUILD, línea ~9076) para diagnosticar caché vieja del bootstrap del .exe. Actualizar HTML_BUILD (dd.mm) en cambios importantes.
+- Nota bootstrap .exe: descarga v2.html fresco de producción al arrancar (api-endpoint.json en GitHub Medicarplus/medicarplus-releases apunta a project-helper-47.emergent.host); si falla la descarga usa caché localStorage medicar.boot.v2html.cache.v1 en silencio → siempre pedir al usuario cerrar/abrir la app tras un deploy.
+- Testeado E2E file:// con prompt() anulado (simulando Electron): diálogo aparece, palabra mal no borra, BORRAR+Enter borra todo conservando licencia/config.
