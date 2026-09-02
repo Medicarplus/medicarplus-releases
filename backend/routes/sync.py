@@ -441,6 +441,72 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
         return {"ok": True, "backup_id": body.backup_id}
 
     # ────────────────────────────────────────────────────────────────────
+    # 🔍 Snapshot del "otro PC" para el Asesor IA · Buscar descuadre
+    # ────────────────────────────────────────────────────────────────────
+    # Devuelve los datos que el otro ordenador de la MISMA licencia tiene:
+    #   · En modo Fusionado → snapshot vivo desde sync_groups (COLL_STATE)
+    #   · En modo Independiente → última copia recibida en el buzón (mailbox)
+    # El frontend usa este snapshot para pedir a la IA una comparación día a
+    # día y detectar entradas que falten o discrepen entre los dos PCs.
+    @router.get("/sync/other-snapshot")
+    async def other_snapshot(license_key: str, install_id: str):
+        lic = await _find_license(license_key)
+        if not lic:
+            raise HTTPException(status_code=404, detail="license_not_found")
+        lkh = _key_hash(license_key)
+        data_out: dict[str, Any] = {}
+        source = None
+        other_install_id = None
+        cloud_ts = None
+
+        # 🔒 Sólo consideramos "otro PC" a los devices ACTIVOS de esta licencia
+        # distintos del que llama. Si no hay ninguno, no devolvemos data (aunque
+        # queden restos huérfanos en sync_groups de instalaciones eliminadas).
+        active_devices = await db[COLL_DEVICES].find({"license_key_hash": lkh}).to_list(length=10)
+        active_ids = {d.get("install_id") for d in active_devices if d.get("install_id") and d.get("install_id") != install_id}
+
+        state = await db[COLL_STATE].find_one({"_id": lkh})
+        if active_ids and state and isinstance(state.get("data"), dict):
+            latest_ts = None
+            for key, item in state["data"].items():
+                if not isinstance(item, dict):
+                    continue
+                author = item.get("author")
+                # Sólo aceptamos data de un device ACTUALMENTE activo (no huérfanos)
+                if not author or author == install_id or author not in active_ids:
+                    continue
+                data_out[key] = item.get("value")
+                ts = _parse_iso(item.get("updated_at"))
+                if ts and (latest_ts is None or ts > latest_ts):
+                    latest_ts = ts
+                    other_install_id = author
+            cloud_ts = _iso(state.get("last_updated_at")) if state.get("last_updated_at") else None
+            if data_out:
+                source = "linked"
+
+        # Fallback: última copia manual/admin recibida (aunque el emisor ya no
+        # esté activo, la copia es real y sirve para comparar).
+        if not data_out:
+            cursor = db[COLL_BACKUPS].find({
+                "license_key_hash": lkh,
+                "from_install_id": {"$ne": install_id},
+            }).sort("created_at", -1).limit(1)
+            async for d in cursor:
+                data_out = d.get("data") or {}
+                other_install_id = d.get("from_install_id")
+                cloud_ts = _iso(d.get("created_at")) if d.get("created_at") else None
+                source = "backup_mailbox"
+                break
+        return {
+            "ok": True,
+            "has_data": bool(data_out),
+            "source": source,
+            "other_install_id": other_install_id,
+            "cloud_updated_at": cloud_ts,
+            "data": data_out,
+        }
+
+    # ────────────────────────────────────────────────────────────────────
     # 👑 ADMIN-ONLY · Enviar copia a CUALQUIER cliente sin vincular licencias
     # ────────────────────────────────────────────────────────────────────
     # Uso: yo (admin MASTER) tengo datos en mi PC. Quiero enviarle una copia

@@ -97,6 +97,9 @@ class AiAskBody(BaseModel):
     diff: float = 0.0
     userGeminiKey: str = ""
     auditSummary: Optional[dict] = None
+    otherData: Optional[dict] = None      # snapshot del OTRO PC (para modo comparar)
+    compareMode: bool = False              # si True, la IA hace diff en vez de análisis normal
+    dateRange: Optional[dict] = None
 
 
 @api_router.post("/ai-ask")
@@ -117,10 +120,90 @@ async def ai_ask(request: Request, body: AiAskBody):
             else:
                 lines.append(f"{d} {e.get('tipo','')} {e.get('nombre','')[:30]} imp={e.get('importe',0)} tasa={e.get('tasa',0)} {e.get('fp','')}")
     data_txt = "\n".join(lines[-400:])
+    # 🔍 Modo COMPARAR: si el frontend adjunta otherData, calculamos un diff
+    # día-por-día entre este PC y el otro y añadimos un resumen estructurado
+    # al prompt. La IA lo usa como base fáctica para la respuesta.
+    compare_txt = ""
+    if body.compareMode and body.otherData:
+        try:
+            other_by_date = (body.otherData.get(body.company) or {}).get("byDate", {}) or {}
+            all_dates = sorted(set(list(company_data.keys()) + list(other_by_date.keys())))
+            # Filtro por rango si viene
+            drng = body.dateRange or {}
+            d_from = drng.get("from") or ""
+            d_to = drng.get("to") or ""
+            if d_from:
+                all_dates = [d for d in all_dates if d >= d_from]
+            if d_to:
+                all_dates = [d for d in all_dates if d <= d_to]
+
+            def fingerprint(e: dict) -> str:
+                nm = (e.get("nombre") or "").strip().lower()
+                return f"{e.get('kind','')}|{e.get('tipo','')}|{e.get('grupo','')}|{nm}|{(e.get('dni') or '').strip().upper()}|{float(e.get('importe') or 0):.2f}|{float(e.get('tasa') or 0):.2f}"
+
+            def label(e: dict) -> str:
+                nm = (e.get("nombre") or "-")[:30]
+                imp = e.get("importe") or 0
+                ta = e.get("tasa") or 0
+                extra = f" tasa={ta}" if ta else ""
+                return f"{e.get('tipo','')} {nm} imp={imp}€{extra} fp={e.get('fp','')}"
+
+            diff_lines = []
+            total_only_here = 0
+            total_only_there = 0
+            for d in all_dates:
+                here = [x for x in (company_data.get(d) or []) if not x.get("retorno")]
+                there = [x for x in (other_by_date.get(d) or []) if not x.get("retorno")]
+                fp_here = {}
+                fp_there = {}
+                for e in here:
+                    fp_here.setdefault(fingerprint(e), []).append(e)
+                for e in there:
+                    fp_there.setdefault(fingerprint(e), []).append(e)
+                keys = set(fp_here) | set(fp_there)
+                only_here, only_there = [], []
+                for k in keys:
+                    n_h = len(fp_here.get(k, []))
+                    n_t = len(fp_there.get(k, []))
+                    if n_h > n_t:
+                        for _ in range(n_h - n_t):
+                            only_here.append(label(fp_here[k][0]))
+                    elif n_t > n_h:
+                        for _ in range(n_t - n_h):
+                            only_there.append(label(fp_there[k][0]))
+                if only_here or only_there:
+                    diff_lines.append(f"📅 {d}:")
+                    for l in only_here[:12]:
+                        diff_lines.append(f"   ➕ Solo en ESTE PC: {l}")
+                        total_only_here += 1
+                    for l in only_there[:12]:
+                        diff_lines.append(f"   ➖ Solo en el OTRO PC: {l}")
+                        total_only_there += 1
+            # Reserva de cambio (last-write-wins, no diff-por-día)
+            try:
+                r_here = float((body.data.get("caja.reserva.v1") or {}).get("_bulk") or 0)
+                r_there = float((body.otherData.get("caja.reserva.v1") or {}).get("_bulk") or 0)
+                if r_here or r_there:
+                    diff_lines.append(f"💰 Reserva de cambio · ESTE PC: {r_here}€ · OTRO PC: {r_there}€ (diff: {r_here - r_there:+.2f}€)")
+            except Exception:
+                pass
+            head = (
+                f"\n\n🔍 COMPARACIÓN entre ESTE PC y el OTRO PC (misma licencia). "
+                f"Total entradas presentes solo aquí: {total_only_here} · solo allá: {total_only_there}.\n"
+            )
+            if not diff_lines:
+                compare_txt = head + "Ambos PCs coinciden en todas las entradas del rango.\n"
+            else:
+                compare_txt = head + "\n".join(diff_lines[:250]) + "\n"
+        except Exception as ex:
+            logging.exception("compare diff error")
+            compare_txt = f"\n(⚠️ No se pudo calcular la comparación: {str(ex)[:120]})\n"
     system = (
         "Eres un asesor contable experto en gestorías de tráfico y medicina deportiva en España. "
         "Analiza el registro de caja y responde en castellano (o catalán solo si el usuario lo pide), breve y práctico con viñetas. "
         "Si hay descuadre (diff), busca causas: devoluciones de tasa DGT no apuntadas, duplicados, importes atípicos. "
+        "Si el mensaje incluye una sección '🔍 COMPARACIÓN', usa esa lista como base fáctica para explicar al usuario "
+        "QUÉ entradas faltan en cada PC (con fecha, nombre, tipo e importe) y sugerir qué copiar/borrar para que cuadren. "
         "Cita fechas concretas dd/mm/yyyy."
     )
     diff_txt = f"DESCUADRE: {body.diff:.2f}€ (positiu=sobra, negatiu=falta)\n" if body.diff else ""
@@ -138,7 +221,7 @@ async def ai_ask(request: Request, body: AiAskBody):
                 for en in c.get("entries", [])[:6]:
                     lines_au.append(f"   · {en.get('date')} {en.get('kind')}/{en.get('tipo','')} imp={en.get('importe',0)} tasa={en.get('tasa',0)} {en.get('fp','')}")
             audit_txt = "\n".join(lines_au) + "\n"
-    user_msg = f"{diff_txt}Pregunta: {body.question}\n{audit_txt}\nRegistre:\n{data_txt}"
+    user_msg = f"{diff_txt}Pregunta: {body.question}\n{audit_txt}{compare_txt}\nRegistre:\n{data_txt}"
     # Use user's own Google Gemini API key if provided (FREE tier)
     user_key_error = None
     if body.userGeminiKey and len(body.userGeminiKey.strip()) >= 20:

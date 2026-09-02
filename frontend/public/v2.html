@@ -6402,6 +6402,10 @@ $('#btnAiAsk').onclick=()=>{
       <textarea id="aiQ" rows="3" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;width:100%;font-family:inherit;font-size:13px" placeholder="Ej: Del 1/7 al 31/7 me faltan 4€ en efectivo, ¿puedes repasar si hay algo que no se haya contado? · Busca duplicados y devoluciones · ¿Qué gastos he tenido esta semana?"></textarea>
     </div>
     <div class="small" style="margin-bottom:12px">💡 <b>Rango de fechas</b>: rellena Desde/Hasta si quieres que la IA solo revise ese periodo (más rápido y preciso). Déjalo vacío para revisar todo. · <b>Descuadre</b>: positivo = te sobra dinero · negativo = te falta. Deja 0 si solo quieres preguntar.</div>
+    <div style="border-top:1px dashed #475569;padding-top:10px;margin-bottom:12px">
+      <button id="aiCompare" data-testid="ai-compare-other-pc" title="Compara tus datos con los del otro ordenador y detecta entradas que falten o discrepen" style="width:100%;padding:12px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;border-radius:8px;font-weight:800;font-size:13.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px">🔍 <span>Comparar con el otro PC</span></button>
+      <div class="small" id="aiCompareHint" style="margin-top:6px;color:#7a8394;font-style:italic">Sólo si tienes 2 ordenadores con la misma licencia. Pide a la IA que revise qué días o entradas no coinciden entre los dos PC.</div>
+    </div>
     <div id="aiAnswer" style="max-height:340px;overflow:auto;padding:12px;background:#0e1117;border-radius:8px;border:1px solid #2a3040;font-size:13px;line-height:1.55;white-space:pre-wrap;display:none;color:#dbe4f0"></div>
     <div class="row" style="margin-top:14px">
       <button class="btn" data-no>Cerrar</button>
@@ -6458,6 +6462,73 @@ $('#btnAiAsk').onclick=()=>{
     }catch(e){ansEl.textContent='❌ Error de conexión: '+e.message}
     btn.disabled=false;btn.textContent='🚀 Preguntar';
   };
+  // 🔍 Comparar con el otro PC: descarga snapshot del otro ordenador y pide a la IA un diff
+  const cmpBtn = back.querySelector('#aiCompare');
+  if(cmpBtn){
+    cmpBtn.onclick = async () => {
+      const dFromInput=back.querySelector('#aiFrom').value||'';
+      const dToInput=back.querySelector('#aiTo').value||'';
+      const userKey=localStorage.getItem('caja.geminiKey')||'';
+      const ansEl=back.querySelector('#aiAnswer');
+      ansEl.style.display='block';
+      cmpBtn.disabled=true; const origTxt = cmpBtn.innerHTML; cmpBtn.innerHTML='⏳ Comparando con el otro PC…';
+      try{
+        // 1) Descarga snapshot del OTRO PC
+        const lic = JSON.parse(localStorage.getItem('caja.license.v1')||'null');
+        const licKey = (lic && (lic.key || lic.license_key)) || '';
+        const iid = localStorage.getItem('caja.install.id.v1') || '';
+        if(!licKey || !iid){ throw new Error('Falta licencia o install_id local'); }
+        const apiBase = getApiBase().replace(/\/$/,'');
+        const r0 = await fetch(`${apiBase}/api/sync/other-snapshot?license_key=${encodeURIComponent(licKey)}&install_id=${encodeURIComponent(iid)}`);
+        const oj = await r0.json();
+        if(!r0.ok || !oj.has_data){
+          ansEl.textContent = '🔍 No hay datos del otro ordenador para comparar todavía.\n\nPara que esta comparación funcione:\n  · Los dos PC deben estar en modo 🔗 Fusionado (Configuración → Sincronización) — con eso los datos se comparten en la nube y se puede comparar en cualquier momento.\n  · O bien, envía una copia manual desde el otro PC (📨 Enviar copia).\n\nCuando el otro PC haya subido datos, este botón podrá analizarlos.';
+          cmpBtn.disabled=false; cmpBtn.innerHTML=origTxt;
+          return;
+        }
+        // 2) Construye datos locales filtrados por rango si aplica
+        const filterByDate=(store)=>{
+          if(!dFromInput&&!dToInput) return store;
+          const bd=(store&&store.byDate)||{}; const out={};
+          for(const iso of Object.keys(bd)){
+            if(dFromInput && iso<dFromInput) continue;
+            if(dToInput && iso>dToInput) continue;
+            out[iso]=bd[iso];
+          }
+          return {byDate:out};
+        };
+        const localTraf = JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}');
+        const localCempla = JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}');
+        const otherTraf = oj.data && oj.data['caja.v1'] ? oj.data['caja.v1'] : {byDate:{}};
+        const otherCempla = oj.data && oj.data['caja.cempla.v1'] ? oj.data['caja.cempla.v1'] : {byDate:{}};
+        const localData={cbTrafic:filterByDate(localTraf), cempla:filterByDate(localCempla)};
+        const otherData={cbTrafic:filterByDate(otherTraf), cempla:filterByDate(otherCempla)};
+        // Reserva de cambio: la mandamos plana para que backend pueda diffear
+        const localReserva = JSON.parse(localStorage.getItem(currentCompany==='cempla'?'caja.cempla.reserva.v1':'caja.reserva.v1')||'{}');
+        const otherReserva = oj.data ? (oj.data[currentCompany==='cempla'?'caja.cempla.reserva.v1':'caja.reserva.v1']||{}) : {};
+        localData['caja.reserva.v1'] = localReserva; otherData['caja.reserva.v1'] = otherReserva;
+        // 3) Composición de la pregunta
+        const rng = (dFromInput||dToInput)?` en el rango ${dFromInput||'inicio'} → ${dToInput||'hoy'}`:'';
+        const originLabel = oj.source === 'linked' ? 'sincronizado en la nube' : 'última copia recibida';
+        const question = `Compara mi ordenador con el otro PC (${originLabel})${rng}. Dime QUÉ entradas faltan en cada lado, qué importes discrepan y qué días descuadran. Termina con una lista clara de acciones a hacer.`;
+        ansEl.textContent = `🔍 Analizando diferencias con el otro PC (${originLabel})…`;
+        // 4) Llamada AI en modo comparación
+        const body = {
+          question, data: localData, otherData,
+          company: currentCompany==='cempla' ? 'cempla' : 'cbTrafic',
+          compareMode: true, userGeminiKey: userKey,
+          dateRange: { from: dFromInput||null, to: dToInput||null }
+        };
+        const res = await fetch(getAiEndpoint(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        const j = await res.json();
+        ansEl.textContent = (j.source==='user-key'?'🎁 (Respuesta gratuita con tu clave Google)\n\n':'') + (j.answer||'(sin respuesta)');
+      }catch(e){
+        console.error('aiCompare', e);
+        ansEl.textContent = '❌ No se ha podido comparar: ' + (e.message||e);
+      }
+      cmpBtn.disabled=false; cmpBtn.innerHTML=origTxt;
+    };
+  }
   setTimeout(()=>back.querySelector('#aiQ').focus(),100);
 };
 $('#btnImportJson').onclick=()=>$('#jsonInput').click();

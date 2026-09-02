@@ -1,5 +1,19 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-28 (parte 3) · 🔍 Comparar 2 PCs con IA · Reserva por empresa · Grupos DGT normalizados
+- **Asesor IA · Comparar con el otro PC**: nuevo botón en el modal del Asesor IA que descarga el snapshot del otro ordenador de la misma licencia y pide a la IA un análisis diff día por día. La IA identifica entradas que faltan/sobran en cada lado, discrepancias de importe y descuadre por reserva de cambio. Termina con lista de acciones concretas para cuadrar.
+  - Backend: nuevo endpoint `GET /api/sync/other-snapshot` que devuelve datos del otro PC. En modo Fusionado usa `sync_groups` (COLL_STATE) filtrando por autores ACTIVOS en `sync_devices` (evita datos huérfanos de installations eliminadas). En modo Independiente cae al último backup del mailbox.
+  - Endpoint `POST /api/ai-ask` extendido con `otherData` + `compareMode: true` + `dateRange`. Genera fingerprint por entrada (kind+tipo+grupo+nombre+DNI+importe+tasa) y emite un bloque `🔍 COMPARACIÓN` con `➕ Solo en ESTE PC` / `➖ Solo en el OTRO PC` que la IA usa como base fáctica.
+  - Tests end-to-end pasados: 2 PCs Fusionados con datos parcialmente distintos → la IA identificó correctamente los 3 casos plantados (PEDRO faltante, CARLA discrepancia importe, ANA solo en otro PC).
+- **Reserva de cambio por empresa**: la clave `caja.reserva.v1` era global. Ahora `cambioKey()` devuelve `caja.reserva.v1` (Empresa 1) o `caja.cempla.reserva.v1` (Empresa 2). Cada empresa tiene su propio cajón físico, no se mezclan. Sync, "empezar de cero" y envío por día actualizados para las 2 claves. Backwards compat: los datos existentes de Empresa 1 permanecen bajo la misma clave.
+- **Modal "Detectamos otro ordenador" ya no atrapa**: ahora tiene X, ESC y click fuera para cerrar sin obligar a elegir. Si se descarta, reaparece en el próximo arranque hasta que se elija.
+- **Grupos y conceptos DGT completos + normalizador de sinónimos**:
+  - Desplegable GRUPO (input+datalist, admite escritura libre): Conducción · Armas · Seguridad · Animales peligrosos · Grúas · Deportes · Marina · Ciclomotor · BTP · Otro.
+  - Desplegable CONCEPTO ampliado: Renovación · Prórroga · Obtención · Expedición · Duplicado · Canje · Recuperación · Otro.
+  - `_normalizeGrupo()` unifica sinónimos al guardar y al agregar estadísticas: `A. peligrosos`/`Animales P.`/`Animales Peli.` → `Animales peligrosos`; `Náutica`/`Nautica` → `Marina`; `S.P`/`S. privada`/`Seguridad Privada` → `Seguridad`; `Conducir` → `Conducción`; `Gruas` → `Grúas`; etc. Tests: 27/27 casos verificados.
+- Archivos tocados: `frontend/public/v2.html`, `backend/routes/sync.py`, `backend/server.py`.
+
+
 ## 2026-02-28 (parte 2) · Deshacer fusión de copia recibida
 - **Solicitud**: poder tirar atrás si tras aplicar una copia recibida algo no cuadra, para volver al estado anterior.
 - **Solución**: aprovecha el sistema existente `caja.snapshots` (últimas 5 copias automáticas).
