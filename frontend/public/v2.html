@@ -695,7 +695,8 @@
               <span class="chip" data-t="DEBE" data-c="Nómina" style="background:linear-gradient(135deg,#2563eb,#3b82f6);border-color:#60a5fa;color:#ffffff;font-weight:700;box-shadow:0 2px 8px rgba(59,130,246,.4)" title="Nómina · sale dinero de caja (gasto)">💼 Nómina</span>
               <span class="chip" data-t="DEBE" data-c="Faena externa" style="background:linear-gradient(135deg,#2563eb,#3b82f6);border-color:#60a5fa;color:#ffffff;font-weight:700;box-shadow:0 2px 8px rgba(59,130,246,.4)" title="Trabajo subcontratado / colaborador · sale dinero de caja (gasto)">💼 Faena externa</span>
               <span class="chip" data-t="DEBE" data-c="Gasto:" data-role="gasto" style="background:linear-gradient(135deg,#ef4444,#f87171);border-color:#fca5a5;color:#ffffff;font-weight:700;box-shadow:0 2px 8px rgba(239,68,68,.5)" title="Gasto del centro (luz, agua, alquiler, material, seguros, teléfono, gestoría…). Marca explícita: SIEMPRE se contabiliza como Gasto y NUNCA como Honorario.">🧾 GASTO</span>
-              <span class="chip" data-t="HABER" data-c="Ingreso en metálico" style="border-color:#3ddc97;color:#3ddc97">Ingreso en metálico</span>
+              <span class="chip" data-role="transfer-caja-banco" style="background:linear-gradient(135deg,#ea580c,#f97316);border-color:#fdba74;color:#ffffff;font-weight:800;box-shadow:0 2px 8px rgba(234,88,12,.5)" title="Ingreso en metálico: pasas dinero de tu CAJA FÍSICA al BANCO. NO cuenta como facturación (es dinero tuyo interno)">🔁 Ingreso en metálico (Caja→Banco)</span>
+              <span class="chip" data-role="transfer-banco-caja" style="background:linear-gradient(135deg,#0369a1,#0284c7);border-color:#7dd3fc;color:#ffffff;font-weight:700;box-shadow:0 2px 8px rgba(3,105,161,.5)" title="Retirada en metálico: sacas dinero del BANCO y lo pones en tu CAJA FÍSICA. NO cuenta como facturación">🏦 Retirada del banco (Banco→Caja)</span>
               <span class="chip" data-t="HABER" data-c="Foto" style="border-color:#3ddc97;color:#3ddc97">Foto</span>
               <span class="chip" data-t="HABER" data-c="Ciclista" style="border-color:#3ddc97;color:#3ddc97">Ciclista</span>
             </div>
@@ -3011,8 +3012,69 @@ $('#btnAddTraf').onclick=()=>{const dniRaw=($('#t-dni').value||'').trim().toUppe
 $('#btnAddPriv').onclick=()=>{const isC=currentCompany==='cempla';let nom=isC?$('#p-nombre-cempla').value.trim():$('#p-nombre').value.trim();let tipo=isC?($('#p-tipo-custom').value.trim()||privConcept||'Revisió'):privConcept;let imp=isC?num($('#p-preu-custom').value):num($('#p-importe').value);let fp=isC?$('#p-fp-cempla').value:$('#p-fp').value;if(isC){const b=num($('#p-pct-b').value)||0,cc=num($('#p-pct-c').value)||0,m=num($('#p-pct-m').value)||0;currentSplit=`${b}-${cc}-${m}`}const e={id:uid(),kind:'PRIV',tipo,grupo:'-',nombre:nom||'Cliente',importe:imp,descuento:isC?0:num($('#p-desc').value),tasa:isC?0:num($('#p-tasa').value),fp,fpTasa:fp,split:isC?currentSplit:null,retorno:false};if(!e.importe&&!e.tasa&&!e.nombre){toast('Afegeix un nom o import');return}entriesOf(currentDate).push(e);saveState();render();if(isC){$('#p-nombre-cempla').value=''}else{$('#p-nombre').value='';$('#p-importe').value='';$('#p-desc').value='0';$('#p-tasa').value='0'}};
 $('#btnAddDH').onclick=()=>{const e={id:uid(),kind:'DH',tipo:$('#dh-tipo').value,grupo:'-',nombre:$('#dh-concepto').value.trim()||'(sin concepto)',importe:num($('#dh-importe').value),descuento:0,tasa:0,fp:$('#dh-fp').value,fpTasa:'',retorno:false};if(!e.importe&&!e.nombre){toast('Indica un concepto');return}entriesOf(currentDate).push(e);saveState();render();$('#dh-concepto').value='';$('#dh-importe').value='';try{refreshWorkersDatalist()}catch(_){}};
 function updateDhTipoColor(){const v=$('#dh-tipo').value;$('#dh-tipo').classList.toggle('haber-sel',v==='HABER');$('#dh-tipo').classList.toggle('debe-sel',v==='DEBE')}
+
+// 🔁 Modal de Traspaso Interno Caja↔Banco.
+//   · caja2banco: "Ingreso en metálico" — pasas dinero de tu caja física al banco.
+//   · banco2caja: "Retirada del banco" — sacas del banco y lo pones en caja.
+// Efecto contable: mueve dinero entre cuentas propias SIN inflar facturación
+// (NO se suma a haber/debe/neto ni cuenta como ingreso/gasto). Sí se refleja
+// en los saldos de Efectivo y Banco del día y del arrastre al día siguiente.
+function openTraspasoInterno(direction){
+  const isCaja2Banco = direction === 'caja2banco';
+  const title = isCaja2Banco ? '🔁 Ingreso en metálico (Caja → Banco)' : '🏦 Retirada del banco (Banco → Caja)';
+  const desc = isCaja2Banco
+    ? 'Vas al cajero e ingresas dinero de tu <b>caja física</b> a tu <b>cuenta bancaria</b>. Es dinero tuyo, no una venta nueva.'
+    : 'Sacas dinero de tu <b>cuenta bancaria</b> y lo pasas a tu <b>caja física</b>. Es dinero tuyo, no un gasto.';
+  const color = isCaja2Banco ? '#f97316' : '#0284c7';
+  const back = document.createElement('div'); back.className='modal-back';
+  back.innerHTML = `<div class="modal" style="max-width:500px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <h3 style="margin:0;color:${color};font-family:Georgia,serif">${title}</h3>
+      <button data-close style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div style="background:rgba(${isCaja2Banco?'249,115,22':'2,132,199'},.1);border:1px solid ${color};border-radius:8px;padding:10px 14px;color:${isCaja2Banco?'#fed7aa':'#bae6fd'};font-size:13px;line-height:1.55;margin-bottom:14px">
+      ${desc}<br><b style="color:#fbbf24">⚠️ NO cuenta como facturación</b> — solo mueve tu propio dinero entre cuentas.
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:11px;color:${color};font-weight:800;letter-spacing:1px;margin-bottom:4px">💶 IMPORTE</label>
+      <input id="tiImporte" type="number" step="0.01" min="0" placeholder="0,00" autofocus style="width:100%;padding:12px;background:#0f172a;border:2px solid ${color};border-radius:8px;color:${color};font-size:20px;font-weight:800;text-align:center;box-sizing:border-box;font-family:'Consolas',monospace"/>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="display:block;font-size:11px;color:#94a3b8;font-weight:800;letter-spacing:1px;margin-bottom:4px">📝 NOTA (OPCIONAL)</label>
+      <input id="tiNota" type="text" maxlength="120" placeholder="${isCaja2Banco?'Ej: ingreso en BBVA 06/09':'Ej: retirada para dar cambio'}" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box"/>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button id="tiSave" data-testid="traspaso-save" style="flex:1;padding:12px;background:linear-gradient(135deg,${color},${isCaja2Banco?'#ea580c':'#0369a1'});color:#fff;border:none;border-radius:8px;font-weight:800;font-size:14px;cursor:pointer">💾 Guardar traspaso</button>
+      <button data-close style="padding:12px 20px;background:#1e293b;color:#94a3b8;border:1px solid #475569;border-radius:8px;font-weight:700;cursor:pointer">Cancelar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(back);
+  back.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>back.remove());
+  back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
+  const imp = back.querySelector('#tiImporte'); setTimeout(()=>imp.focus(),50);
+  back.querySelector('#tiSave').onclick = () => {
+    const val = +imp.value || 0;
+    if(val <= 0){ toast('Introduce un importe válido'); return; }
+    const nota = (back.querySelector('#tiNota').value||'').trim();
+    const nombre = (isCaja2Banco ? '🔁 Ingreso en metálico' : '🏦 Retirada del banco') + (nota ? ' · '+nota : '');
+    const entry = {
+      id: uid(), kind: 'DH', tipo: isCaja2Banco?'HABER':'DEBE',  // solo para badge visual
+      grupo: '-', nombre, importe: val, descuento: 0, tasa: 0,
+      fp: isCaja2Banco ? 'X' : 'E',   // no se usa en cálculo (por _internal), pero coherente visualmente
+      fpTasa: '', retorno: false,
+      _internal: true, _transferDir: direction,
+    };
+    entriesOf(currentDate).push(entry);
+    saveState(); render(); back.remove();
+    toast(isCaja2Banco ? `🔁 ${fmt(val)} traspasados de Caja a Banco` : `🏦 ${fmt(val)} retirados del Banco a Caja`);
+  };
+}
 $('#dh-tipo').addEventListener('change',updateDhTipoColor);updateDhTipoColor();
-document.addEventListener('click',ev=>{const chip=ev.target.closest('#chips-dh .chip');if(!chip)return;document.querySelectorAll('#chips-dh .chip').forEach(x=>x.style.fontWeight='');chip.style.fontWeight='bold';$('#dh-tipo').value=chip.dataset.t;updateDhTipoColor();
+document.addEventListener('click',ev=>{const chip=ev.target.closest('#chips-dh .chip');if(!chip)return;
+  // 🔁 Chips especiales: abren el modal de traspaso interno (no facturable)
+  if(chip.dataset.role === 'transfer-caja-banco'){ openTraspasoInterno('caja2banco'); return; }
+  if(chip.dataset.role === 'transfer-banco-caja'){ openTraspasoInterno('banco2caja'); return; }
+  document.querySelectorAll('#chips-dh .chip').forEach(x=>x.style.fontWeight='');chip.style.fontWeight='bold';$('#dh-tipo').value=chip.dataset.t;updateDhTipoColor();
   // Si el chip es un pago a trabajador, prefija con espacio y refresca el datalist para sugerir nombres.
   const isWorkerChip = /honoraris|nomina|nómina|sueldo|salario|faena|jornal|colaborador|autonom/i.test(chip.dataset.c||'');
   const isGastoChip = chip.dataset.role === 'gasto';
@@ -3202,7 +3264,16 @@ function wireFilterControls(){
     render();
   };
 }
-function render(){$('#fecha').value=currentDate;const list=entriesOf(currentDate);const shown = getFilteredEntries();$('#empty').style.display=shown.length?'none':'block';const tb=$('#tbody');tb.innerHTML='';shown.forEach((e,i)=>{const tr=document.createElement('tr');if(e.retorno)tr.className='retorno';const tipoTag=e.kind==='DH'?`<span class="tag ${e.tipo==='HABER'?'haber':'debe'}">${e.tipo}</span>`:`<span class="tag">${e.tipo||'-'}</span>`;const dateBadge=(entryFilter.from||entryFilter.to)&&e._date?`<span style="font-size:10px;color:#7a8394;margin-left:6px">${e._date.split('-').reverse().slice(0,2).join('/')}</span>`:'';tr.innerHTML=`<td>${i+1}</td><td>${tipoTag}${dateBadge}</td><td>${e.grupo||'-'}</td><td>${escapeHtml(e.nombre)}${e.dni?`<div style="font-size:10px;color:#7a8394;margin-top:2px;font-family:Consolas,Menlo,monospace;letter-spacing:.3px">🪪 ${escapeHtml(e.dni)}</div>`:''}</td><td class="num">${fmt(e.importe)}</td><td class="num">${e.descuento?fmt(e.descuento):'—'}</td><td class="num">${e.tasa?fmt(e.tasa):'—'}</td><td>${fpTag(e.fp,e.id,'fp')}</td><td>${e.tasa?fpTag(e.fpTasa,e.id,'fpTasa'):'—'}</td><td class="act"><div class="actions no-print"><button class="icon-btn" data-act="edit" data-id="${e.id}" title="Editar">✏️</button><button class="icon-btn" data-act="ret" data-id="${e.id}" title="Retorno / Reactivar">${e.retorno?'↩︎':'↺'}</button><button class="icon-btn" data-act="del" data-id="${e.id}" title="Eliminar">🗑️</button></div></td>`;tb.appendChild(tr)});tb.querySelectorAll('button').forEach(b=>b.onclick=()=>actEntry(b.dataset.act,b.dataset.id));tb.querySelectorAll('[data-fp-tag]').forEach(el=>{el.oncontextmenu=ev=>{ev.preventDefault();showFpMenu(ev.clientX,ev.clientY,el.dataset.fpTag,el.dataset.fpWhich)};el.onclick=ev=>{ev.preventDefault();showFpMenu(ev.clientX,ev.clientY,el.dataset.fpTag,el.dataset.fpWhich)}});renderSummary(list);renderByConcept(list);renderHistory();renderSaldoAnterior();wireOtrosDetail(list);renderFilterChips();wireFilterControls()}
+function render(){$('#fecha').value=currentDate;const list=entriesOf(currentDate);const shown = getFilteredEntries();$('#empty').style.display=shown.length?'none':'block';const tb=$('#tbody');tb.innerHTML='';shown.forEach((e,i)=>{const tr=document.createElement('tr');if(e.retorno)tr.className='retorno';
+  // 🔁 Fila resaltada naranja para movimientos internos (no facturables)
+  if(e.kind==='DH' && e._internal){
+    tr.style.background = 'linear-gradient(90deg,rgba(234,88,12,.14),rgba(234,88,12,.04))';
+    tr.style.borderLeft = '4px solid #f97316';
+  }
+  const tipoTag = e.kind==='DH' && e._internal
+    ? `<span class="tag" style="background:#7c2d12;color:#fed7aa;border:1px solid #f97316">🔁 TRASPASO</span>`
+    : e.kind==='DH' ? `<span class="tag ${e.tipo==='HABER'?'haber':'debe'}">${e.tipo}</span>` : `<span class="tag">${e.tipo||'-'}</span>`;
+  const dateBadge=(entryFilter.from||entryFilter.to)&&e._date?`<span style="font-size:10px;color:#7a8394;margin-left:6px">${e._date.split('-').reverse().slice(0,2).join('/')}</span>`:'';tr.innerHTML=`<td>${i+1}</td><td>${tipoTag}${dateBadge}</td><td>${e.grupo||'-'}</td><td>${escapeHtml(e.nombre)}${e.dni?`<div style="font-size:10px;color:#7a8394;margin-top:2px;font-family:Consolas,Menlo,monospace;letter-spacing:.3px">🪪 ${escapeHtml(e.dni)}</div>`:''}</td><td class="num">${fmt(e.importe)}</td><td class="num">${e.descuento?fmt(e.descuento):'—'}</td><td class="num">${e.tasa?fmt(e.tasa):'—'}</td><td>${e._internal?'<span style="color:#f97316;font-weight:700">—</span>':fpTag(e.fp,e.id,'fp')}</td><td>${e.tasa?fpTag(e.fpTasa,e.id,'fpTasa'):'—'}</td><td class="act"><div class="actions no-print"><button class="icon-btn" data-act="edit" data-id="${e.id}" title="Editar">✏️</button><button class="icon-btn" data-act="ret" data-id="${e.id}" title="Retorno / Reactivar">${e.retorno?'↩︎':'↺'}</button><button class="icon-btn" data-act="del" data-id="${e.id}" title="Eliminar">🗑️</button></div></td>`;tb.appendChild(tr)});tb.querySelectorAll('button').forEach(b=>b.onclick=()=>actEntry(b.dataset.act,b.dataset.id));tb.querySelectorAll('[data-fp-tag]').forEach(el=>{el.oncontextmenu=ev=>{ev.preventDefault();showFpMenu(ev.clientX,ev.clientY,el.dataset.fpTag,el.dataset.fpWhich)};el.onclick=ev=>{ev.preventDefault();showFpMenu(ev.clientX,ev.clientY,el.dataset.fpTag,el.dataset.fpWhich)}});renderSummary(list);renderByConcept(list);renderHistory();renderSaldoAnterior();wireOtrosDetail(list);renderFilterChips();wireFilterControls()}
 function wireOtrosDetail(list){const row=document.querySelector('[data-otros-detail]');if(!row)return;row.onclick=()=>showOtrosDetail(list)}
 function showOtrosDetail(list){const otros=list.filter(e=>!e.retorno&&e.kind!=='DH'&&!isTramiteDGT(e));if(!otros.length){toast('No hay otros servicios');return}const back=document.createElement('div');back.className='modal-back';const rows=otros.map((e,i)=>`<tr><td style="padding:6px 8px">${i+1}</td><td style="padding:6px 8px"><span class="tag" style="font-size:10px">${e.tipo||'-'}</span></td><td style="padding:6px 8px">${escapeHtml(e.nombre)}</td><td class="num" style="padding:6px 8px">${fmt(e.importe)}</td><td class="num" style="padding:6px 8px">${e.tasa?fmt(e.tasa):'—'}</td><td style="padding:6px 8px;text-align:center"><span title="Forma de pago">${e.fp||'E'}</span></td></tr>`).join('');const total=otros.reduce((s,e)=>s+(e.importe-(e.descuento||0)),0);const tasas=otros.reduce((s,e)=>s+(e.tasa||0),0);back.innerHTML=`<div class="modal" style="max-width:720px;width:95%"><h3>📋 Otros servicios · Detalle (${otros.length})</h3><p style="color:#9aa3b2;font-size:12px;margin:-4px 0 12px">Estos son los servicios que <b>NO</b> vienen del CSV de la DGT (añadidos manualmente).</p><div style="max-height:400px;overflow:auto;border:1px solid #262b36;border-radius:6px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead style="background:#171a21;position:sticky;top:0"><tr><th style="padding:8px;text-align:left">#</th><th style="padding:8px;text-align:left">Tipo</th><th style="padding:8px;text-align:left">Nombre / Concepto</th><th style="padding:8px;text-align:right">Importe</th><th style="padding:8px;text-align:right">Tasa</th><th style="padding:8px;text-align:center">FP</th></tr></thead><tbody>${rows}</tbody><tfoot style="background:#171a21"><tr><td colspan="3" style="padding:8px;font-weight:700">TOTAL</td><td class="num" style="padding:8px;font-weight:700">${fmt(total)}</td><td class="num" style="padding:8px;font-weight:700">${fmt(tasas)}</td><td></td></tr></tfoot></table></div><div class="row" style="margin-top:14px"><button class="btn btn-primary" data-close>Cerrar</button></div></div>`;document.body.appendChild(back);back.addEventListener('click',ev=>{if(ev.target===back||ev.target.matches('[data-close]'))back.remove()});document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){back.remove();document.removeEventListener('keydown',esc)}})}
 function showFpMenu(x,y,id,which){document.querySelectorAll('.fp-menu').forEach(m=>m.remove());const list=entriesOf(currentDate);const e=list.find(x=>x.id===id);if(!e)return;const opts=[{k:'E',lbl:L('💵 Efectiu','💵 Efectivo'),c:'#3ddc97'},{k:'T',lbl:L('💳 Targeta → Banc','💳 Tarjeta → Banco'),c:'#5aa9ff'},{k:'B',lbl:L('📱 Bizum → Banc','📱 Bizum → Banco'),c:'#f5b301'},{k:'X',lbl:L('🏦 Transferència → Banc','🏦 Transferencia → Banco'),c:'#a78bfa'}];const menu=document.createElement('div');menu.className='fp-menu';menu.style.cssText=`position:fixed;top:${y}px;left:${x}px;background:#1a1e26;border:1px solid #3a4050;border-radius:8px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.6);z-index:9999;min-width:200px`;menu.innerHTML=`<div style="padding:6px 10px;font-size:11px;color:#7a8394;border-bottom:1px solid #2a3040;margin-bottom:4px">${L('Canviar mètode de pagament','Cambiar método de pago')}${which==='fpTasa'?' (tasa DGT)':''}</div>`+opts.map(o=>`<div data-k="${o.k}" style="padding:8px 12px;cursor:pointer;border-radius:5px;color:${o.c};font-weight:${e[which]===o.k?700:500};background:${e[which]===o.k?'rgba(255,255,255,.05)':'transparent'};display:flex;justify-content:space-between;align-items:center"><span>${o.lbl}</span>${e[which]===o.k?'<span style="font-size:12px">✓</span>':''}</div>`).join('');document.body.appendChild(menu);menu.querySelectorAll('[data-k]').forEach(row=>{row.onmouseenter=()=>row.style.background='rgba(255,255,255,.08)';row.onmouseleave=()=>row.style.background=e[which]===row.dataset.k?'rgba(255,255,255,.05)':'transparent';row.onclick=()=>{e[which]=row.dataset.k;saveState();render();toast(L('✓ Mètode de pagament actualitzat','✓ Método de pago actualizado'))}});setTimeout(()=>{document.addEventListener('click',function close(ev){if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('click',close)}})},50)}
@@ -3223,7 +3294,22 @@ function isTramiteDGT(entry){
   const s=String(entry||'').toUpperCase();
   return /RENOV|EXPED|CANJE|CANVI|RECUPER|OBTEN/.test(s);
 }
-function computeTotals(list){const t={bruto:0,dto:0,tasas:0,neto:0,byFp:{E:0,T:0,B:0,X:0},tasasByFp:{E:0,T:0,B:0,X:0},haber:0,debe:0,cnt:list.length,retornos:0,brutoDGT:0,tasasDGT:0,cntDGT:0,brutoOtros:0,cntOtros:0,tasasBreakdown:{}};list.forEach(e=>{if(e.retorno){t.retornos++;return}if(e.kind==='DH'){const fp=e.fp||'E';if(e.tipo==='HABER'){t.haber+=e.importe;t.byFp[fp]=(t.byFp[fp]||0)+e.importe;t.neto+=e.importe}else{t.debe+=e.importe;t.byFp[fp]=(t.byFp[fp]||0)-e.importe;t.neto-=e.importe}return}const subt=e.importe-(e.descuento||0);t.bruto+=e.importe;t.dto+=e.descuento||0;t.tasas+=e.tasa||0;const fp=e.fp||'E';t.byFp[fp]=(t.byFp[fp]||0)+subt;const fpt=e.fpTasa||fp;t.tasasByFp[fpt]=(t.tasasByFp[fpt]||0)+(e.tasa||0);t.neto+=subt+(e.tasa||0);
+function computeTotals(list){const t={bruto:0,dto:0,tasas:0,neto:0,byFp:{E:0,T:0,B:0,X:0},tasasByFp:{E:0,T:0,B:0,X:0},haber:0,debe:0,cnt:list.length,retornos:0,brutoDGT:0,tasasDGT:0,cntDGT:0,brutoOtros:0,cntOtros:0,tasasBreakdown:{}};list.forEach(e=>{if(e.retorno){t.retornos++;return}
+  // 🔁 Movimiento interno Caja↔Banco: mueve dinero entre cuentas propias SIN
+  // afectar facturación (haber/debe/neto). Sólo ajusta byFp para reflejar el
+  // desplazamiento entre caja física (E) y banco (T).
+  if(e.kind==='DH' && e._internal){
+    const amt = +e.importe || 0;
+    if(e._transferDir === 'caja2banco'){
+      t.byFp['E'] = (t.byFp['E']||0) - amt;   // sale de caja
+      t.byFp['T'] = (t.byFp['T']||0) + amt;   // entra en banco
+    } else if(e._transferDir === 'banco2caja'){
+      t.byFp['T'] = (t.byFp['T']||0) - amt;   // sale del banco
+      t.byFp['E'] = (t.byFp['E']||0) + amt;   // entra en caja
+    }
+    return; // NO cuenta como facturación
+  }
+  if(e.kind==='DH'){const fp=e.fp||'E';if(e.tipo==='HABER'){t.haber+=e.importe;t.byFp[fp]=(t.byFp[fp]||0)+e.importe;t.neto+=e.importe}else{t.debe+=e.importe;t.byFp[fp]=(t.byFp[fp]||0)-e.importe;t.neto-=e.importe}return}const subt=e.importe-(e.descuento||0);t.bruto+=e.importe;t.dto+=e.descuento||0;t.tasas+=e.tasa||0;const fp=e.fp||'E';t.byFp[fp]=(t.byFp[fp]||0)+subt;const fpt=e.fpTasa||fp;t.tasasByFp[fpt]=(t.tasasByFp[fpt]||0)+(e.tasa||0);t.neto+=subt+(e.tasa||0);
 // Desglossament de tasas per import (agrupa entrades amb mateixa tasa > 0)
 if(e.tasa && +e.tasa > 0){const k=(+e.tasa).toFixed(2);t.tasasBreakdown[k]=(t.tasasBreakdown[k]||0)+1}
 // Comptem al comptador (cntDGT/cntOtros) només si l'entrada té import > 0 (les de 0€ són invisibles al resum però es guarden per traçabilitat).
@@ -3287,7 +3373,7 @@ function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(
     };
   }
 }
-function renderByConcept(list){const map={};list.forEach(e=>{if(e.retorno)return;const gn=window._normalizeGrupo?window._normalizeGrupo(e.grupo):e.grupo;const key=e.kind==='DH'?`[${e.tipo}] libre`:`${e.tipo}${gn&&gn!=='-'?' · '+gn:''}`;map[key]||={n:0,total:0};map[key].n++;const signo=e.kind==='DH'&&e.tipo==='DEBE'?-1:1;map[key].total+=signo*((e.importe-(e.descuento||0))+(e.tasa||0))});const entries=Object.entries(map).sort((a,b)=>b[1].total-a[1].total);$('#byConcept').innerHTML=entries.length?`<table style="width:100%"><tbody>${entries.map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td class="num">${v.n}×</td><td class="num"><b>${fmt(v.total)}</b></td></tr>`).join('')}</tbody></table>`:`<div class="small">Sin datos</div>`}
+function renderByConcept(list){const map={};list.forEach(e=>{if(e.retorno)return;if(e.kind==='DH' && e._internal)return;const gn=window._normalizeGrupo?window._normalizeGrupo(e.grupo):e.grupo;const key=e.kind==='DH'?`[${e.tipo}] libre`:`${e.tipo}${gn&&gn!=='-'?' · '+gn:''}`;map[key]||={n:0,total:0};map[key].n++;const signo=e.kind==='DH'&&e.tipo==='DEBE'?-1:1;map[key].total+=signo*((e.importe-(e.descuento||0))+(e.tasa||0))});const entries=Object.entries(map).sort((a,b)=>b[1].total-a[1].total);$('#byConcept').innerHTML=entries.length?`<table style="width:100%"><tbody>${entries.map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td class="num">${v.n}×</td><td class="num"><b>${fmt(v.total)}</b></td></tr>`).join('')}</tbody></table>`:`<div class="small">Sin datos</div>`}
 // 💰 Saldo inicial (opening balance) · Para clientes que empiezan a usar la app
 // a mediados de año y no quieren pasar todo el histórico día a día. Se guarda
 // por empresa. NUNCA entra en estadísticas (no es una entrada de facturación),
