@@ -1325,3 +1325,8 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - Causa: caja.datafono / caja.cempla.datafono son mapas {fecha: importe(número)}. _isByDateShape los detecta como byDate → _mergeByDate → _mergeArrays sobre NÚMEROS → crash. Solo ocurría si AMBOS PCs tenían datáfono (tests previos no lo cubrían).
 - Fix: (1) _mergeByDate: si el valor de una fecha no es array → escalar: gana lo local, si falta entra lo remoto; (2) _mergeArrays coerciona no-arrays a []; (3) _mergeSnapshots con try/catch POR CLAVE (una clave corrupta nunca rompe la fusión completa; fallback conserva lo local).
 - Testeado E2E file://: admin push con datafono en ambos lados → sin error, entradas fusionadas, datafono por día (local gana en conflicto, remoto entra en días nuevos), cempla.datafono entra, reserva LWW, saldo inicial intacto, banner cierra. PENDIENTE deploy usuario (marker 03.09).
+
+### 💳 Datáfono/VISA manual descuenta del Efectivo visible · Jun 2026
+- CAJA FÍSICA/CUENTA BANCO ya reclasificaban vía delta, pero la casilla '💵 Efectivo' mostraba el bruto sin descontar → parecía que la VISA no hacía nada.
+- Fix: Efectivo muestra el NETO (efShown − delta) en ambas empresas (data-testid efectivo-neto-cb / efectivo-neto-c) + etiqueta gris '(−X € a tarjeta)' cuando hay reclasificación.
+- Testeado E2E: entrada 100€ efectivo + datáfono manual 60 → Efectivo 40,00 (−60,00 a tarjeta), CAJA FÍSICA 40, CUENTA BANCO 60.
