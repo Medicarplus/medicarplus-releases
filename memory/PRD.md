@@ -1271,3 +1271,11 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - data-testids: reset-word-input, reset-word-confirm, reset-word-cancel, reset-word-error, reset-done-ok.
 - HTML_BUILD subido a '02.09' (esquina superior derecha) para verificar que el usuario recibe esta versión.
 - Testeado E2E file:// con window.confirm/alert/prompt anulados para lanzar excepción: tecleo real por teclado, clic en esquina del campo, clic fuera re-enfoca, palabra mal → error inline sin borrar, BORRAR+Enter → wipe + modal verde + reload limpio. 6/6 OK.
+
+### 🔒 Saldo Anterior 100% aislado en TODAS las vías de sync · Jun 2026
+- Pregunta del usuario: al fusionar/enviar copia, el "Saldo anterior" (caja.saldoInicial.*.v1) NO debe mezclarse entre PCs. Auditoría completa:
+  - Cliente inline (fusión + copias manuales + admin push): ya excluía en SALIDA (SYNC_EXCLUDE_PREFIXES). AÑADIDO filtro también en ENTRADA: pullNow filtra cloudSnap y applyBackup filtra backupData con _isSyncable (la nube podía tener saldos antiguos de antes del fix).
+  - Motor 60s (heartbeat): BUG REAL — isSyncable solo excluía claves exactas; saldoInicial y caja.apibase.* SÍ viajaban. Añadido NON_SYNCABLE_PREFIXES = ['caja.saldoInicial.','caja.install.','caja.sync.','caja.license.','caja.plan.preview.','caja.apibase.'] (aplica en captura markKeyChanged, en collectLocalChanges y en applyRemote — entrada y salida).
+  - Copia a archivo (medicar_copia_*.json): nunca incluyó saldoInicial ✓.
+- SÍ viajan: entradas byDate (fusión aditiva por id), caja.reserva.v1 (cajón único, gana _mtime más reciente), stats, irpf, datafono.
+- Testeado E2E file://: hook no marca saldoInicial/apibase pero sí caja.v1/reserva; applyBackup con saldo remoto 9999 → saldo local 500 intacto, entradas remota+local fusionadas, reserva fusionada. 2/2 OK.

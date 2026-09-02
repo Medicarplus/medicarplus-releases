@@ -351,7 +351,8 @@
     try {
       const r = await _get(`/api/sync/pull?license_key=${encodeURIComponent(cfg.licenseKey)}&install_id=${encodeURIComponent(cfg.installId)}`);
       const cloudSnap = {};
-      Object.entries(r.entries || {}).forEach(([k, v]) => { cloudSnap[k] = v && v.value; });
+      // Filtra también lo ENTRANTE: la nube puede tener claves locales antiguas (saldoInicial, etc.)
+      Object.entries(r.entries || {}).forEach(([k, v]) => { if(_isSyncable(k)) cloudSnap[k] = v && v.value; });
       const localSnap = _snapshotLocalStorage();
       const merged = _mergeSnapshots(localSnap, cloudSnap);
       if(cfg.onIncoming) cfg.onIncoming(merged, cloudSnap);
@@ -372,7 +373,10 @@
   }
   async function applyBackup(backupData){
     const localSnap = _snapshotLocalStorage();
-    return _mergeSnapshots(localSnap, backupData || {});
+    // Filtra lo ENTRANTE: nunca aplicar claves locales del otro PC (saldoInicial, etc.)
+    const incoming = {};
+    Object.keys(backupData || {}).forEach(k => { if(_isSyncable(k)) incoming[k] = backupData[k]; });
+    return _mergeSnapshots(localSnap, incoming);
   }
   async function consumeBackup(backupId){
     return await _post('/api/sync/backup/consume', { license_key: cfg.licenseKey, install_id: cfg.installId, backup_id: backupId });
@@ -10648,7 +10652,9 @@ setTimeout(()=>{
     'caja.__sync_last_push','caja.__sync_last_pull','caja.__sync_status',
     'caja.license.lastcheck.v1','caja.sync.admfavs.v1',
   ]);
-  const isSyncable = (k) => typeof k === 'string' && k.startsWith('caja.') && !NON_SYNCABLE.has(k);
+  // 🔒 Claves LOCALES de cada PC: NUNCA viajan por sync (mismo criterio que el cliente inline)
+  const NON_SYNCABLE_PREFIXES = ['caja.saldoInicial.','caja.install.','caja.sync.','caja.license.','caja.plan.preview.','caja.apibase.'];
+  const isSyncable = (k) => typeof k === 'string' && k.startsWith('caja.') && !NON_SYNCABLE.has(k) && !NON_SYNCABLE_PREFIXES.some(p=>k.startsWith(p));
   const getApiUrl = (path) => {
     let base = '';
     try{
