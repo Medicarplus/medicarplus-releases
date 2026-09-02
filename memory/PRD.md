@@ -1315,3 +1315,8 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
   2. 'Saldo solo caja (sin cajón de cambio)' = saCC.caja + traspasoCambio() (data-testid=saldo-ant-solo-caja)
 - En renderSummary: resCambio desglosado en cajonCambio + traspCaja. Tooltips explicativos en ambas.
 - Testeado E2E file://: saldo inicial 1200 + traspaso 50 + cajón 300 → 1550/1250 correctos.
+
+### ↩ Devolver a cambio desde caja (deshacer traspaso) · Jun 2026
+- Tercer botón azul '↩ Devolver a cambio (desde caja)' (data-testid=cambio-return-btn) junto a Añadir/Retirar + botón inline en la línea de traspaso (cambio-devolver-btn). Ambos abren _cambioBulkOp modo 'return'.
+- Lógica return: suma piezas al cajón (data[d.k]+=q), _bulk_seed += retEur (para que saveCambio no absorba la devolución), _toCaja -= retEur. TOPE: no se puede devolver más que _toCaja (toast de aviso, no aplica nada). Con _toCaja=0 el botón avisa y no abre modal.
+- CAJA FÍSICA constante en la operación (el dinero solo cambia de sitio). Testeado E2E: traspaso 100 → devuelvo 50 → reserva 294,74→344,74, traspaso 50, intento de devolver 100 con 50 → rechazado, caja física idéntica.

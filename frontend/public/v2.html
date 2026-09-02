@@ -5667,11 +5667,12 @@ function openCambio(){
     <div id="cambioTotal" style="text-align:center;padding:16px;background:linear-gradient(135deg,#065f46,#0f172a);border:2px solid #22c55e;border-radius:12px;margin-bottom:14px">
       <div style="font-size:11px;color:#a7f3d0;letter-spacing:2px;text-transform:uppercase">Total guardat</div>
       <div id="cambioTotalNum" style="font-size:36px;color:#7ee3aa;font-weight:700;font-family:'Courier New',monospace;margin-top:4px">0,00 €</div>
-      <div id="cambioTraspaso" data-testid="cambio-traspaso-line" style="display:none;margin-top:8px;font-size:12px;color:#fdba74">🔁 Traspasado a caja: <b id="cambioTraspasoNum" style="font-family:'Courier New',monospace">0,00 €</b> <span style="color:#94a3b8">(sigue en tu CAJA FÍSICA, no se resta del saldo)</span></div>
+      <div id="cambioTraspaso" data-testid="cambio-traspaso-line" style="display:none;margin-top:8px;font-size:12px;color:#fdba74">🔁 Traspasado a caja: <b id="cambioTraspasoNum" style="font-family:'Courier New',monospace">0,00 €</b> <span style="color:#94a3b8">(sigue en tu CAJA FÍSICA, no se resta del saldo)</span> <button id="cambioDevolver" data-testid="cambio-devolver-btn" style="margin-left:8px;padding:4px 12px;background:#1d4ed8;color:#fff;border:1px solid #3b82f6;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">↩ Devolver a la reserva</button></div>
     </div>
     <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" id="cambioAdd" style="background:#166534;color:#fff;border-color:#166534;flex:1;font-weight:700">➕ Añadir cambio (del banco)</button>
       <button class="btn" id="cambioRemove" style="background:#7c2d12;color:#fff;border-color:#7c2d12;flex:1;font-weight:700">➖ Retirar (para caja)</button>
+      <button class="btn" id="cambioReturn" data-testid="cambio-return-btn" style="background:#1d4ed8;color:#fff;border-color:#1d4ed8;flex:1;font-weight:700">↩ Devolver a cambio (desde caja)</button>
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:12px">
       <thead><tr style="background:#0f172a;color:#f5b301">
@@ -5726,6 +5727,8 @@ function openCambio(){
     const trNum=back.querySelector('#cambioTraspasoNum');
     const tr=+(data&&data._toCaja)||0;
     if(tr>0){trBox.style.display='block';trNum.textContent=fmt(tr);}else{trBox.style.display='none';}
+    const devBtn=back.querySelector('#cambioDevolver');
+    if(devBtn)devBtn.onclick=()=>_cambioBulkOp(data,render,'return');
     // Banner "Pendiente de repartir" del Saldo inicial
     const pendBox = back.querySelector('#cambioPendiente');
     const pendNum = back.querySelector('#cambioPendienteNum');
@@ -5752,18 +5755,27 @@ function openCambio(){
   };
   back.querySelector('#cambioAdd').onclick=()=>_cambioBulkOp(data,render,'add');
   back.querySelector('#cambioRemove').onclick=()=>_cambioBulkOp(data,render,'remove');
+  back.querySelector('#cambioReturn').onclick=()=>{
+    const tr=+(data&&data._toCaja)||0;
+    if(tr<=0){toast('No hay nada traspasado a caja que devolver');return}
+    _cambioBulkOp(data,render,'return');
+  };
 }
 
 function _cambioBulkOp(data,rerender,mode){
   const back=document.createElement('div');back.className='modal-back';
-  const title=mode==='add'?'➕ Añadir cambio (del banco)':'➖ Retirar cambio (para caja)';
-  const color=mode==='add'?'#166534':'#7c2d12';
+  const title=mode==='add'?'➕ Añadir cambio (del banco)':(mode==='return'?'↩ Devolver a la reserva (desde caja)':'➖ Retirar cambio (para caja)');
+  const color=mode==='add'?'#166534':(mode==='return'?'#1d4ed8':'#7c2d12');
+  const maxRet=+(data&&data._toCaja)||0;
+  const desc=mode==='add'?'Indica cuántas piezas de cada tipo añades en esta operación. Se sumarán a la reserva actual.'
+    :(mode==='return'?`Devuelves dinero de la caja al cajón de cambio (deshacer traspaso). Indica en qué piezas lo devuelves. <b style="color:#93c5fd">Máximo a devolver: ${fmt(maxRet)}</b> (lo traspasado a caja).`
+    :'Indica cuántas piezas de cada tipo retiras en esta operación. Se restarán a la reserva actual.');
   back.innerHTML=`<div class="modal" style="max-width:520px;width:97%">
     <div style="display:flex;align-items:center;gap:14px;margin:-16px -16px 16px -16px;padding:12px 18px;background:${color};color:#fff;border-radius:12px 12px 0 0">
       <h3 style="margin:0;flex:1;font-family:Georgia,serif">${title}</h3>
       <button class="btn" id="bkClose" style="background:#0f172a;color:#fff;border-color:#0f172a">✖</button>
     </div>
-    <p class="small" style="color:#94a3b8;margin:0 0 12px">Indica cuántas piezas de cada tipo ${mode==='add'?'añades':'retiras'} en esta operación. Se ${mode==='add'?'sumarán':'restarán'} a la reserva actual.</p>
+    <p class="small" style="color:#94a3b8;margin:0 0 12px">${desc}</p>
     <div id="bkBody" style="max-height:60vh;overflow:auto"></div>
     <div style="text-align:center;padding:14px 0;border-top:1px solid #1e293b;margin-top:10px">
       <div class="small" style="color:#94a3b8">Total operación</div>
@@ -5771,7 +5783,7 @@ function _cambioBulkOp(data,rerender,mode){
     </div>
     <div style="text-align:right;margin-top:12px">
       <button class="btn" id="bkCancel">Cancelar</button>
-      <button class="btn" id="bkOk" style="background:${color};color:#fff;border-color:${color};font-weight:700">${mode==='add'?'✓ Añadir':'✓ Retirar'}</button>
+      <button class="btn" id="bkOk" style="background:${color};color:#fff;border-color:${color};font-weight:700">${mode==='add'?'✓ Añadir':(mode==='return'?'✓ Devolver':'✓ Retirar')}</button>
     </div>
   </div>`;
   document.body.appendChild(back);
@@ -5808,6 +5820,21 @@ function _cambioBulkOp(data,rerender,mode){
   bkBody.querySelectorAll('[data-bk]').forEach(inp=>inp.oninput=recalc);
   back.querySelector('#bkOk').onclick=()=>{
     recalc();
+    if(mode==='return'){
+      // ↩ DEVOLVER: deshace traspasos caja→cajón. Tope: lo traspasado a caja.
+      let retEur=0;
+      CAMBIO_DENOMS.forEach(d=>{const q=ops[d.k]||0;if(q>0)retEur+=q*(d.pack||d.val);});
+      if(retEur<=0){toast('No has indicado ninguna cantidad');return}
+      if(retEur>maxRet+0.001){toast(`⚠️ Solo puedes devolver hasta ${fmt(maxRet)} (lo traspasado a caja)`,4000);return}
+      CAMBIO_DENOMS.forEach(d=>{const q=ops[d.k]||0;if(q>0)data[d.k]=(Number(data[d.k])||0)+q;});
+      if(data._bulk_seed!==undefined)data._bulk_seed=(+data._bulk_seed||0)+retEur;
+      data._toCaja=Math.max(0,maxRet-retEur);
+      saveCambio(data);
+      back.remove();
+      rerender();
+      toast(`↩ ${fmt(retEur)} devueltos de la caja a la reserva de cambio`,4000);
+      return;
+    }
     let changed=0;
     let movedEur=0;   // € realmente movidos (retirar) o añadidos
     let capped=false; // true si se pidió más de lo disponible en alguna denominación
