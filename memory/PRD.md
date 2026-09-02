@@ -1330,3 +1330,7 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - CAJA FÍSICA/CUENTA BANCO ya reclasificaban vía delta, pero la casilla '💵 Efectivo' mostraba el bruto sin descontar → parecía que la VISA no hacía nada.
 - Fix: Efectivo muestra el NETO (efShown − delta) en ambas empresas (data-testid efectivo-neto-cb / efectivo-neto-c) + etiqueta gris '(−X € a tarjeta)' cuando hay reclasificación.
 - Testeado E2E: entrada 100€ efectivo + datáfono manual 60 → Efectivo 40,00 (−60,00 a tarjeta), CAJA FÍSICA 40, CUENTA BANCO 60.
+
+### ✅ Verificación VISA en saldos acumulados · Jun 2026
+- Confirmado (sin cambios de código necesarios): saldoAnteriorPorCuenta ya reclasifica el datáfono de días previos (delta=df−autoT por día). Los 3 apartados (saldo ant. caja+cambio, saldo solo caja, CAJA FÍSICA) y CUENTA BANCO reflejan la VISA correctamente.
+- Test numérico E2E: ayer 100€ E + df 60 + cajón 300 + traspaso 50 → 390/90/390/60/450 todos exactos.
