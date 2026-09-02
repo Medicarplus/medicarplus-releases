@@ -3435,20 +3435,28 @@ function openSaldoInicial(){
       nota:     back.querySelector('#siNota').value.trim() || ''
     };
     setSaldoInicial(obj);
-    // 💰 Si hay cambio inicial: siembra la Reserva de cambio con ese importe
-    // pendiente de repartir en denominaciones (billetes/monedas).
-    if(obj.cambio > 0){
-      try{
-        const existing = loadCambio() || {};
+    // 💰 Sincroniza la Reserva de cambio con el campo "cambio" del Saldo inicial:
+    //  · Si cambio > 0 → siembra _bulk pendiente de repartir en denominaciones.
+    //  · Si cambio = 0 → LIMPIA la semilla anterior (así puedes reiniciar el saldo
+    //    inicial sin arrastrar un _bulk viejo que ya no quieres).
+    try{
+      const existing = loadCambio() || {};
+      const denomsSum = CAMBIO_DENOMS.reduce((s,d)=>s+cambioSubtotal(d,existing),0);
+      if(obj.cambio > 0){
         // Solo siembra si aún no hay denominaciones puestas (evita pisar datos del cliente)
-        const denomsSum = CAMBIO_DENOMS.reduce((s,d)=>s+cambioSubtotal(d,existing),0);
         if(denomsSum === 0){
           existing._bulk_seed = obj.cambio;
           existing._bulk = obj.cambio;
           saveCambio(existing);
         }
-      }catch(e){ console.warn('siembra reserva cambio', e); }
-    }
+      } else {
+        // cambio = 0 → borra la semilla anterior si existía
+        let changed = false;
+        if(existing._bulk_seed !== undefined){ delete existing._bulk_seed; changed = true; }
+        if(existing._bulk !== undefined){ delete existing._bulk; changed = true; }
+        if(changed) saveCambio(existing);
+      }
+    }catch(e){ console.warn('sync reserva cambio', e); }
     toast('🏦 Saldo inicial guardado');
     back.remove();
     // Refresca la pantalla
@@ -5873,9 +5881,21 @@ function openCambio(){
   render();
 
   back.querySelector('#cambioReset').onclick=()=>{
-    if(!confirm('¿Vaciar la reserva de cambio? Se pondrán todas las cantidades a 0.'))return;
+    if(!confirm('¿Vaciar la reserva de cambio? Se pondrán todas las cantidades a 0.\n\n(El histórico de "traspasado a caja" se mantiene, ese dinero sigue en tu caja física.)'))return;
     // Conserva el histórico de traspasos a caja (ese dinero sigue en la caja física)
-    data={_toCaja:+(data&&data._toCaja)||0};saveCambio(data);render();
+    // pero borra COMPLETAMENTE denominaciones, _bulk y _bulk_seed → total real 0€.
+    data={_toCaja:+(data&&data._toCaja)||0};
+    saveCambio(data);
+    // 💡 Si el "cambio" del Saldo inicial es el que sembró _bulk_seed, también lo
+    // ponemos a 0 para que no vuelva a re-sembrar al abrir/cerrar el modal.
+    try{
+      const si = getSaldoInicial();
+      if(si && +si.cambio > 0){
+        setSaldoInicial(Object.assign({}, si, { cambio: 0 }));
+      }
+    }catch(e){ console.warn('reset saldoInicial.cambio', e); }
+    render();
+    if(typeof toast==='function') toast('🗑️ Reserva de cambio vaciada');
   };
   back.querySelector('#cambioAdd').onclick=()=>_cambioBulkOp(data,render,'add');
   back.querySelector('#cambioRemove').onclick=()=>_cambioBulkOp(data,render,'remove');
