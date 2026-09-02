@@ -450,7 +450,7 @@
         return;
       }
       // Reserva de cambio → siempre entera (cajón físico único)
-      if(k === 'caja.reserva.v1'){ out[k] = v; return; }
+      if(k === 'caja.reserva.v1' || k === 'caja.cempla.reserva.v1'){ out[k] = v; return; }
       // Todo lo demás (stats agregadas, irpf, saldos, config…) → NO se envía al enviar "solo un día"
     });
     return out;
@@ -5677,7 +5677,11 @@ function _buildYearComparison(latestYear,count){
 // ============================================================================
 // RESERVA DE CAMBIO · seguiment de monedes i bitllets guardats a l'oficina
 // ============================================================================
-const CAMBIO_KEY='caja.reserva.v1';
+// Reserva de cambio POR EMPRESA. Cada empresa tiene su propio cajón físico:
+//  · Empresa 1 (trafic) → caja.reserva.v1
+//  · Empresa 2 (cempla) → caja.cempla.reserva.v1
+// Existía una única clave global; los datos previos permanecen bajo la clave de trafic.
+function cambioKey(){ return currentCompany==='cempla' ? 'caja.cempla.reserva.v1' : 'caja.reserva.v1'; }
 // Monedes: es compten per PAQUETS (amb el valor típic del paquet). També permet € manuals per si tens mitges peces.
 // Bitllets: es compten per unitat solta.
 const CAMBIO_DENOMS=[
@@ -5695,7 +5699,7 @@ const CAMBIO_DENOMS=[
   {k:'b50',label:'50 €',        val:50,   type:'bill'},
 ];
 function loadCambio(){
-  let o={};try{o=JSON.parse(localStorage.getItem(CAMBIO_KEY))||{}}catch(e){return{}}
+  let o={};try{o=JSON.parse(localStorage.getItem(cambioKey()))||{}}catch(e){return{}}
   // Migració v1→v2: si hi ha dades antigues sense flag, el valor era "# monedes soltes". Convertim-lo a manual €.
   if(!o._v){
     CAMBIO_DENOMS.forEach(d=>{
@@ -5706,7 +5710,7 @@ function loadCambio(){
       }
     });
     o._v=2;
-    try{localStorage.setItem(CAMBIO_KEY,JSON.stringify(o))}catch(e){}
+    try{localStorage.setItem(cambioKey(),JSON.stringify(o))}catch(e){}
   }
   return o;
 }
@@ -5723,7 +5727,7 @@ function saveCambio(o){
   }
   // 🔗 _mtime para sync multi-PC (last-write-wins entre 2 ordenadores)
   o._mtime = Date.now();
-  localStorage.setItem(CAMBIO_KEY,JSON.stringify(o));
+  localStorage.setItem(cambioKey(),JSON.stringify(o));
 }
 function cambioSubtotal(d,o){
   if(d.pack){
@@ -7075,7 +7079,7 @@ function openSettingsModal(){
     // Pasa a Independiente para que la nube / el otro PC no devuelvan los datos a ESTE PC
     try{ if(window.mcSync){ window.mcSync.stopAutosync(); await window.mcSync.setMode('independent'); } }catch(e){}
     try{ localStorage.setItem('caja.sync.modeChosen.v1','independent'); }catch(e){}
-    const WIPE_EXACT=['caja.v1','caja.cempla.v1','caja.datafono','caja.cempla.datafono','caja.reserva.v1','caja.stats.v1','caja.stats.traffic.overrides.v1','caja.irpf.v1','caja.__sync_ts','caja.__sync_last_push','caja.__sync_last_pull','caja.__sync_status'];
+    const WIPE_EXACT=['caja.v1','caja.cempla.v1','caja.datafono','caja.cempla.datafono','caja.reserva.v1','caja.cempla.reserva.v1','caja.stats.v1','caja.stats.traffic.overrides.v1','caja.irpf.v1','caja.__sync_ts','caja.__sync_last_push','caja.__sync_last_pull','caja.__sync_status'];
     WIPE_EXACT.forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
     for(let i=localStorage.length-1;i>=0;i--){ const k=localStorage.key(i); if(k && k.startsWith('caja.saldoInicial.')) try{localStorage.removeItem(k)}catch(e){} }
     // 🛡️ Olvida el archivo de copia recordado: la próxima copia se guardará como ARCHIVO NUEVO
@@ -11496,7 +11500,7 @@ setTimeout(()=>{
                 filtered[k] = Object.assign({},v,{byDate:oneDay});
               } else if(k==='caja.datafono' || k==='caja.cempla.datafono'){
                 if(v && typeof v==='object' && v[admDay]!==undefined) filtered[k] = {[admDay]:v[admDay]};
-              } else if(k==='caja.reserva.v1'){ filtered[k] = v; }
+              } else if(k==='caja.reserva.v1' || k==='caja.cempla.reserva.v1'){ filtered[k] = v; }
               // resto se omite (stats, irpf, etc.)
             });
             data = filtered;
