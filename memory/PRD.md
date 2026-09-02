@@ -1287,3 +1287,11 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - Mejoras del banner (clase .bk-restore-banner): muestra tiempo relativo ("hace X min", data-testid=backup-banner-reltime), nota "siempre se muestra la más reciente", dedupe (si hay banner viejo abierto se sustituye), snooze en memoria (_bkSnoozedId: "Más tarde" no re-avisa de ESA copia, pero sí de una más nueva). data-testids: backup-banner-apply, backup-banner-later.
 - Backend ya garantizaba 1 sola copia por remitente (replace_one upsert) y orden desc.
 - Testeado E2E preview: 2 envíos consecutivos → pending=1 solo la BUENA con created_at+00:00; banner en receptor muestra BUENA con "hace 1 min", aplicar fusiona (importe 99 presente) y no reaparece. Interval 60s no testeado en vivo (lógica trivial).
+
+### 🐛 FIX botón "Aplicar copia" + blindaje escritura sync · Jun 2026 (iteration_38)
+- Reporte: en el PC receptor "Aplicar copia (fusionar)" no hacía nada. Fixes de raíz:
+  1. _syncWrite (v2.html ~258, expuesto como mcSync.safeWrite): string plano → setItem raw; objeto → JSON.stringify. Antes TODO iba con stringify → 'cempla' quedaba '"cempla"' y caja.apibase.* se corrompía con comillas (rompía las llamadas API tras aplicar). Usado en bkApply y en onIncoming del modo Fusionado.
+  2. SYNC_EXCLUDE_PREFIXES += 'caja.apibase.', 'caja.__sync' (cliente inline, entrada Y salida) + snapshot del admin. Un emisor ya no puede pisar la URL de conexión del receptor (probado con URL "maliciosa").
+  3. bkApply defensivo: try/catch, botón '⏳ Aplicando…', error visible (data-testid=backup-apply-error), consume tolerante a fallos (no bloquea la aplicación de datos). El botón nunca queda muerto en silencio.
+- REGLA: al escribir claves recibidas por sync usar SIEMPRE mcSync.safeWrite, nunca JSON.stringify directo.
+- Testing: iteration_38 100% (pytest 8/8: upsert por remitente, tz +00:00, consume, admin push x3, 403/404, reset-devices; Playwright: integridad post-aplicar 5/5 — company sin comillas, apibase intacta, saldo local 500 intacto, reserva LWW 350, fusión ambas fechas). Test file: /app/backend/tests/test_iter38_backup_pending_admin.py
