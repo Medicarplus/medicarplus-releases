@@ -4626,6 +4626,16 @@ function generateLedgerEntries(dateFrom,dateTo,company){
           // Filtro anti-basura: entradas de 0€ no aportan nada al libro contable
           // (ej: visita sin cobro porque ya se pagó otro día, cliente que solo pasa a recoger papeles).
           if(!e.importe || Math.abs(e.importe) < 0.005) return;
+          // 🔁 Movimiento interno Caja↔Banco: NO es ingreso (no toca 705). Es un traspaso
+          // entre cuentas propias. Español contable: DEBE = cuenta destino / HABER = origen.
+          if(e._internal){
+            if(e._transferDir === 'caja2banco'){
+              expenseRows.push({date,concepto:`🔁 Ingreso en metálico: ${e.nombre||'—'}`,debeAcct:'572 Banco',debeAmt:e.importe,haberAcct:'570 Caja',haberAmt:e.importe});
+            } else {
+              expenseRows.push({date,concepto:`🏦 Retirada del banco: ${e.nombre||'—'}`,debeAcct:'570 Caja',debeAmt:e.importe,haberAcct:'572 Banco',haberAmt:e.importe});
+            }
+            return;
+          }
           // Els DEBE/HABER manuals apareixen com a LÍNIES SEPARADES (no s'agrupen amb els ingressos del programa DGT)
           if(e.tipo==='HABER'){
             expenseRows.push({date,concepto:`Ingreso manual: ${e.nombre||'—'}`,debeAcct:acct,debeAmt:e.importe,haberAcct:'705 Ingresos servicios',haberAmt:e.importe});
@@ -4681,6 +4691,15 @@ function generateLedgerEntries(dateFrom,dateTo,company){
         if(e.kind==='DH'){
           // Filtro anti-basura: entradas de 0€ no aportan nada al libro contable.
           if(!e.importe || Math.abs(e.importe) < 0.005) return;
+          // 🔁 Movimiento interno Caja↔Banco: NO es ingreso. DEBE=destino / HABER=origen.
+          if(e._internal){
+            if(e._transferDir === 'caja2banco'){
+              rows.push({date,concepto:`🔁 Ingreso en metálico: ${e.nombre||'—'}`,debeAcct:'572 Banco',debeAmt:e.importe,haberAcct:'570 Caja',haberAmt:e.importe});
+            } else {
+              rows.push({date,concepto:`🏦 Retirada del banco: ${e.nombre||'—'}`,debeAcct:'570 Caja',debeAmt:e.importe,haberAcct:'572 Banco',haberAmt:e.importe});
+            }
+            return;
+          }
           if(e.tipo==='HABER'){
             rows.push({date,concepto:e.nombre||'Ingreso',debeAcct:acct,debeAmt:e.importe,haberAcct:'705 Ingresos servicios',haberAmt:e.importe});
           }else{
