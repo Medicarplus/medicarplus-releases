@@ -620,7 +620,7 @@
         <div class="body tab" id="tab-traf">
           <div class="form-row">
             <div><label data-i18n="concept">Concepto</label><select id="t-tipo"><option data-i18n="renewal">Renovación</option><option>Obtención</option><option data-i18n="issue">Expedición</option><option data-i18n="duplicate">Duplicado</option><option data-i18n="exchange">Canje</option><option data-i18n="other">Otro</option></select></div>
-            <div><label data-i18n="group">Grupo</label><select id="t-grupo"><option data-i18n="driving">Conducir</option><option data-i18n="moped">Ciclomotor</option><option>BTP</option><option data-i18n="other">Otro</option></select></div>
+            <div><label data-i18n="group">Grupo</label><input type="text" id="t-grupo" list="t-grupo-list" placeholder="Escribe o elige…" autocomplete="off" style="padding:8px 10px;background:#0f172a;border:1px solid #2a3040;border-radius:6px;color:#e2e8f0;font-size:13px;width:100%;box-sizing:border-box"/><datalist id="t-grupo-list"><option value="Conducción"></option><option value="Armas"></option><option value="Seguridad"></option><option value="Animales peligrosos"></option><option value="Grúas"></option><option value="Deportes"></option><option value="Marina"></option><option value="Ciclomotor"></option><option value="BTP"></option><option value="Otro"></option></datalist></div>
             <div><label data-i18n="name">Nombre</label><input type="text" id="t-nombre" data-i18n-ph="ph_name" placeholder="Apellidos, Nombre" /></div>
             <div><label data-i18n="amount">Importe (€)</label><input type="number" step="0.01" id="t-importe" /></div>
             <div><label data-i18n="dgt_fee">Tasa DGT (€)</label><input type="number" step="0.01" id="t-tasa" value="0" /></div>
@@ -1502,7 +1502,7 @@ function openLibroRegistro(){
     if(!filtered.length){body.innerHTML=`<div style="text-align:center;padding:60px;color:#7a8394"><div style="font-size:48px">📭</div><div style="margin-top:12px">No hay entradas de CSV DGT en este rango.</div><div style="margin-top:8px;font-size:12px">Importa el CSV de la DGT desde el botón <b>📥 Importar CSV/Excel</b> de Entradas del día.</div></div>`;return}
     // Agrupació per Tipo · Grupo
     const groups=new Map();
-    filtered.forEach(e=>{const k=`${(e.tipo||'?').trim()} · ${(e.grupo||'-').trim()}`;groups.set(k,(groups.get(k)||0)+1)});
+    filtered.forEach(e=>{const g=(window._normalizeGrupo?window._normalizeGrupo(e.grupo):(e.grupo||'-')).trim()||'-';const k=`${(e.tipo||'?').trim()} · ${g}`;groups.set(k,(groups.get(k)||0)+1)});
     const sorted=[...groups.entries()].sort((a,b)=>b[1]-a[1]);
     const totalAll=filtered.length;
     // Carnets de conducir: detecció "Profesional" o classe C/C1/D/D1/C+E/C1+E/D+E/D1+E
@@ -2224,6 +2224,34 @@ function openStats(initialSection){
     return t.charAt(0).toUpperCase() + t.slice(1);
   }
   function _trafBaseCat(tipo){ return _trafNormalizeCat(tipo); }
+  // Normalitza el "grupo" fusionant sinònims i variacions (S.P/S. privada/Seguridad Privada →
+  // Seguridad; Náutica → Marina; A. peligrosos → Animales peligrosos; Conducir → Conducción…).
+  // Els canònics coincideixen amb els del programa DGT: Conducción, Armas, Seguridad,
+  // Animales peligrosos, Grúas, Deportes, Marina, Ciclomotor, BTP, Otro.
+  window._normalizeGrupo = function(raw){
+    const t = String(raw||'').trim();
+    if(!t) return '';
+    const lc = t.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[\.\-_]/g,' ')
+      .replace(/\s+/g,' ')
+      .trim();
+    // Ordre: patrons més específics primer
+    if(/\banim(al(es)?)?\b.*\bp(eli|eligros(o|os))?\b|\banim(al(es)?)?\s*(p(eli|eligros(o|os))?)?\b|^a p$|^a peligrosos$|^a peli$/.test(lc)) return 'Animales peligrosos';
+    if(/\bmarina\b|\bnautic[ao]\b|\bnautic\b/.test(lc)) return 'Marina';
+    if(/\bseg(uridad)?\s*(priv(ada)?)?\b|\bs\s*p(rivad[ao])?\b|^sp$/.test(lc)) return 'Seguridad';
+    if(/\bconduc(cion|ci[oó]n|ir)?\b|\bcond\b/.test(lc)) return 'Conducción';
+    if(/\bciclomot(or)?\b|\bciclo\b/.test(lc)) return 'Ciclomotor';
+    if(/\barm[ao]s?\b/.test(lc)) return 'Armas';
+    if(/\bgru?as?\b/.test(lc)) return 'Grúas';
+    if(/\bdeport(es|iv[ao])?\b/.test(lc)) return 'Deportes';
+    if(/\bbtp\b/.test(lc)) return 'BTP';
+    if(/\brecupera(cion|ci[oó]n)?\b/.test(lc)) return 'Recuperación';
+    if(/\botros?\b/.test(lc)) return 'Otro';
+    // Fallback: capitalitza la primera lletra i deixa la resta com estava
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  };
+  window._trafNormalizeCat = _trafNormalizeCat;
   // Retorna l'array complet de categories detectades al CSV (ordenat alfabèticament).
   // S'utilitza per generar dinàmicament les columnes de la taula.
   function _trafDetectedCats(){
@@ -2273,7 +2301,7 @@ function openStats(initialSection){
         // Exclusión 0€: si subtotal (importe - descuento + tasa) es 0 → NO cuenta como certificado
         if(!countZero && (imp - desc + ta) <= 0) continue;
         const cat = _trafBaseCat(e.tipo);
-        const grp = String(e.grupo || 'Sin grupo').trim() || 'Sin grupo';
+        const grp = (window._normalizeGrupo?window._normalizeGrupo(e.grupo):String(e.grupo || 'Sin grupo').trim()) || 'Sin grupo';
         out.count++;
         out.byCat[cat] = (out.byCat[cat] || 0) + 1;
         // Desglose por grupo para tooltips (Marina, Armas, Náutica, Conducir, etc.)
@@ -2351,7 +2379,7 @@ function openStats(initialSection){
           const desc = +e.descuento || 0;
           if(!countZero && (imp - desc + ta) <= 0) continue;
           const tipo = _trafBaseCat(e.tipo);
-          const grupo = String(e.grupo || 'Sin grupo').trim() || 'Sin grupo';
+          const grupo = (window._normalizeGrupo?window._normalizeGrupo(e.grupo):String(e.grupo || 'Sin grupo').trim()) || 'Sin grupo';
           const precio = +imp || 0;
           const k = `${tipo}||${grupo}||${precio.toFixed(2)}`;
           if(!detailMap[k]) detailMap[k] = { tipo, grupo, precio, count:0, total:0, tasa:0 };
@@ -2977,7 +3005,7 @@ function openStats(initialSection){
 $$('#chips-priv-cempla .chip').forEach(c=>c.onclick=()=>{$$('#chips-priv-cempla .chip').forEach(x=>x.classList.remove('active'));c.classList.add('active');privConcept=c.dataset.c||'';currentPreu=c.dataset.preu||'';currentSplit=c.dataset.split||'45-45-10';$('#p-tipo-custom').value=privConcept;$('#p-preu-custom').value=currentPreu;const[b,cc,m]=currentSplit.split('-');$('#p-pct-b').value=b;$('#p-pct-c').value=cc;$('#p-pct-m').value=m;setTimeout(()=>$('#p-nombre-cempla').focus(),50)});
 $$('.tabs button').forEach(b=>b.onclick=()=>{$$('.tabs button').forEach(x=>x.classList.remove('active'));$$('.tab').forEach(x=>x.style.display='none');b.classList.add('active');$('#'+b.dataset.tab).style.display='block'});
 $$('#chips-priv .chip').forEach(c=>c.onclick=()=>{$$('#chips-priv .chip').forEach(x=>x.classList.remove('active'));c.classList.add('active');privConcept=c.dataset.c;if(c.dataset.preu){$('#p-importe').value=c.dataset.preu;$('#p-nombre').focus()}});
-$('#btnAddTraf').onclick=()=>{const e={id:uid(),kind:'TRAF',tipo:$('#t-tipo').value,grupo:$('#t-grupo').value,nombre:$('#t-nombre').value.trim()||'Cliente',importe:num($('#t-importe').value),descuento:0,tasa:num($('#t-tasa').value),fp:$('#t-fp').value,fpTasa:$('#t-fp').value,retorno:false};if(!e.importe&&!e.tasa&&!e.nombre){toast('Añade al menos un nombre/concepto');return}entriesOf(currentDate).push(e);saveState();render();$('#t-nombre').value='';$('#t-importe').value='';$('#t-tasa').value='0'};
+$('#btnAddTraf').onclick=()=>{const e={id:uid(),kind:'TRAF',tipo:$('#t-tipo').value,grupo:(window._normalizeGrupo?window._normalizeGrupo($('#t-grupo').value):$('#t-grupo').value)||'Otro',nombre:$('#t-nombre').value.trim()||'Cliente',importe:num($('#t-importe').value),descuento:0,tasa:num($('#t-tasa').value),fp:$('#t-fp').value,fpTasa:$('#t-fp').value,retorno:false};if(!e.importe&&!e.tasa&&!e.nombre){toast('Añade al menos un nombre/concepto');return}entriesOf(currentDate).push(e);saveState();render();$('#t-nombre').value='';$('#t-importe').value='';$('#t-tasa').value='0'};
 $('#btnAddPriv').onclick=()=>{const isC=currentCompany==='cempla';let nom=isC?$('#p-nombre-cempla').value.trim():$('#p-nombre').value.trim();let tipo=isC?($('#p-tipo-custom').value.trim()||privConcept||'Revisió'):privConcept;let imp=isC?num($('#p-preu-custom').value):num($('#p-importe').value);let fp=isC?$('#p-fp-cempla').value:$('#p-fp').value;if(isC){const b=num($('#p-pct-b').value)||0,cc=num($('#p-pct-c').value)||0,m=num($('#p-pct-m').value)||0;currentSplit=`${b}-${cc}-${m}`}const e={id:uid(),kind:'PRIV',tipo,grupo:'-',nombre:nom||'Cliente',importe:imp,descuento:isC?0:num($('#p-desc').value),tasa:isC?0:num($('#p-tasa').value),fp,fpTasa:fp,split:isC?currentSplit:null,retorno:false};if(!e.importe&&!e.tasa&&!e.nombre){toast('Afegeix un nom o import');return}entriesOf(currentDate).push(e);saveState();render();if(isC){$('#p-nombre-cempla').value=''}else{$('#p-nombre').value='';$('#p-importe').value='';$('#p-desc').value='0';$('#p-tasa').value='0'}};
 $('#btnAddDH').onclick=()=>{const e={id:uid(),kind:'DH',tipo:$('#dh-tipo').value,grupo:'-',nombre:$('#dh-concepto').value.trim()||'(sin concepto)',importe:num($('#dh-importe').value),descuento:0,tasa:0,fp:$('#dh-fp').value,fpTasa:'',retorno:false};if(!e.importe&&!e.nombre){toast('Indica un concepto');return}entriesOf(currentDate).push(e);saveState();render();$('#dh-concepto').value='';$('#dh-importe').value='';try{refreshWorkersDatalist()}catch(_){}};
 function updateDhTipoColor(){const v=$('#dh-tipo').value;$('#dh-tipo').classList.toggle('haber-sel',v==='HABER');$('#dh-tipo').classList.toggle('debe-sel',v==='DEBE')}
@@ -3104,7 +3132,7 @@ function setCountZero(v){localStorage.setItem('caja.count_zero',v?'1':'0')}
 const entryFilter = { types: new Set(), from: null, to: null };
 function _entryKey(e){
   const t = String(e.tipo||'').trim() || '?';
-  const g = String(e.grupo||'').trim();
+  const g = (window._normalizeGrupo?window._normalizeGrupo(e.grupo):String(e.grupo||'').trim());
   return g && g!=='-' ? `${t} · ${g}` : t;
 }
 function getFilteredEntries(){
@@ -3257,7 +3285,7 @@ function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(
     };
   }
 }
-function renderByConcept(list){const map={};list.forEach(e=>{if(e.retorno)return;const key=e.kind==='DH'?`[${e.tipo}] libre`:`${e.tipo}${e.grupo&&e.grupo!=='-'?' · '+e.grupo:''}`;map[key]||={n:0,total:0};map[key].n++;const signo=e.kind==='DH'&&e.tipo==='DEBE'?-1:1;map[key].total+=signo*((e.importe-(e.descuento||0))+(e.tasa||0))});const entries=Object.entries(map).sort((a,b)=>b[1].total-a[1].total);$('#byConcept').innerHTML=entries.length?`<table style="width:100%"><tbody>${entries.map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td class="num">${v.n}×</td><td class="num"><b>${fmt(v.total)}</b></td></tr>`).join('')}</tbody></table>`:`<div class="small">Sin datos</div>`}
+function renderByConcept(list){const map={};list.forEach(e=>{if(e.retorno)return;const gn=window._normalizeGrupo?window._normalizeGrupo(e.grupo):e.grupo;const key=e.kind==='DH'?`[${e.tipo}] libre`:`${e.tipo}${gn&&gn!=='-'?' · '+gn:''}`;map[key]||={n:0,total:0};map[key].n++;const signo=e.kind==='DH'&&e.tipo==='DEBE'?-1:1;map[key].total+=signo*((e.importe-(e.descuento||0))+(e.tasa||0))});const entries=Object.entries(map).sort((a,b)=>b[1].total-a[1].total);$('#byConcept').innerHTML=entries.length?`<table style="width:100%"><tbody>${entries.map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td class="num">${v.n}×</td><td class="num"><b>${fmt(v.total)}</b></td></tr>`).join('')}</tbody></table>`:`<div class="small">Sin datos</div>`}
 // 💰 Saldo inicial (opening balance) · Para clientes que empiezan a usar la app
 // a mediados de año y no quieren pasar todo el histórico día a día. Se guarda
 // por empresa. NUNCA entra en estadísticas (no es una entrada de facturación),
