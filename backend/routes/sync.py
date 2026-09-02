@@ -58,6 +58,8 @@ def _iso(dt) -> Optional[str]:
     if dt is None:
         return None
     if isinstance(dt, datetime):
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
         return dt.replace(microsecond=0).isoformat()
     return str(dt)
 

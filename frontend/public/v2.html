@@ -10993,6 +10993,8 @@ setTimeout(()=>{
       if(st.is_premium && (st.peers||[]).length >= 1 && !alreadyChosen){ setTimeout(() => showSyncOnboarding(st), 800); }
       if(st.my_mode === 'linked'){ window.mcSync.startAutosync(30000); }
       setTimeout(checkPendingBackups, 1500);
+      // Revisa el buzón cada 60s: si llega una copia nueva con la app abierta, avisa al momento
+      setInterval(checkPendingBackups, 60000);
     }
   }
   function showSyncOnboarding(st){
@@ -11003,21 +11005,43 @@ setTimeout(()=>{
     back.querySelector('#opFus').onclick = async () => { localStorage.setItem('caja.sync.modeChosen.v1','linked'); await window.mcSync.setMode('linked'); window.mcSync.startAutosync(30000); back.remove(); if(typeof toast==='function') toast('🔗 Modo fusionado activado'); };
     back.querySelector('#opInd').onclick = async () => { localStorage.setItem('caja.sync.modeChosen.v1','independent'); await window.mcSync.setMode('independent'); window.mcSync.stopAutosync(); back.remove(); if(typeof toast==='function') toast('🔒 Modo independiente activado'); };
   }
+  let _bkSnoozedId = null;   // copia pospuesta con "Más tarde" (no re-avisar hasta que llegue OTRA más nueva)
+  let _bkBannerId = null;    // copia actualmente visible en el aviso
   async function checkPendingBackups(){
-    try{ const r = await window.mcSync.getPendingBackup(); if(!r || !r.count) return; showBackupRestoreBanner(r.pending[0]); }catch(e){}
+    try{
+      const r = await window.mcSync.getPendingBackup(); if(!r || !r.count) return;
+      const newest = r.pending[0]; // el backend las devuelve de más nueva a más vieja
+      if(newest.backup_id === _bkSnoozedId) return;   // ya la pospuso el usuario
+      if(newest.backup_id === _bkBannerId) return;    // ya está en pantalla
+      // Si hay un aviso viejo abierto, quítalo: SIEMPRE se muestra solo la más nueva
+      document.querySelectorAll('.bk-restore-banner').forEach(b => b.remove());
+      _bkBannerId = newest.backup_id;
+      showBackupRestoreBanner(newest);
+    }catch(e){}
+  }
+  function _bkRelTime(iso){
+    try{
+      const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime())/60000));
+      if(mins < 1) return 'hace unos segundos';
+      if(mins < 60) return `hace ${mins} min`;
+      const h = Math.floor(mins/60);
+      return `hace ${h} h ${mins%60} min`;
+    }catch(e){ return ''; }
   }
   function showBackupRestoreBanner(backup){
-    const back = document.createElement('div'); back.className='modal-back'; back.style.zIndex='100005';
-    back.innerHTML = `<div class="modal" style="max-width:520px"><div style="text-align:center;margin-bottom:12px"><div style="font-size:44px">📨</div><h3 style="margin:8px 0 6px;color:#f5b301;font-family:Georgia,serif">Copia pendiente de restaurar</h3><p style="color:#94a3b8;font-size:13px;line-height:1.55;margin:0">Recibiste una copia del otro ordenador${backup.label?` (<i>${backup.label}</i>)`:''} enviada el <b>${new Date(backup.created_at).toLocaleString('es-ES')}</b>.</p></div><div style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35);border-radius:8px;padding:12px;color:#bfdbfe;font-size:12.5px;line-height:1.55;margin:14px 0">✅ Se hará <b>fusión sin duplicados</b>: solo se añadirá lo que TÚ no tengas. Nada se sobrescribe.</div><div style="display:flex;gap:8px"><button id="bkApply" style="flex:1;padding:12px;background:linear-gradient(135deg,#22c55e,#15803d);color:#fff;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">✅ Aplicar copia (fusionar)</button><button id="bkLater" style="padding:12px 18px;background:#1e293b;color:#94a3b8;border:1px solid #475569;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">Más tarde</button></div></div>`;
+    const back = document.createElement('div'); back.className='modal-back bk-restore-banner'; back.style.zIndex='100005';
+    const rel = _bkRelTime(backup.created_at);
+    back.innerHTML = `<div class="modal" style="max-width:520px"><div style="text-align:center;margin-bottom:12px"><div style="font-size:44px">📨</div><h3 style="margin:8px 0 6px;color:#f5b301;font-family:Georgia,serif">Copia pendiente de restaurar</h3><p style="color:#94a3b8;font-size:13px;line-height:1.55;margin:0">Recibiste una copia del otro ordenador${backup.label?` (<i>${backup.label}</i>)`:''} enviada <b data-testid="backup-banner-reltime" style="color:#22c55e">${rel}</b> (${new Date(backup.created_at).toLocaleString('es-ES')}).</p><p style="color:#64748b;font-size:11.5px;margin:6px 0 0;font-style:italic">Siempre se muestra la copia más reciente enviada; las anteriores quedan descartadas.</p></div><div style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35);border-radius:8px;padding:12px;color:#bfdbfe;font-size:12.5px;line-height:1.55;margin:14px 0">✅ Se hará <b>fusión sin duplicados</b>: solo se añadirá lo que TÚ no tengas. Nada se sobrescribe.</div><div style="display:flex;gap:8px"><button id="bkApply" data-testid="backup-banner-apply" style="flex:1;padding:12px;background:linear-gradient(135deg,#22c55e,#15803d);color:#fff;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">✅ Aplicar copia (fusionar)</button><button id="bkLater" data-testid="backup-banner-later" style="padding:12px 18px;background:#1e293b;color:#94a3b8;border:1px solid #475569;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">Más tarde</button></div></div>`;
     document.body.appendChild(back);
     back.querySelector('#bkApply').onclick = async () => {
       const merged = await window.mcSync.applyBackup(backup.data);
       Object.entries(merged).forEach(([k,v])=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}});
       await window.mcSync.consumeBackup(backup.backup_id);
+      _bkBannerId = null;
       back.remove(); if(typeof toast==='function') toast('✅ Copia aplicada (sin duplicados)');
       setTimeout(() => location.reload(), 800);
     };
-    back.querySelector('#bkLater').onclick = () => back.remove();
+    back.querySelector('#bkLater').onclick = () => { _bkSnoozedId = backup.backup_id; _bkBannerId = null; back.remove(); };
   }
   // ℹ️ Ahora sync-client va INLINE en v2.html → window.mcSync SIEMPRE existe al cargar
   function _ensureSyncClient(){ return Promise.resolve(!!window.mcSync); }

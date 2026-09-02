@@ -1279,3 +1279,11 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
   - Copia a archivo (medicar_copia_*.json): nunca incluyó saldoInicial ✓.
 - SÍ viajan: entradas byDate (fusión aditiva por id), caja.reserva.v1 (cajón único, gana _mtime más reciente), stats, irpf, datafono.
 - Testeado E2E file://: hook no marca saldoInicial/apibase pero sí caja.v1/reserva; applyBackup con saldo remoto 9999 → saldo local 500 intacto, entradas remota+local fusionadas, reserva fusionada. 2/2 OK.
+
+### 📨 Aviso de copia pendiente: siempre la más nueva + hora correcta · Jun 2026
+- Problema usuario: pospuso una copia vieja, envió la buena, y el aviso parecía mostrar solo la vieja. Causas reales:
+  1. _iso() en sync.py devolvía datetimes de Mongo SIN zona horaria (naive UTC) → el aviso mostraba la hora 2h atrasada en España → la copia nueva parecía vieja. FIX: _iso añade tzinfo UTC si es naive (afecta también last_seen de peers).
+  2. El receptor solo consultaba el buzón 1 vez al arrancar (setTimeout 1500ms). FIX: además setInterval cada 60s → si llega una copia con la app abierta, avisa en <1 min.
+- Mejoras del banner (clase .bk-restore-banner): muestra tiempo relativo ("hace X min", data-testid=backup-banner-reltime), nota "siempre se muestra la más reciente", dedupe (si hay banner viejo abierto se sustituye), snooze en memoria (_bkSnoozedId: "Más tarde" no re-avisa de ESA copia, pero sí de una más nueva). data-testids: backup-banner-apply, backup-banner-later.
+- Backend ya garantizaba 1 sola copia por remitente (replace_one upsert) y orden desc.
+- Testeado E2E preview: 2 envíos consecutivos → pending=1 solo la BUENA con created_at+00:00; banner en receptor muestra BUENA con "hace 1 min", aplicar fusiona (importe 99 presente) y no reaparece. Interval 60s no testeado en vivo (lógica trivial).
