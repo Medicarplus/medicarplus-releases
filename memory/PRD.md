@@ -1,5 +1,14 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-28 (parte 2) · Deshacer fusión de copia recibida
+- **Solicitud**: poder tirar atrás si tras aplicar una copia recibida algo no cuadra, para volver al estado anterior.
+- **Solución**: aprovecha el sistema existente `caja.snapshots` (últimas 5 copias automáticas).
+  1. Antes de aplicar la copia por sync banner → `pushSnapshot('preSyncApply')`.
+  2. Tras aplicar → nuevo modal de éxito con dos botones: **"↩ Deshacer fusión"** (restaura el último snapshot al instante) y **"Aceptar y recargar"**.
+  3. Etiqueta nueva "⚠ Antes de fusionar copia recibida" añadida al modal del Historial de copias, para poder deshacer también más tarde desde Configuración.
+- Archivo tocado: `frontend/public/v2.html` (bloque `showBackupRestoreBanner` + nuevo helper `_showSyncApplySuccess` + reasonTxt map).
+
+
 ## 2026-02-28 · Fusión de copia sin duplicados por CONTENIDO (max cLocal, cRemoto)
 - **Problema reportado por el usuario**: al pasar copia por 2ª vez desde un PC al otro, todas las entradas (Renovaciones/Obtenciones Tráfico, Revisiones, Fotos, ciclistas, etc.) se DUPLICABAN, teniendo el doble de todo. La regla acordada es: nunca duplicar lo que ya existe; sólo añadir lo que falta.
 - **Causa raíz**: el motor `_mergeArrays` sólo dedupeaba por `id`. Si la misma ficha (mismo cliente, importe, tipo, fp) se había escrito manualmente en los dos PCs con `uid()` distinto, quedaba duplicada en cada fusión.

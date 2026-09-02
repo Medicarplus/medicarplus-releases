@@ -898,7 +898,7 @@ function openBackupHistory(){
     <p class="small" style="margin-bottom:10px">Se guardan hasta ${MAX_SNAPS} copias automáticas locales. Puedes restaurar cualquiera si algo va mal.<br>Antes de cualquier restauración se crea otra copia por seguridad.</p>
     <div style="flex:1;overflow:auto;padding-right:6px">${snaps.length?snaps.map((s,i)=>{
       const d=new Date(s.ts);
-      const reasonTxt={auto:'Auto',preRestore:'⚠ Antes de restaurar',manual:'Manual',preClear:'⚠ Antes de borrar día'}[s.reason]||s.reason;
+      const reasonTxt={auto:'Auto',preRestore:'⚠ Antes de restaurar',manual:'Manual',preClear:'⚠ Antes de borrar día',preSyncApply:'⚠ Antes de fusionar copia recibida'}[s.reason]||s.reason;
       return `<div style="background:#141821;padding:10px 12px;border-radius:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;border:1px solid ${s.reason!=='auto'?'#5e4a2a':'#2a3040'}">
         <div><b>${d.toLocaleString('es-ES')}</b><br><span class="small">${reasonTxt} · ${(window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1'}: ${cntEntries(s.cbTrafic)} · ${(window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2'}: ${cntEntries(s.cempla)}</span></div>
         <div style="display:flex;gap:6px">
@@ -11202,12 +11202,15 @@ setTimeout(()=>{
       const btn = back.querySelector('#bkApply');
       btn.disabled = true; btn.textContent = '⏳ Aplicando…';
       try{
+        // 🛡️ Snapshot ANTES de fusionar → permite deshacer si algo no cuadra
+        try{ if(typeof pushSnapshot==='function') pushSnapshot('preSyncApply'); }catch(_){}
         const merged = await window.mcSync.applyBackup(backup.data);
         Object.entries(merged).forEach(([k,v]) => window.mcSync.safeWrite(k, v));
         try{ await window.mcSync.consumeBackup(backup.backup_id); }catch(e){ console.warn('consume falló (se continúa):', e); }
         _bkBannerId = null;
-        back.remove(); if(typeof toast==='function') toast('✅ Copia aplicada (sin duplicados)');
-        setTimeout(() => location.reload(), 800);
+        back.remove();
+        // Modal de éxito con opción directa "Deshacer fusión"
+        _showSyncApplySuccess();
       }catch(e){
         console.error('Error aplicando copia:', e);
         btn.disabled = false; btn.textContent = '✅ Aplicar copia (fusionar)';
@@ -11216,6 +11219,49 @@ setTimeout(()=>{
       }
     };
     back.querySelector('#bkLater').onclick = () => { _bkSnoozedId = backup.backup_id; _bkBannerId = null; back.remove(); };
+  }
+  // Modal de éxito tras aplicar copia recibida. Ofrece "Deshacer fusión" que restaura
+  // el snapshot 'preSyncApply' recién creado (el último de caja.snapshots).
+  function _showSyncApplySuccess(){
+    const back = document.createElement('div'); back.className='modal-back'; back.style.zIndex='100010';
+    back.innerHTML = `<div class="modal" style="max-width:520px" data-testid="sync-apply-success">
+      <div style="text-align:center;margin-bottom:14px">
+        <div style="font-size:44px">✅</div>
+        <h3 style="margin:8px 0 6px;color:#22c55e;font-family:Georgia,serif">Copia aplicada</h3>
+        <p style="color:#94a3b8;font-size:13px;line-height:1.55;margin:0">Se ha fusionado sin duplicados (solo entradas nuevas se han añadido).</p>
+      </div>
+      <div style="background:rgba(245,179,1,.1);border:1px solid rgba(245,179,1,.35);border-radius:8px;padding:12px;color:#fde68a;font-size:12.5px;line-height:1.55;margin:8px 0 14px">
+        🛡️ Antes de fusionar se ha guardado una copia de seguridad de tu estado anterior.<br>
+        Si algo no te cuadra, pulsa <b>“↩ Deshacer fusión”</b> para volver a como estaba justo antes.
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="undoSync" data-testid="sync-undo-apply" style="padding:12px 16px;background:#1e293b;color:#f5b301;border:1px solid #f5b301;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">↩ Deshacer fusión</button>
+        <button id="okSync" data-testid="sync-apply-ok" style="flex:1;padding:12px;background:linear-gradient(135deg,#22c55e,#15803d);color:#fff;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">Aceptar y recargar</button>
+      </div>
+      <p style="color:#64748b;font-size:11px;margin:10px 0 0;text-align:center">También puedes deshacerla más tarde desde <b>Configuración → 🛡️ Historial de copias</b>.</p>
+    </div>`;
+    document.body.appendChild(back);
+    back.querySelector('#okSync').onclick = () => { back.remove(); setTimeout(()=>location.reload(), 100); };
+    back.querySelector('#undoSync').onclick = () => {
+      try{
+        const snaps = JSON.parse(localStorage.getItem('caja.snapshots')||'[]');
+        // Última copia = la que se acaba de crear con reason 'preSyncApply'
+        const last = snaps.length ? snaps[snaps.length-1] : null;
+        if(!last){ if(typeof toast==='function') toast('⚠ No hay copia previa para deshacer'); return; }
+        if(last.cbTrafic) localStorage.setItem('caja.v1', last.cbTrafic);
+        if(last.cempla) localStorage.setItem('caja.cempla.v1', last.cempla);
+        if(last.datafono) localStorage.setItem('caja.datafono', last.datafono);
+        if(last.datafonoCempla) localStorage.setItem('caja.cempla.datafono', last.datafonoCempla);
+        if(last.stats) localStorage.setItem('caja.stats.v1', last.stats);
+        if(last.irpf) localStorage.setItem('caja.irpf.v1', last.irpf);
+        back.remove();
+        if(typeof toast==='function') toast('↩ Fusión deshecha · estado anterior restaurado', 4000);
+        setTimeout(()=>location.reload(), 400);
+      }catch(e){
+        console.error('undoSync error', e);
+        if(typeof toast==='function') toast('❌ No se pudo deshacer: '+(e.message||e));
+      }
+    };
   }
   // ℹ️ Ahora sync-client va INLINE en v2.html → window.mcSync SIEMPRE existe al cargar
   function _ensureSyncClient(){ return Promise.resolve(!!window.mcSync); }
