@@ -1485,14 +1485,14 @@ function openLibroRegistro(){
   const renderLibro=()=>{
     try{
     const from=back.querySelector('#lrFrom').value||today,to=back.querySelector('#lrTo').value||today;
-    // Recopila entrades del CSV DGT (kind==='TRAF' AND _csv===true) dins del rang
+    // Recopila TODAS las entradas de Tráfico (kind==='TRAF') en el rango,
+    // tanto las importadas del CSV DGT como las añadidas manualmente.
     const filtered=[];
     Object.entries(state.byDate||{}).forEach(([d,arr])=>{
       if(d<from||d>to)return;
       (arr||[]).forEach(e=>{
         if(e.retorno)return;
         if(e.kind!=='TRAF')return;
-        if(e._csv!==true)return;
         // Filtre 0€: si el checkbox NO està activat, exclou entrades amb importe=0 i tasa=0
         const subt=(e.importe||0)-(e.descuento||0)+(e.tasa||0);
         if(subt<=0&&!getCountZero())return;
@@ -8600,11 +8600,11 @@ async function autoMarkAttendanceForDate(iso){
     citas = events.filter(e => e && e.date === iso);
   }catch(e){}
   if(citas.length === 0) return result;
-  // Obté entrades CSV DGT del mateix dia
+  // Obté totes les entrades de Tràfic del dia (tant del CSV DGT com manuals)
   let csvEntries = [];
   try{
     const bd = (state && state.byDate) || {};
-    csvEntries = (bd[iso] || []).filter(e => e && e.kind === 'TRAF' && e._csv === true);
+    csvEntries = (bd[iso] || []).filter(e => e && e.kind === 'TRAF' && !e.retorno);
   }catch(e){}
   const csvNames = csvEntries.map(e => e.nombre || '').filter(Boolean);
   for(const cita of citas){
