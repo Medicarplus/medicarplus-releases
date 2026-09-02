@@ -2262,7 +2262,8 @@ function openStats(initialSection){
     for(const iso of Object.keys(src)){
       const list = src[iso] || [];
       for(const e of list){
-        if(e.kind !== 'TRAF' || !e._csv) continue;
+        // Incluye TRAF importado (CSV DGT) Y manual (Renov/Obtención escrita a mano)
+        if(!e || e.kind !== 'TRAF' || e.retorno) continue;
         set.add(_trafBaseCat(e.tipo));
       }
     }
@@ -2295,7 +2296,7 @@ function openStats(initialSection){
       if(filterMonth != null && m !== +filterMonth) continue;
       const list = src[iso] || [];
       for(const e of list){
-        if(e.kind !== 'TRAF' || !e._csv) continue;
+        if(!e || e.kind !== 'TRAF' || e.retorno) continue;
         const imp = +e.importe || 0;
         const ta = +e.tasa || 0;
         const desc = +e.descuento || 0;
@@ -2374,7 +2375,7 @@ function openStats(initialSection){
         if(isNaN(dt) || dt.getFullYear() !== +filterYear) continue;
         if(filterMonth != null && (dt.getMonth() + 1) !== +filterMonth) continue;
         for(const e of (src[iso] || [])){
-          if(e.kind !== 'TRAF' || !e._csv) continue;
+          if(!e || e.kind !== 'TRAF' || e.retorno) continue;
           const imp = +e.importe || 0;
           const ta = +e.tasa || 0;
           const desc = +e.descuento || 0;
