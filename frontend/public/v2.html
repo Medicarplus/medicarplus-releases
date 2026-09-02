@@ -431,9 +431,41 @@
     autosyncTimer = setInterval(async () => { if(currentMode !== 'linked') return; await pushNow(); await pullNow(); }, intervalMs);
   }
   function stopAutosync(){ if(autosyncTimer){ clearInterval(autosyncTimer); autosyncTimer = null; } }
-  async function sendBackup(label){
-    const data = _snapshotLocalStorage();
-    return await _post('/api/sync/backup/send', { license_key: cfg.licenseKey, install_id: cfg.installId, data, label: label || null });
+  // Filtra el snapshot a UN SOLO DÍA. Sólo aplica a datos por fecha:
+  // caja.v1.byDate[date], caja.cempla.v1.byDate[date], datáfono[date] y cempla.datafono[date].
+  // Reserva de cambio se envía completa (cajón físico único).
+  function _filterSnapshotByDay(snap, dayIso){
+    const out = {};
+    Object.entries(snap || {}).forEach(([k, v]) => {
+      // Empresa 1 / Empresa 2 (byDate arrays)
+      if(k === 'caja.v1' || k === 'caja.cempla.v1'){
+        const bd = (v && v.byDate) || {};
+        const oneDay = bd[dayIso] ? { [dayIso]: bd[dayIso] } : {};
+        out[k] = Object.assign({}, v, { byDate: oneDay });
+        return;
+      }
+      // Datáfono por fecha (dict {fecha: importe})
+      if(k === 'caja.datafono' || k === 'caja.cempla.datafono'){
+        if(v && typeof v === 'object' && v[dayIso] !== undefined) out[k] = { [dayIso]: v[dayIso] };
+        return;
+      }
+      // Reserva de cambio → siempre entera (cajón físico único)
+      if(k === 'caja.reserva.v1'){ out[k] = v; return; }
+      // Todo lo demás (stats agregadas, irpf, saldos, config…) → NO se envía al enviar "solo un día"
+    });
+    return out;
+  }
+  async function sendBackup(label, opts){
+    let data = _snapshotLocalStorage();
+    const scope = opts && opts.scope;
+    const day = opts && opts.day;
+    let finalLabel = label || null;
+    if(scope === 'day' && day){
+      data = _filterSnapshotByDay(data, day);
+      const dayHuman = day.split('-').reverse().join('/');
+      finalLabel = (label ? label + ' · ' : '') + 'Solo día ' + dayHuman;
+    }
+    return await _post('/api/sync/backup/send', { license_key: cfg.licenseKey, install_id: cfg.installId, data, label: finalLabel });
   }
   async function getPendingBackup(){
     return await _get(`/api/sync/backup/pending?license_key=${encodeURIComponent(cfg.licenseKey)}&install_id=${encodeURIComponent(cfg.installId)}`);
@@ -11299,8 +11331,10 @@ setTimeout(()=>{
       : '<div style="color:#64748b;font-size:12px;font-style:italic">No hay otros ordenadores activos con esta licencia todavía.</div>';
     // 👑 Detecta si el usuario es el ADMIN MASTER para mostrar el bloque especial
     const _isMaster = (function(){ try{ const lic=JSON.parse(localStorage.getItem('caja.license.v1')||'null'); return !!(lic && (lic.key==='MB-MASTER-BRUGULAT-2026-OWNER' || lic.license_key==='MB-MASTER-BRUGULAT-2026-OWNER' || lic.type==='MASTER')); }catch(e){ return false; } })();
-    const adminHtml = _isMaster ? `<div style="border-top:1px dashed #7c3aed;padding-top:14px;margin-top:14px;background:rgba(124,58,237,.06);border-radius:8px;padding:14px;border:1px dashed rgba(124,58,237,.35)"><label style="font-size:11px;color:#c4b5fd;font-weight:800;letter-spacing:1px">👑 ADMIN · ENVIAR COPIA A OTRO CLIENTE</label><p style="font-size:12px;color:#c4b5fd;margin:6px 0 10px;line-height:1.4">Envía tus datos actuales al PC de un cliente <b>sin necesidad de vincular licencias</b>. El cliente verá el aviso al abrir su app y podrá fusionar sin perder sus datos.</p><div style="display:flex;gap:8px;margin-bottom:8px;align-items:center"><select id="admTarget" data-testid="admin-target-select" style="flex:1;padding:9px 12px;background:#0f172a;border:1px solid #7c3aed;border-radius:6px;color:#e2e8f0;font-size:13px"><option value="">Cargando clientes…</option></select><button id="admFav" data-testid="admin-fav-toggle" title="Marcar / quitar favorito el cliente seleccionado" style="padding:8px 12px;background:#0f172a;border:1px solid #7c3aed;border-radius:6px;color:#f5b301;font-size:16px;cursor:pointer;line-height:1">☆</button></div><div style="font-size:10.5px;color:#8b7fb8;margin:-4px 0 8px">Selecciona un cliente y pulsa ☆ para fijarlo arriba como favorito.</div><div style="display:flex;gap:8px"><input id="admLabel" type="text" placeholder="Etiqueta (ej: Datos actualizados desde el admin)" style="flex:1;padding:9px 12px;background:#0f172a;border:1px solid #7c3aed;border-radius:6px;color:#e2e8f0;font-size:13px"/><button id="admSend" data-testid="admin-send-to-license" style="padding:9px 18px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border:none;border-radius:6px;font-weight:800;font-size:13px;cursor:pointer">👑 Enviar</button></div></div>` : '';
-    back.innerHTML = `<div class="modal" style="max-width:600px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><h3 style="margin:0;color:#38bdf8;font-family:Georgia,serif">🔗 Sincronización Multi-PC</h3><button data-close style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">×</button></div><p style="color:#94a3b8;font-size:13px;margin:8px 0 18px;line-height:1.5">Tu plan <b style="color:${st.is_premium?'#22c55e':'#94a3b8'}">${st.is_premium?'Premium':'Standard'}</b> permite ${st.is_premium?'2 ordenadores':'1 ordenador'}.</p><div style="margin-bottom:14px"><label style="font-size:11px;color:#38bdf8;font-weight:800;letter-spacing:1px">MODO DE ESTE ORDENADOR</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px"><button id="mFus" data-testid="sync-btn-linked" style="padding:12px;background:${mode==='linked'?'linear-gradient(135deg,#22c55e,#15803d)':'#1e293b'};color:${mode==='linked'?'#fff':'#94a3b8'};border:2px solid ${mode==='linked'?'#22c55e':'#475569'};border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">🔗 Fusionado ${mode==='linked'?'✓':''}</button><button id="mInd" data-testid="sync-btn-independent" style="padding:12px;background:${mode==='independent'?'linear-gradient(135deg,#64748b,#475569)':'#1e293b'};color:${mode==='independent'?'#fff':'#94a3b8'};border:2px solid ${mode==='independent'?'#94a3b8':'#475569'};border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">🔒 Independiente ${mode==='independent'?'✓':''}</button></div></div><div style="margin-bottom:14px"><label style="font-size:11px;color:#a855f7;font-weight:800;letter-spacing:1px">OTROS ORDENADORES DE ESTA LICENCIA</label><div style="margin-top:6px">${peersHtml}</div></div>${st.is_premium ? `<div style="border-top:1px dashed #475569;padding-top:14px;margin-top:14px"><label style="font-size:11px;color:#f5b301;font-weight:800;letter-spacing:1px">📨 ENVIAR COPIA AL OTRO ORDENADOR (manual)</label><p style="font-size:12px;color:#94a3b8;margin:6px 0 10px;line-height:1.4">Útil en modo Independiente. El otro PC verá un aviso al abrir la app y podrá fusionarla sin duplicar.</p><div style="display:flex;gap:8px"><input id="bkLabel" type="text" placeholder="Etiqueta (opcional) - ej: Cierre marzo" style="flex:1;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:13px"/><button id="bkSend" data-testid="sync-send-backup" style="padding:9px 18px;background:linear-gradient(135deg,#f5b301,#eab308);color:#0f172a;border:none;border-radius:6px;font-weight:800;font-size:13px;cursor:pointer">📤 Enviar</button></div></div>` : ''}${adminHtml}<div style="display:flex;justify-content:flex-end;margin-top:16px"><button data-close style="padding:10px 16px;background:#1e293b;color:#94a3b8;border:1px solid #475569;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer">Cerrar</button></div></div>`;
+    const _defaultBkDay = (typeof currentDate === 'string' && currentDate) ? currentDate : new Date().toISOString().slice(0,10);
+    const _scopeHtml = (prefix, color) => `<div style="display:flex;gap:6px;margin-bottom:8px" data-testid="${prefix}-scope-row"><label style="flex:1;padding:8px 10px;background:#0f172a;border:1px solid ${color};border-radius:6px;color:${color};font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:700"><input type="radio" name="${prefix}Scope" value="all" checked data-testid="${prefix}-scope-all" style="accent-color:${color}"/>📋 Copia total</label><label style="flex:1;padding:8px 10px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#94a3b8;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px"><input type="radio" name="${prefix}Scope" value="day" data-testid="${prefix}-scope-day" style="accent-color:${color}"/>📅 Solo un día</label></div><div id="${prefix}DayWrap" style="display:none;margin-bottom:8px"><button type="button" id="${prefix}DayBtn" data-testid="${prefix}-day-btn" style="width:100%;padding:14px 16px;background:linear-gradient(135deg,#0f172a,#1e293b);border:2px solid ${color};border-radius:10px;color:#e2e8f0;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-sizing:border-box;transition:all .2s"><span style="font-size:22px">📅</span><span id="${prefix}DayLabel">Elige un día · toca aquí</span></button><input id="${prefix}Day" type="date" data-testid="${prefix}-day" value="${_defaultBkDay}" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0"/></div>`;
+    const adminHtml = _isMaster ? `<div style="border-top:1px dashed #7c3aed;padding-top:14px;margin-top:14px;background:rgba(124,58,237,.06);border-radius:8px;padding:14px;border:1px dashed rgba(124,58,237,.35)"><label style="font-size:11px;color:#c4b5fd;font-weight:800;letter-spacing:1px">👑 ADMIN · ENVIAR COPIA A OTRO CLIENTE</label><p style="font-size:12px;color:#c4b5fd;margin:6px 0 10px;line-height:1.4">Envía tus datos actuales al PC de un cliente <b>sin necesidad de vincular licencias</b>. El cliente verá el aviso al abrir su app y podrá fusionar sin perder sus datos.</p><div style="display:flex;gap:8px;margin-bottom:8px;align-items:center"><select id="admTarget" data-testid="admin-target-select" style="flex:1;padding:9px 12px;background:#0f172a;border:1px solid #7c3aed;border-radius:6px;color:#e2e8f0;font-size:13px"><option value="">Cargando clientes…</option></select><button id="admFav" data-testid="admin-fav-toggle" title="Marcar / quitar favorito el cliente seleccionado" style="padding:8px 12px;background:#0f172a;border:1px solid #7c3aed;border-radius:6px;color:#f5b301;font-size:16px;cursor:pointer;line-height:1">☆</button></div><div style="font-size:10.5px;color:#8b7fb8;margin:-4px 0 8px">Selecciona un cliente y pulsa ☆ para fijarlo arriba como favorito.</div>${_scopeHtml('adm','#a855f7')}<div style="display:flex;gap:8px"><input id="admLabel" type="text" placeholder="Etiqueta (ej: Datos actualizados desde el admin)" style="flex:1;padding:9px 12px;background:#0f172a;border:1px solid #7c3aed;border-radius:6px;color:#e2e8f0;font-size:13px"/><button id="admSend" data-testid="admin-send-to-license" style="padding:9px 18px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border:none;border-radius:6px;font-weight:800;font-size:13px;cursor:pointer">👑 Enviar</button></div></div>` : '';
+    back.innerHTML = `<div class="modal" style="max-width:600px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><h3 style="margin:0;color:#38bdf8;font-family:Georgia,serif">🔗 Sincronización Multi-PC</h3><button data-close style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">×</button></div><p style="color:#94a3b8;font-size:13px;margin:8px 0 18px;line-height:1.5">Tu plan <b style="color:${st.is_premium?'#22c55e':'#94a3b8'}">${st.is_premium?'Premium':'Standard'}</b> permite ${st.is_premium?'2 ordenadores':'1 ordenador'}.</p><div style="margin-bottom:14px"><label style="font-size:11px;color:#38bdf8;font-weight:800;letter-spacing:1px">MODO DE ESTE ORDENADOR</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px"><button id="mFus" data-testid="sync-btn-linked" style="padding:12px;background:${mode==='linked'?'linear-gradient(135deg,#22c55e,#15803d)':'#1e293b'};color:${mode==='linked'?'#fff':'#94a3b8'};border:2px solid ${mode==='linked'?'#22c55e':'#475569'};border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">🔗 Fusionado ${mode==='linked'?'✓':''}</button><button id="mInd" data-testid="sync-btn-independent" style="padding:12px;background:${mode==='independent'?'linear-gradient(135deg,#64748b,#475569)':'#1e293b'};color:${mode==='independent'?'#fff':'#94a3b8'};border:2px solid ${mode==='independent'?'#94a3b8':'#475569'};border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">🔒 Independiente ${mode==='independent'?'✓':''}</button></div></div><div style="margin-bottom:14px"><label style="font-size:11px;color:#a855f7;font-weight:800;letter-spacing:1px">OTROS ORDENADORES DE ESTA LICENCIA</label><div style="margin-top:6px">${peersHtml}</div></div>${st.is_premium ? `<div style="border-top:1px dashed #475569;padding-top:14px;margin-top:14px"><label style="font-size:11px;color:#f5b301;font-weight:800;letter-spacing:1px">📨 ENVIAR COPIA AL OTRO ORDENADOR (manual)</label><p style="font-size:12px;color:#94a3b8;margin:6px 0 10px;line-height:1.4">Útil en modo Independiente. El otro PC verá un aviso al abrir la app y podrá fusionarla sin duplicar.</p>${_scopeHtml('bk','#f5b301')}<div style="display:flex;gap:8px"><input id="bkLabel" type="text" placeholder="Etiqueta (opcional) - ej: Cierre marzo" style="flex:1;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:13px"/><button id="bkSend" data-testid="sync-send-backup" style="padding:9px 18px;background:linear-gradient(135deg,#f5b301,#eab308);color:#0f172a;border:none;border-radius:6px;font-weight:800;font-size:13px;cursor:pointer">📤 Enviar</button></div></div>` : ''}${adminHtml}<div style="display:flex;justify-content:flex-end;margin-top:16px"><button data-close style="padding:10px 16px;background:#1e293b;color:#94a3b8;border:1px solid #475569;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer">Cerrar</button></div></div>`;
     document.body.appendChild(back);
     back.addEventListener('click', ev => { if(ev.target===back || ev.target.hasAttribute('data-close')) back.remove(); });
     const setModeBtn = async (m) => {
@@ -11311,12 +11345,58 @@ setTimeout(()=>{
     };
     back.querySelector('#mFus').onclick = () => setModeBtn('linked');
     back.querySelector('#mInd').onclick = () => setModeBtn('independent');
+    // 🎚️ Wire de los radios de scope y el botón grande de calendario (para bk y adm).
+    // Devuelve una función getScope() que lee el estado actual.
+    const _wireScope = (prefix) => {
+      const wrap = back.querySelector('#'+prefix+'DayWrap');
+      const dayInp = back.querySelector('#'+prefix+'Day');
+      const dayBtn = back.querySelector('#'+prefix+'DayBtn');
+      const dayLbl = back.querySelector('#'+prefix+'DayLabel');
+      if(!wrap || !dayInp) return () => ({ scope: 'all', day: null });
+      const fmtHuman = iso => { try{ const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }catch(e){ return iso; } };
+      const refreshLabel = () => { if(dayLbl) dayLbl.textContent = dayInp.value ? '📅 Día seleccionado: ' + fmtHuman(dayInp.value) : 'Elige un día · toca aquí'; };
+      refreshLabel();
+      back.querySelectorAll(`input[name="${prefix}Scope"]`).forEach(r => {
+        r.addEventListener('change', () => {
+          const isDay = back.querySelector(`input[name="${prefix}Scope"]:checked`).value === 'day';
+          wrap.style.display = isDay ? '' : 'none';
+          // repintar los labels
+          back.querySelectorAll(`label:has(input[name="${prefix}Scope"])`).forEach(lb => {
+            const inp = lb.querySelector('input');
+            const active = inp.checked;
+            const color = (prefix==='adm')?'#a855f7':'#f5b301';
+            lb.style.borderColor = active ? color : '#475569';
+            lb.style.color = active ? color : '#94a3b8';
+            lb.style.fontWeight = active ? 700 : 500;
+          });
+          if(isDay){
+            // abrir el calendario automáticamente al elegir "Solo un día"
+            try{ if(dayInp.showPicker) dayInp.showPicker(); }catch(_){ dayInp.focus(); dayInp.click(); }
+          }
+        });
+      });
+      if(dayBtn){
+        dayBtn.onclick = () => { try{ if(dayInp.showPicker) dayInp.showPicker(); else { dayInp.focus(); dayInp.click(); } }catch(_){ dayInp.focus(); } };
+        dayBtn.onmouseenter = () => dayBtn.style.transform='translateY(-1px)';
+        dayBtn.onmouseleave = () => dayBtn.style.transform='translateY(0)';
+      }
+      dayInp.addEventListener('change', refreshLabel);
+      return () => {
+        const checked = back.querySelector(`input[name="${prefix}Scope"]:checked`);
+        const scope = checked ? checked.value : 'all';
+        return { scope, day: scope==='day' ? (dayInp.value||null) : null };
+      };
+    };
+    const getBkScope = _wireScope('bk');
+    const getAdmScope = _wireScope('adm');
     const bkBtn = back.querySelector('#bkSend');
     if(bkBtn){
       bkBtn.onclick = async () => {
         const label = back.querySelector('#bkLabel').value.trim();
+        const { scope, day } = getBkScope();
+        if(scope==='day' && !day){ alert('Selecciona un día antes de enviar'); return; }
         bkBtn.disabled = true; bkBtn.textContent = 'Enviando…';
-        try{ await window.mcSync.sendBackup(label); bkBtn.textContent = '✅ Enviada'; if(typeof toast==='function') toast('📤 Copia enviada al otro ordenador'); setTimeout(() => back.remove(), 1200); }
+        try{ await window.mcSync.sendBackup(label, { scope, day }); bkBtn.textContent = '✅ Enviada'; if(typeof toast==='function') toast(scope==='day' ? `📤 Copia del día ${day.split('-').reverse().join('/')} enviada` : '📤 Copia total enviada al otro ordenador'); setTimeout(() => back.remove(), 1200); }
         catch(e){ alert('Error: '+e.message); bkBtn.disabled=false; bkBtn.textContent='📤 Enviar'; }
       };
     }
@@ -11378,14 +11458,18 @@ setTimeout(()=>{
         const targetKey = admSelect.value;
         if(!targetKey){ alert('Selecciona un cliente destino'); return; }
         const targetTxt = admSelect.options[admSelect.selectedIndex].text;
-        if(!confirm(`¿Enviar TODOS tus datos actuales a:\n\n${targetTxt}?\n\nEl cliente verá el aviso al abrir su app y podrá fusionar sin perder sus datos.`)) return;
-        const label = (back.querySelector('#admLabel').value||'').trim();
+        const { scope: admScope, day: admDay } = getAdmScope();
+        if(admScope==='day' && !admDay){ alert('Selecciona un día antes de enviar'); return; }
+        const scopeTxt = admScope==='day' ? `los datos del día ${admDay.split('-').reverse().join('/')}` : 'TODOS tus datos actuales';
+        if(!confirm(`¿Enviar ${scopeTxt} a:\n\n${targetTxt}?\n\nEl cliente verá el aviso al abrir su app y podrá fusionar sin perder sus datos.`)) return;
+        let label = (back.querySelector('#admLabel').value||'').trim();
+        if(admScope==='day') label = (label?label+' · ':'') + 'Solo día ' + admDay.split('-').reverse().join('/');
         admSend.disabled = true; admSend.textContent = 'Enviando…';
         try{
           const lic = JSON.parse(localStorage.getItem('caja.license.v1')||'null');
           const adminKey = (lic && (lic.key || lic.license_key)) || '';
           const iid = localStorage.getItem('caja.install.id.v1') || '';
-          const data = {}; // reutiliza el snapshot público del cliente
+          let data = {}; // reutiliza el snapshot público del cliente
           for(let i=0;i<localStorage.length;i++){
             const k = localStorage.key(i);
             // Excluye claves locales (saldoInicial, install_id, sync, license, plan preview)
@@ -11395,6 +11479,20 @@ setTimeout(()=>{
                k.startsWith('caja.apibase.') || k.startsWith('caja.__sync') ||
                k.startsWith('caja.plan.preview.')) continue;
             try{ data[k] = JSON.parse(localStorage.getItem(k)); }catch(e){ data[k] = localStorage.getItem(k); }
+          }
+          // Filtrar por día si procede (mismo criterio que sendBackup)
+          if(admScope==='day' && admDay){
+            const filtered = {};
+            Object.entries(data).forEach(([k,v])=>{
+              if(k==='caja.v1' || k==='caja.cempla.v1'){
+                const bd=(v&&v.byDate)||{}; const oneDay = bd[admDay]?{[admDay]:bd[admDay]}:{};
+                filtered[k] = Object.assign({},v,{byDate:oneDay});
+              } else if(k==='caja.datafono' || k==='caja.cempla.datafono'){
+                if(v && typeof v==='object' && v[admDay]!==undefined) filtered[k] = {[admDay]:v[admDay]};
+              } else if(k==='caja.reserva.v1'){ filtered[k] = v; }
+              // resto se omite (stats, irpf, etc.)
+            });
+            data = filtered;
           }
           const base = _apiBase().replace(/\/$/, '');
           const r = await fetch(`${base}/api/sync/admin/push-to-license`, {
@@ -11407,7 +11505,7 @@ setTimeout(()=>{
           const j = await r.json();
           if(!r.ok) throw new Error(j.detail || ('HTTP '+r.status));
           admSend.textContent = '✅ Enviada';
-          if(typeof toast==='function') toast(`👑 Copia enviada a ${j.target_client_name||j.target_client_email||'cliente'}`);
+          if(typeof toast==='function') toast(`👑 Copia enviada a ${j.target_client_name||j.target_client_email||'cliente'}${admScope==='day'?' (solo día '+admDay.split('-').reverse().join('/')+')':''}`);
           setTimeout(() => back.remove(), 1500);
         }catch(e){ alert('Error: '+e.message); admSend.disabled=false; admSend.textContent='👑 Enviar'; }
       };
