@@ -1303,3 +1303,8 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - UI: línea '🔁 Traspasado a caja: X € (sigue en tu CAJA FÍSICA, no se resta del saldo)' en el modal Reserva (data-testid=cambio-traspaso-line). 'Vaciar todo' conserva _toCaja. 'Empezar de cero' sí lo borra (reset completo).
 - Denominaciones clave: monedas c1,c2,c5,c10,c20,c50,e1,e2 (por PAQUETES, pack=€/paq; e2=50€/paq) + '_m' manual €; billetes b5,b10,b20,b50 (unidades).
 - Testeado E2E file:// (3 tests): retiro 50€ → reserva 300/caja 350 intacta; retiro 100€ del manual; retiro con tope. CAJA FÍSICA y saldo idénticos antes/después en todos.
+
+### 💰 FIX total reserva no bajaba al retirar (caso Saldo inicial / _bulk_seed) · Jun 2026
+- Síntoma usuario: retirar restaba de las casillas pero el TOTAL GUARDAT no bajaba. Causa: saveCambio recalcula _bulk = _bulk_seed − suma(denoms); al restar de denoms sin bajar el seed, el dinero "volvía" al pendiente de repartir → total invariable.
+- Fix (HTML_BUILD 03.09): en retirar, (1) orden de descuento: paquetes → € manual → _bulk (pendiente de repartir, funciona aunque NO haya casillas rellenas); (2) _bulk_seed -= movedEur (para que el recálculo de saveCambio cuadre); (3) data._bulk = bulkPool restante; (4) _toCaja += movedEur (traspaso automático a CAJA FÍSICA).
+- Testeado E2E file:// 2 casos: todo en _bulk (350→300, traspaso 50, caja física constante) y mixto (e2:1 paq + bulk; retiro 100 → 50 del paquete + 50 del bulk, total 250). PENDIENTE: usuario debe hacer Deploy (verificar esquina · 03.09).

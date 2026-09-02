@@ -5809,6 +5809,7 @@ function _cambioBulkOp(data,rerender,mode){
     let changed=0;
     let movedEur=0;   // € realmente movidos (retirar) o añadidos
     let capped=false; // true si se pidió más de lo disponible en alguna denominación
+    let bulkPool=+(data._bulk)||0; // 🏦 dinero del Saldo inicial aún sin repartir en denominaciones
     CAMBIO_DENOMS.forEach(d=>{
       const q=ops[d.k]||0;
       if(q<=0) return;
@@ -5816,19 +5817,27 @@ function _cambioBulkOp(data,rerender,mode){
         data[d.k]=(data[d.k]||0)+q;changed++;
         movedEur+=q*(d.pack||d.val);
       }else{
-        // RETIRAR en euros: primero de paquetes/unidades, después del € manual.
+        // RETIRAR en euros: paquetes → € manual → pendiente de repartir (bulk).
         const unitVal=d.pack||d.val;
         const wantEur=q*unitVal;
         const packsEur=(Number(data[d.k])||0)*unitVal;
         const manualEur=d.pack?(Number(data[d.k+'_m'])||0):0;
-        const available=packsEur+manualEur;
+        const available=packsEur+manualEur+bulkPool;
         const takeEur=Math.min(wantEur,available);
         if(takeEur<wantEur)capped=true;
         if(takeEur<=0)return;
         const fromPacks=Math.min(packsEur,takeEur);
         data[d.k]=(packsEur-fromPacks)/unitVal;
-        const rest=takeEur-fromPacks;
-        if(d.pack&&rest>0)data[d.k+'_m']=Math.max(0,manualEur-rest);
+        let rest=takeEur-fromPacks;
+        if(d.pack&&rest>0){
+          const fromManual=Math.min(manualEur,rest);
+          data[d.k+'_m']=Math.max(0,manualEur-fromManual);
+          rest-=fromManual;
+        }
+        if(rest>0){
+          const fromBulk=Math.min(bulkPool,rest);
+          bulkPool-=fromBulk;rest-=fromBulk;
+        }
         movedEur+=takeEur;
         changed++;
       }
@@ -5837,6 +5846,9 @@ function _cambioBulkOp(data,rerender,mode){
     if(mode==='remove'){
       // 🔁 TRASPASO, no resta: el dinero pasa del cajón de cambio a la CAJA FÍSICA.
       data._toCaja=(+data._toCaja||0)+movedEur;
+      // El total objetivo del Saldo inicial baja por lo retirado (saveCambio recalcula _bulk)
+      if(data._bulk_seed!==undefined)data._bulk_seed=Math.max(0,(+data._bulk_seed||0)-movedEur);
+      data._bulk=bulkPool;
     }
     saveCambio(data);
     back.remove();
@@ -9168,7 +9180,7 @@ try{setInterval(function(){try{window.updateTrialBadge()}catch(e){}}, 60000)}cat
   try{
     var v = (window.appInfo && window.appInfo.version) ? window.appInfo.version : '2.1.12';
     var isElectron = !!(window.appInfo && window.appInfo.isDesktop);
-    var HTML_BUILD = '02.09'; // fecha de publicación de este v2.html (dd.mm) para diagnóstico
+    var HTML_BUILD = '03.09'; // fecha de publicación de este v2.html (dd.mm) para diagnóstico
     var el = document.getElementById('appVersion');
     if(el){ el.textContent = 'v' + v + ' · ' + HTML_BUILD + (isElectron ? '' : ' (web)'); }
   }catch(e){}
