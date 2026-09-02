@@ -274,9 +274,11 @@
     return out;
   }
   function _mergeArrays(local, remote){
+    const L = Array.isArray(local) ? local : [];
+    const R = Array.isArray(remote) ? remote : [];
     const map = new Map();
-    (local||[]).forEach(e => { if(e && e.id) map.set(e.id, e); else map.set(Symbol(), e); });
-    (remote||[]).forEach(e => {
+    L.forEach(e => { if(e && e.id) map.set(e.id, e); else map.set(Symbol(), e); });
+    R.forEach(e => {
       if(!e || !e.id) return map.set(Symbol(), e);
       const cur = map.get(e.id);
       const cur_ts = cur && cur.updated_at ? new Date(cur.updated_at).getTime() : 0;
@@ -288,7 +290,13 @@
   function _mergeByDate(local, remote){
     const out = {};
     const dates = new Set([...Object.keys(local||{}), ...Object.keys(remote||{})]);
-    dates.forEach(iso => { out[iso] = _mergeArrays((local||{})[iso], (remote||{})[iso]); });
+    dates.forEach(iso => {
+      const l = (local||{})[iso];
+      const r = (remote||{})[iso];
+      if(Array.isArray(l) || Array.isArray(r)){ out[iso] = _mergeArrays(l, r); return; }
+      // Valores escalares por fecha (ej. datáfono {fecha: importe}): lo local gana; si falta, entra lo remoto
+      out[iso] = (l !== undefined && l !== null) ? l : r;
+    });
     return out;
   }
   function _isByDateShape(v){
@@ -306,6 +314,7 @@
     keys.forEach(k => {
       const lv = (localSnap||{})[k];
       const rv = (remoteSnap||{})[k];
+      try{
       if(rv === undefined){ out[k] = lv; return; }
       if(lv === undefined){ out[k] = rv; return; }
       const looksLikeByDate = BYDATE_KEY_HINT.test(k) || _isByDateShape(lv) || _isByDateShape(rv);
@@ -321,6 +330,11 @@
       const lts = (lv && lv._mtime) || 0;
       const rts = (rv && rv._mtime) || 0;
       out[k] = rts > lts ? rv : lv;
+      }catch(e){
+        // Blindaje: una clave problemática NUNCA rompe toda la fusión. Se conserva lo local.
+        console.warn('[mcSync] merge fallback en', k, e);
+        out[k] = lv !== undefined ? lv : rv;
+      }
     });
     return out;
   }

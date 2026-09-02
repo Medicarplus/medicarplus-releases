@@ -1320,3 +1320,8 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - Tercer botón azul '↩ Devolver a cambio (desde caja)' (data-testid=cambio-return-btn) junto a Añadir/Retirar + botón inline en la línea de traspaso (cambio-devolver-btn). Ambos abren _cambioBulkOp modo 'return'.
 - Lógica return: suma piezas al cajón (data[d.k]+=q), _bulk_seed += retEur (para que saveCambio no absorba la devolución), _toCaja -= retEur. TOPE: no se puede devolver más que _toCaja (toast de aviso, no aplica nada). Con _toCaja=0 el botón avisa y no abre modal.
 - CAJA FÍSICA constante en la operación (el dinero solo cambia de sitio). Testeado E2E: traspaso 100 → devuelvo 50 → reserva 294,74→344,74, traspaso 50, intento de devolver 100 con 50 → rechazado, caja física idéntica.
+
+### 🐛 FIX "(remote || []).forEach is not a function" al aplicar copia · Jun 2026
+- Causa: caja.datafono / caja.cempla.datafono son mapas {fecha: importe(número)}. _isByDateShape los detecta como byDate → _mergeByDate → _mergeArrays sobre NÚMEROS → crash. Solo ocurría si AMBOS PCs tenían datáfono (tests previos no lo cubrían).
+- Fix: (1) _mergeByDate: si el valor de una fecha no es array → escalar: gana lo local, si falta entra lo remoto; (2) _mergeArrays coerciona no-arrays a []; (3) _mergeSnapshots con try/catch POR CLAVE (una clave corrupta nunca rompe la fusión completa; fallback conserva lo local).
+- Testeado E2E file://: admin push con datafono en ambos lados → sin error, entradas fusionadas, datafono por día (local gana en conflicto, remoto entra en días nuevos), cempla.datafono entra, reserva LWW, saldo inicial intacto, banner cierra. PENDIENTE deploy usuario (marker 03.09).
