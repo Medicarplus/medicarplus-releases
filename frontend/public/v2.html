@@ -622,6 +622,7 @@
             <div><label data-i18n="concept">Concepto</label><select id="t-tipo"><option data-i18n="renewal">Renovación</option><option>Prórroga</option><option>Obtención</option><option data-i18n="issue">Expedición</option><option data-i18n="duplicate">Duplicado</option><option data-i18n="exchange">Canje</option><option>Recuperación</option><option data-i18n="other">Otro</option></select></div>
             <div><label data-i18n="group">Grupo</label><input type="text" id="t-grupo" list="t-grupo-list" placeholder="Escribe o elige…" autocomplete="off" style="padding:8px 10px;background:#0f172a;border:1px solid #2a3040;border-radius:6px;color:#e2e8f0;font-size:13px;width:100%;box-sizing:border-box"/><datalist id="t-grupo-list"><option value="Conducción"></option><option value="Armas"></option><option value="Seguridad"></option><option value="Animales peligrosos"></option><option value="Grúas"></option><option value="Deportes"></option><option value="Marina"></option><option value="Ciclomotor"></option><option value="BTP"></option><option value="Otro"></option></datalist></div>
             <div><label data-i18n="name">Nombre</label><input type="text" id="t-nombre" data-i18n-ph="ph_name" placeholder="Apellidos, Nombre" /></div>
+            <div><label>DNI</label><input type="text" id="t-dni" placeholder="12345678A" autocomplete="off" style="text-transform:uppercase;font-family:Consolas,Menlo,monospace;letter-spacing:.3px" /></div>
             <div><label data-i18n="amount">Importe (€)</label><input type="number" step="0.01" id="t-importe" /></div>
             <div><label data-i18n="dgt_fee">Tasa DGT (€)</label><input type="number" step="0.01" id="t-tasa" value="0" /></div>
             <div><label data-i18n="payment">F. Pago</label><select id="t-fp"><option value="E" data-i18n="cash">Efectivo</option><option value="T" data-i18n="card">Tarjeta</option><option value="B">Bizum</option><option value="X" data-i18n="transfer">Transferencia</option></select></div>
@@ -3005,7 +3006,7 @@ function openStats(initialSection){
 $$('#chips-priv-cempla .chip').forEach(c=>c.onclick=()=>{$$('#chips-priv-cempla .chip').forEach(x=>x.classList.remove('active'));c.classList.add('active');privConcept=c.dataset.c||'';currentPreu=c.dataset.preu||'';currentSplit=c.dataset.split||'45-45-10';$('#p-tipo-custom').value=privConcept;$('#p-preu-custom').value=currentPreu;const[b,cc,m]=currentSplit.split('-');$('#p-pct-b').value=b;$('#p-pct-c').value=cc;$('#p-pct-m').value=m;setTimeout(()=>$('#p-nombre-cempla').focus(),50)});
 $$('.tabs button').forEach(b=>b.onclick=()=>{$$('.tabs button').forEach(x=>x.classList.remove('active'));$$('.tab').forEach(x=>x.style.display='none');b.classList.add('active');$('#'+b.dataset.tab).style.display='block'});
 $$('#chips-priv .chip').forEach(c=>c.onclick=()=>{$$('#chips-priv .chip').forEach(x=>x.classList.remove('active'));c.classList.add('active');privConcept=c.dataset.c;if(c.dataset.preu){$('#p-importe').value=c.dataset.preu;$('#p-nombre').focus()}});
-$('#btnAddTraf').onclick=()=>{const e={id:uid(),kind:'TRAF',tipo:$('#t-tipo').value,grupo:(window._normalizeGrupo?window._normalizeGrupo($('#t-grupo').value):$('#t-grupo').value)||'Otro',nombre:$('#t-nombre').value.trim()||'Cliente',importe:num($('#t-importe').value),descuento:0,tasa:num($('#t-tasa').value),fp:$('#t-fp').value,fpTasa:$('#t-fp').value,retorno:false};if(!e.importe&&!e.tasa&&!e.nombre){toast('Añade al menos un nombre/concepto');return}entriesOf(currentDate).push(e);saveState();render();$('#t-nombre').value='';$('#t-importe').value='';$('#t-tasa').value='0'};
+$('#btnAddTraf').onclick=()=>{const dniRaw=($('#t-dni').value||'').trim().toUpperCase();const e={id:uid(),kind:'TRAF',tipo:$('#t-tipo').value,grupo:(window._normalizeGrupo?window._normalizeGrupo($('#t-grupo').value):$('#t-grupo').value)||'Otro',nombre:$('#t-nombre').value.trim()||'Cliente',dni:dniRaw||undefined,importe:num($('#t-importe').value),descuento:0,tasa:num($('#t-tasa').value),fp:$('#t-fp').value,fpTasa:$('#t-fp').value,retorno:false};if(!e.importe&&!e.tasa&&!e.nombre){toast('Añade al menos un nombre/concepto');return}entriesOf(currentDate).push(e);saveState();render();$('#t-nombre').value='';$('#t-dni').value='';$('#t-importe').value='';$('#t-tasa').value='0'};
 $('#btnAddPriv').onclick=()=>{const isC=currentCompany==='cempla';let nom=isC?$('#p-nombre-cempla').value.trim():$('#p-nombre').value.trim();let tipo=isC?($('#p-tipo-custom').value.trim()||privConcept||'Revisió'):privConcept;let imp=isC?num($('#p-preu-custom').value):num($('#p-importe').value);let fp=isC?$('#p-fp-cempla').value:$('#p-fp').value;if(isC){const b=num($('#p-pct-b').value)||0,cc=num($('#p-pct-c').value)||0,m=num($('#p-pct-m').value)||0;currentSplit=`${b}-${cc}-${m}`}const e={id:uid(),kind:'PRIV',tipo,grupo:'-',nombre:nom||'Cliente',importe:imp,descuento:isC?0:num($('#p-desc').value),tasa:isC?0:num($('#p-tasa').value),fp,fpTasa:fp,split:isC?currentSplit:null,retorno:false};if(!e.importe&&!e.tasa&&!e.nombre){toast('Afegeix un nom o import');return}entriesOf(currentDate).push(e);saveState();render();if(isC){$('#p-nombre-cempla').value=''}else{$('#p-nombre').value='';$('#p-importe').value='';$('#p-desc').value='0';$('#p-tasa').value='0'}};
 $('#btnAddDH').onclick=()=>{const e={id:uid(),kind:'DH',tipo:$('#dh-tipo').value,grupo:'-',nombre:$('#dh-concepto').value.trim()||'(sin concepto)',importe:num($('#dh-importe').value),descuento:0,tasa:0,fp:$('#dh-fp').value,fpTasa:'',retorno:false};if(!e.importe&&!e.nombre){toast('Indica un concepto');return}entriesOf(currentDate).push(e);saveState();render();$('#dh-concepto').value='';$('#dh-importe').value='';try{refreshWorkersDatalist()}catch(_){}};
 function updateDhTipoColor(){const v=$('#dh-tipo').value;$('#dh-tipo').classList.toggle('haber-sel',v==='HABER');$('#dh-tipo').classList.toggle('debe-sel',v==='DEBE')}
@@ -6406,9 +6407,18 @@ $('#btnAiAsk').onclick=()=>{
       <button id="aiCompare" data-testid="ai-compare-other-pc" title="Compara tus datos con los del otro ordenador y detecta entradas que falten o discrepen" style="width:100%;padding:12px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;border-radius:8px;font-weight:800;font-size:13.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px">🔍 <span>Comparar con el otro PC</span></button>
       <div class="small" id="aiCompareHint" style="margin-top:6px;color:#7a8394;font-style:italic">Sólo si tienes 2 ordenadores con la misma licencia. Pide a la IA que revise qué días o entradas no coinciden entre los dos PC.</div>
     </div>
+    <div id="aiAdmCmpBlock" style="display:none;border:1px dashed rgba(124,58,237,.35);background:rgba(124,58,237,.06);border-radius:8px;padding:12px;margin-bottom:12px">
+      <label style="font-size:11px;color:#c4b5fd;font-weight:800;letter-spacing:1px">👑 ADMIN · COMPARARTE CON UN CLIENTE</label>
+      <p style="font-size:12px;color:#c4b5fd;margin:6px 0 10px;line-height:1.4">Selecciona un cliente y la IA comparará TUS datos con los suyos, detectando entradas que falten o discrepen. Útil para auditar cajas.</p>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <select id="aiAdmTarget" data-testid="ai-adm-target" style="flex:1;padding:9px 12px;background:#0f172a;border:1px solid #7c3aed;border-radius:6px;color:#e2e8f0;font-size:13px"><option value="">Cargando clientes…</option></select>
+        <button id="aiAdmCompareBtn" data-testid="ai-adm-compare" style="padding:9px 16px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border:none;border-radius:6px;font-weight:800;font-size:13px;cursor:pointer">👑 Comparar</button>
+      </div>
+    </div>
     <div id="aiAnswer" style="max-height:340px;overflow:auto;padding:12px;background:#0e1117;border-radius:8px;border:1px solid #2a3040;font-size:13px;line-height:1.55;white-space:pre-wrap;display:none;color:#dbe4f0"></div>
     <div class="row" style="margin-top:14px">
       <button class="btn" data-no>Cerrar</button>
+      <button class="btn" id="aiHist" data-testid="ai-history-btn" title="Ver las últimas 5 consultas guardadas" style="background:#1e293b;color:#e2e8f0;border:1px solid #475569">📚 Historial</button>
       <button class="btn btn-primary" id="aiSend" style="background:linear-gradient(90deg,#7c3aed 0%,#a855f7 100%);color:#fff;border-color:transparent">🚀 Preguntar</button>
     </div></div>`;
   document.body.appendChild(back);
@@ -6458,10 +6468,157 @@ $('#btnAiAsk').onclick=()=>{
       const rangeNote=(dFromInput||dToInput)?`\n\n[Rango solicitado: ${dFromInput||'inicio'} → ${dToInput||'hoy'}]`:'';
       const res=await fetch(getAiEndpoint(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q+rangeNote,data:allData,company:currentCompany==='cempla'?'cempla':'cbTrafic',diff,userGeminiKey:userKey,auditSummary,dateRange:{from:dFromInput||null,to:dToInput||null}})});
       const j=await res.json();
-      ansEl.textContent=(j.source==='user-key'?'🎁 (Respuesta gratuita con tu clave Google)\n\n':'')+(j.answer||'(sin respuesta)');
+      const answer=(j.source==='user-key'?'🎁 (Respuesta gratuita con tu clave Google)\n\n':'')+(j.answer||'(sin respuesta)');
+      ansEl.textContent=answer;
+      // 📚 Guarda en historial (últimas 5 consultas)
+      try{ _aiHistPush({kind:'ask', q:q, from:dFromInput||null, to:dToInput||null, diff, answer}); }catch(_){}
     }catch(e){ansEl.textContent='❌ Error de conexión: '+e.message}
     btn.disabled=false;btn.textContent='🚀 Preguntar';
   };
+  // 📚 Historial de consultas IA (localStorage · últimas 5)
+  const AI_HIST_KEY = 'caja.ai.history.v1';
+  const AI_HIST_MAX = 5;
+  function _aiHistPush(item){
+    const arr = (()=>{try{return JSON.parse(localStorage.getItem(AI_HIST_KEY)||'[]');}catch(e){return [];}})();
+    arr.push({ts: Date.now(), ...item});
+    while(arr.length > AI_HIST_MAX) arr.shift();
+    try{ localStorage.setItem(AI_HIST_KEY, JSON.stringify(arr)); }catch(_){}
+  }
+  const histBtn = back.querySelector('#aiHist');
+  if(histBtn){
+    histBtn.onclick = () => {
+      const arr = (()=>{try{return JSON.parse(localStorage.getItem(AI_HIST_KEY)||'[]');}catch(e){return [];}})().slice().reverse();
+      const hBack = document.createElement('div'); hBack.className='modal-back'; hBack.style.zIndex='100020';
+      const rows = arr.length ? arr.map((it,i)=>{
+        const d = new Date(it.ts).toLocaleString('es-ES');
+        const kindTxt = it.kind==='compare' ? '🔍 Comparar con el otro PC' : '💬 Consulta';
+        const q = (it.q || '(sin pregunta)').slice(0,140);
+        const rng = (it.from||it.to) ? ` · ${it.from||'inicio'}→${it.to||'hoy'}` : '';
+        return `<div style="background:#141821;border:1px solid #2a3040;border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer" data-i="${i}" data-testid="ai-hist-item-${i}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="color:#a855f7;font-size:12px">${kindTxt}</b><span style="color:#7a8394;font-size:11px">${d}${rng}</span></div>
+          <div style="color:#cbd5e1;font-size:12px;line-height:1.4">${escapeHtml(q)}</div>
+        </div>`;
+      }).join('') : '<div class="empty" style="padding:30px;text-align:center;color:#7a8394">No hay consultas guardadas todavía. Pregunta algo o pulsa "Comparar con el otro PC" y se guardará aquí.</div>';
+      hBack.innerHTML = `<div class="modal" style="max-width:640px;max-height:85vh;display:flex;flex-direction:column">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <h3 style="margin:0;color:#a855f7">📚 Historial · últimas ${AI_HIST_MAX} consultas IA</h3>
+          <button data-no style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">×</button>
+        </div>
+        <p style="color:#94a3b8;font-size:12px;margin:0 0 12px">Pulsa una consulta para releerla sin gastar otra pregunta a la IA. Se guardan en tu ordenador (nunca se envían a nadie).</p>
+        <div style="flex:1;overflow:auto;padding-right:4px">${rows}</div>
+        <div class="row" style="margin-top:12px;justify-content:space-between">
+          <button class="btn btn-danger" id="aiHistClear" data-testid="ai-hist-clear">🗑️ Vaciar historial</button>
+          <button class="btn" data-no>Cerrar</button>
+        </div></div>`;
+      document.body.appendChild(hBack);
+      hBack.querySelectorAll('[data-no]').forEach(b=>b.onclick=()=>hBack.remove());
+      hBack.addEventListener('click', ev => { if(ev.target===hBack) hBack.remove(); });
+      hBack.querySelector('#aiHistClear').onclick = () => {
+        confirmModal('🗑️ Vaciar historial IA','¿Borrar las consultas guardadas? Se perderán todas.',()=>{
+          localStorage.removeItem(AI_HIST_KEY); hBack.remove(); if(typeof toast==='function') toast('✅ Historial vaciado');
+        },'Sí, borrar');
+      };
+      hBack.querySelectorAll('[data-i]').forEach(el => {
+        el.onclick = () => {
+          const idx = +el.dataset.i;
+          const it = arr[idx]; if(!it) return;
+          const ansEl = back.querySelector('#aiAnswer');
+          ansEl.style.display='block';
+          const header = `📅 ${new Date(it.ts).toLocaleString('es-ES')}\n💬 ${it.q}\n${'—'.repeat(40)}\n\n`;
+          ansEl.textContent = header + (it.answer||'(sin respuesta guardada)');
+          hBack.remove();
+        };
+      });
+    };
+  }
+  // 👑 ADMIN · Comparar tus datos con un cliente cualquiera
+  const _isMasterAi = (function(){ try{ const lic=JSON.parse(localStorage.getItem('caja.license.v1')||'null'); return !!(lic && (lic.key==='MB-MASTER-BRUGULAT-2026-OWNER' || lic.license_key==='MB-MASTER-BRUGULAT-2026-OWNER' || lic.type==='MASTER')); }catch(e){ return false; } })();
+  const admBlock = back.querySelector('#aiAdmCmpBlock');
+  if(_isMasterAi && admBlock){
+    admBlock.style.display = 'block';
+    const admSelect = back.querySelector('#aiAdmTarget');
+    const admBtn = back.querySelector('#aiAdmCompareBtn');
+    // Cargar lista de clientes
+    (async () => {
+      try{
+        const lic = JSON.parse(localStorage.getItem('caja.license.v1')||'null');
+        const adminKey = (lic && (lic.key || lic.license_key)) || '';
+        const base = getApiBase().replace(/\/$/, '');
+        const r = await fetch(`${base}/api/sync/admin/list-licenses?admin_license_key=${encodeURIComponent(adminKey)}`);
+        if(!r.ok) throw new Error('HTTP '+r.status);
+        const j = await r.json();
+        const licenses = j.licenses || [];
+        // Excluye la propia licencia (admin) de la lista
+        const filtered = licenses.filter(l => l.license_key !== adminKey);
+        if(!filtered.length){ admSelect.innerHTML = '<option value="">(no hay clientes disponibles)</option>'; return; }
+        admSelect.innerHTML = '<option value="">-- Selecciona un cliente --</option>' + filtered.map(l => {
+          const name = l.client_name || l.client_email || '(sin nombre)';
+          const email = l.client_email ? ` · ${l.client_email}` : '';
+          const plan = l.plan ? ` [${l.plan}]` : '';
+          return `<option value="${l.license_key}">${name}${email}${plan}</option>`;
+        }).join('');
+      }catch(e){ admSelect.innerHTML='<option value="">Error cargando clientes</option>'; console.warn('list-licenses', e); }
+    })();
+    admBtn.onclick = async () => {
+      const targetKey = admSelect.value;
+      if(!targetKey){ alert('Selecciona un cliente'); return; }
+      const targetTxt = admSelect.options[admSelect.selectedIndex].text;
+      const dFromInput = back.querySelector('#aiFrom').value || '';
+      const dToInput = back.querySelector('#aiTo').value || '';
+      const userKey = localStorage.getItem('caja.geminiKey') || '';
+      const ansEl = back.querySelector('#aiAnswer');
+      ansEl.style.display='block';
+      admBtn.disabled = true; const origTxt = admBtn.textContent; admBtn.textContent = '⏳ Cargando…';
+      try{
+        const lic = JSON.parse(localStorage.getItem('caja.license.v1')||'null');
+        const adminKey = (lic && (lic.key || lic.license_key)) || '';
+        const base = getApiBase().replace(/\/$/, '');
+        // 1) Descarga snapshot del cliente objetivo
+        const r0 = await fetch(`${base}/api/sync/admin/other-license-snapshot?admin_license_key=${encodeURIComponent(adminKey)}&target_license_key=${encodeURIComponent(targetKey)}`);
+        const oj = await r0.json();
+        if(!r0.ok || !oj.has_data){
+          ansEl.textContent = `🔍 No hay datos en la nube de <${targetTxt}> para comparar.\n\nEse cliente todavía no ha subido datos (necesita modo Fusionado) o no tiene copias en su buzón.`;
+          admBtn.disabled=false; admBtn.textContent = origTxt; return;
+        }
+        // 2) Prepara ambos snapshots (locales + cliente) filtrados por rango
+        const filterByDate = (store) => {
+          if(!dFromInput && !dToInput) return store;
+          const bd=(store&&store.byDate)||{}; const out={};
+          for(const iso of Object.keys(bd)){
+            if(dFromInput && iso<dFromInput) continue;
+            if(dToInput && iso>dToInput) continue;
+            out[iso]=bd[iso];
+          }
+          return {byDate:out};
+        };
+        const localTraf = JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}');
+        const localCempla = JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}');
+        const otherTraf = (oj.data && oj.data['caja.v1']) || {byDate:{}};
+        const otherCempla = (oj.data && oj.data['caja.cempla.v1']) || {byDate:{}};
+        const localData = { cbTrafic: filterByDate(localTraf), cempla: filterByDate(localCempla) };
+        const otherData = { cbTrafic: filterByDate(otherTraf), cempla: filterByDate(otherCempla) };
+        const rng = (dFromInput||dToInput)?` en el rango ${dFromInput||'inicio'} → ${dToInput||'hoy'}`:'';
+        const question = `👑 Compara MIS datos con los del cliente ${oj.target_client_name||oj.target_client_email||'destino'}${rng}. Dime qué entradas faltan en cada lado, qué importes discrepan y termina con una lista de acciones para cuadrar.`;
+        ansEl.textContent = `🔍 Comparando con ${oj.target_client_name||oj.target_client_email||'cliente'}…`;
+        // 3) Envía a la IA en modo comparación
+        const body = {
+          question, data: localData, otherData,
+          company: currentCompany==='cempla' ? 'cempla' : 'cbTrafic',
+          compareMode: true, userGeminiKey: userKey,
+          dateRange: { from: dFromInput||null, to: dToInput||null }
+        };
+        const res = await fetch(getAiEndpoint(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        const j = await res.json();
+        const answer = (j.source==='user-key'?'🎁 (Respuesta gratuita con tu clave Google)\n\n':'') + (j.answer||'(sin respuesta)');
+        ansEl.textContent = answer;
+        try{ _aiHistPush({kind:'compare', q:question, from:dFromInput||null, to:dToInput||null, diff:0, answer}); }catch(_){}
+      }catch(e){
+        console.error('aiAdmCompare', e);
+        ansEl.textContent = '❌ No se pudo comparar: ' + (e.message||e);
+      }
+      admBtn.disabled = false; admBtn.textContent = origTxt;
+    };
+  }
   // 🔍 Comparar con el otro PC: descarga snapshot del otro ordenador y pide a la IA un diff
   const cmpBtn = back.querySelector('#aiCompare');
   if(cmpBtn){
@@ -6521,7 +6678,10 @@ $('#btnAiAsk').onclick=()=>{
         };
         const res = await fetch(getAiEndpoint(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
         const j = await res.json();
-        ansEl.textContent = (j.source==='user-key'?'🎁 (Respuesta gratuita con tu clave Google)\n\n':'') + (j.answer||'(sin respuesta)');
+        const answer = (j.source==='user-key'?'🎁 (Respuesta gratuita con tu clave Google)\n\n':'') + (j.answer||'(sin respuesta)');
+        ansEl.textContent = answer;
+        // 📚 Guarda en historial (últimas 5 consultas)
+        try{ _aiHistPush({kind:'compare', q:question, from:dFromInput||null, to:dToInput||null, diff:0, answer}); }catch(_){}
       }catch(e){
         console.error('aiCompare', e);
         ansEl.textContent = '❌ No se ha podido comparar: ' + (e.message||e);

@@ -1,5 +1,20 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-28 (parte 5) · 👑 Admin: Comparar con CUALQUIER cliente
+- Nuevo bloque ADMIN dentro del Asesor IA (visible sólo para MASTER): selector de cliente + botón "👑 Comparar". Descarga el snapshot de la licencia elegida y pide a la IA un diff contra los datos del admin. Útil para auditar cajas de cualquier cliente.
+- Backend: nuevo endpoint `GET /api/sync/admin/other-license-snapshot?admin_license_key=…&target_license_key=…` (auth MASTER-only). Combina `sync_groups` + último backup del mailbox del cliente objetivo. Devuelve `target_client_name/email/plan` para trazabilidad.
+- Tests end-to-end pasados:
+  - Guard 403 si admin_license_key ≠ MASTER · 404 si target no existe · has_data=False si el cliente no ha subido datos (muestra mensaje amable en frontend).
+  - Con datos reales cross-license: la IA identificó los 3 diffs plantados (JUAN faltante, ANA faltante, PEDRO solo en admin) y omitió correctamente el nombre que coincidía en ambos.
+- Archivos: `backend/routes/sync.py`, `frontend/public/v2.html`.
+
+
+## 2026-02-28 (parte 4) · Campo DNI + Historial de consultas IA
+- **Campo DNI en Tráfico manual**: nueva columna `DNI` en la fila de entrada de Tráfico (entre Nombre e Importe). Se guarda en mayúsculas y monoespaciado. Al añadir la entrada, el DNI se incluye en el objeto guardado (`e.dni`) y participa en la huella de dedup, los filtros y la búsqueda.
+- **Historial de consultas IA (últimas 5)**: nuevo botón "📚 Historial" en el modal del Asesor IA. Guarda automáticamente cada consulta (tanto `💬 Consulta` como `🔍 Comparar con el otro PC`) con timestamp, rango de fechas, pregunta y respuesta completa en localStorage (`caja.ai.history.v1`). Al pulsar en cualquier entrada del historial se muestra la respuesta guardada sin volver a consultar la IA. Botón "🗑️ Vaciar historial" con confirmación.
+- Archivo tocado: `frontend/public/v2.html`.
+
+
 ## 2026-02-28 (parte 3) · 🔍 Comparar 2 PCs con IA · Reserva por empresa · Grupos DGT normalizados
 - **Asesor IA · Comparar con el otro PC**: nuevo botón en el modal del Asesor IA que descarga el snapshot del otro ordenador de la misma licencia y pide a la IA un análisis diff día por día. La IA identifica entradas que faltan/sobran en cada lado, discrepancias de importe y descuadre por reserva de cambio. Termina con lista de acciones concretas para cuadrar.
   - Backend: nuevo endpoint `GET /api/sync/other-snapshot` que devuelve datos del otro PC. En modo Fusionado usa `sync_groups` (COLL_STATE) filtrando por autores ACTIVOS en `sync_devices` (evita datos huérfanos de installations eliminadas). En modo Independiente cae al último backup del mailbox.

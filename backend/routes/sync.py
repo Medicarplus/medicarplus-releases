@@ -606,4 +606,60 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
             })
         return {"licenses": out, "count": len(out)}
 
+    @router.get("/sync/admin/other-license-snapshot")
+    async def admin_other_license_snapshot(admin_license_key: str, target_license_key: str):
+        """👑 ADMIN-ONLY · Devuelve el snapshot de datos de una licencia objetivo.
+
+        Se combinan dos fuentes:
+          · sync_groups (COLL_STATE) → últimos datos push del cliente en la nube.
+          · última copia del buzón de la licencia (si no hay estado vivo).
+
+        Uso: comparar los datos del admin contra los de cualquier cliente para
+        auditar o ayudar a detectar descuadres/entradas faltantes en su caja.
+        """
+        if (admin_license_key or "").strip() != MASTER_KEY:
+            raise HTTPException(status_code=403, detail="admin_only")
+        target_lic = await _find_license(target_license_key)
+        if not target_lic:
+            raise HTTPException(status_code=404, detail="target_license_not_found")
+        lkh = _key_hash(target_license_key)
+        data_out: dict[str, Any] = {}
+        source = None
+        author = None
+        cloud_ts = None
+        state = await db[COLL_STATE].find_one({"_id": lkh})
+        if state and isinstance(state.get("data"), dict):
+            latest_ts = None
+            for key, item in state["data"].items():
+                if not isinstance(item, dict):
+                    continue
+                data_out[key] = item.get("value")
+                ts = _parse_iso(item.get("updated_at"))
+                if ts and (latest_ts is None or ts > latest_ts):
+                    latest_ts = ts
+                    author = item.get("author") or author
+            cloud_ts = _iso(state.get("last_updated_at")) if state.get("last_updated_at") else None
+            if data_out:
+                source = "linked"
+        if not data_out:
+            # Fallback: última copia recibida (mailbox), independientemente del emisor
+            cursor = db[COLL_BACKUPS].find({"license_key_hash": lkh}).sort("created_at", -1).limit(1)
+            async for d in cursor:
+                data_out = d.get("data") or {}
+                author = d.get("from_install_id")
+                cloud_ts = _iso(d.get("created_at")) if d.get("created_at") else None
+                source = "backup_mailbox"
+                break
+        return {
+            "ok": True,
+            "has_data": bool(data_out),
+            "source": source,
+            "target_client_name": target_lic.get("client_name"),
+            "target_client_email": target_lic.get("client_email"),
+            "target_plan": target_lic.get("plan"),
+            "author_install_id": author,
+            "cloud_updated_at": cloud_ts,
+            "data": data_out,
+        }
+
     return router
