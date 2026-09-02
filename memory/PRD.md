@@ -1308,3 +1308,10 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - Síntoma usuario: retirar restaba de las casillas pero el TOTAL GUARDAT no bajaba. Causa: saveCambio recalcula _bulk = _bulk_seed − suma(denoms); al restar de denoms sin bajar el seed, el dinero "volvía" al pendiente de repartir → total invariable.
 - Fix (HTML_BUILD 03.09): en retirar, (1) orden de descuento: paquetes → € manual → _bulk (pendiente de repartir, funciona aunque NO haya casillas rellenas); (2) _bulk_seed -= movedEur (para que el recálculo de saveCambio cuadre); (3) data._bulk = bulkPool restante; (4) _toCaja += movedEur (traspaso automático a CAJA FÍSICA).
 - Testeado E2E file:// 2 casos: todo en _bulk (350→300, traspaso 50, caja física constante) y mixto (e2:1 paq + bulk; retiro 100 → 50 del paquete + 50 del bulk, total 250). PENDIENTE: usuario debe hacer Deploy (verificar esquina · 03.09).
+
+### 📊 Dos líneas de saldo anterior en el resumen (Tráfico C+B) · Jun 2026
+- Sustituida la línea única 'Saldo anterior caja' por DOS lado a lado:
+  1. 'Saldo anterior caja + cambio (todo el efectivo)' = saCC.caja + traspasoCambio() + reservaCambio() (data-testid=saldo-ant-caja-cambio)
+  2. 'Saldo solo caja (sin cajón de cambio)' = saCC.caja + traspasoCambio() (data-testid=saldo-ant-solo-caja)
+- En renderSummary: resCambio desglosado en cajonCambio + traspCaja. Tooltips explicativos en ambas.
+- Testeado E2E file://: saldo inicial 1200 + traspaso 50 + cajón 300 → 1550/1250 correctos.
