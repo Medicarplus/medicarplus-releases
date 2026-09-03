@@ -1,5 +1,27 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-03 (parte 3) · IRPF ↔ Debe/Haber vínculo bidireccional
+**Modelo aclarado por el usuario:**
+- El chip IRPF de Debe/Haber es SOLO para pagos trimestrales a Hacienda (efectivo→banco→Hacienda o transferencia bancaria directa). Nunca por trabajador.
+- La tabla IRPF de la sección es solo la CALCULADORA teórica de retenciones. Lo que cuenta contablemente (y en estadísticas) es lo apuntado en Debe/Haber.
+
+**Implementado:**
+- Nuevas funciones helper en v2.html: `_normalizeWorkerKey`, `_detectIrpfQuarterPayment`, `_autoMarkIrpfQuarterFromEntry`, `_getLinkedHonorariosForWorker`, `_getHonorariosWorkersOfMonth`.
+- **Detección trimestral automática**: al añadir un DH DEBE con concepto tipo "IRPF Q1 2026" / "IRPF T2" / "IRPF Trimestre 3 2025" / "IRPF 4T" / "IRPF Hacienda Q1" → auto-marca el trimestre como pagado en la sección IRPF (con toast confirmando) y guarda `_irpfPayment: 'YYYY-QN'` + `_irpfComp` en la entrada. Idempotente (no reprocesa entradas ya marcadas). Formatos soportados: Q1-Q4, T1-T4, 1T-4T, Trimestre N, ordinales (primer/segundo/tercer/cuarto). Año explícito (20XX) o actual.
+- **Auto-población de trabajadores en la tabla IRPF**: al abrir la sección IRPF de un mes, se listan automáticamente todos los trabajadores con honorarios (Nómina/Honoraris/Faena/Sueldo/Salario) DEBE en ese mes, con toggle `active:false` por defecto. Los trabajadores ya añadidos manualmente antes de esta feature quedan `active:true` (retro-compat).
+- **Toggle "IRPF activo" por trabajador**: si activo → se calcula IRPF y suma al trimestre. Si inactivo → aparece en la lista greyed out sin cálculo, no cuenta en totales. Cada trabajador independiente. El % IRPF sigue siendo por empresa (input general).
+- **Badge 🔔 en cada fila**: muestra `N entradas · X€` de honorarios enlazados del mes. Al pulsar abre popup con detalle (fecha, concepto, importe, FP). No auto-rellena BRUT.
+- **Botón "📌 Usar como BRUT"** (visible solo si activo y hay honorarios enlazados): copia el total de honorarios del mes al campo BRUT del trabajador con un clic. Deshabilita cert/certPrice auto.
+- **Nuevo panel "📊 IRPF realmente pagado a Hacienda · Año YYYY"** en la sección IRPF: tabla con todos los pagos DH marcados con flag `_irpfPayment` del año actual (fecha, trimestre, importe, FP, concepto) + total YTD. Este es el valor que cuenta contablemente / en estadísticas.
+- **Botón "Marcar como ingresado" retirado**: ya no es necesario porque el usuario siempre apunta el ingreso desde el chip IRPF de Debe/Haber y se marca automáticamente. Se sustituye por un aviso informativo verde. El botón "↺ Revertir" se conserva para cambiar de opinión.
+- **Chips Debe/Haber Empresa 1 modificados**: eliminados "Mercadona / material" (DEBE) y "Ciclista" (HABER) en tarea anterior.
+- **Datalist workers**: añadido bloque de sugerencias fijas para el chip IRPF con Q1..Q4 del año actual y anterior (facilita apuntar "IRPF Q1 2026" con autocompletado).
+- Testing: verificado con datos simulados en Chromium — auto-mark quarter=true, agrupación de workers correcta, detección de 5 formatos trimestrales pasa OK y `IRPF Pep Brugulat` correctamente descartado como no-trimestral.
+
+Archivo tocado: `frontend/public/v2.html`.
+
+
+
 ## 2026-02-03 (parte 2) · Chips Debe/Haber + Verificación separación de empresas
 - **Chips eliminados** del panel Debe/Haber (Empresa 1): `Mercadona / material` (DEBE) y `Ciclista` (HABER). Los chips restantes son: IRPF, Devolució tasa DGT, 💼 Honoraris, 💼 Nómina, 💼 Faena externa, 🧾 GASTO, ↩ Devolución (dinámico según empresa), 🔁 Ingreso metálico, 🏦 Retirada del banco, Foto.
 - **Verificación separación estricta Empresa 1 ↔ Empresa 2** (todas las claves localStorage confirmadas independientes):
