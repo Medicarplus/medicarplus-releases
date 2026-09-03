@@ -4654,9 +4654,34 @@ $('#btnStatCites').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openS
 $('#btnStatCompararAnys').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openYearComparison()};
 const _btnStatE2 = document.getElementById('btnStatEmpresa2'); if(_btnStatE2) _btnStatE2.onclick = ()=>{ $('#btnStatsSubmenu').style.display='none'; openStatsEmpresa2(); };
 
-// 🏥 Estadísticas Empresa 2 · Revisiones deportivas + certificados agrupadas por
-// tipo/concepto y desglose mensual/anual. Solo se muestra si Empresa 2 está
-// configurada. Lee datos de caja.cempla.v1.
+// 🏥 Normalizador de sinónimos para TIPOS de Empresa 2 (revisiones deportivas)
+// Une variantes de escritura al mismo canónico. Ej: P.esforç, Prueba esfuerzo,
+// Prova esforç → "Prueba de esfuerzo".
+window._normalizeTipoEmpresa2 = function(raw){
+  const t = String(raw||'').trim();
+  if(!t) return '';
+  const lc = t.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[\.\-_]/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+  if(/\b(p|prueba|prova)\s*(de\s+)?(esfuerz(o)?|esforc)\b/.test(lc)) return 'Prueba de esfuerzo';
+  if(/\brecon(ocimiento|eixement)?\s*(de\s+)?(refuerz(o)?|reforc)\b|\brecon\s+ref/.test(lc)) return 'Recon. Refuerzo';
+  if(/\brecon(ocimiento|eixement)?\b(?!\s*(refuerz|reforc))/.test(lc)) return 'Reconocimiento';
+  if(/\bcertificad(o|os)?\b|\bcerts?\b/.test(lc)) return 'Certificado';
+  if(/\brenov(acion|ació|ac|a)?\b/.test(lc)) return 'Renovación';
+  if(/\bfutbol\b|\bfootball\b|\bfut\b/.test(lc)) return 'Fútbol';
+  if(/\bpatinatge\b|\bpatina(je|do)?\b/.test(lc)) return 'Patinaje';
+  if(/\btennis\b|\btenis\b/.test(lc)) return 'Tenis';
+  if(/\bpadel\b/.test(lc)) return 'Pádel';
+  if(/\bmuntanya\b|\bmonta(n|ñ)a\b/.test(lc)) return 'Montaña';
+  if(/\btriatl(o|ó|on)\b/.test(lc)) return 'Triatlón';
+  if(/\bp\s*submarin(a|isme|ismo)\b/.test(lc)) return 'Pesca submarina';
+  if(/\bsubmarin(isme|ismo)\b/.test(lc)) return 'Submarinismo';
+  if(/\bhandbol\b|\bbalonmano\b/.test(lc)) return 'Handbol';
+  if(/\bhockey\b|\bhoquei\b/.test(lc)) return 'Hockey';
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
 function openStatsEmpresa2(){
   document.querySelectorAll('.modal-back').forEach(m=>m.remove());
   const raw = JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}');
@@ -4697,7 +4722,7 @@ function openStatsEmpresa2(){
         if(e.kind==='DH' && (e._internal||e._tasaRefund)) return;
         const importe = (+e.importe||0) - (+e.descuento||0);
         const tasa = +e.tasa || 0;
-        const key = (e.tipo || 'Sin tipo').trim() || 'Sin tipo';
+        const key = window._normalizeTipoEmpresa2 ? window._normalizeTipoEmpresa2(e.tipo) : ((e.tipo || 'Sin tipo').trim() || 'Sin tipo');
         if(!byType[key]) byType[key] = {count:0, importe:0, tasas:0, byMonth: Array.from({length:12},()=>({c:0,i:0}))};
         byType[key].count++;
         byType[key].importe += importe;
