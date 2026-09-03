@@ -1,5 +1,35 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-03 (parte 6) · Auditoría completa: BRUTO nunca aparece donde no debe + unificación Nómina/Honorarios
+
+**Auditoría exhaustiva del programa: BRUTO no cuenta en NADA que sea contable/caja/banco.**
+
+Se corrigieron **7 lugares** que aún contaban entradas `_hnBruto:true`:
+1. `renderByConcept` (agrupación por concepto del día) — añadido filtro `_hnBruto`.
+2. `computeGastos` (Empresa 2 stats por año/tipo) — añadido filtro.
+3. Segundo `computeGastos` (idem en otra ruta de agregación) — añadido filtro.
+4. Ledger contable **trafic** (asentamientos "Libreta") — filtro al inicio del `arr.forEach`.
+5. Ledger contable **esport** (asentamientos CEMPLA) — filtro al inicio.
+6. Informe anual · `grandTotals.gastos` — filtro al inicio del `list.forEach`.
+7. Panel Honorarios · Pagos a trabajadores (`_hn_show`) — filtro antes de `_isHonorarioLikeEntry`.
+8. Stats admin duplicados (`dhCount`) — filtro añadido.
+
+**Test integral verificado** con datos combinados en el mismo día:
+- 100€ tráfico normal + 94,15€ tasa DGT
+- 2000€ Honoraris BRUTO Pep (_hnBruto:true)
+- 1600€ Nómina Pep (neto)
+
+Resultados: `totalsDebe=1600`, `byFp.X=-1600` (solo neto sale de banco), `byFp.E=100` (tráfico), `totalsBruto=100` (solo facturación), `hnBrutoTotal=2000` (informativo). El bruto NO aparece en gastos, ledger, honorarios ni en byFp. ✅
+
+**Unificación chips Nómina/Honorarios:**
+- El chip `💼 Nómina` se ha fusionado con `💼 Honoraris a pagar (neto)`.
+- Chip nuevo unificado: `💼 Pago nómina/honorario (neto)` con `data-c="Nómina"` (Nómina matches el regex `_hnMatchKeyword` y sigue apareciendo en la sección IRPF/Honorarios). Cubre tanto empleados (nómina) como profesionales (honorario).
+- Tooltip actualizado con ejemplo: "bruto 2000€, IRPF 15% (300€) → aquí apuntas 1700€ netos".
+
+Archivos tocados: `frontend/public/v2.html`.
+
+
+
 ## 2026-02-03 (parte 5) · Auto-Vincular BRUTO desde Debe/Haber a sección IRPF
 
 **Feature completada:**

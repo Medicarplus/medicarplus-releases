@@ -691,8 +691,7 @@
             <div class="chip-row" id="chips-dh">
               <span class="chip" data-t="DEBE" data-c="IRPF" style="background:linear-gradient(135deg,#dc2626,#f87171);border-color:#fecaca;color:#ffffff;font-weight:800;box-shadow:0 2px 8px rgba(220,38,38,.5);letter-spacing:.5px" title="INGRESO A HACIENDA (Modelo 111) · Este es el chip para apuntar el pago trimestral. Ejemplo de concepto: 'IRPF Q1 2026' o 'IRPF T2'. Al detectarlo se marca automáticamente el trimestre como pagado en la sección 📋 IRPF. Sí afecta caja/banco (dinero real que sale).">💸 IRPF (pago a Hacienda)</span>
               <span class="chip" data-t="DEBE" data-c="Honoraris bruto" data-role="hn-bruto" style="background:linear-gradient(135deg,#7c3aed,#a855f7);border-color:#c4b5fd;color:#ffffff;font-weight:800;box-shadow:0 2px 8px rgba(124,58,237,.5)" title="💼 HONORARIOS BRUTOS · Sirve para que la sección 📋 IRPF DETECTE y CALCULE el IRPF de la persona. Es el importe bruto antes de la retención IRPF (ej. factura de un profesional). NO afecta a caja ni a banco (es solo informativo para el cálculo IRPF Modelo 111). Después, para el pago real usa el chip 'Honoraris a pagar'.">💼 Honoraris BRUTO (IRPF)</span>
-              <span class="chip" data-t="DEBE" data-c="Honoraris" data-role="hn-neto" style="background:linear-gradient(135deg,#2563eb,#3b82f6);border-color:#60a5fa;color:#ffffff;font-weight:700;box-shadow:0 2px 8px rgba(59,130,246,.4)" title="💼 HONORARIOS A PAGAR (neto) · Es el dinero que REALMENTE le pagas al trabajador después de retener el IRPF. Sí afecta caja/banco (sale dinero de verdad). Ejemplo: si el bruto es 588€ y retienes 15% IRPF (88€), aquí apuntas los 500€ netos que le llegan al trabajador.">💼 Honoraris a pagar (neto)</span>
-              <span class="chip" data-t="DEBE" data-c="Nómina" style="background:linear-gradient(135deg,#2563eb,#3b82f6);border-color:#60a5fa;color:#ffffff;font-weight:700;box-shadow:0 2px 8px rgba(59,130,246,.4)" title="Nómina · sale dinero de caja (gasto)">💼 Nómina</span>
+              <span class="chip" data-t="DEBE" data-c="Nómina" data-role="hn-neto" style="background:linear-gradient(135deg,#2563eb,#3b82f6);border-color:#60a5fa;color:#ffffff;font-weight:700;box-shadow:0 2px 8px rgba(59,130,246,.4)" title="💼 PAGO A TRABAJADOR (neto) · Cubre nóminas de empleados y honorarios de profesionales. Es el dinero que REALMENTE le pagas al trabajador después de retener el IRPF. Sí afecta caja/banco (sale dinero real). Ejemplo: bruto 2000€, IRPF 15% (300€) → aquí apuntas 1700€ netos.">💼 Pago nómina/honorario (neto)</span>
               <span class="chip" data-t="DEBE" data-c="Faena externa" style="background:linear-gradient(135deg,#2563eb,#3b82f6);border-color:#60a5fa;color:#ffffff;font-weight:700;box-shadow:0 2px 8px rgba(59,130,246,.4)" title="Trabajo subcontratado / colaborador · sale dinero de caja (gasto)">💼 Faena externa</span>
               <span class="chip" data-t="DEBE" data-c="Gasto:" data-role="gasto" style="background:linear-gradient(135deg,#ef4444,#f87171);border-color:#fca5a5;color:#ffffff;font-weight:700;box-shadow:0 2px 8px rgba(239,68,68,.5)" title="Gasto del centro (luz, agua, alquiler, material, seguros, teléfono, gestoría…). Marca explícita: SIEMPRE se contabiliza como Gasto y NUNCA como Honorario.">🧾 GASTO</span>
               <span class="chip" data-role="tasa-refund" style="background:linear-gradient(135deg,#b45309,#d97706);border-color:#fbbf24;color:#ffffff;font-weight:800;box-shadow:0 2px 8px rgba(180,83,9,.5)" title="Devuelve parte de una tasa DGT cobrada anteriormente (ej: tasa quedó en menos por menos años del carnet)"><span data-refund-label>↩ Devolución tasa DGT</span></span>
@@ -3591,7 +3590,7 @@ function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(
     };
   }
 }
-function renderByConcept(list){const map={};list.forEach(e=>{if(e.retorno)return;if(e.kind==='DH' && (e._internal||e._tasaRefund))return;const gn=window._normalizeGrupo?window._normalizeGrupo(e.grupo):e.grupo;const key=e.kind==='DH'?`[${e.tipo}] libre`:`${e.tipo}${gn&&gn!=='-'?' · '+gn:''}`;map[key]||={n:0,total:0};map[key].n++;const signo=e.kind==='DH'&&e.tipo==='DEBE'?-1:1;map[key].total+=signo*((e.importe-(e.descuento||0))+(e.tasa||0))});const entries=Object.entries(map).sort((a,b)=>b[1].total-a[1].total);$('#byConcept').innerHTML=entries.length?`<table style="width:100%"><tbody>${entries.map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td class="num">${v.n}×</td><td class="num"><b>${fmt(v.total)}</b></td></tr>`).join('')}</tbody></table>`:`<div class="small">Sin datos</div>`}
+function renderByConcept(list){const map={};list.forEach(e=>{if(e.retorno)return;if(e.kind==='DH' && (e._internal||e._tasaRefund||e._hnBruto))return;const gn=window._normalizeGrupo?window._normalizeGrupo(e.grupo):e.grupo;const key=e.kind==='DH'?`[${e.tipo}] libre`:`${e.tipo}${gn&&gn!=='-'?' · '+gn:''}`;map[key]||={n:0,total:0};map[key].n++;const signo=e.kind==='DH'&&e.tipo==='DEBE'?-1:1;map[key].total+=signo*((e.importe-(e.descuento||0))+(e.tasa||0))});const entries=Object.entries(map).sort((a,b)=>b[1].total-a[1].total);$('#byConcept').innerHTML=entries.length?`<table style="width:100%"><tbody>${entries.map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td class="num">${v.n}×</td><td class="num"><b>${fmt(v.total)}</b></td></tr>`).join('')}</tbody></table>`:`<div class="small">Sin datos</div>`}
 // 💰 Saldo inicial (opening balance) · Para clientes que empiezan a usar la app
 // a mediados de año y no quieren pasar todo el histórico día a día. Se guarda
 // por empresa. NUNCA entra en estadísticas (no es una entrada de facturación),
@@ -4639,6 +4638,9 @@ function openHonorariosPanel(){
       const bd = raw.byDate || {};
       for(const iso of Object.keys(bd)){
         for(const e of (bd[iso]||[])){
+          // 💼 BRUTO IRPF: NUNCA aparece en el panel de honorarios pagados (no es un pago real,
+          //    es solo información para el cálculo IRPF). Los brutos se ven en la sección 📋 IRPF.
+          if(e._hnBruto) continue;
           if(_isHonorarioLikeEntry(e)){
             const match = _hnMatchKeyword((e.nombre||'')+' '+(e.tipo||'')+' '+(e.concepto||''));
             allEntries.push({date: iso, name: _cleanWorkerName(e.nombre), amount: +e.importe||0, company: comp, fp: e.fp||'', cat: match ? match.cat : 'HONORARIO'});
@@ -4932,7 +4934,7 @@ function openStatsEmpresa2(){
       const m = parseInt(iso.slice(5,7),10) - 1;
       (arr||[]).forEach(e => {
         if(e.retorno) return;
-        if(e.kind==='DH' && (e._internal||e._tasaRefund)) return;
+        if(e.kind==='DH' && (e._internal||e._tasaRefund||e._hnBruto)) return;
         const importe = (+e.importe||0) - (+e.descuento||0);
         const tasa = +e.tasa || 0;
         const key = window._normalizeTipoEmpresa2 ? window._normalizeTipoEmpresa2(e.tipo) : ((e.tipo || 'Sin tipo').trim() || 'Sin tipo');
@@ -4993,7 +4995,7 @@ function openStatsEmpresa2(){
       const m = parseInt(iso.slice(5,7),10) - 1;
       (arr||[]).forEach(e => {
         if(e.retorno) return;
-        if(e.kind==='DH' && (e._internal||e._tasaRefund)) return;
+        if(e.kind==='DH' && (e._internal||e._tasaRefund||e._hnBruto)) return;
         const importe = (+e.importe||0) - (+e.descuento||0);
         const tasa = +e.tasa || 0;
         const key = window._normalizeTipoEmpresa2 ? window._normalizeTipoEmpresa2(e.tipo) : ((e.tipo || 'Sin tipo').trim() || 'Sin tipo');
@@ -5189,6 +5191,8 @@ function generateLedgerEntries(dateFrom,dateTo,company){
       arr.forEach(e=>{if(e.retorno||e.kind==='DH')return;if(e.fp==='T')autoT+=(e.importe-(e.descuento||0));if((e.fpTasa||e.fp)==='T')autoT+=(e.tasa||0)});
       arr.forEach(e=>{
         if(e.retorno)return;
+        // 💼 BRUTO IRPF: NUNCA aparece en el libro contable (informativo solo para IRPF)
+        if(e.kind==='DH' && e._hnBruto) return;
         const acct=fpToAccount[e.fp]||'570 Caja';
         const acctT=fpToAccount[e.fpTasa||e.fp]||acct;
         if(e.kind==='DH'){
@@ -5261,6 +5265,8 @@ function generateLedgerEntries(dateFrom,dateTo,company){
       // ESPORT: detall per entrada (revisió/certificat) — manté totes les entrades tal com són.
       arr.forEach(e=>{
         if(e.retorno)return;
+        // 💼 BRUTO IRPF: NUNCA aparece en el libro contable (informativo solo para IRPF)
+        if(e.kind==='DH' && e._hnBruto) return;
         const acct=fpToAccount[e.fp]||'570 Caja';
         const acctT=fpToAccount[e.fpTasa||e.fp]||acct;
         if(e.kind==='DH'){
@@ -6208,6 +6214,10 @@ function _buildAnnualReport(year){
       grandTotals.byFp.X += transDay;
       list.forEach(e=>{
         if(e.retorno)return;
+        // 💼 BRUTO IRPF: NUNCA aparece en gastos ni informe (informativo solo para IRPF)
+        if(e.kind==='DH' && e._hnBruto) return;
+        // 🔁 Traspaso interno · ↩ Devolución: tampoco cuentan como ingresos/gastos aquí
+        if(e.kind==='DH' && (e._internal||e._tasaRefund)) return;
         // 📚 REGLES COMPTABLES (autoescola/gestoria autònom · Espanya)
         // ─────────────────────────────────────────────────────────
         //  • Servei propi (importe - descuento) = base imponible IRPF = FACTURACIÓN
@@ -7118,6 +7128,7 @@ function computeAudit(dateFrom,dateTo){
     const byGroup={};
     v.entries.forEach(({e})=>{
       if(e.retorno)return;
+      if(e.kind==='DH' && e._hnBruto) return;  // 💼 BRUTO IRPF no cuenta en stats
       if(e.kind==='DH'){dhCount++;dhSum+=(e.tipo==='HABER'?1:-1)*(e.importe||0);return}
       trafCount++;totalImp+=e.importe||0;totalTasa+=e.tasa||0;
       if((e.importe||0)===0&&(e.tasa||0)===0)zeroCount++;
