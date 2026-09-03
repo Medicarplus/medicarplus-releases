@@ -1,5 +1,31 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-03 (parte 7) · Simplificación: eliminado chip BRUTO · IRPF section = fuente única
+
+**Decisión de UX del usuario**: dado que el BRUTO no afecta caja/banco/asentamientos, el chip en Debe/Haber sobra. Todo lo de IRPF va DIRECTO en la sección IRPF.
+
+**Cambios:**
+- **Retirado** el chip `💼 Honoraris BRUTO (IRPF)` de Debe/Haber. Debe/Haber ahora es más limpio (8 chips).
+- **Retirado** el estado temporal `window._pendingBruto` y su lógica en `btnAddDH` (código muerto).
+- **Retirada** la variante A de auto-sincronización de BRUT. El BRUT vuelve a ser 100% editable manual en la sección IRPF (como un simple input, con soporte de cert × certPrice si el usuario lo usa).
+- **`_getHonorariosWorkersOfMonth`** ahora agrupa por pagos NETOS (Nómina/Honoraris/Faena) del mes, no por brutos. Esto sigue auto-poblando la lista de trabajadores en IRPF section (útil: si has pagado a alguien, aparece automáticamente en IRPF con IRPF DESACTIVADO por defecto).
+- **`_getLinkedHonorariosForWorker`** ahora devuelve pagos NETOS del mes (solo informativo, badge 🔔 en la fila IRPF).
+- **Badge en fila IRPF**: `🔔 3 pagos neto · 1700€` (referencia visual de lo pagado). No auto-rellena BRUT.
+- **Filtros `_hnBruto`** en gastos/ledger/informe se conservan por compatibilidad hacia atrás (entradas antiguas con el flag no se cuentan doblemente).
+
+**Test integral verificado:**
+- Nómina Pep 1700€ (neto) → workers list: Pep 1700€ ✅ · linked: 1 pago 1700€ ✅ · caja/banco: byFp.X=-1700 ✅ · gastos total: 1700 ✅
+- Sin chip BRUTO ni flag `_hnBruto` en flujo nuevo. Existing legacy entries siguen filtrándose bien.
+
+**Flow definitivo simplificado:**
+1. Vas a Debe/Haber → apuntas pagos reales (nómina/honorario/gasto/IRPF/…) → afecta caja/banco.
+2. Vas a 📋 IRPF → seleccionas trabajador ya listado (o añades nuevo) → editas BRUT y S.S. → IRPF calcula solo.
+3. Cada sección tiene una lógica clara y no se solapan.
+
+Archivo tocado: `frontend/public/v2.html`.
+
+
+
 ## 2026-02-03 (parte 6) · Auditoría completa: BRUTO nunca aparece donde no debe + unificación Nómina/Honorarios
 
 **Auditoría exhaustiva del programa: BRUTO no cuenta en NADA que sea contable/caja/banco.**
