@@ -4717,16 +4717,13 @@ function openStatsEmpresa2(){
       <td style="text-align:left;padding-left:10px"><b>${escapeHtml(k)}</b></td>
       <td class="num"><b>${v.count}</b></td>
       ${v.byMonth.map(m=>`<td class="num" style="font-size:11px">${m.c||'—'}</td>`).join('')}
-      <td class="num"><b>${fmt(v.importe)}</b></td>
-      <td class="num" style="color:#fbbf24">${v.tasas?fmt(v.tasas):'—'}</td>
-      <td class="num" style="color:#22c55e"><b>${fmt(v.importe+v.tasas)}</b></td>
+      <td class="num" style="color:#22c55e"><b>${fmt(v.importe)}</b></td>
     </tr>`).join('');
     body.innerHTML = `<div style="background:linear-gradient(135deg,#3a1e2a,#4a1e35);border:1px solid #ec4899;border-radius:10px;padding:16px;margin-bottom:14px">
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:center">
         <div><div style="color:#f9a8d4;font-size:11px;letter-spacing:1px">TOTAL REVISIONES</div><div style="color:#fff;font-size:28px;font-weight:800">${totalCount}</div></div>
-        <div><div style="color:#f9a8d4;font-size:11px;letter-spacing:1px">IMPORTE</div><div style="color:#fff;font-size:24px;font-weight:800">${fmt(totalImporte)}</div></div>
-        <div><div style="color:#f9a8d4;font-size:11px;letter-spacing:1px">TASAS DGT</div><div style="color:#fbbf24;font-size:24px;font-weight:800">${fmt(totalTasas)}</div></div>
-        <div><div style="color:#f9a8d4;font-size:11px;letter-spacing:1px">TOTAL AÑO</div><div style="color:#22c55e;font-size:24px;font-weight:800">${fmt(totalImporte+totalTasas)}</div></div>
+        <div><div style="color:#f9a8d4;font-size:11px;letter-spacing:1px">IMPORTE</div><div style="color:#fff;font-size:28px;font-weight:800">${fmt(totalImporte)}</div></div>
+        <div><div style="color:#f9a8d4;font-size:11px;letter-spacing:1px">TOTAL AÑO</div><div style="color:#22c55e;font-size:28px;font-weight:800">${fmt(totalImporte)}</div></div>
       </div>
     </div>
     <h4 style="margin:14px 0 8px;color:#ec4899">📅 Desglose por tipo × mes</h4>
@@ -4734,15 +4731,13 @@ function openStatsEmpresa2(){
       <thead><tr style="background:#3a1e2a;color:#f9a8d4">
         <th style="padding:8px;text-align:left">Tipo</th><th>#</th>
         ${MESES.map(m=>`<th style="min-width:38px">${m}</th>`).join('')}
-        <th>Importe</th><th>Tasas</th><th>Total</th>
+        <th>Importe</th>
       </tr></thead><tbody>${typeRows}</tbody>
       <tfoot><tr style="background:#1e293b;color:#fff;font-weight:700">
         <td style="padding:8px;text-align:left">TOTAL ${year}</td>
         <td class="num">${totalCount}</td>
         ${byMonthAll.map(m=>`<td class="num" style="font-size:11px">${m.count||'—'}</td>`).join('')}
-        <td class="num">${fmt(totalImporte)}</td>
-        <td class="num" style="color:#fbbf24">${fmt(totalTasas)}</td>
-        <td class="num" style="color:#22c55e">${fmt(totalImporte+totalTasas)}</td>
+        <td class="num" style="color:#22c55e">${fmt(totalImporte)}</td>
       </tr></tfoot>
     </table></div>`;
   };
