@@ -3021,13 +3021,15 @@ function updateDhTipoColor(){const v=$('#dh-tipo').value;$('#dh-tipo').classList
 // (NO se suma a haber/debe/neto ni cuenta como ingreso/gasto). Sí se refleja
 // en los saldos de Efectivo y Banco del día y del arrastre al día siguiente.
 function openTraspasoInterno(direction){
+  // Cierra cualquier modal previo (evita bloqueos por modales fantasma)
+  document.querySelectorAll('.modal-back').forEach(m => m.remove());
   const isCaja2Banco = direction === 'caja2banco';
   const title = isCaja2Banco ? '🔁 Ingreso en metálico (Caja → Banco)' : '🏦 Retirada del banco (Banco → Caja)';
   const desc = isCaja2Banco
     ? 'Vas al cajero e ingresas dinero de tu <b>caja física</b> a tu <b>cuenta bancaria</b>. Es dinero tuyo, no una venta nueva.'
     : 'Sacas dinero de tu <b>cuenta bancaria</b> y lo pasas a tu <b>caja física</b>. Es dinero tuyo, no un gasto.';
   const color = isCaja2Banco ? '#f97316' : '#0284c7';
-  const back = document.createElement('div'); back.className='modal-back';
+  const back = document.createElement('div'); back.className='modal-back'; back.style.zIndex='100050';
   back.innerHTML = `<div class="modal" style="max-width:500px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <h3 style="margin:0;color:${color};font-family:Georgia,serif">${title}</h3>
@@ -3081,7 +3083,9 @@ function openTraspasoInterno(direction){
 //      NO cuenta en totales (para no restar 2 veces) pero sí queda registrada
 //      en la libreta contable como asentamiento de devolución.
 function openTasaRefund(){
-  const back = document.createElement('div'); back.className='modal-back';
+  // Cierra cualquier modal previo que pudiera estar bloqueando la interfaz
+  document.querySelectorAll('.modal-back').forEach(m => m.remove());
+  const back = document.createElement('div'); back.className='modal-back'; back.style.zIndex='100050';
   back.innerHTML = `<div class="modal" style="max-width:640px;max-height:90vh;display:flex;flex-direction:column">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <h3 style="margin:0;color:#d97706;font-family:Georgia,serif">↩ Devolución de tasa DGT</h3>
@@ -11704,6 +11708,21 @@ setTimeout(()=>{
   else boot();
 })();
 </script>
+
+<!-- 🆘 RESCATE GLOBAL: F9 cierra TODOS los modales fantasma que bloqueen la interfaz -->
+<script>
+document.addEventListener('keydown', function(ev){
+  if(ev.key === 'F9'){
+    const modals = document.querySelectorAll('.modal-back');
+    if(modals.length){
+      modals.forEach(m => m.remove());
+      if(typeof toast==='function') toast(`🆘 ${modals.length} modal(es) cerrado(s) con F9`);
+      ev.preventDefault();
+    }
+  }
+}, true);
+</script>
+
 
 <!-- 🔗 SYNC MULTI-PC · Fase 2 UI · integración con /sync-client.js -->
 <script>
