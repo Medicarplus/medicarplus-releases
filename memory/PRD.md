@@ -1,5 +1,62 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-03 (parte 5) · Auto-Vincular BRUTO desde Debe/Haber a sección IRPF
+
+**Feature completada:**
+- Cuando se apunta un `💼 Honoraris BRUTO (IRPF)` en Debe/Haber de un trabajador que YA está en la sección 📋 IRPF con **IRPF activo**, el campo BRUT de ese trabajador para ese mes se auto-sincroniza con la suma de sus brutos en DH.
+- El BRUT queda `readonly` con badge visual "🔗 BRUT sincronizado" púrpura (border #7c3aed, bg #ede9fe) y tooltip que indica "🔗 Sincronizado automáticamente con Debe/Haber · N entradas brutas · X€".
+- Si el trabajador está inactivo o no tiene brutos en DH, el BRUT sigue siendo manual (comportamiento anterior).
+- Multi-entrada: si añades varios brutos del mismo trabajador en el mismo mes, la suma se actualiza sola.
+- Test funcional verificado: 2 brutos de Pep (600€+400€=1000€) → BRUT=1000€ auto, IRPF=150€ (15%), NET=850€. Cero clics manuales.
+- Prioridad de fuentes de BRUT:
+  1. Auto DH (si hay brutos y trabajador activo) — máxima prioridad
+  2. cert × certPrice (auto local dentro de la fila IRPF)
+  3. Manual (usuario escribe)
+- El botón "📌 Usar como BRUT" ya no aparece cuando el bruto se auto-sincroniza (redundante).
+
+Archivo tocado: `frontend/public/v2.html`.
+
+
+
+## 2026-02-03 (parte 4) · Honorarios BRUTO vs NETO + IRPF chip destacado + IRPF Modelo 111 en Informe Anual + Impresión Empresa 2
+
+**Corrección conceptual Informe Anual · IRPF Modelo 111:**
+- **Retirado** el "Resumen trimestral (IRPF)" incorrecto que calculaba 15% de la facturación de la empresa (SL/CB paga IS, autónomo tributa por beneficio neto — no un % plano sobre bruto).
+- **Añadido** un panel "📋 IRPF Modelo 111 · Retenciones a trabajadores" que muestra desglose Trabajador × Trimestre × Total año, sólo trabajadores con IRPF activo. Se calcula desde la sección 📋 IRPF.
+- **Añadido** cotejo "Ingresado a Hacienda (Debe/Haber)": suma pagos DH con flag `_irpfPayment` por trimestre + diferencia con lo retenido teóricamente.
+- KPI "TASAS DGT" ocultada en Informe Anual cuando la empresa activa es Empresa 2 (cempla), ya que no tiene tasas.
+
+**Impresión Empresa 2 stats (bug crítico):**
+- Botón "🖨️ Imprimir" en `openStatsEmpresa2` no hacía nada (usaba `window.open` bloqueado por Electron).
+- Migrado a `printHtml()` con landscape A4, KPIs (TOTAL REVISIONES, TOTAL AÑO, MEDIA MENSUAL, TICKET MEDIO), tabla completa Tipo × Mes, footer con Mejor Mes. Sin cortes.
+
+**Honorarios BRUTO vs NETO (nueva distinción por flag `_hnBruto:true`):**
+- **Nuevo chip** `💼 Honoraris BRUTO (IRPF)` (gradient púrpura #7c3aed→#a855f7): crea entrada con `_hnBruto:true`. **NO afecta caja/banco**. Sólo se detecta en la sección 📋 IRPF para calcular el IRPF Modelo 111.
+- **Chip existente renombrado** a `💼 Honoraris a pagar (neto)` (gradient azul): entrada estándar que sí afecta caja/banco (dinero real que sale al trabajador después de retención).
+- **Chip IRPF actualizado** a `💸 IRPF (pago a Hacienda)` (gradient rojo #dc2626→#f87171 destacado): sólo para el pago trimestral a Hacienda. Se detecta como `_irpfPayment` y marca el trimestre pagado.
+- Flag técnico `_pendingBruto` en window: se activa al clicar el chip bruto, tinta el input importe púrpura, y se aplica al añadir. Se resetea automáticamente después de guardar.
+- `computeTotals`: skip completo de entradas `_hnBruto` (nuevos contadores `hnBrutoCount`, `hnBrutoTotal` sólo informativos).
+- `_getLinkedHonorariosForWorker` / `_getHonorariosWorkersOfMonth`: filtran a `_hnBruto === true` únicamente (solo brutos alimentan IRPF).
+- `_cleanWorkerName` extendido: reconoce prefijos "Honoraris bruto", "Nómina bruto", "Sueldo bruto", "bruto" solo.
+- Badge visual "💼 BRUTO IRPF" (color púrpura) en la fila de la entrada del día. FP oculto porque no aplica.
+
+**Chips deportivos Empresa 2 traducidos al castellano** (data-label-es/data-label-ca):
+- Recon. C/Dte→Recon. C/Dto · P.Esforç→P.Esfuerzo · Futbol→Fútbol · Bàsquet→Baloncesto · Atletisme→Atletismo · Natació→Natación · Tennis→Tenis · Pàdel→Pádel · Muntanya→Montaña · Triatló→Triatlón · Submarinisme→Submarinismo · Handbol→Balonmano · Patinatge→Patinaje · Escriure a mà→Escribir a mano
+- Hook en `applyLang()` que actualiza automáticamente todos los `[data-label-ca][data-label-es]` al cambiar idioma.
+
+**Chip antiguo "Devolució tasa DGT" eliminado** (era duplicado del nuevo dinámico `↩ Devolución tasa DGT` con modal).
+
+**Testing verificado con datos simulados:**
+- Bruto 600€ Pep + Neto 510€ Pep: `totalsDebe=510`, `totalsByFpX=-510`, `totalsHnBrutoTotal=600`. Caja/banco solo afectados por el neto. ✅
+- `_getHonorariosWorkersOfMonth` devuelve `PEP BRUGULAT BORRAS · 600€` (solo bruto). ✅
+- Impresión Empresa 2: función usa `printHtml` con landscape, KPIs, sin `window.open`. ✅
+- Chips deportivos ES: Fútbol/Baloncesto/Balonmano/Escribir a mano correcto. ✅
+- Auto-mark quarter IRPF: detecta 5 formatos ("Q1 2026","T2","Trimestre 3","4T","Hacienda Q1"), descarta "IRPF Pep Brugulat" y "Nomina Pep". ✅
+
+Archivos tocados: `frontend/public/v2.html`.
+
+
+
 ## 2026-02-03 (parte 3) · IRPF ↔ Debe/Haber vínculo bidireccional
 **Modelo aclarado por el usuario:**
 - El chip IRPF de Debe/Haber es SOLO para pagos trimestrales a Hacienda (efectivo→banco→Hacienda o transferencia bancaria directa). Nunca por trabajador.
