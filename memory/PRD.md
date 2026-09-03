@@ -1,5 +1,20 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-03 (parte 2) · Chips Debe/Haber + Verificación separación de empresas
+- **Chips eliminados** del panel Debe/Haber (Empresa 1): `Mercadona / material` (DEBE) y `Ciclista` (HABER). Los chips restantes son: IRPF, Devolució tasa DGT, 💼 Honoraris, 💼 Nómina, 💼 Faena externa, 🧾 GASTO, ↩ Devolución (dinámico según empresa), 🔁 Ingreso metálico, 🏦 Retirada del banco, Foto.
+- **Verificación separación estricta Empresa 1 ↔ Empresa 2** (todas las claves localStorage confirmadas independientes):
+  - Entradas: `caja.v1` vs `caja.cempla.v1`
+  - Datáfono: `caja.datafono` vs `caja.cempla.datafono`
+  - Reserva cambio: `caja.reserva.v1` vs `caja.cempla.reserva.v1`
+  - Saldo inicial: `caja.saldoInicial.trafic.v1` vs `caja.saldoInicial.cempla.v1`
+  - IRPF: `caja.irpf.v1` único archivo pero estructura interna `{trafic:{...}, cempla:{...}}` seleccionada por `irpfComp`
+  - Stats autoescuelas: sólo aplica a Empresa 1 (Marc Brugulat / CEMPLA CB); Empresa 2 tiene su propia ventana `openStatsEmpresa2` que lee de `caja.cempla.v1`
+- **Aclaración chip IRPF ↔ sección 📋 IRPF**: NO están vinculados. El chip IRPF del Debe/Haber genera un simple gasto DEBE en el día (útil para el pago trimestral a Hacienda). La sección 📋 IRPF (Contabilidad → IRPF) es un cuaderno independiente de retenciones trimestrales por trabajador que se rellena manualmente. Recomendación al cliente: escribir el nombre del trabajador tras "IRPF" (ej. "IRPF Pep Brugulat Borras") para trazabilidad en la libreta contable, pero las retenciones oficiales van en la sección IRPF.
+- **Manual de usuario actualizado** (`manual-usuari.html` v2.1.16 · 03/02/2026): nueva FAQ sobre chip IRPF vs sección IRPF y sobre separación estricta de empresas con todas las claves de storage documentadas.
+- Archivos tocados: `frontend/public/v2.html`, `frontend/public/manual-usuari.html`.
+
+
+
 ## 2026-02-03 · Empresa 2: eliminar todas las referencias a "Tasas DGT"
 - **Chip "↩ Devolución tasa DGT"**: ahora es dinámico. En Empresa 1 sigue diciendo "↩ Devolución tasa DGT"; en Empresa 2 (cempla) muestra sólo "↩ Devolución" y su `title` se adapta al contexto (importe cobrado por revisión/certificado).
 - **Modal `openTasaRefund()` unificado**: detecta `currentCompany`. En Empresa 2 busca cualquier ficha con `importe > 0` (no exige `kind==='TRAF'` ni `tasa>0`), la etiqueta del campo cambia de "Tasa" a "Importe" y al guardar reduce `entry.importe` en la ficha original en lugar de `entry.tasa`. El flag `_tasaRefund` se mantiene por compatibilidad con la lógica de compensación de fp existente (evita doble-descuento).

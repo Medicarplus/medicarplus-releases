@@ -48,7 +48,7 @@
 
 <header>
   <h1>📘 Manual de Usuario · MediCar Plus</h1>
-  <p>Guía completa para usar el programa día a día · Versión 2.1.15 · Actualizado 27/02/2026</p>
+  <p>Guía completa para usar el programa día a día · Versión 2.1.16 · Actualizado 03/02/2026</p>
 </header>
 
 <nav class="tab-nav" role="tablist" aria-label="Manual de usuario">
@@ -511,6 +511,27 @@
     <li>Repite <b>semanalmente</b></li>
   </ol>
 
+  <h3>❓ ¿El chip "IRPF" del Debe/Haber está vinculado a la sección 📋 IRPF?</h3>
+  <div class="callout callout-blue"><b>No.</b> Son dos sistemas <b>independientes</b>:
+    <ul style="margin-top:8px">
+      <li>El <b>chip IRPF</b> del panel Debe/Haber es sólo un acceso rápido para anotar un <b>gasto puntual</b> (por ejemplo, ingreso trimestral a Hacienda) en la caja del día. Es un DEBE normal — <b>no</b> alimenta la sección de retenciones.</li>
+      <li>La <b>sección 📋 IRPF</b> (botón <i>Contabilidad → 📋 IRPF</i>) es un cuaderno aparte de <b>retenciones trimestrales por trabajador</b>. Se rellena manualmente con los certificados profesionales de cada empresa y mes.</li>
+    </ul>
+    <b>Consejo:</b> escribe el chip IRPF con el nombre del trabajador para que quede trazable en la libreta contable (ej. <i>"IRPF Pep Brugulat Borras"</i>), pero recuerda que las retenciones oficiales se llevan en la sección 📋 IRPF.
+  </div>
+
+  <h3>❓ ¿Se mezclan los datos de Empresa 1 y Empresa 2?</h3>
+  <div class="callout callout-red"><b>Nunca.</b> Cada empresa tiene su propio almacenamiento totalmente separado:
+    <ul style="margin-top:8px">
+      <li><b>Entradas del día</b> (caja): claves distintas — <code>caja.v1</code> (Empresa 1) y <code>caja.cempla.v1</code> (Empresa 2)</li>
+      <li><b>Datáfono</b>: <code>caja.datafono</code> vs <code>caja.cempla.datafono</code></li>
+      <li><b>Reserva de cambio</b>: <code>caja.reserva.v1</code> vs <code>caja.cempla.reserva.v1</code></li>
+      <li><b>Saldo inicial</b>: <code>caja.saldoInicial.trafic.v1</code> vs <code>caja.saldoInicial.cempla.v1</code></li>
+      <li><b>IRPF trimestral</b>: un único archivo <code>caja.irpf.v1</code> pero internamente separado por empresa (<code>trafic</code> vs <code>cempla</code>)</li>
+    </ul>
+    Aunque un mismo cliente o trabajador tenga el mismo nombre en las dos empresas, sus entradas <b>nunca</b> se cruzan. La aplicación siempre trabaja con la empresa activa que ves en la barra superior.
+  </div>
+
   <h3>❓ ¿Cómo cambio el % de IRPF?</h3>
   <ol>
     <li>Clic en <b>⚙️ Configuración</b></li>
@@ -537,7 +558,7 @@
 </div>
 
 <footer>
-Manual de Usuario MediCar Plus v2.1.15 · Actualizado 27/02/2026<br>
+Manual de Usuario MediCar Plus v2.1.16 · Actualizado 03/02/2026<br>
 <a href="/guia-client-installacio.html">📥 Guía de instalación</a> · <a href="mailto:info@medicarplus.es">📧 Soporte</a>
 </footer>
 
