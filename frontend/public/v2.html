@@ -11709,14 +11709,13 @@ setTimeout(()=>{
 })();
 </script>
 
-<!-- 🆘 RESCATE GLOBAL: F9 cierra TODOS los modales fantasma que bloqueen la interfaz -->
+<!-- 🆘 RESCATE GLOBAL SILENCIOSO: F9 cierra TODOS los modales fantasma sin avisos -->
 <script>
 document.addEventListener('keydown', function(ev){
   if(ev.key === 'F9'){
     const modals = document.querySelectorAll('.modal-back');
     if(modals.length){
       modals.forEach(m => m.remove());
-      if(typeof toast==='function') toast(`🆘 ${modals.length} modal(es) cerrado(s) con F9`);
       ev.preventDefault();
     }
   }
