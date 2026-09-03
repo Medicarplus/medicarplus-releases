@@ -568,7 +568,7 @@
         <button class="btn util-item" id="btnStatSms" data-premium="1" data-testid="btn-stat-sms" style="background:#0f3a20;border-color:#22c55e;color:#22c55e;font-weight:600;width:100%;text-align:left">📱 Estadísticas SMS</button>
         <button class="btn util-item" id="btnStatCites" data-premium="1" data-testid="btn-stat-cites" style="background:#0c2a3e;border-color:#0ea5e9;color:#0ea5e9;font-weight:600;width:100%;text-align:left">📅 Estadísticas Citas</button>
         <button class="btn" id="btnStatCompararAnys" data-testid="btn-stat-comparar-anys" style="background:#152a3a;border-color:#7ec8ff;color:#7ec8ff;font-weight:600;width:100%;text-align:left">📈 Comparativa años</button>
-        <button class="btn" id="btnStatEmpresa2" data-testid="btn-stat-empresa2" style="background:#3a1e2a;border-color:#ec4899;color:#ec4899;font-weight:600;width:100%;text-align:left;display:none">🏥 Revisiones Empresa 2</button>
+        <button class="btn" id="btnStatEmpresa2" data-testid="btn-stat-empresa2" style="background:#3a1e2a;border-color:#ec4899;color:#ec4899;font-weight:600;width:100%;text-align:left;display:none">🏥 Revisiones <span data-cfg-name="2">Empresa 2</span></button>
       </div>
     </div>
     <!-- Utilidades dropdown · SECCIÓ PREMIUM (només Premium/Trial/Master accés complet) -->
@@ -696,7 +696,7 @@
               <span class="chip" data-t="DEBE" data-c="Nómina" style="background:linear-gradient(135deg,#2563eb,#3b82f6);border-color:#60a5fa;color:#ffffff;font-weight:700;box-shadow:0 2px 8px rgba(59,130,246,.4)" title="Nómina · sale dinero de caja (gasto)">💼 Nómina</span>
               <span class="chip" data-t="DEBE" data-c="Faena externa" style="background:linear-gradient(135deg,#2563eb,#3b82f6);border-color:#60a5fa;color:#ffffff;font-weight:700;box-shadow:0 2px 8px rgba(59,130,246,.4)" title="Trabajo subcontratado / colaborador · sale dinero de caja (gasto)">💼 Faena externa</span>
               <span class="chip" data-t="DEBE" data-c="Gasto:" data-role="gasto" style="background:linear-gradient(135deg,#ef4444,#f87171);border-color:#fca5a5;color:#ffffff;font-weight:700;box-shadow:0 2px 8px rgba(239,68,68,.5)" title="Gasto del centro (luz, agua, alquiler, material, seguros, teléfono, gestoría…). Marca explícita: SIEMPRE se contabiliza como Gasto y NUNCA como Honorario.">🧾 GASTO</span>
-              <span class="chip" data-role="tasa-refund" style="background:linear-gradient(135deg,#b45309,#d97706);border-color:#fbbf24;color:#ffffff;font-weight:800;box-shadow:0 2px 8px rgba(180,83,9,.5)" title="Devuelve parte de una tasa DGT cobrada anteriormente (ej: tasa quedó en menos por menos años del carnet)">↩ Devolución tasa DGT</span>
+              <span class="chip" data-role="tasa-refund" style="background:linear-gradient(135deg,#b45309,#d97706);border-color:#fbbf24;color:#ffffff;font-weight:800;box-shadow:0 2px 8px rgba(180,83,9,.5)" title="Devuelve parte de una tasa DGT cobrada anteriormente (ej: tasa quedó en menos por menos años del carnet)"><span data-refund-label>↩ Devolución tasa DGT</span></span>
               <span class="chip" data-role="transfer-caja-banco" style="background:linear-gradient(135deg,#ea580c,#f97316);border-color:#fdba74;color:#ffffff;font-weight:800;box-shadow:0 2px 8px rgba(234,88,12,.5)" title="Ingreso en metálico: pasas dinero de tu CAJA FÍSICA al BANCO. NO cuenta como facturación (es dinero tuyo interno)">🔁 Ingreso en metálico (Caja→Banco)</span>
               <span class="chip" data-role="transfer-banco-caja" style="background:linear-gradient(135deg,#0369a1,#0284c7);border-color:#7dd3fc;color:#ffffff;font-weight:700;box-shadow:0 2px 8px rgba(3,105,161,.5)" title="Retirada en metálico: sacas dinero del BANCO y lo pones en tu CAJA FÍSICA. NO cuenta como facturación">🏦 Retirada del banco (Banco→Caja)</span>
               <span class="chip" data-t="HABER" data-c="Foto" style="border-color:#3ddc97;color:#3ddc97">Foto</span>
@@ -975,6 +975,15 @@ function switchCompany(c){currentCompany=c;localStorage.setItem('caja.company',c
 function applyCompanyUI(){const hasC2=!!(window.CFG&&CFG.company2&&CFG.company2.name);const isC=hasC2&&currentCompany==='cempla';const c1=(window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1';const c2=(window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2';document.body.classList.toggle('cempla',isC);$('#cTrafic').classList.toggle('active',!isC);$('#cCempla').classList.toggle('active',isC);$('#cCempla').style.display=hasC2?'':'none';document.querySelectorAll('[data-cfg-name="1"]').forEach(el=>el.textContent=c1);document.querySelectorAll('[data-cfg-name="2"]').forEach(el=>el.textContent=c2);const titleMain=document.querySelector('#appTitle .app-title-main');if(titleMain)titleMain.textContent=isC?c2:'MediCar Plus';$('#appSub').textContent=isC?('REVISIONES · '+c2.toUpperCase()):'GESTIÓN DE CENTROS MÉDICOS';
   // Botón de estadísticas de Empresa 2: solo visible si Empresa 2 configurada
   const stE2 = document.getElementById('btnStatEmpresa2'); if(stE2) stE2.style.display = hasC2 ? '' : 'none';
+  // 🏥 Empresa 2 no usa Tasas DGT: adaptamos el chip "Devolución" y su title
+  const _refundChip = document.querySelector('#chips-dh .chip[data-role="tasa-refund"]');
+  if(_refundChip){
+    const _refLbl = _refundChip.querySelector('[data-refund-label]');
+    if(_refLbl) _refLbl.textContent = isC ? '↩ Devolución' : '↩ Devolución tasa DGT';
+    _refundChip.title = isC
+      ? 'Devuelve parte de un importe cobrado anteriormente por una revisión/certificado.'
+      : 'Devuelve parte de una tasa DGT cobrada anteriormente (ej: tasa quedó en menos por menos años del carnet)';
+  }
   // Socis (opcionals): mostra tants inputs de % com socis configurats. Si no n'hi ha, s'amaga.
   const parts=(window.CFG&&Array.isArray(CFG.partners))?CFG.partners:[];
   document.querySelectorAll('.partner-input').forEach(el=>{
@@ -3088,15 +3097,22 @@ function openTraspasoInterno(direction){
 function openTasaRefund(){
   // Cierra cualquier modal previo que pudiera estar bloqueando la interfaz
   document.querySelectorAll('.modal-back').forEach(m => m.remove());
+  // 🏥 Empresa 2 (cempla) NO usa tasas DGT. En ese caso el modal funciona como
+  // "Devolución de importe" sobre las revisiones/certificados. En Empresa 1
+  // mantiene el flujo tradicional de devolución de tasa DGT.
+  const isC2 = currentCompany === 'cempla';
+  const modalTitle = isC2 ? '↩ Devolución' : '↩ Devolución de tasa DGT';
+  const modalHelp  = isC2
+    ? 'Busca al cliente por <b>nombre</b> o <b>DNI</b>. Se listarán sus revisiones/certificados cobrados. Elige el correcto y anota el importe a devolver. El importe de la ficha original se recalcula y el asentamiento contable queda en el día de hoy.'
+    : 'Busca al cliente por <b>nombre</b> o <b>DNI</b>. Se listarán sus entradas con tasa cobrada. Elige la correcta y anota el importe a devolver. La tasa de la ficha original se recalcula automáticamente y el asentamiento contable queda en el día de hoy.';
   const back = document.createElement('div'); back.className='modal-back'; back.style.zIndex='100050';
   back.innerHTML = `<div class="modal" style="max-width:640px;max-height:90vh;display:flex;flex-direction:column">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <h3 style="margin:0;color:#d97706;font-family:Georgia,serif">↩ Devolución de tasa DGT</h3>
+      <h3 style="margin:0;color:#d97706;font-family:Georgia,serif">${modalTitle}</h3>
       <button data-close style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">×</button>
     </div>
     <div style="background:rgba(217,119,6,.1);border:1px solid #d97706;border-radius:8px;padding:10px 14px;color:#fbbf24;font-size:12.5px;line-height:1.55;margin-bottom:12px">
-      Busca al cliente por <b>nombre</b> o <b>DNI</b>. Se listarán sus entradas con tasa cobrada. Elige la correcta y anota el importe a devolver.
-      La tasa de la ficha original se recalcula automáticamente y el asentamiento contable queda en el día de hoy.
+      ${modalHelp}
     </div>
     <input id="trSearch" type="text" placeholder="🔎 Nombre o DNI del cliente…" autofocus autocomplete="off" style="width:100%;padding:11px 14px;background:#0f172a;border:2px solid #d97706;border-radius:8px;color:#e2e8f0;font-size:14px;box-sizing:border-box;margin-bottom:10px;text-transform:uppercase"/>
     <div id="trResults" style="flex:1;overflow:auto;padding:4px 2px 6px 0;min-height:120px;max-height:340px"></div>
@@ -3125,9 +3141,16 @@ function openTasaRefund(){
     const all = [];
     Object.entries(state.byDate||{}).forEach(([d,arr])=>{
       (arr||[]).forEach(e=>{
-        if(e.kind !== 'TRAF') return;
         if(e.retorno) return;
-        if(!(+e.tasa > 0)) return; // solo entradas con tasa cobrada
+        if(e.kind === 'DH') return; // ignora asientos DH (traspasos/refunds/gastos)
+        if(isC2){
+          // Empresa 2: cualquier revisión/certificado con importe cobrado
+          if(!(+e.importe > 0)) return;
+        } else {
+          // Empresa 1: solo entradas TRAF con tasa DGT cobrada
+          if(e.kind !== 'TRAF') return;
+          if(!(+e.tasa > 0)) return;
+        }
         const nn = norm(e.nombre); const dn = norm(e.dni);
         if(!nn.includes(nq) && !dn.includes(nq)) return;
         all.push({...e, _date:d});
@@ -3138,8 +3161,10 @@ function openTasaRefund(){
     results.innerHTML = all.slice(0,40).map(e => {
       const alreadyRefunded = (e._refunds||[]).reduce((s,r)=>s+(+r.amount||0),0);
       const disp = e._date.split('-').reverse().join('/');
+      const refValue = isC2 ? (+e.importe||0) : (+e.tasa||0);
+      const refLabel = isC2 ? 'Importe' : 'Tasa';
       return `<div data-id="${e.id}" data-date="${e._date}" style="background:#141821;border:1px solid #2a3040;border-radius:6px;padding:9px 12px;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px">
-        <div style="flex:1;min-width:0"><div style="color:#e2e8f0;font-size:13px;font-weight:700">${escapeHtml(e.nombre)}${e.dni?` <span style="color:#7a8394;font-size:11px;font-family:Consolas,monospace">${escapeHtml(e.dni)}</span>`:''}</div><div style="color:#94a3b8;font-size:11px;margin-top:2px">📅 ${disp} · ${e.tipo||'-'} · ${e.grupo||'-'} · Importe ${fmt(e.importe)} · <b style="color:#fbbf24">Tasa ${fmt(e.tasa)}</b>${alreadyRefunded>0?` · <span style="color:#f87171">Ya devuelto ${fmt(alreadyRefunded)}</span>`:''}</div></div>
+        <div style="flex:1;min-width:0"><div style="color:#e2e8f0;font-size:13px;font-weight:700">${escapeHtml(e.nombre)}${e.dni?` <span style="color:#7a8394;font-size:11px;font-family:Consolas,monospace">${escapeHtml(e.dni)}</span>`:''}</div><div style="color:#94a3b8;font-size:11px;margin-top:2px">📅 ${disp} · ${e.tipo||'-'} · ${e.grupo||'-'} · <b style="color:#fbbf24">${refLabel} ${fmt(refValue)}</b>${alreadyRefunded>0?` · <span style="color:#f87171">Ya devuelto ${fmt(alreadyRefunded)}</span>`:''}</div></div>
         <button style="padding:6px 12px;background:#d97706;color:#fff;border:none;border-radius:5px;font-weight:700;font-size:11px;cursor:pointer;white-space:nowrap">Seleccionar</button>
       </div>`;
     }).join('');
@@ -3150,7 +3175,9 @@ function openTasaRefund(){
         if(!e) return;
         selected = {entry:e, date:d};
         const dispDate = d.split('-').reverse().join('/');
-        picked.innerHTML = `✅ <b>${escapeHtml(e.nombre)}</b>${e.dni?` (${escapeHtml(e.dni)})`:''} · ${dispDate} · tasa actual <b style="color:#fbbf24">${fmt(e.tasa)}</b>`;
+        const curVal = isC2 ? (+e.importe||0) : (+e.tasa||0);
+        const curLbl = isC2 ? 'importe actual' : 'tasa actual';
+        picked.innerHTML = `✅ <b>${escapeHtml(e.nombre)}</b>${e.dni?` (${escapeHtml(e.dni)})`:''} · ${dispDate} · ${curLbl} <b style="color:#fbbf24">${fmt(curVal)}</b>`;
         action.style.display='block';
         back.querySelector('#trAmt').focus();
       };
@@ -3162,26 +3189,35 @@ function openTasaRefund(){
     if(!selected){ toast('Selecciona una entrada primero'); return; }
     const amt = +back.querySelector('#trAmt').value || 0;
     if(amt <= 0){ toast('Introduce un importe válido'); return; }
-    const currentTasa = +selected.entry.tasa || 0;
-    if(amt > currentTasa + 0.001){ toast(`⚠️ La devolución (${fmt(amt)}) supera la tasa actual (${fmt(currentTasa)})`, 4500); return; }
+    const currentVal = isC2 ? (+selected.entry.importe || 0) : (+selected.entry.tasa || 0);
+    const valLabel = isC2 ? 'importe actual' : 'tasa actual';
+    if(amt > currentVal + 0.001){ toast(`⚠️ La devolución (${fmt(amt)}) supera el ${valLabel} (${fmt(currentVal)})`, 4500); return; }
     const fp = back.querySelector('#trFp').value;
-    // 1) Reduce la tasa en la ficha original y guarda el histórico de devoluciones
-    selected.entry.tasa = Math.max(0, currentTasa - amt);
+    // 1) Reduce el importe/tasa en la ficha original y guarda el histórico de devoluciones
+    if(isC2){
+      selected.entry.importe = Math.max(0, currentVal - amt);
+    } else {
+      selected.entry.tasa = Math.max(0, currentVal - amt);
+    }
     selected.entry._refunds = selected.entry._refunds || [];
-    selected.entry._refunds.push({date: currentDate, amount: amt, fp, id: uid()});
-    // 2) Crea una entrada INFORMATIVA en el día actual (no cuenta en totales si
-    //    fp coincide con el original; si difiere, aplica compensación cruzada)
+    selected.entry._refunds.push({date: currentDate, amount: amt, fp, id: uid(), kind: isC2 ? 'importe' : 'tasa'});
+    // 2) Crea una entrada INFORMATIVA en el día actual. En Empresa 2 no
+    //    mencionamos "tasa"; el flag _tasaRefund se mantiene por compatibilidad
+    //    con la lógica contable existente (misma compensación fp origen/refund).
+    const refundNamePrefix = isC2 ? '↩ Devolución' : '↩ Devolución tasa';
     const refundEntry = {
       id: uid(), kind: 'DH', tipo: 'DEBE', grupo: '-',
-      nombre: `↩ Devolución tasa · ${selected.entry.nombre}${selected.entry.dni?` (${selected.entry.dni})`:''} · del ${selected.date.split('-').reverse().join('/')}`,
+      nombre: `${refundNamePrefix} · ${selected.entry.nombre}${selected.entry.dni?` (${selected.entry.dni})`:''} · del ${selected.date.split('-').reverse().join('/')}`,
       importe: amt, descuento: 0, tasa: 0, fp, fpTasa: '', retorno: false,
       _tasaRefund: true, refEntryId: selected.entry.id, refEntryDate: selected.date,
-      _origFp: selected.entry.fpTasa || selected.entry.fp || 'E'  // fp original de la tasa
+      _origFp: (isC2 ? selected.entry.fp : (selected.entry.fpTasa || selected.entry.fp)) || 'E'
     };
     entriesOf(currentDate).push(refundEntry);
     saveState(); render();
     back.remove();
-    toast(`↩ Devolución de ${fmt(amt)} registrada · Tasa ficha ${selected.date.split('-').reverse().join('/')} actualizada a ${fmt(selected.entry.tasa)}`, 5000);
+    const newVal = isC2 ? selected.entry.importe : selected.entry.tasa;
+    const newLbl = isC2 ? 'Importe ficha' : 'Tasa ficha';
+    toast(`↩ Devolución de ${fmt(amt)} registrada · ${newLbl} ${selected.date.split('-').reverse().join('/')} actualizada a ${fmt(newVal)}`, 5000);
   };
 }
 $('#dh-tipo').addEventListener('change',updateDhTipoColor);updateDhTipoColor();
@@ -4970,7 +5006,7 @@ function generateLedgerEntries(dateFrom,dateTo,company){
           }
           if(e._tasaRefund){
             const haberA = e.fp==='X'?'572 Banco':(e.fp==='B'?'572 Banco (Bizum)':(e.fp==='T'?'572 Banco (Tarj)':'570 Caja'));
-            rows.push({date,concepto:`↩ Devolución tasa DGT: ${e.nombre||'—'}`,debeAcct:'708 Devoluciones ventas',debeAmt:e.importe,haberAcct:haberA,haberAmt:e.importe});
+            rows.push({date,concepto:`↩ Devolución: ${e.nombre||'—'}`,debeAcct:'708 Devoluciones ventas',debeAmt:e.importe,haberAcct:haberA,haberAmt:e.importe});
             return;
           }
           if(e.tipo==='HABER'){

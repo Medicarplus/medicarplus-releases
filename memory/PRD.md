@@ -1,5 +1,15 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-03 · Empresa 2: eliminar todas las referencias a "Tasas DGT"
+- **Chip "↩ Devolución tasa DGT"**: ahora es dinámico. En Empresa 1 sigue diciendo "↩ Devolución tasa DGT"; en Empresa 2 (cempla) muestra sólo "↩ Devolución" y su `title` se adapta al contexto (importe cobrado por revisión/certificado).
+- **Modal `openTasaRefund()` unificado**: detecta `currentCompany`. En Empresa 2 busca cualquier ficha con `importe > 0` (no exige `kind==='TRAF'` ni `tasa>0`), la etiqueta del campo cambia de "Tasa" a "Importe" y al guardar reduce `entry.importe` en la ficha original en lugar de `entry.tasa`. El flag `_tasaRefund` se mantiene por compatibilidad con la lógica de compensación de fp existente (evita doble-descuento).
+- **Botón de estadísticas de Empresa 2**: ahora usa `<span data-cfg-name="2">` para reflejar el nombre real de la empresa configurada por cada cliente (p.ej. "🏥 Revisiones CEMPLA S.L" en lugar del hardcodeado "Empresa 2"). Vinculado al mecanismo global de `applyCompanyUI()`.
+- **Ledger Empresa 2**: concepto de devolución en la libreta contable cambia de "↩ Devolución tasa DGT: …" a "↩ Devolución: …" (asentamiento 708 Devoluciones ventas / 570 o 572 según fp igual que antes).
+- Verificación smoke test: `btnStatEmpresa2` → "🏥 Revisiones CEMPLA S.L" ✅ · chip refund → "↩ Devolución" ✅.
+- Archivo tocado: `frontend/public/v2.html`.
+
+
+
 ## 2026-02-28 (parte 6) · Movimientos internos Caja↔Banco + Devolución de tasa DGT
 - **3 chips nuevos** en Debe/Haber (funcionan en las 2 empresas):
   - 🟠 **🔁 Ingreso en metálico (Caja→Banco)**: modal con importe/nota. Efecto: Caja−X, Banco+X, facturación 0. Fila resaltada naranja con badge "TRASPASO".
