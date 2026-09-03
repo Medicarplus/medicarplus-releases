@@ -1,5 +1,24 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-28 (parte 6) · Movimientos internos Caja↔Banco + Devolución de tasa DGT
+- **3 chips nuevos** en Debe/Haber (funcionan en las 2 empresas):
+  - 🟠 **🔁 Ingreso en metálico (Caja→Banco)**: modal con importe/nota. Efecto: Caja−X, Banco+X, facturación 0. Fila resaltada naranja con badge "TRASPASO".
+  - 🔵 **🏦 Retirada del banco (Banco→Caja)**: inverso del anterior.
+  - 🟡 **↩ Devolución tasa DGT**: modal con buscador por nombre/DNI, muestra entradas del cliente con tasa cobrada. Al guardar: modifica retroactivamente la tasa en la ficha original + entrada informativa amarilla en día actual + libreta contable con asentamiento 708/570 o 708/572 en día devolución. Si fp devolución ≠ fp original, aplica compensación cruzada en byFp para que el dinero real quede coherente sin doble-descuento.
+- Asentamientos contables en la Libreta correctos según Plan General Contable ES:
+  - Ingreso metálico: **DEBE 572 Banco / HABER 570 Caja**
+  - Retirada banco: **DEBE 570 Caja / HABER 572 Banco**
+  - Devolución tasa: **DEBE 708 Devoluciones ventas / HABER 570 Caja o 572 Banco (según fp)**
+- Nunca tocan la cuenta 705 Ingresos (correcto — no son ventas).
+- `computeTotals` extendido con `internalCaja` e `internalBanco` que se aplican al final en renderSummary + `saldoAnteriorPorCuenta` para arrastre correcto al día siguiente.
+- Bugs anteriores corregidos:
+  - Reserva de cambio no vaciaba con "Vaciar todo" si Saldo inicial la re-sembraba: ahora Vaciar todo también pone `saldoInicial.cambio=0`, y setSaldoInicial ahora limpia `_bulk_seed`/`_bulk` cuando cambio=0.
+  - Entradas manuales de Tráfico ahora cuentan en TODAS las estadísticas y desgloses (se quitó el filtro `_csv===true` en 5 sitios).
+  - Campo DNI en fila Tráfico manual añadido y usado en fingerprint sync/dedup.
+  - Grupos DGT ampliados con "Deportes", concepto ampliado con "Prórroga" y "Recuperación".
+- Archivos tocados: `frontend/public/v2.html` (todo).
+
+
 ## 2026-02-28 (parte 5) · 👑 Admin: Comparar con CUALQUIER cliente
 - Nuevo bloque ADMIN dentro del Asesor IA (visible sólo para MASTER): selector de cliente + botón "👑 Comparar". Descarga el snapshot de la licencia elegida y pide a la IA un diff contra los datos del admin. Útil para auditar cajas de cualquier cliente.
 - Backend: nuevo endpoint `GET /api/sync/admin/other-license-snapshot?admin_license_key=…&target_license_key=…` (auth MASTER-only). Combina `sync_groups` + último backup del mailbox del cliente objetivo. Devuelve `target_client_name/email/plan` para trazabilidad.
