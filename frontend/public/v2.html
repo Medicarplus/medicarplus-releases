@@ -568,6 +568,7 @@
         <button class="btn util-item" id="btnStatSms" data-premium="1" data-testid="btn-stat-sms" style="background:#0f3a20;border-color:#22c55e;color:#22c55e;font-weight:600;width:100%;text-align:left">📱 Estadísticas SMS</button>
         <button class="btn util-item" id="btnStatCites" data-premium="1" data-testid="btn-stat-cites" style="background:#0c2a3e;border-color:#0ea5e9;color:#0ea5e9;font-weight:600;width:100%;text-align:left">📅 Estadísticas Citas</button>
         <button class="btn" id="btnStatCompararAnys" data-testid="btn-stat-comparar-anys" style="background:#152a3a;border-color:#7ec8ff;color:#7ec8ff;font-weight:600;width:100%;text-align:left">📈 Comparativa años</button>
+        <button class="btn" id="btnStatEmpresa2" data-testid="btn-stat-empresa2" style="background:#3a1e2a;border-color:#ec4899;color:#ec4899;font-weight:600;width:100%;text-align:left;display:none">🏥 Revisiones Empresa 2</button>
       </div>
     </div>
     <!-- Utilidades dropdown · SECCIÓ PREMIUM (només Premium/Trial/Master accés complet) -->
@@ -972,6 +973,8 @@ function openBackupHistory(){
 }
 function switchCompany(c){currentCompany=c;localStorage.setItem('caja.company',c);state=loadState();applyCompanyUI();render()}
 function applyCompanyUI(){const hasC2=!!(window.CFG&&CFG.company2&&CFG.company2.name);const isC=hasC2&&currentCompany==='cempla';const c1=(window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1';const c2=(window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2';document.body.classList.toggle('cempla',isC);$('#cTrafic').classList.toggle('active',!isC);$('#cCempla').classList.toggle('active',isC);$('#cCempla').style.display=hasC2?'':'none';document.querySelectorAll('[data-cfg-name="1"]').forEach(el=>el.textContent=c1);document.querySelectorAll('[data-cfg-name="2"]').forEach(el=>el.textContent=c2);const titleMain=document.querySelector('#appTitle .app-title-main');if(titleMain)titleMain.textContent=isC?c2:'MediCar Plus';$('#appSub').textContent=isC?('REVISIONES · '+c2.toUpperCase()):'GESTIÓN DE CENTROS MÉDICOS';
+  // Botón de estadísticas de Empresa 2: solo visible si Empresa 2 configurada
+  const stE2 = document.getElementById('btnStatEmpresa2'); if(stE2) stE2.style.display = hasC2 ? '' : 'none';
   // Socis (opcionals): mostra tants inputs de % com socis configurats. Si no n'hi ha, s'amaga.
   const parts=(window.CFG&&Array.isArray(CFG.partners))?CFG.partners:[];
   document.querySelectorAll('.partner-input').forEach(el=>{
@@ -4649,6 +4652,107 @@ $('#btnStatTrafico').onclick=()=>{$('#btnStatsSubmenu').style.display='none';ope
 $('#btnStatSms').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openStats('sms')};
 $('#btnStatCites').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openStats('cites')};
 $('#btnStatCompararAnys').onclick=()=>{$('#btnStatsSubmenu').style.display='none';openYearComparison()};
+const _btnStatE2 = document.getElementById('btnStatEmpresa2'); if(_btnStatE2) _btnStatE2.onclick = ()=>{ $('#btnStatsSubmenu').style.display='none'; openStatsEmpresa2(); };
+
+// 🏥 Estadísticas Empresa 2 · Revisiones deportivas + certificados agrupadas por
+// tipo/concepto y desglose mensual/anual. Solo se muestra si Empresa 2 está
+// configurada. Lee datos de caja.cempla.v1.
+function openStatsEmpresa2(){
+  document.querySelectorAll('.modal-back').forEach(m=>m.remove());
+  const raw = JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}');
+  const bd = raw.byDate || {};
+  const years = new Set();
+  Object.keys(bd).forEach(iso => { const y = iso.slice(0,4); if(y) years.add(y); });
+  const yearList = Array.from(years).sort().reverse();
+  const currentYear = yearList[0] || String(new Date().getFullYear());
+  const c2name = (window.CFG&&CFG.company2&&CFG.company2.name) || 'Empresa 2';
+  const back = document.createElement('div'); back.className='modal-back'; back.style.zIndex='100040';
+  back.innerHTML = `<div class="modal" style="max-width:1000px;max-height:92vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin:0;color:#ec4899;font-family:Georgia,serif">🏥 Estadísticas ${escapeHtml(c2name)} · Revisiones y Certificados</h3>
+      <button data-close style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+      <label style="color:#94a3b8;font-size:12px">Año:</label>
+      <select id="stE2Year" style="padding:6px 10px;background:#0f172a;border:1px solid #ec4899;border-radius:6px;color:#e2e8f0">${yearList.map(y=>`<option value="${y}"${y===currentYear?' selected':''}>${y}</option>`).join('')||'<option>—</option>'}</select>
+      <button id="stE2Print" style="margin-left:auto;padding:7px 14px;background:#ec4899;color:#fff;border:none;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer">🖨️ Imprimir</button>
+    </div>
+    <div id="stE2Body" style="flex:1;overflow:auto;padding-right:4px"></div>
+  </div>`;
+  document.body.appendChild(back);
+  back.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>back.remove());
+  back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
+  const render = () => {
+    const year = back.querySelector('#stE2Year').value;
+    const body = back.querySelector('#stE2Body');
+    // Filtrar entradas del año elegido
+    const byType = {};  // tipo → {count, importe, tasas, byMonth:{1..12}}
+    let totalCount = 0, totalImporte = 0, totalTasas = 0;
+    const byMonthAll = Array.from({length:12},()=>({count:0,importe:0,tasas:0}));
+    Object.entries(bd).forEach(([iso,arr]) => {
+      if(!iso.startsWith(year)) return;
+      const m = parseInt(iso.slice(5,7),10) - 1;
+      (arr||[]).forEach(e => {
+        if(e.retorno) return;
+        if(e.kind==='DH' && (e._internal||e._tasaRefund)) return;
+        const importe = (+e.importe||0) - (+e.descuento||0);
+        const tasa = +e.tasa || 0;
+        const key = (e.tipo || 'Sin tipo').trim() || 'Sin tipo';
+        if(!byType[key]) byType[key] = {count:0, importe:0, tasas:0, byMonth: Array.from({length:12},()=>({c:0,i:0}))};
+        byType[key].count++;
+        byType[key].importe += importe;
+        byType[key].tasas += tasa;
+        byType[key].byMonth[m].c++;
+        byType[key].byMonth[m].i += importe + tasa;
+        totalCount++; totalImporte += importe; totalTasas += tasa;
+        byMonthAll[m].count++; byMonthAll[m].importe += importe; byMonthAll[m].tasas += tasa;
+      });
+    });
+    if(totalCount === 0){
+      body.innerHTML = `<div style="padding:40px;text-align:center;color:#94a3b8;font-size:14px">Sin datos para <b>${year}</b> en ${escapeHtml(c2name)}.</div>`;
+      return;
+    }
+    const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const typeRows = Object.entries(byType).sort((a,b)=>b[1].importe-a[1].importe).map(([k,v]) => `<tr>
+      <td style="text-align:left;padding-left:10px"><b>${escapeHtml(k)}</b></td>
+      <td class="num"><b>${v.count}</b></td>
+      ${v.byMonth.map(m=>`<td class="num" style="font-size:11px">${m.c||'—'}</td>`).join('')}
+      <td class="num"><b>${fmt(v.importe)}</b></td>
+      <td class="num" style="color:#fbbf24">${v.tasas?fmt(v.tasas):'—'}</td>
+      <td class="num" style="color:#22c55e"><b>${fmt(v.importe+v.tasas)}</b></td>
+    </tr>`).join('');
+    body.innerHTML = `<div style="background:linear-gradient(135deg,#3a1e2a,#4a1e35);border:1px solid #ec4899;border-radius:10px;padding:16px;margin-bottom:14px">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center">
+        <div><div style="color:#f9a8d4;font-size:11px;letter-spacing:1px">TOTAL REVISIONES</div><div style="color:#fff;font-size:28px;font-weight:800">${totalCount}</div></div>
+        <div><div style="color:#f9a8d4;font-size:11px;letter-spacing:1px">IMPORTE</div><div style="color:#fff;font-size:24px;font-weight:800">${fmt(totalImporte)}</div></div>
+        <div><div style="color:#f9a8d4;font-size:11px;letter-spacing:1px">TASAS DGT</div><div style="color:#fbbf24;font-size:24px;font-weight:800">${fmt(totalTasas)}</div></div>
+        <div><div style="color:#f9a8d4;font-size:11px;letter-spacing:1px">TOTAL AÑO</div><div style="color:#22c55e;font-size:24px;font-weight:800">${fmt(totalImporte+totalTasas)}</div></div>
+      </div>
+    </div>
+    <h4 style="margin:14px 0 8px;color:#ec4899">📅 Desglose por tipo × mes</h4>
+    <div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#3a1e2a;color:#f9a8d4">
+        <th style="padding:8px;text-align:left">Tipo</th><th>#</th>
+        ${MESES.map(m=>`<th style="min-width:38px">${m}</th>`).join('')}
+        <th>Importe</th><th>Tasas</th><th>Total</th>
+      </tr></thead><tbody>${typeRows}</tbody>
+      <tfoot><tr style="background:#1e293b;color:#fff;font-weight:700">
+        <td style="padding:8px;text-align:left">TOTAL ${year}</td>
+        <td class="num">${totalCount}</td>
+        ${byMonthAll.map(m=>`<td class="num" style="font-size:11px">${m.count||'—'}</td>`).join('')}
+        <td class="num">${fmt(totalImporte)}</td>
+        <td class="num" style="color:#fbbf24">${fmt(totalTasas)}</td>
+        <td class="num" style="color:#22c55e">${fmt(totalImporte+totalTasas)}</td>
+      </tr></tfoot>
+    </table></div>`;
+  };
+  back.querySelector('#stE2Year').addEventListener('change', render);
+  back.querySelector('#stE2Print').onclick = () => {
+    const win = window.open('','_blank');
+    if(win){ win.document.write(`<html><head><title>Estadísticas ${c2name}</title><style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #333;padding:6px}th{background:#3a1e2a;color:#fff}</style></head><body><h1>🏥 Estadísticas ${c2name}</h1>${back.querySelector('#stE2Body').innerHTML}</body></html>`); win.document.close(); setTimeout(()=>win.print(),300); }
+  };
+  render();
+}
 $('#btnStatsToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnStatsSubmenu');const willOpen=(m.style.display==='none'||!m.style.display);if(willOpen)closeTopMenus('btnStatsSubmenu');m.style.display=willOpen?'flex':'none'};
 document.addEventListener('click',(e)=>{const box=$('#btnStatsBox');const menu=$('#btnStatsSubmenu');if(menu&&box&&!box.contains(e.target))menu.style.display='none'});
 
