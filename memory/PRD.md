@@ -1,5 +1,15 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-04 · Sync "Solo un día" ahora es el radio por defecto
+- **Enviar copia al otro ordenador (Manual)** y **Envío admin a licencia**: por defecto se marca `📅 SOLO UN DÍA` (antes `📋 COPIA TOTAL`).
+- El wrap del selector de fecha aparece visible al abrir el modal (`display:block`) para que el usuario elija el día directamente.
+- Los estilos de los labels se han invertido: `SOLO UN DÍA` con color/borde de énfasis, `COPIA TOTAL` gris hasta que se seleccione.
+- Aplica tanto al panel de sincronización manual entre PCs como al panel admin de envío por licencia.
+- Verificado en preview: `Default sync scope: DAY checked`. ✅
+- Archivo tocado: `frontend/public/v2.html` (función `_scopeHtml`).
+
+
+
 ## 2026-02-03 (parte 7) · Simplificación: eliminado chip BRUTO · IRPF section = fuente única
 
 **Decisión de UX del usuario**: dado que el BRUTO no afecta caja/banco/asentamientos, el chip en Debe/Haber sobra. Todo lo de IRPF va DIRECTO en la sección IRPF.
