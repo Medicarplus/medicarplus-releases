@@ -1,5 +1,16 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-04 (parte 2) · Retiradas columnas NET S.S. y TOTAL FINAL de la tabla IRPF
+- Tabla IRPF pasa de 10 columnas a 8: `NOM | CERT | €/CERT | BRUT | S.S. | TOTAL | IRPF % | NET | 🗑`.
+- Retirado el input `netSS` de la fila y su lógica de habilitar/deshabilitar según S.S.
+- Retirada la última columna `TOTAL FINAL` (era NET + NET S.S.).
+- Fila de TOTALES MES actualizada: pasa de 9 celdas de totales a 5 (brut, ss, total, irpf, net).
+- El objeto `irpfCalc` sigue devolviendo `netSS` y `totalFinal` internamente por compatibilidad (datos antiguos no se pierden).
+- Motivo: campo no estándar en nómina española que confundía más que aportaba. Los 4 conceptos que sí importan (BRUT → S.S. → IRPF → NET) siguen bien visibles.
+- Archivo tocado: `frontend/public/v2.html`.
+
+
+
 ## 2026-02-04 · Sync "Solo un día" ahora es el radio por defecto
 - **Enviar copia al otro ordenador (Manual)** y **Envío admin a licencia**: por defecto se marca `📅 SOLO UN DÍA` (antes `📋 COPIA TOTAL`).
 - El wrap del selector de fecha aparece visible al abrir el modal (`display:block`) para que el usuario elija el día directamente.

@@ -5669,8 +5669,6 @@ function openIRPF(){
         <td style="padding:4px 6px;border:1px solid #b45309;text-align:right;background:#f5f5dc;font-family:'Courier New',monospace;font-weight:700;color:#1a1a1a">${isActive&&c.hasSs?fmt(c.total):'—'}</td>
         <td style="padding:4px 6px;border:1px solid #b45309;text-align:right;background:${isActive?'#fef3c7':'#f0e6d2'};font-family:'Courier New',monospace;font-weight:700;color:#78350f">${isActive?fmt(c.irpf):'—'}</td>
         <td style="padding:4px 6px;border:1px solid #b45309;text-align:right;background:#f5f5dc;font-family:'Courier New',monospace;font-weight:700;color:#1a1a1a">${isActive?fmt(c.net):'—'}</td>
-        <td style="padding:4px 6px;border:1px solid #b45309;text-align:right"><input data-i="${i}" data-f="netSS" type="text" inputmode="decimal" value="${e.netSS||''}" placeholder="${c.hasSs?'0,00':'—'}" ${(!isActive||!c.hasSs)?'disabled':''} title="${!isActive?'Fila inactiva':(c.hasSs?'':L('Introdueix primer S.S. per activar aquest camp','Introduce primero S.S. para activar este campo'))}" style="width:95px;background:${isActive&&c.hasSs?'#fff':'#f0e6d2'};color:#1a1a1a;border:1px solid #d4a373;border-radius:4px;text-align:right;font-family:'Courier New',monospace;padding:6px 8px;font-size:13px;${(!isActive||!c.hasSs)?'cursor:not-allowed;opacity:.55':''}" /></td>
-        <td style="padding:4px 6px;border:1px solid #b45309;text-align:right;background:#f5f5dc;font-family:'Courier New',monospace;font-weight:700;color:#1a1a1a">${isActive&&c.hasSs?fmt(c.totalFinal):'—'}</td>
         <td style="padding:4px 6px;border:1px solid #b45309;text-align:center"><button class="btn" data-del="${i}" title="${L('Eliminar aquesta persona','Eliminar esta persona')}" style="padding:4px 10px;background:#b91c1c;color:#fff;border:none;border-radius:4px;font-size:14px;cursor:pointer">🗑</button></td>
       </tr>`;
     }).join('');
@@ -5695,12 +5693,10 @@ function openIRPF(){
             <th style="padding:8px;border:1px solid #78350f;width:100px">TOTAL</th>
             <th style="padding:8px;border:1px solid #78350f;width:100px;background:#b45309">IRPF ${pct}%</th>
             <th style="padding:8px;border:1px solid #78350f;width:100px">NET</th>
-            <th style="padding:8px;border:1px solid #78350f;width:100px">NET S.S.</th>
-            <th style="padding:8px;border:1px solid #78350f;width:100px">TOTAL</th>
             <th style="padding:8px;border:1px solid #78350f;width:50px"></th>
           </tr>
         </thead>
-        <tbody>${entriesHTML||'<tr><td colspan="10" style="padding:20px;text-align:center;color:#78350f;font-style:italic">Ninguna persona añadida todavía. Haz clic en &quot;+ Añadir persona&quot; para empezar.</td></tr>'}
+        <tbody>${entriesHTML||'<tr><td colspan="8" style="padding:20px;text-align:center;color:#78350f;font-style:italic">Ninguna persona añadida todavía. Haz clic en &quot;+ Añadir persona&quot; para empezar.</td></tr>'}
         <tr style="background:#fef3c7;font-weight:700;border-top:3px double #78350f">
           <td colspan="3" style="padding:8px;border:1px solid #b45309;text-align:right;color:#78350f">TOTALES MES:</td>
           <td style="padding:8px;border:1px solid #b45309;text-align:right;font-family:'Courier New',monospace">${fmt(totals.brut)}</td>
@@ -5708,8 +5704,6 @@ function openIRPF(){
           <td style="padding:8px;border:1px solid #b45309;text-align:right;font-family:'Courier New',monospace">${fmt(totals.total)}</td>
           <td style="padding:8px;border:1px solid #b45309;text-align:right;font-family:'Courier New',monospace;background:#b45309;color:#fff">${fmt(totals.irpf)}</td>
           <td style="padding:8px;border:1px solid #b45309;text-align:right;font-family:'Courier New',monospace">${fmt(totals.net)}</td>
-          <td style="padding:8px;border:1px solid #b45309;text-align:right;font-family:'Courier New',monospace">${fmt(totals.netSS)}</td>
-          <td style="padding:8px;border:1px solid #b45309;text-align:right;font-family:'Courier New',monospace">${fmt(totals.totalFinal)}</td>
           <td style="padding:8px;border:1px solid #b45309"></td>
         </tr>
         </tbody>
@@ -5837,20 +5831,10 @@ function openIRPF(){
         if(tr){
           const c=irpfCalc(d2[irpfComp].months[m].entries[i],pct);
           const cells=tr.querySelectorAll('td');
-          // cells: 0=NOM, 1=CERT, 2=€/CERT, 3=BRUT, 4=S.S., 5=TOTAL, 6=IRPF, 7=NET, 8=NET S.S., 9=TOTAL FINAL, 10=DEL
+          // cells: 0=NOM, 1=CERT, 2=€/CERT, 3=BRUT, 4=S.S., 5=TOTAL, 6=IRPF, 7=NET, 8=DEL
           if(cells[5])cells[5].textContent=c.hasSs?fmt(c.total):'—';
           if(cells[6])cells[6].textContent=fmt(c.irpf);
           if(cells[7])cells[7].textContent=fmt(c.net);
-          if(cells[9])cells[9].textContent=c.hasSs?fmt(c.totalFinal):'—';
-          // Toggle netSS input enabled state
-          const netSsInp=tr.querySelector('input[data-f="netSS"]');
-          if(netSsInp){
-            netSsInp.disabled=!c.hasSs;
-            netSsInp.style.background=c.hasSs?'#fff':'#f0e6d2';
-            netSsInp.style.opacity=c.hasSs?'1':'.55';
-            netSsInp.style.cursor=c.hasSs?'text':'not-allowed';
-            netSsInp.placeholder=c.hasSs?'0,00':'—';
-          }
         }
         // Update TOTALS MES row live
         updateTotalsRow();
@@ -5887,14 +5871,12 @@ function openIRPF(){
       const totRow=back.querySelector('#irpfBody table tbody tr:last-child');
       if(totRow){
         const tds=totRow.querySelectorAll('td');
-        // tds: [colspan=3 (NOM+CERT+€/CERT)][BRUT][SS][TOTAL][IRPF][NET][NETSS][TOTALFINAL][blank]
+        // tds: [colspan=3 (NOM+CERT+€/CERT)][BRUT][SS][TOTAL][IRPF][NET][blank]
         if(tds[1])tds[1].textContent=fmt(t.brut);
         if(tds[2])tds[2].textContent=fmt(t.ss);
         if(tds[3])tds[3].textContent=fmt(t.total);
         if(tds[4])tds[4].textContent=fmt(t.irpf);
         if(tds[5])tds[5].textContent=fmt(t.net);
-        if(tds[6])tds[6].textContent=fmt(t.netSS);
-        if(tds[7])tds[7].textContent=fmt(t.totalFinal);
       }
     }
     back.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
