@@ -551,6 +551,7 @@
         <button class="btn" id="btnLedger" style="background:#2a1f3a;border-color:#5e2a5e;color:#e0bff0;font-weight:600;width:100%;text-align:left" data-i18n="ledger">📖 Llibreta</button>
         <button class="btn" id="btnIrpf" style="background:#3a2a1f;border-color:#8b5e2a;color:#f0d6bf;font-weight:600;width:100%;text-align:left">📋 IRPF</button>
         <button class="btn" id="btnCambio" style="background:#1f3a2e;border-color:#22c55e;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-i18n="reserve" data-testid="btn-cambio">💰 Reserva de cambio</button>
+        <button class="btn" id="btnCuadreCaja" data-testid="btn-cuadre-caja" style="background:#152535;border-color:#38bdf8;color:#bae6fd;font-weight:600;width:100%;text-align:left">🧮 Cuadre de Caja</button>
         <button class="btn" id="btnLibroRegMenu" style="background:#152a3a;border-color:#7ec8ff;color:#7ec8ff;font-weight:600;width:100%;text-align:left">📖 Libro de Registro</button>
         <button class="btn" id="btnHonorarios" data-testid="btn-honorarios" style="background:#2a2015;border-color:#fbbf24;color:#fbbf24;font-weight:600;width:100%;text-align:left">💼 Honorarios</button>
         <button class="btn" id="btnGastos" data-testid="btn-gastos" style="background:#2a1515;border-color:#f472b6;color:#f472b6;font-weight:600;width:100%;text-align:left">🧾 Gastos (luz · agua · alquiler…)</button>
@@ -3932,6 +3933,7 @@ $('#btnExport').addEventListener('click',()=>{setTimeout(()=>{const m=$('#btnBac
 $('#btnImportJson').addEventListener('click',()=>{setTimeout(()=>{const m=$('#btnBackupMenu');if(m)m.style.display='none'},50)});
 $('#btnLedger').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLedger()};
 $('#btnIrpf').onclick=()=>{$('#btnAccountingMenu').style.display='none';openIRPF()};
+const _bCuadre = document.getElementById('btnCuadreCaja'); if(_bCuadre) _bCuadre.onclick=()=>{ const menu=$('#btnAccountingMenu'); if(menu) menu.style.display='none'; openCuadreCaja(); };
 $('#btnCambio').onclick=()=>{$('#btnAccountingMenu').style.display='none';openCambio()};
 $('#btnLibroRegMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLibroRegistro()};
 $('#btnHonorarios').onclick=()=>{$('#btnAccountingMenu').style.display='none';openHonorariosPanel()};
@@ -5526,6 +5528,210 @@ function irpfCalc(e,pct){
 }
 function quarterOf(ym){const [y,m]=ym.split('-').map(Number);return `${y}-Q${Math.ceil(m/3)}`;}
 function monthsOfQuarter(yq){const [y,q]=yq.split('-Q').map(s=>parseInt(s));const m0=(q-1)*3+1;return [0,1,2].map(i=>`${y}-${String(m0+i).padStart(2,'0')}`);}
+// ============================================================================
+// 🧮 CUADRE DE CAJA — reconciliación mensual multi-empresa
+// ============================================================================
+// Muestra un resumen tipo Excel: SALDO ANTERIOR + INGRESOS − GASTOS = SALDO
+// ACTUAL. Coteja contra caja física + banco de cada empresa. Diferencia = 0
+// significa que todo cuadra. El "saldo anterior" es el cierre del último día
+// del mes anterior. Ingresos/gastos suman del día 1 al cutoff (hoy si es mes
+// en curso, o fin de mes si es pasado) INCLUSIVE.
+function _cuadreCajaCompute(comp, month, cutoffIso){
+  const storeKey = comp === 'cempla' ? 'caja.cempla.v1' : 'caja.v1';
+  const dfStoreKey = comp === 'cempla' ? 'caja.cempla.datafono' : 'caja.datafono';
+  const siKey = 'caja.saldoInicial.' + (comp==='cempla'?'cempla':'trafic') + '.v1';
+  let bd = {}, dfMap = {}, si = {caja:0, banc:0, from:null};
+  try{ bd = (JSON.parse(localStorage.getItem(storeKey)||'{"byDate":{}}').byDate)||{}; }catch(_){}
+  try{ dfMap = JSON.parse(localStorage.getItem(dfStoreKey)||'{}'); }catch(_){}
+  try{ const raw = localStorage.getItem(siKey); if(raw){ const o=JSON.parse(raw); si.caja=+o.caja||0; si.banc=+o.banc||0; si.from=o.from||null; } }catch(_){}
+  const firstDay = month + '-01';
+  const isC = comp === 'cempla';
+  const detail = { ingresos: { traf:0, priv:0, otros:0, dhHaber:0 }, gastos: {} };
+  let saldoAntCaja = si.caja, saldoAntBanc = si.banc;
+  let ingresos = 0, gastos = 0;
+  let cajaActual = si.caja, bancActual = si.banc;
+  Object.keys(bd).sort().forEach(iso => {
+    if(si.from && iso < si.from) return;
+    if(iso > cutoffIso) return;
+    const arr = bd[iso] || [];
+    const t = computeTotals(arr);
+    const df = parseFloat(dfMap[iso]||0);
+    const cajaAuto = isC ? (t.byFp.E||0) : ((t.byFp.E||0)+(t.tasasByFp.E||0));
+    const bancTAuto = isC ? (t.byFp.T||0) : ((t.byFp.T||0)+(t.tasasByFp.T||0));
+    const delta = df > 0 ? (df - bancTAuto) : 0;
+    const cajaDay = cajaAuto - delta;
+    const bancTDay = bancTAuto + delta;
+    const bancBDay = isC ? (t.byFp.B||0) : ((t.byFp.B||0)+(t.tasasByFp.B||0));
+    const bancXDay = isC ? (t.byFp.X||0) : ((t.byFp.X||0)+(t.tasasByFp.X||0));
+    const cajaTotal = cajaDay + (t.internalCaja||0);
+    const bancTotal = bancTDay + bancBDay + bancXDay + (t.internalBanco||0);
+    if(iso < firstDay){
+      saldoAntCaja += cajaTotal;
+      saldoAntBanc += bancTotal;
+    } else {
+      arr.forEach(e => {
+        if(e.retorno) return;
+        if(e.kind==='DH' && (e._internal||e._tasaRefund||e._hnBruto)) return;
+        const imp = (+e.importe||0) - (+e.descuento||0);
+        const tasa = +e.tasa || 0;
+        if(e.kind === 'TRAF'){ detail.ingresos.traf += imp + tasa; ingresos += imp + tasa; }
+        else if(e.kind === 'PRIV'){ detail.ingresos.priv += imp + tasa; ingresos += imp + tasa; }
+        else if(e.kind === 'OTROS'){ detail.ingresos.otros += imp + tasa; ingresos += imp + tasa; }
+        else if(e.kind === 'DH'){
+          if(e.tipo === 'HABER'){ detail.ingresos.dhHaber += imp; ingresos += imp; }
+          else if(e.tipo === 'DEBE'){
+            const raw = (e.nombre||'(sin concepto)').trim();
+            const key = raw.replace(/^\s*(Nómina|Nomina|Nòmina|Honoraris|Honorarios|Honorario|Sueldo|Salario|Faena externa|Faena|Jornal|Gasto:?)\s+.*/i, '$1').trim() || raw;
+            detail.gastos[key] = (detail.gastos[key]||0) + imp;
+            gastos += imp;
+          }
+        }
+      });
+    }
+    cajaActual += cajaTotal;
+    bancActual += bancTotal;
+  });
+  return { saldoAnt: saldoAntCaja + saldoAntBanc, ingresos, gastos, detail, cajaActual, bancActual };
+}
+function openCuadreCaja(){
+  const back = document.createElement('div'); back.className='modal-back'; back.style.zIndex='100055';
+  const today = new Date();
+  const currentMonth = today.toISOString().slice(0,7);
+  const cfg = (window.CFG||{});
+  const c1Name = (cfg.company1 && cfg.company1.name) || 'Empresa 1';
+  const c2Name = (cfg.company2 && cfg.company2.name) || null;
+  const hasC2 = !!c2Name;
+  back.innerHTML = `<div class="modal" style="max-width:820px;max-height:90vh;overflow:auto;background:#0f172a;color:#e2e8f0">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <h3 style="margin:0;color:#38bdf8;font-family:Georgia,serif;font-size:20px">🧮 Cuadre de Caja</h3>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:12px;color:#94a3b8">MES:</label>
+        <input id="ccMonth" type="month" value="${currentMonth}" style="padding:6px 10px;background:#1e293b;border:1px solid #38bdf8;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace" data-testid="cc-month"/>
+        <button class="btn" id="ccPrint" data-testid="cc-print" style="background:#0369a1;color:#fff;border-color:#0369a1">🖨️ Imprimir</button>
+        <button data-close style="background:none;border:none;color:#94a3b8;font-size:24px;cursor:pointer">×</button>
+      </div>
+    </div>
+    <div style="background:#0c4a6e;border:1px solid #38bdf8;border-radius:6px;padding:10px 14px;color:#bae6fd;font-size:12px;line-height:1.5;margin-bottom:14px">
+      💡 <b>Saldo anterior</b> = cierre del mes previo. <b>Ingresos/Gastos</b> = suma del día 1 al día seleccionado inclusive. <b>Suma Caja+Banco</b> = balance real actual (debe cuadrar con Saldo Actual).
+    </div>
+    <div id="ccBody"></div>
+  </div>`;
+  document.body.appendChild(back);
+  back.querySelectorAll('[data-close]').forEach(b => b.onclick = () => back.remove());
+  back.addEventListener('click', ev => { if(ev.target === back) back.remove() });
+  const monthInp = back.querySelector('#ccMonth');
+  const render = () => {
+    const m = monthInp.value || currentMonth;
+    const todayIso = today.toISOString().slice(0,10);
+    const isCurrentMonth = m === currentMonth;
+    const cutoff = isCurrentMonth ? todayIso : (m + '-31');
+    const c1 = _cuadreCajaCompute('trafic', m, cutoff);
+    const c2 = hasC2 ? _cuadreCajaCompute('cempla', m, cutoff) : null;
+    const saldoAntTotal = c1.saldoAnt + (c2 ? c2.saldoAnt : 0);
+    const saldoActual = saldoAntTotal + c1.ingresos - c1.gastos + (c2 ? (c2.ingresos - c2.gastos) : 0);
+    const sumaCajaBanco = c1.cajaActual + c1.bancActual + (c2 ? (c2.cajaActual + c2.bancActual) : 0);
+    const diferencia = saldoActual - sumaCajaBanco;
+    const monthLabel = new Date(m+'-01').toLocaleString('es-ES', {month:'long', year:'numeric'}).toUpperCase();
+    const cutoffLabel = cutoff.split('-').reverse().join('/');
+    const detailIng = data => {
+      const rows = [
+        ['Tráfico', data.traf, '#22c55e'],
+        ['Revisiones/Cert.', data.priv, '#ec4899'],
+        ['Otros (fotos, dup...)', data.otros, '#8b5cf6'],
+        ['Debe/Haber HABER', data.dhHaber, '#38bdf8']
+      ].filter(r => r[1] > 0);
+      if(!rows.length) return `<div style="padding:10px;color:#64748b;font-style:italic;text-align:center;font-size:11px">Sin ingresos este mes</div>`;
+      return `<table style="width:100%;border-collapse:collapse;font-size:12px;margin:4px 0"><tbody>${rows.map(([lbl,v,col])=>`<tr style="border-bottom:1px solid #1e293b"><td style="padding:4px 10px;color:${col}">${escapeHtml(lbl)}</td><td style="padding:4px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(v)}</td></tr>`).join('')}</tbody></table>`;
+    };
+    const detailGas = data => {
+      const rows = Object.entries(data).sort((a,b)=>b[1]-a[1]);
+      if(!rows.length) return `<div style="padding:10px;color:#64748b;font-style:italic;text-align:center;font-size:11px">Sin gastos este mes</div>`;
+      return `<table style="width:100%;border-collapse:collapse;font-size:12px;margin:4px 0"><tbody>${rows.map(([k,v])=>`<tr style="border-bottom:1px solid #1e293b"><td style="padding:4px 10px;color:#f472b6">${escapeHtml(k)}</td><td style="padding:4px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(v)}</td></tr>`).join('')}</tbody></table>`;
+    };
+    const compBlock = (name, comp, color, tag) => `
+      <div style="background:#1e293b;border-left:3px solid ${color};border-radius:6px;padding:10px 14px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" data-toggle="ing-${tag}">
+          <span style="color:${color};font-weight:700">📥 INGRESOS ${escapeHtml(name)}</span>
+          <span style="font-family:'Courier New',monospace;font-weight:800;color:#22c55e">${fmt(comp.ingresos)}</span>
+        </div>
+        <div id="ing-${tag}" style="display:none;margin-top:6px">${detailIng(comp.detail.ingresos)}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-top:6px" data-toggle="gas-${tag}">
+          <span style="color:${color};font-weight:700">📤 GASTOS ${escapeHtml(name)}</span>
+          <span style="font-family:'Courier New',monospace;font-weight:800;color:#f472b6">${fmt(comp.gastos)}</span>
+        </div>
+        <div id="gas-${tag}" style="display:none;margin-top:6px">${detailGas(comp.detail.gastos)}</div>
+      </div>`;
+    const cuadraOk = Math.abs(diferencia) < 0.01;
+    back.querySelector('#ccBody').innerHTML = `
+      <div style="text-align:center;font-family:Georgia,serif;font-size:16px;color:#fbbf24;margin-bottom:14px">MES DE ${monthLabel} <span style="color:#94a3b8;font-size:12px">(hasta ${cutoffLabel})</span></div>
+      <div style="background:#1e293b;border:1px solid #38bdf8;border-radius:6px;padding:12px 16px;margin-bottom:10px;display:flex;justify-content:space-between">
+        <span style="color:#38bdf8;font-weight:700">SALDO ANTERIOR</span>
+        <span style="font-family:'Courier New',monospace;font-weight:800;color:#e2e8f0;font-size:16px">${fmt(saldoAntTotal)}</span>
+      </div>
+      ${compBlock(c1Name, c1, '#f5b301', 'e1')}
+      ${c2 ? compBlock(c2Name, c2, '#ec4899', 'e2') : ''}
+      <div style="background:#0f766e;border:2px solid #14b8a6;border-radius:6px;padding:12px 16px;margin:12px 0;display:flex;justify-content:space-between">
+        <span style="color:#fff;font-weight:800;font-size:15px">SALDO ACTUAL</span>
+        <span style="font-family:'Courier New',monospace;font-weight:800;color:#fff;font-size:18px">${fmt(saldoActual)}</span>
+      </div>
+      <div style="margin-top:16px;padding:12px 14px;background:#1e293b;border-radius:6px">
+        <div style="color:#94a3b8;font-size:11px;letter-spacing:1px;margin-bottom:8px">💰 CAJA FÍSICA + BANCO (real)</div>
+        <table style="width:100%;font-size:13px;border-collapse:collapse">
+          <tbody>
+            <tr style="border-bottom:1px solid #334155"><td style="padding:5px 10px">CAJA · ${escapeHtml(c1Name)}</td><td style="padding:5px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(c1.cajaActual)}</td></tr>
+            ${c2?`<tr style="border-bottom:1px solid #334155"><td style="padding:5px 10px">CAJA · ${escapeHtml(c2Name)}</td><td style="padding:5px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(c2.cajaActual)}</td></tr>`:''}
+            <tr style="border-bottom:1px solid #334155"><td style="padding:5px 10px">BANCO · ${escapeHtml(c1Name)}</td><td style="padding:5px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(c1.bancActual)}</td></tr>
+            ${c2?`<tr><td style="padding:5px 10px">BANCO · ${escapeHtml(c2Name)}</td><td style="padding:5px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(c2.bancActual)}</td></tr>`:''}
+          </tbody>
+          <tfoot><tr style="border-top:2px solid #38bdf8;background:#0f172a"><td style="padding:8px 10px;font-weight:800;color:#38bdf8">SUMA CAJA + BANCO</td><td style="padding:8px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:800;color:#38bdf8;font-size:16px">${fmt(sumaCajaBanco)}</td></tr></tfoot>
+        </table>
+      </div>
+      <div style="margin-top:12px;padding:14px;background:${cuadraOk?'#166534':'#7f1d1d'};border-radius:6px;text-align:center">
+        <div style="color:#fff;font-size:12px;letter-spacing:1px;margin-bottom:4px">DIFERENCIA</div>
+        <div style="font-family:'Courier New',monospace;font-weight:800;color:#fff;font-size:22px">${cuadraOk?'✓ 0,00 — TODO CUADRA':(diferencia>=0?'+':'')+fmt(diferencia)+' — REVISAR'}</div>
+      </div>`;
+    back.querySelectorAll('[data-toggle]').forEach(el => {
+      el.onclick = () => {
+        const target = back.querySelector('#'+el.dataset.toggle);
+        if(target) target.style.display = target.style.display==='none'?'block':'none';
+      };
+    });
+    back.querySelector('#ccPrint').onclick = () => {
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Cuadre · ${monthLabel}</title>
+        <style>@page{size:A4;margin:12mm}*{box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;color:#111;margin:0;font-size:12px}
+        h1{color:#0369a1;text-align:center;margin:0 0 6px;font-family:Georgia,serif;font-size:22px}
+        .sub{text-align:center;color:#64748b;margin-bottom:16px;font-size:11px}
+        table{width:100%;border-collapse:collapse;margin-bottom:12px}
+        td{padding:6px 8px;border-bottom:1px solid #cbd5e1}
+        .num{text-align:right;font-family:'Courier New',monospace;font-weight:700}
+        .final{background:#0f766e;color:#fff;font-weight:800;font-size:15px}
+        .cuadra{background:${cuadraOk?'#166534':'#7f1d1d'};color:#fff;padding:12px;text-align:center;font-family:'Courier New',monospace;font-weight:800;font-size:18px;border-radius:6px;margin-top:12px}</style></head><body>
+        <h1>🧮 Cuadre de Caja · ${monthLabel}</h1>
+        <div class="sub">Corte al ${cutoffLabel} · Generado el ${new Date().toLocaleString('es-ES')}</div>
+        <table><tbody>
+          <tr><td>SALDO ANTERIOR</td><td class="num">${fmt(saldoAntTotal)}</td></tr>
+          <tr><td>INGRESOS · ${escapeHtml(c1Name)}</td><td class="num" style="color:#166534">${fmt(c1.ingresos)}</td></tr>
+          <tr><td>GASTOS · ${escapeHtml(c1Name)}</td><td class="num" style="color:#b91c1c">${fmt(c1.gastos)}</td></tr>
+          ${c2?`<tr><td>INGRESOS · ${escapeHtml(c2Name)}</td><td class="num" style="color:#166534">${fmt(c2.ingresos)}</td></tr><tr><td>GASTOS · ${escapeHtml(c2Name)}</td><td class="num" style="color:#b91c1c">${fmt(c2.gastos)}</td></tr>`:''}
+          <tr class="final"><td>SALDO ACTUAL</td><td class="num">${fmt(saldoActual)}</td></tr>
+        </tbody></table>
+        <table><tbody>
+          <tr><td>CAJA · ${escapeHtml(c1Name)}</td><td class="num">${fmt(c1.cajaActual)}</td></tr>
+          ${c2?`<tr><td>CAJA · ${escapeHtml(c2Name)}</td><td class="num">${fmt(c2.cajaActual)}</td></tr>`:''}
+          <tr><td>BANCO · ${escapeHtml(c1Name)}</td><td class="num">${fmt(c1.bancActual)}</td></tr>
+          ${c2?`<tr><td>BANCO · ${escapeHtml(c2Name)}</td><td class="num">${fmt(c2.bancActual)}</td></tr>`:''}
+          <tr class="final"><td>SUMA CAJA + BANCO</td><td class="num">${fmt(sumaCajaBanco)}</td></tr>
+        </tbody></table>
+        <div class="cuadra">DIFERENCIA: ${cuadraOk?'✓ 0,00 — TODO CUADRA':(diferencia>=0?'+':'')+fmt(diferencia)+' — REVISAR'}</div>
+        </body></html>`;
+      try{ printHtml(html, {title:`Cuadre ${monthLabel}`}); }
+      catch(err){ toast('Error impresión: '+err.message, 3500); }
+    };
+  };
+  monthInp.addEventListener('change', render);
+  render();
+}
+
 function openIRPF(){
   const back=document.createElement('div');back.className='modal-back';
   const now=new Date();

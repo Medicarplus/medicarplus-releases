@@ -1,5 +1,23 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-04 (parte 3) · Nueva sección "🧮 Cuadre de Caja" (reconciliación mensual multi-empresa)
+- Botón nuevo en **Contabilidad → 🧮 Cuadre de Caja** que abre un modal tipo hoja de Excel.
+- **Estructura del modal**:
+  - Selector de mes (`type=month`) · Botón imprimir · Cierre X
+  - Título: `MES DE AGOSTO 2026 (hasta 15/08)` (muestra cutoff)
+  - `SALDO ANTERIOR` = cierre del mes previo (caja + banco de ambas empresas al último día del mes anterior + saldo inicial aplicable)
+  - Bloque por empresa: `📥 INGRESOS EMPRESA X` (clicable → desglose Tráfico/Revisiones/Otros/DH-Haber) + `📤 GASTOS EMPRESA X` (clicable → desglose agrupado por concepto normalizado: Nómina, Honoraris, Faena, IRPF, Gasto...)
+  - `SALDO ACTUAL` = SALDO ANTERIOR + Σ(INGRESOS − GASTOS) por empresa
+  - Tabla `💰 CAJA + BANCO real` por empresa (Caja C.B., Caja S.L., BBVA C.B., BBVA S.L.) + `SUMA CAJA + BANCO`
+  - Banner de `DIFERENCIA` (verde si `|dif|<0,01€ = ✓ TODO CUADRA`, rojo si hay descuadre)
+- **Cutoff inclusivo**: si estamos a 28/08 y miro agosto → suma del 1 al 28/08 (inclusive el propio día 28). Si el mes es pasado, usa fin de mes.
+- **Filtros contables aplicados**: excluye `_hnBruto`, `_internal`, `_tasaRefund`, `retorno:true`. Cuenta tasas DGT en ingresos de Empresa 1. Aplica reclasificación datáfono (T→X). Suma internalCaja/internalBanco de los traspasos.
+- **Botón imprimir**: usa `printHtml()` con landscape A4, todos los datos en 1-2 páginas, sin cortes.
+- Test verificado: saldoAnt 6100€ + ingresos 294,15€ − gastos 150€ = 6244,15€ = caja 1394,15€ + banco 4850€. Diferencia 0€. ✅
+- Archivo tocado: `frontend/public/v2.html`.
+
+
+
 ## 2026-02-04 (parte 2) · Retiradas columnas NET S.S. y TOTAL FINAL de la tabla IRPF
 - Tabla IRPF pasa de 10 columnas a 8: `NOM | CERT | €/CERT | BRUT | S.S. | TOTAL | IRPF % | NET | 🗑`.
 - Retirado el input `netSS` de la fila y su lógica de habilitar/deshabilitar según S.S.
