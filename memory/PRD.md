@@ -1,5 +1,25 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-04 (parte 4) · Cuadre por empresa + Canje 66,50€ + Novedades reubicado
+
+**Cuadre de Caja mejorado:**
+- Cada bloque de empresa muestra ahora su **mini-saldo aislado**: `Saldo ant. X → Saldo actual Y` calculado solo con datos de esa empresa (nunca se mezcla con la otra). Los totales globales (SALDO ANTERIOR / SALDO ACTUAL) siguen siendo la suma de ambas.
+- Test verificado: E1 saldoAnt=6000, ingresos=194, gastos=200, caja=1194, banc=4800 · E2 saldoAnt=2500, ingresos=50, gastos=0, caja=550, banc=2000. Cero cruces. ✅
+
+**Detección "Canje" automática (virtual, no muta datos):**
+- Nueva función `window._effectiveTipo(e)`: devuelve `'Canje'` si `kind==='TRAF' && tipo empieza por 'Expedición' && grupo contiene 'Conducción' && importe===66,50`. En cualquier otro caso devuelve `e.tipo`.
+- Aplicada en las 3 agregaciones de stats por tipo (líneas 2281, 2319, 2397). Ahora Canje aparece separado de Expedición en las estadísticas anuales.
+- Test verificado: 4/4 casos correctos (positivo + 3 negativos por importe/grupo/tipo distinto). ✅
+- También ampliado `_normalizeTipo` para reconocer 'canj' y 'canv' (catalán).
+
+**Novedades reubicada:**
+- Botón `🎁 Novedades` movido del menú Contabilidad a la **barra superior** (al lado de ⚙️ Configuración), con estilo naranja destacado.
+- Contenido de v2.2.0 actualizado con 11 highlights de todo lo hecho hoy (Cuadre, IRPF Modelo 111, chip IRPF dinámico, Empresa 2 sin tasas, impresión Empresa 2, chips deportivos ES, sync por defecto solo día, chips DH limpiados).
+
+Archivo tocado: `frontend/public/v2.html`.
+
+
+
 ## 2026-02-04 (parte 3) · Nueva sección "🧮 Cuadre de Caja" (reconciliación mensual multi-empresa)
 - Botón nuevo en **Contabilidad → 🧮 Cuadre de Caja** que abre un modal tipo hoja de Excel.
 - **Estructura del modal**:

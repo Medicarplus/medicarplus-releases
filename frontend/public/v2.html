@@ -556,9 +556,9 @@
         <button class="btn" id="btnHonorarios" data-testid="btn-honorarios" style="background:#2a2015;border-color:#fbbf24;color:#fbbf24;font-weight:600;width:100%;text-align:left">💼 Honorarios</button>
         <button class="btn" id="btnGastos" data-testid="btn-gastos" style="background:#2a1515;border-color:#f472b6;color:#f472b6;font-weight:600;width:100%;text-align:left">🧾 Gastos (luz · agua · alquiler…)</button>
         <button class="btn" id="btnBuscarOps" data-testid="btn-buscar-ops" style="background:#152a25;border-color:#22d3ee;color:#22d3ee;font-weight:600;width:100%;text-align:left">🔎 Buscar operaciones</button>
-        <button class="btn" id="btnWhatsNewMenu" data-testid="btn-whats-new" style="background:#2a1f15;border-color:#f97316;color:#fed7aa;font-weight:600;width:100%;text-align:left">🎁 Novedades</button>
       </div>
     </div>
+    <button class="btn" id="btnWhatsNewMenu" data-testid="btn-whats-new" title="Ver novedades y últimas mejoras" style="background:linear-gradient(135deg,#c2410c,#f97316);border-color:#fed7aa;color:#fff;font-weight:800;padding:6px 14px;box-shadow:0 2px 8px rgba(249,115,22,.4)">🎁 <span>Novedades</span></button>
     <!-- Estadísticas dropdown · Facturación + Autoescuelas + Tráfico + SMS + Citas + Comparativa años -->
     <div class="btn-dropdown" id="btnStatsBox" style="position:relative;display:inline-block">
       <button class="btn" id="btnStatsToggle" style="background:linear-gradient(90deg,#8b5e2a 0%,#c2841c 100%);border-color:transparent;color:#fff;font-weight:700" data-testid="btn-stats">📊 <span data-i18n="stats_menu">Estadísticas</span> <span style="font-size:9px;margin-left:4px">▼</span></button>
@@ -2227,7 +2227,7 @@ function openStats(initialSection){
     if(lc.startsWith('period') || lc.startsWith('periód') || lc.startsWith('periodic')) return 'Periódica';
     if(lc.startsWith('exped') || lc.startsWith('obten')) return 'Expedición';
     if(lc.startsWith('dupl'))  return 'Duplicado';
-    if(lc.startsWith('canj'))  return 'Canje';
+    if(lc.startsWith('canj') || lc.startsWith('canv'))  return 'Canje';
     if(lc.startsWith('recup')) return 'Recuperación';
     if(lc.startsWith('conduc')) return 'Conducción';
     if(lc.startsWith('marin')) return 'Marina';
@@ -2278,7 +2278,7 @@ function openStats(initialSection){
       for(const e of list){
         // Incluye TRAF importado (CSV DGT) Y manual (Renov/Obtención escrita a mano)
         if(!e || e.kind !== 'TRAF' || e.retorno) continue;
-        set.add(_trafBaseCat(e.tipo));
+        set.add(_trafBaseCat(window._effectiveTipo?window._effectiveTipo(e):e.tipo));
       }
     }
     if(set.size === 0) ['Renovación','Expedición','Duplicado','Canje','Otro'].forEach(c => set.add(c));
@@ -2316,7 +2316,7 @@ function openStats(initialSection){
         const desc = +e.descuento || 0;
         // Exclusión 0€: si subtotal (importe - descuento + tasa) es 0 → NO cuenta como certificado
         if(!countZero && (imp - desc + ta) <= 0) continue;
-        const cat = _trafBaseCat(e.tipo);
+        const cat = _trafBaseCat(window._effectiveTipo?window._effectiveTipo(e):e.tipo);
         const grp = (window._normalizeGrupo?window._normalizeGrupo(e.grupo):String(e.grupo || 'Sin grupo').trim()) || 'Sin grupo';
         out.count++;
         out.byCat[cat] = (out.byCat[cat] || 0) + 1;
@@ -2394,7 +2394,7 @@ function openStats(initialSection){
           const ta = +e.tasa || 0;
           const desc = +e.descuento || 0;
           if(!countZero && (imp - desc + ta) <= 0) continue;
-          const tipo = _trafBaseCat(e.tipo);
+          const tipo = _trafBaseCat(window._effectiveTipo?window._effectiveTipo(e):e.tipo);
           const grupo = (window._normalizeGrupo?window._normalizeGrupo(e.grupo):String(e.grupo || 'Sin grupo').trim()) || 'Sin grupo';
           const precio = +imp || 0;
           const k = `${tipo}||${grupo}||${precio.toFixed(2)}`;
@@ -4852,6 +4852,21 @@ const _btnStatE2 = document.getElementById('btnStatEmpresa2'); if(_btnStatE2) _b
 // 🏥 Normalizador de sinónimos para TIPOS de Empresa 2 (revisiones deportivas)
 // Une variantes de escritura al mismo canónico. Ej: P.esforç, Prueba esfuerzo,
 // Prova esforç → "Prueba de esfuerzo".
+// 🔄 Canje automático: si es Expedición + Grupo Conducción + 66,50€ → cuenta como Canje.
+// Función virtual (no modifica el entry guardado, solo devuelve el tipo efectivo para stats).
+// 🔄 Canje automático: si es Expedición + Grupo Conducción + 66,50€ → cuenta como Canje.
+// Función virtual (no modifica el entry guardado, solo devuelve el tipo efectivo para stats).
+window._effectiveTipo = function(e){
+  if(!e || e.kind !== 'TRAF') return e && e.tipo;
+  const tipoNorm = (e.tipo||'').toString().toLowerCase();
+  const grupoNorm = (e.grupo||'').toString().toLowerCase();
+  const imp = +e.importe || 0;
+  const isExped = tipoNorm.startsWith('exped') || tipoNorm.startsWith('obten');
+  const isConduc = /conduc/.test(grupoNorm);
+  const is66_50 = Math.abs(imp - 66.5) < 0.005;
+  if(isExped && isConduc && is66_50) return 'Canje';
+  return e.tipo;
+};
 window._normalizeTipoEmpresa2 = function(raw){
   const t = String(raw||'').trim();
   if(!t) return '';
@@ -5648,19 +5663,28 @@ function openCuadreCaja(){
       if(!rows.length) return `<div style="padding:10px;color:#64748b;font-style:italic;text-align:center;font-size:11px">Sin gastos este mes</div>`;
       return `<table style="width:100%;border-collapse:collapse;font-size:12px;margin:4px 0"><tbody>${rows.map(([k,v])=>`<tr style="border-bottom:1px solid #1e293b"><td style="padding:4px 10px;color:#f472b6">${escapeHtml(k)}</td><td style="padding:4px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(v)}</td></tr>`).join('')}</tbody></table>`;
     };
-    const compBlock = (name, comp, color, tag) => `
+    const compBlock = (name, comp, color, tag) => {
+      // Cálculo mini-saldo aislado de esta empresa (sin mezclar con la otra)
+      // Ojo: comp.saldoAnt es el saldo anterior SOLO de esta empresa (storage independiente)
+      const saldoActualComp = comp.saldoAnt + comp.ingresos - comp.gastos;
+      return `
       <div style="background:#1e293b;border-left:3px solid ${color};border-radius:6px;padding:10px 14px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:6px;border-bottom:1px dashed #334155">
+          <span style="color:${color};font-weight:800;font-size:13px">🏢 ${escapeHtml(name)}</span>
+          <span style="font-size:11px;color:#94a3b8">Saldo ant. ${fmt(comp.saldoAnt)} → Saldo actual <b style="color:${color}">${fmt(saldoActualComp)}</b></span>
+        </div>
         <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" data-toggle="ing-${tag}">
-          <span style="color:${color};font-weight:700">📥 INGRESOS ${escapeHtml(name)}</span>
+          <span style="color:${color};font-weight:700">📥 INGRESOS</span>
           <span style="font-family:'Courier New',monospace;font-weight:800;color:#22c55e">${fmt(comp.ingresos)}</span>
         </div>
         <div id="ing-${tag}" style="display:none;margin-top:6px">${detailIng(comp.detail.ingresos)}</div>
         <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-top:6px" data-toggle="gas-${tag}">
-          <span style="color:${color};font-weight:700">📤 GASTOS ${escapeHtml(name)}</span>
+          <span style="color:${color};font-weight:700">📤 GASTOS</span>
           <span style="font-family:'Courier New',monospace;font-weight:800;color:#f472b6">${fmt(comp.gastos)}</span>
         </div>
         <div id="gas-${tag}" style="display:none;margin-top:6px">${detailGas(comp.detail.gastos)}</div>
       </div>`;
+    };
     const cuadraOk = Math.abs(diferencia) < 0.01;
     back.querySelector('#ccBody').innerHTML = `
       <div style="text-align:center;font-family:Georgia,serif;font-size:16px;color:#fbbf24;margin-bottom:14px">MES DE ${monthLabel} <span style="color:#94a3b8;font-size:12px">(hasta ${cutoffLabel})</span></div>
@@ -10741,6 +10765,19 @@ const CHANGELOG = [
     '🖨️ <b>Vista previa de impresión</b> · antes de imprimir aparece una previsualización a pantalla completa con botón "🖨️ Imprimir ahora" y "Cerrar" · puedes verificar el documento antes de imprimir o guardarlo como PDF.',
     '🐛 FIX crítico IRPF · entradas con nombre "JOSEP BRUGULAT" ya no se borran automáticamente al escribir.',
     '📄 Impresión IRPF en orientación apaisada con colores y KPIs · legible al 100%.',
+  ]},
+  { version:'2.2.0', date:'04/02/2026', highlights:[
+    '🧮 <b>NUEVO · Cuadre de Caja</b> (Contabilidad ▸ 🧮 Cuadre de Caja): resumen mensual multi-empresa tipo Excel · Saldo anterior + Ingresos − Gastos = Saldo actual · coteja contra caja + banco reales · diferencia debe ser 0€.',
+    '📥 <b>Ingresos y Gastos clicables</b> en el Cuadre: al pulsar se desglosa por tipo (Tráfico, Revisiones, Otros, DH) y por concepto agrupado (Nómina, Honoraris, IRPF, Gasto…).',
+    '📋 <b>IRPF Modelo 111 correcto en Informe Anual</b>: eliminada la tabla incorrecta que calculaba 15% sobre la facturación. Ahora sale el desglose real Trabajador × Trimestre + cotejo con lo ingresado a Hacienda.',
+    '💼 <b>Chip IRPF (💸) más visible</b> en Debe/Haber con gradient rojo. Al escribir "IRPF Q1 2026", "IRPF T2", etc., el trimestre se marca automáticamente como pagado en la sección 📋 IRPF.',
+    '🎯 <b>Sección IRPF simplificada</b>: la tabla se auto-rellena con los trabajadores a los que has pagado nómina/honoraris ese mes. Cada uno con checkbox individual "IRPF activo/inactivo". Retiradas las columnas NET S.S. y TOTAL FINAL que confundían.',
+    '🏥 <b>Empresa 2 sin Tasas DGT</b>: retiradas todas las referencias a tasas en Empresa 2 · botón "Devolución tasa DGT" ahora dice sólo "Devolución" en Empresa 2 · estadísticas anuales sin la KPI de tasas cuando estás en cempla.',
+    '📊 <b>Estadísticas Empresa 2 · Imprimir</b> ahora funciona (bug corregido, antes no hacía nada) · sale PDF landscape completo con KPIs, tabla y mejor mes.',
+    '⚽ <b>Chips deportivos Empresa 2 traducidos</b>: Fútbol/Baloncesto/Balonmano/Escribir a mano/Pádel/Tenis en castellano cuando eliges el idioma español.',
+    '📤 <b>Sync "Solo un día" por defecto</b>: al enviar copia a otro PC se marca automáticamente la opción de un día concreto (evita mandar la copia total por error).',
+    '🎁 <b>Novedades movidas a la barra superior</b> (icono naranja al lado de ⚙️ Configuración) — antes estaba en Contabilidad, ahora más accesible.',
+    '🧹 <b>Debe/Haber más limpio</b>: eliminados chips que sobraban (Mercadona, Ciclista, chip Devolución antiguo duplicado, chip Nómina fusionado con Honoraris).',
   ]},
   { version:'2.1.1', date:'14/07/2026', highlights:[
     '🐛 <b>FIX CRÍTICO IRPF · Personas que "no suman"</b> · un bug raro eliminaba entradas con nombres como "JOSEP BRUGULAT" cuando aún no tenían valores. Los nombres de doctor ya no se filtran nunca más.',
