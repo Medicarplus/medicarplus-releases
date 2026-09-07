@@ -6265,6 +6265,11 @@ function openAnnualReport(){
       <select id="arYear" style="background:#1e293b;color:#f5b301;border:1px solid #f5b301;border-radius:6px;padding:6px 10px;font-weight:700">
         ${[yearNow,yearNow-1,yearNow-2,yearNow-3,yearNow-4].map(y=>`<option value="${y}" ${y===yearNow?'selected':''}>${y}</option>`).join('')}
       </select>
+      <label class="small" style="margin:0;color:#cbd5e1">${L('Mes','Mes')}:</label>
+      <select id="arMonth" data-testid="ar-month" style="background:#1e293b;color:#f5b301;border:1px solid #f5b301;border-radius:6px;padding:6px 10px;font-weight:700">
+        <option value="-1" selected>${L('Any complet','Año completo')}</option>
+        ${['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m,i)=>`<option value="${i}">${m}</option>`).join('')}
+      </select>
       <button class="btn" id="arPrint" style="background:#f5b301;color:#0f172a;border-color:#f5b301;font-weight:700">📥 ${L('Descarregar PDF','Descargar PDF')}</button>
       <button class="btn" id="arClose" style="background:#7f1d1d;color:#fff;border-color:#7f1d1d">✖</button>
     </div>
@@ -6298,12 +6303,24 @@ function openAnnualReport(){
     });
   };
   const yearSel=back.querySelector('#arYear');
+  const monthSel=back.querySelector('#arMonth');
   const bodyEl=back.querySelector('#arBody');
-  const render=()=>{bodyEl.innerHTML=_buildAnnualReport(parseInt(yearSel.value))};
-  yearSel.onchange=render;render();
+  const render=()=>{
+    const y = parseInt(yearSel.value);
+    const m = parseInt(monthSel.value); // -1 = año completo, 0-11 = mes concreto
+    bodyEl.innerHTML=_buildAnnualReport(y, m);
+  };
+  yearSel.onchange=render;
+  monthSel.onchange=render;
+  render();
 }
 
-function _buildAnnualReport(year){
+function _buildAnnualReport(year, monthFilterIdx){
+  // monthFilterIdx: -1 (por defecto, año completo) o 0..11 para filtrar a un solo mes
+  if(typeof monthFilterIdx !== 'number') monthFilterIdx = -1;
+  const _monthSuffix = monthFilterIdx >= 0
+    ? '-' + String(monthFilterIdx + 1).padStart(2,'0')  // filtro por prefijo YYYY-MM
+    : null;
   // Normalitzador de categories a nivell d'informe · fusiona sinònims:
   //   Obtención → Expedición (mateixa cosa a nivell de negoci)
   //   Prórroga  → Renovación (mateixa cosa)
@@ -6337,8 +6354,10 @@ function _buildAnnualReport(year){
   const TRIM_LABEL=currentLang==='es'?['T1 (Ene-Mar)','T2 (Abr-Jun)','T3 (Jul-Sep)','T4 (Oct-Dic)']:['T1 (Gen-Mar)','T2 (Abr-Jun)','T3 (Jul-Set)','T4 (Oct-Des)'];
 
   let html='';
+  const _periodLabel = _monthSuffix ? (MESES[monthFilterIdx] + ' ' + year) : year;
+  const _titleLabel = _monthSuffix ? L('Informe mensual','Informe mensual') : L('Informe anual','Informe anual');
   html+=`<div class="print-header" style="text-align:center;padding:14px 0;border-bottom:2px solid #0f172a;margin-bottom:20px">
-    <div style="font-size:22px;font-weight:700;font-family:Georgia,serif;color:#0f172a">${L('Informe anual','Informe anual')} · ${year}</div>
+    <div style="font-size:22px;font-weight:700;font-family:Georgia,serif;color:#0f172a">${_titleLabel} · ${_periodLabel}</div>
     <div style="font-size:13px;color:#64748b;margin-top:4px">MediCar Plus · ${comps.map(c=>c.name).join(' + ')}</div>
   </div>`;
 
@@ -6353,6 +6372,8 @@ function _buildAnnualReport(year){
     let cTotal={bruto:0,tasas:0,neto:0,cnt:0,byMonth:Array(12).fill(0)};
     Object.keys(compRaw.byDate||{}).forEach(d=>{
       if(!d.startsWith(String(year)+'-'))return;
+      // 📅 Filtro por mes concreto (si monthFilterIdx >= 0)
+      if(_monthSuffix && !d.startsWith(String(year)+_monthSuffix)) return;
       const m=parseInt(d.split('-')[1])-1;
       const list=compRaw.byDate[d]||[];
       const t=computeTotals(list);

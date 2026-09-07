@@ -1,5 +1,27 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-04 (parte 5) · Selector mensual en Informe Anual + Revisión prints
+
+**Selector mensual añadido en Informe Anual:**
+- Nuevo `<select id="arMonth" data-testid="ar-month">` junto al selector de año: opción "Año completo" (default) + 12 meses.
+- Firma actualizada: `_buildAnnualReport(year, monthFilterIdx = -1)`.
+- Filtro aplicado a nivel de día (`d` en el forEach): si `_monthSuffix` está definido, solo procesa días con prefijo `YYYY-MM`.
+- Título dinámico: `Informe anual · 2026` cuando es año completo; `Informe mensual · Agosto 2026` cuando se filtra.
+- Test verificado: título cambia correctamente entre año/mes, función se ejecuta sin errores. ✅
+
+**Revisión rápida de prints de estadísticas:**
+- **Estadísticas Tráfico** (`openTraficStats`): `@page A4 landscape · margin 10mm` + `page-break-inside:avoid` en tablas. ✅
+- **Estadísticas anuales** (`openAnnualReport`): `printVisibleElement` + `@page A4 landscape · margin 6mm`. Modal 900px+ ancho, encaja en landscape. ✅
+- **Cuadre de Caja**: `@page A4 landscape · margin 12mm`. Tablas compactas. ✅
+- **Estadísticas Empresa 2**: `@page A4 landscape · margin 8mm`. KPIs + tabla mes × tipo. ✅
+- **Gastos y Honorarios**: `@page A4 portrait · margin 8mm`. Tablas estrechas por concepto. ✅
+- **Gráficas chart**: `printVisibleElement` con extraCss `@page A4 landscape · margin 6mm`. WYSIWYG. ✅
+- Los prints principales tienen la configuración correcta. Una revisión visual completa in-app con datos reales del cliente puede requerir ajustes puntuales caso por caso.
+
+Archivo tocado: `frontend/public/v2.html`.
+
+
+
 ## 2026-02-04 (parte 4) · Cuadre por empresa + Canje 66,50€ + Novedades reubicado
 
 **Cuadre de Caja mejorado:**
