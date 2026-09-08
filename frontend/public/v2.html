@@ -11005,7 +11005,7 @@ function showWhatsNew(force){
   const back = document.createElement('div');
   back.className = 'modal-back';
   back.setAttribute('data-testid','whats-new-modal');
-  back.style.zIndex = '650';
+  back.style.zIndex = '100060';
   const cards = entries.map(e => {
     const items = e.highlights.map(h => `<li style="padding:6px 0;line-height:1.55;color:#e2e8f0">${h}</li>`).join('');
     return `<div style="margin-bottom:18px;padding:14px 16px;background:linear-gradient(135deg,rgba(249,115,22,0.08),rgba(245,158,11,0.04));border:1px solid #7c2d12;border-left:4px solid #f97316;border-radius:8px">
