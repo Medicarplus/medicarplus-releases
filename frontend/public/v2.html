@@ -3527,8 +3527,16 @@ function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(
   const trShown=df>0?df:autoT_C;
   const efShownCB=(t.byFp.E||0)+(t.tasasByFp.E||0);
   const trShownCB=df>0?df:autoT_CB;
-  const delta_C=df>0?(df-autoT_C):0;
-  const delta_CB=df>0?(df-autoT_CB):0;
+  // 🔧 Delta capped: NUNCA puede sacar más efectivo del que hay. Si datáfono declara más
+  // de lo justificable con entradas, el sobrante refleja ingresos de tarjeta sin entrada
+  // (no se reclasifica desde efectivo — se muestra tal cual, sin dejar el efectivo en negativo).
+  const rawDelta_C = df>0?(df-autoT_C):0;
+  const rawDelta_CB = df>0?(df-autoT_CB):0;
+  const delta_C = rawDelta_C > 0 ? Math.min(rawDelta_C, efShown) : rawDelta_C;
+  const delta_CB = rawDelta_CB > 0 ? Math.min(rawDelta_CB, efShownCB) : rawDelta_CB;
+  // Exceso de tarjeta sin entrada correspondiente (aparecerá como "ingreso extra tarjeta" en la vista)
+  const dfExcess_C = Math.max(rawDelta_C - delta_C, 0);
+  const dfExcess_CB = Math.max(rawDelta_CB - delta_CB, 0);
   // Partida doble: entrades auto (i, en agregat, redistribuïdes entre Caixa/Banc segons datàfon).
   const totalMovC=(t.bruto-t.dto)+t.haber+t.debe;
   const haberTotalC=totalMovC;
@@ -5821,6 +5829,19 @@ function openCuadreCaja(){
     const cuadraOk = hasCount && Math.abs(diff) < 0.01;
     const diffLabel = !hasCount ? '⏳ Cuenta el efectivo y el banco para ver el cuadre' : (cuadraOk ? '✓ 0,00 — TODO CUADRA' : (diff>0?'FALTA '+fmt(Math.abs(diff)):'SOBRA '+fmt(Math.abs(diff)))+' — REVISAR');
     const diffColor = !hasCount ? '#475569' : (cuadraOk ? '#166534' : '#7f1d1d');
+    // 💡 Pistas por importe (idénticas a las del prompt de IA) — se muestran directamente si hay descuadre
+    const _pistas = [
+      {min:3, max:5, txt:'💡 Suele ser una FOTO olvidada (~4€) o una tasa DGT parcial'},
+      {min:8, max:12, txt:'💡 Puede ser una TASA DGT olvidada (10€) o una foto doble'},
+      {min:18, max:22, txt:'💡 Posible CERTIFICADO OFICIAL / C.O. (20€) o tasa DGT duplicada'},
+      {min:23, max:27, txt:'💡 Posible DUPLICADO (25€) o tasa PPC (25,80€)'},
+      {min:28, max:32, txt:'💡 Posible RENOVACIÓN de moto (30€) o certificado oficial'},
+      {min:65, max:70, txt:'💡 Posible CANJE (66,50€) o tasa DGT B (66€)'},
+      {min:79, max:82, txt:'💡 Posible EXPEDICIÓN completa (80€ + tasa)'},
+      {min:99, max:104, txt:'💡 Posible RENOVACIÓN completa conducción (~100€)'},
+    ];
+    const pistaFound = (hasCount && !cuadraOk) ? _pistas.find(p => Math.abs(diff) >= p.min && Math.abs(diff) <= p.max) : null;
+    const pistaHtml = pistaFound ? `<div style="margin-top:10px;background:#78350f;color:#fef3c7;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:600;text-align:left;line-height:1.4">${pistaFound.txt}</div>` : '';
     return `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
         <!-- COLUMNA IZQUIERDA: SEGÚN EXCEL (teórico) -->
@@ -5866,6 +5887,7 @@ function openCuadreCaja(){
         <div style="color:#fff;font-size:12px;letter-spacing:1px;margin-bottom:6px;font-weight:700">DIFERENCIA · ${escapeHtml(compName)}</div>
         <div style="font-family:'Courier New',monospace;font-weight:800;color:#fff;font-size:22px">${diffLabel}</div>
         ${hasCount && !cuadraOk ? `<div style="margin-top:8px;color:#fecaca;font-size:11px;font-style:italic">Excel dice ${fmt(saldoExcel)} · Tú tienes ${fmt(totalReal)}</div>` : ''}
+        ${pistaHtml}
       </div>`;
   };
   const render = () => {
