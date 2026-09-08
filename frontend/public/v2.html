@@ -5555,15 +5555,25 @@ function _cuadreCajaCompute(comp, fromIso, cutoffIso){
   const storeKey = comp === 'cempla' ? 'caja.cempla.v1' : 'caja.v1';
   const dfStoreKey = comp === 'cempla' ? 'caja.cempla.datafono' : 'caja.datafono';
   const siKey = 'caja.saldoInicial.' + (comp==='cempla'?'cempla':'trafic') + '.v1';
+  // 💰 Reserva de cambio: dinero físico (cajón) — cuenta como CAJA FÍSICA
+  // Incluye también _toCaja (traspaso a caja) porque, aunque haya salido del cajón,
+  // sigue siendo efectivo del negocio (mismo mental model que la vista diaria).
+  const reservaKey = comp === 'cempla' ? 'caja.cempla.reserva.v1' : 'caja.reserva.v1';
+  let reserva = 0;
+  try{
+    const rObj = JSON.parse(localStorage.getItem(reservaKey) || '{}');
+    if(typeof cambioTotal === 'function') reserva = cambioTotal(rObj) + (+(rObj && rObj._toCaja)||0);
+  }catch(_){}
   let bd = {}, dfMap = {}, si = {caja:0, banc:0, from:null};
   try{ bd = (JSON.parse(localStorage.getItem(storeKey)||'{"byDate":{}}').byDate)||{}; }catch(_){}
   try{ dfMap = JSON.parse(localStorage.getItem(dfStoreKey)||'{}'); }catch(_){}
   try{ const raw = localStorage.getItem(siKey); if(raw){ const o=JSON.parse(raw); si.caja=+o.caja||0; si.banc=+o.banc||0; si.from=o.from||null; } }catch(_){}
   const isC = comp === 'cempla';
   const detail = { ingresos: { traf:0, priv:0, otros:0, dhHaber:0, privByTipo:{} }, gastos: {} };
-  let saldoAntCaja = si.caja, saldoAntBanc = si.banc;
+  // La reserva se añade tanto al SALDO ANTERIOR como al CAJA ACTUAL (mismo delta → diferencia inalterada, pero cifras reales)
+  let saldoAntCaja = si.caja + reserva, saldoAntBanc = si.banc;
   let ingresos = 0, gastos = 0;
-  let cajaActual = si.caja, bancActual = si.banc;
+  let cajaActual = si.caja + reserva, bancActual = si.banc;
   Object.keys(bd).sort().forEach(iso => {
     if(si.from && iso < si.from) return;
     if(iso > cutoffIso) return;
@@ -5662,6 +5672,7 @@ function openCuadreCaja(){
         <input id="ccFrom" type="date" value="${firstOfMonthIso}" max="${todayIso}" style="padding:6px 8px;background:#1e293b;border:1px solid #38bdf8;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:12px" data-testid="cc-from"/>
         <label style="font-size:11px;color:#94a3b8">HASTA:</label>
         <input id="ccDate" type="date" value="${todayIso}" max="${todayIso}" style="padding:6px 8px;background:#1e293b;border:1px solid #38bdf8;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:12px" data-testid="cc-date"/>
+        ${(typeof isPremiumLicense === 'function' && isPremiumLicense()) ? `<button class="btn" id="ccAskAi" data-testid="cc-ask-ai" title="Preguntar al Asesor IA por qué la caja no cuadra (busca tasas duplicadas, tasas olvidadas, entradas incompletas)" style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;font-weight:800;box-shadow:0 2px 6px rgba(124,58,237,.35)">🤖 IA</button>` : ''}
         <button class="btn" id="ccPrint" data-testid="cc-print" style="background:#0369a1;color:#fff;border-color:#0369a1">🖨️ Imprimir</button>
         <button data-close style="background:none;border:none;color:#94a3b8;font-size:24px;cursor:pointer">×</button>
       </div>
@@ -5833,6 +5844,53 @@ function openCuadreCaja(){
         tb.style.fontWeight = isActive ? '800' : '700';
       });
     }
+    // 🤖 Botón IA: pre-rellena el Asesor IA con el rango del Cuadre y contexto de descuadres típicos
+    const aiBtnEl = back.querySelector('#ccAskAi');
+    if(aiBtnEl){
+      aiBtnEl.onclick = () => {
+        // Recalcular con los overrides aplicados para pasar los valores reales que ve el usuario
+        const ovSaldoAnt = _ccGetOv(activeComp, ovKey, 'saldoAnt');
+        const ovIng = _ccGetOv(activeComp, ovKey, 'ingresos');
+        const ovGas = _ccGetOv(activeComp, ovKey, 'gastos');
+        const ovSaldoAct = _ccGetOv(activeComp, ovKey, 'saldoActual');
+        const ovCaja = _ccGetOv(activeComp, ovKey, 'cajaActual');
+        const ovBanc = _ccGetOv(activeComp, ovKey, 'bancActual');
+        const ovSuma = _ccGetOv(activeComp, ovKey, 'sumaCB');
+        const saldoAnt = ovSaldoAnt!=null ? ovSaldoAnt : activeData.saldoAnt;
+        const ing = ovIng!=null ? ovIng : activeData.ingresos;
+        const gas = ovGas!=null ? ovGas : activeData.gastos;
+        const caja = ovCaja!=null ? ovCaja : activeData.cajaActual;
+        const banc = ovBanc!=null ? ovBanc : activeData.bancActual;
+        const saldoActualComp = ovSaldoAct!=null ? ovSaldoAct : (saldoAnt + ing - gas);
+        const sumaCB = ovSuma!=null ? ovSuma : (caja + banc);
+        const diff = saldoActualComp - sumaCB;
+        const cuadraOk = Math.abs(diff) < 0.01;
+        const aiBtn = document.getElementById('btnAiAsk');
+        if(!aiBtn){ toast('Asesor IA no disponible'); return; }
+        aiBtn.click();
+        setTimeout(()=>{
+          const fromEl = document.getElementById('aiFrom');
+          const toEl = document.getElementById('aiTo');
+          const q = document.getElementById('aiQ');
+          if(fromEl) fromEl.value = fromIso;
+          if(toEl) toEl.value = cutoff;
+          if(q){
+            const empresa = activeName;
+            let prompt;
+            if(cuadraOk){
+              prompt = `Cuadre de Caja · ${empresa} · Del ${fromLabel} al ${cutoffLabel}.\n\nCIFRAS ACTUALES:\n- Saldo anterior: ${fmt(saldoAnt)}\n- Ingresos: ${fmt(ing)}\n- Gastos: ${fmt(gas)}\n- Saldo actual (teórico): ${fmt(saldoActualComp)}\n- Caja física + Banco (real): ${fmt(sumaCB)}\n- DIFERENCIA: 0€ (cuadra ✓)\n\nLa caja cuadra en el papel, pero repasa igualmente el rango en busca de posibles inconsistencias: tasas duplicadas para el mismo cliente, tasas olvidadas (Renovación/Expedición sin tasa DGT), entradas con 0€, importes atípicos, o entradas sin nombre. Dime si algo te llama la atención.`;
+            } else {
+              const signo = diff > 0 ? 'SOBRA' : 'FALTA';
+              prompt = `Cuadre de Caja · ${empresa} · Del ${fromLabel} al ${cutoffLabel}.\n\nCIFRAS ACTUALES:\n- Saldo anterior: ${fmt(saldoAnt)}\n- Ingresos: ${fmt(ing)}\n- Gastos: ${fmt(gas)}\n- Saldo actual (teórico): ${fmt(saldoActualComp)}\n- Caja física + Banco (real): ${fmt(sumaCB)}\n- DIFERENCIA: ${(diff>=0?'+':'')+fmt(diff)} → ${signo} ${fmt(Math.abs(diff))} en la caja/banco real\n\nAyúdame a encontrar el descuadre. Repasa en este orden los MOTIVOS TÍPICOS DE DESCUADRE (de más frecuente a menos):\n1. **Tasas DGT duplicadas al mismo nombre** — Busca clientes que aparezcan 2 veces el mismo día con tasa DGT (típico: se apuntó 2 veces por error).\n2. **Tasas olvidadas** — Entradas de Renovación/Expedición SIN tasa DGT que normalmente sí llevan (comparar con otras entradas del mismo tipo).\n3. **Entradas interrumpidas / incompletas** — Con nombre vacío, importe 0€, o falta forma de pago.\n4. **Devoluciones DGT olvidadas** — Cliente que se le apuntó una tasa pero pidió el dinero de vuelta (buscar HABER/DEBE pendientes).\n5. **Gastos sin apuntar** — Salidas de caja (nóminas, IRPF, material) que no estén en Debe/Haber.\n6. **Datáfono mal introducido** — La cifra manual del datáfono no coincide con lo cobrado por tarjeta.\n\nDime qué encuentras, con nombres y fechas concretas si es posible.`;
+            }
+            q.value = prompt;
+            q.focus();
+            q.setSelectionRange(q.value.length, q.value.length);
+          }
+        }, 250);
+      };
+    }
+
     back.querySelector('#ccPrint').onclick = () => {
       // Aplicar overrides también al imprimir (usando la MISMA clave que renderCompany)
       const ovK = ovKey;
