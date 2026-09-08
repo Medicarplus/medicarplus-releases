@@ -5574,7 +5574,11 @@ function _cuadreCajaCompute(comp, fromIso, cutoffIso){
   let saldoAntCaja = si.caja + reserva, saldoAntBanc = si.banc;
   let ingresos = 0, gastos = 0;
   let cajaActual = si.caja + reserva, bancActual = si.banc;
-  Object.keys(bd).sort().forEach(iso => {
+  // Unión de días con entradas + días con datáfono (para no perder datáfonos "huérfanos")
+  const daySet = new Set(Object.keys(bd));
+  Object.keys(dfMap).forEach(d => { if(parseFloat(dfMap[d])>0) daySet.add(d); });
+  const allDays = Array.from(daySet).sort();
+  allDays.forEach(iso => {
     if(si.from && iso < si.from) return;
     if(iso > cutoffIso) return;
     const arr = bd[iso] || [];
@@ -5582,9 +5586,13 @@ function _cuadreCajaCompute(comp, fromIso, cutoffIso){
     const df = parseFloat(dfMap[iso]||0);
     const cajaAuto = isC ? (t.byFp.E||0) : ((t.byFp.E||0)+(t.tasasByFp.E||0));
     const bancTAuto = isC ? (t.byFp.T||0) : ((t.byFp.T||0)+(t.tasasByFp.T||0));
-    const delta = df > 0 ? (df - bancTAuto) : 0;
-    const cajaDay = cajaAuto - delta;
-    const bancTDay = bancTAuto + delta;
+    // ✅ Cuadre correcto: si el usuario ha declarado un cierre de datáfono, ES la verdad
+    // del dinero real que entró en la tarjeta ese día. NO se reclasifica desde efectivo
+    // (esa reclasificación del "Cierre diario" enmascara descuadres). Si el datáfono no
+    // coincide con las entradas T, la diferencia se refleja en SUMA CAJA+BANCO real
+    // y el Cuadre lo detecta como descuadre — que es exactamente su propósito.
+    const cajaDay = cajaAuto;
+    const bancTDay = df > 0 ? df : bancTAuto;
     const bancBDay = isC ? (t.byFp.B||0) : ((t.byFp.B||0)+(t.tasasByFp.B||0));
     const bancXDay = isC ? (t.byFp.X||0) : ((t.byFp.X||0)+(t.tasasByFp.X||0));
     const cajaTotal = cajaDay + (t.internalCaja||0);
@@ -5846,7 +5854,7 @@ function openCuadreCaja(){
       </div>
       <div style="margin-top:12px;padding:14px;background:${cuadraOk?'#166534':'#7f1d1d'};border-radius:6px;text-align:center">
         <div style="color:#fff;font-size:12px;letter-spacing:1px;margin-bottom:4px">DIFERENCIA · ${escapeHtml(compName)}</div>
-        <div style="font-family:'Courier New',monospace;font-weight:800;color:#fff;font-size:22px">${cuadraOk?'✓ 0,00 — TODO CUADRA':(diff>=0?'+':'')+fmt(diff)+' — REVISAR'}</div>
+        <div style="font-family:'Courier New',monospace;font-weight:800;color:#fff;font-size:22px">${cuadraOk?'✓ 0,00 — TODO CUADRA':(diff>0?'FALTA '+fmt(Math.abs(diff)):'SOBRA '+fmt(Math.abs(diff)))+' — REVISAR'}</div>
       </div>`;
   };
   const render = () => {
@@ -6038,7 +6046,7 @@ function openCuadreCaja(){
             if(cuadraOk){
               prompt = `Cuadre de Caja · ${empresa} · Del ${fromLabel} al ${cutoffLabel}.\n\nCIFRAS ACTUALES:\n- Saldo anterior: ${fmt(saldoAnt)}\n- Ingresos: ${fmt(ing)}\n- Gastos: ${fmt(gas)}\n- Saldo actual (teórico): ${fmt(saldoActualComp)}\n- Caja física + Banco (real): ${fmt(sumaCB)}\n- DIFERENCIA: 0€ (cuadra ✓)\n\nLa caja cuadra en el papel, pero repasa igualmente el rango en busca de posibles inconsistencias: tasas duplicadas para el mismo cliente, tasas olvidadas (Renovación/Expedición sin tasa DGT), entradas con 0€, importes atípicos, o entradas sin nombre. Dime si algo te llama la atención.`;
             } else {
-              const signo = diff > 0 ? 'SOBRA' : 'FALTA';
+              const signo = diff > 0 ? 'FALTA' : 'SOBRA';
               prompt = `Cuadre de Caja · ${empresa} · Del ${fromLabel} al ${cutoffLabel}.\n\nCIFRAS ACTUALES:\n- Saldo anterior: ${fmt(saldoAnt)}\n- Ingresos: ${fmt(ing)}\n- Gastos: ${fmt(gas)}\n- Saldo actual (teórico): ${fmt(saldoActualComp)}\n- Caja física + Banco (real): ${fmt(sumaCB)}\n- DIFERENCIA: ${(diff>=0?'+':'')+fmt(diff)} → ${signo} ${fmt(Math.abs(diff))} en la caja/banco real\n\nAyúdame a encontrar el descuadre. Repasa en este orden los MOTIVOS TÍPICOS DE DESCUADRE (de más frecuente a menos):\n1. **Tasas DGT duplicadas al mismo nombre** — Busca clientes que aparezcan 2 veces el mismo día con tasa DGT (típico: se apuntó 2 veces por error).\n2. **Tasas olvidadas** — Entradas de Renovación/Expedición SIN tasa DGT que normalmente sí llevan (comparar con otras entradas del mismo tipo).\n3. **Entradas interrumpidas / incompletas** — Con nombre vacío, importe 0€, o falta forma de pago.\n4. **Devoluciones DGT olvidadas** — Cliente que se le apuntó una tasa pero pidió el dinero de vuelta (buscar HABER/DEBE pendientes).\n5. **Gastos sin apuntar** — Salidas de caja (nóminas, IRPF, material) que no estén en Debe/Haber.\n6. **Datáfono mal introducido** — La cifra manual del datáfono no coincide con lo cobrado por tarjeta.\n\nDime qué encuentras, con nombres y fechas concretas si es posible.`;
             }
             q.value = prompt;
@@ -6100,7 +6108,7 @@ function openCuadreCaja(){
           <tr><td>BANCO${mark(ovBanc)}</td><td class="num">${fmt(banc)}</td></tr>
           <tr class="final"><td>SUMA CAJA + BANCO${mark(ovSuma)}</td><td class="num">${fmt(sumaCB)}</td></tr>
         </tbody></table>
-        <div class="cuadra">DIFERENCIA: ${cuadraOk?'✓ 0,00 — TODO CUADRA':(diff>=0?'+':'')+fmt(diff)+' — REVISAR'}</div>
+        <div class="cuadra">DIFERENCIA: ${cuadraOk?'✓ 0,00 — TODO CUADRA':(diff>0?'FALTA '+fmt(Math.abs(diff)):'SOBRA '+fmt(Math.abs(diff)))+' — REVISAR'}</div>
         ${(ovSaldoAnt!=null||ovIng!=null||ovGas!=null||ovSaldoAct!=null||ovCaja!=null||ovBanc!=null||ovSuma!=null)?'<div class="foot">✏️ Cifras marcadas: ajustadas manualmente en este PC.</div>':''}
         </body></html>`;
       try{ printHtml(html, {title:`Cuadre ${activeName} ${monthLabel}`}); }
