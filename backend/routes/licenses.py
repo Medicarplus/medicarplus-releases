@@ -1428,7 +1428,22 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         - SMS del mes actual + total històric
         - Sender del mode MediCar Cloud (si l'usa)
         """
-        lic = await coll.find_one({"install_id": install_id}, {"_id": 0})
+        # 🔧 Fix: prioriza la licencia ACTIVA más reciente para este install_id.
+        # Antes usaba find_one sin ordenar → podía devolver una licencia vieja
+        # expirada/revocada con last_verify_at obsoleto (bug reportado: cliente
+        # se conectó hoy pero panel decía "hace 5d").
+        lic = await coll.find_one(
+            {"install_id": install_id, "status": "active"},
+            {"_id": 0},
+            sort=[("created_at", -1)],
+        )
+        if not lic:
+            # Fallback: la más reciente en cualquier estado (expirada/revocada)
+            lic = await coll.find_one(
+                {"install_id": install_id},
+                {"_id": 0},
+                sort=[("created_at", -1)],
+            )
         if not lic:
             raise HTTPException(status_code=404, detail="License not found")
         from datetime import datetime as _dt, timezone as _tz
