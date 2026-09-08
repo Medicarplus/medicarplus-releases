@@ -6087,11 +6087,16 @@ function openCuadreCaja(){
         // Invocar el handler directamente (más fiable que .click() si el botón está oculto en un dropdown)
         if(typeof aiBtn.onclick === 'function') aiBtn.onclick();
         else aiBtn.click();
+        // 🔝 Asegurar que el modal IA aparece POR ENCIMA del Cuadre (que usa z-index 100055)
+        setTimeout(()=>{
+          const modals = document.querySelectorAll('.modal-back');
+          const aiModal = Array.from(modals).find(m => m.querySelector('#aiQ') || m.querySelector('#aiFrom'));
+          if(aiModal){ aiModal.style.zIndex = '100080'; }
+        }, 300);
         setTimeout(()=>{
           const fromEl = document.getElementById('aiFrom');
           const toEl = document.getElementById('aiTo');
-          const q = document.getElementById('aiQ');
-          if(fromEl) fromEl.value = fromIso;
+          const q = document.getElementById('aiQ');          if(fromEl) fromEl.value = fromIso;
           if(toEl) toEl.value = cutoff;
           if(q){
             const empresa = activeName;
@@ -6122,7 +6127,7 @@ function openCuadreCaja(){
             q.focus();
             q.setSelectionRange(q.value.length, q.value.length);
           }
-        }, 250);
+        }, 400);
       };
     }
 
