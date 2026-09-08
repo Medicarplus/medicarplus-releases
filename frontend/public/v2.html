@@ -248,7 +248,7 @@
     if(!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
     return r.json();
   }
-  const SYNC_EXCLUDE_PREFIXES = ['caja.saldoInicial.','caja.install.','caja.sync.','caja.license.','caja.plan.preview.','caja.apibase.','caja.__sync'];
+  const SYNC_EXCLUDE_PREFIXES = ['caja.saldoInicial.','caja.install.','caja.sync.','caja.license.','caja.plan.preview.','caja.apibase.','caja.__sync','caja.cuadre.'];
   function _isSyncable(k){
     if(!k || !k.startsWith('caja.')) return false;
     for(const p of SYNC_EXCLUDE_PREFIXES){ if(k.startsWith(p)) return false; }
@@ -5618,6 +5618,33 @@ function openCuadreCaja(){
   const hasC2 = !!c2Name;
   // Estado local (NO persiste, NO se sincroniza entre PCs — es vista calculada)
   let activeTab = 'e1';
+  // ✏️ Overrides manuales — LOCALES por PC (prefijo caja.cuadre.* excluido de sync)
+  // Estructura: { [comp]: { [cutoff]: { [field]: value } } }
+  // Fields: saldoAnt, ingresos, gastos, saldoActual, cajaActual, bancActual, sumaCB
+  const CC_OV_KEY = 'caja.cuadre.overrides.v1';
+  const _ccLoadOv = () => { try{ return JSON.parse(localStorage.getItem(CC_OV_KEY)||'{}')||{} }catch(_){ return {} } };
+  const _ccSaveOv = (o) => { try{ localStorage.setItem(CC_OV_KEY, JSON.stringify(o||{})) }catch(_){} };
+  const _ccGetOv = (comp, cutoff, field) => {
+    const o = _ccLoadOv();
+    const v = o && o[comp] && o[comp][cutoff] && o[comp][cutoff][field];
+    return (v==null || v==='' || isNaN(+v)) ? null : +v;
+  };
+  const _ccSetOv = (comp, cutoff, field, value) => {
+    const o = _ccLoadOv();
+    if(!o[comp]) o[comp] = {};
+    if(!o[comp][cutoff]) o[comp][cutoff] = {};
+    o[comp][cutoff][field] = +value;
+    _ccSaveOv(o);
+  };
+  const _ccClearOv = (comp, cutoff, field) => {
+    const o = _ccLoadOv();
+    if(o[comp] && o[comp][cutoff]){
+      delete o[comp][cutoff][field];
+      if(!Object.keys(o[comp][cutoff]).length) delete o[comp][cutoff];
+      if(!Object.keys(o[comp]).length) delete o[comp];
+    }
+    _ccSaveOv(o);
+  };
   back.innerHTML = `<div class="modal" style="max-width:820px;max-height:90vh;overflow:auto;background:#0f172a;color:#e2e8f0">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
       <h3 style="margin:0;color:#38bdf8;font-family:Georgia,serif;font-size:20px">🧮 Cuadre de Caja</h3>
@@ -5629,7 +5656,7 @@ function openCuadreCaja(){
       </div>
     </div>
     <div style="background:#0c4a6e;border:1px solid #38bdf8;border-radius:6px;padding:10px 14px;color:#bae6fd;font-size:12px;line-height:1.5;margin-bottom:14px">
-      💡 Rango: del <b>día 1 del mes</b> hasta el <b>día seleccionado</b> (inclusive). Cada empresa se muestra <b>aislada</b> en su propia pestaña. Esta vista <b>NO se sincroniza</b> entre PCs (se calcula al vuelo).
+      💡 Rango: del <b>día 1 del mes</b> hasta el <b>día seleccionado</b> (inclusive). Cada empresa <b>aislada</b> en su propia pestaña. Esta vista <b>NO se sincroniza</b> entre PCs (se calcula al vuelo). Puedes <b>editar cualquier cifra a mano</b> con el ✏️ para cuadrar la caja — los ajustes son <b>locales de este PC</b>.
     </div>
     ${hasC2 ? `<div id="ccTabs" style="display:flex;gap:4px;margin-bottom:10px;border-bottom:2px solid #1e293b">
       <button class="cc-tab" data-tab="e1" data-testid="cc-tab-e1" style="padding:8px 16px;background:#f5b301;color:#0f172a;border:none;border-radius:6px 6px 0 0;font-weight:800;cursor:pointer">🏢 ${escapeHtml(c1Name)}</button>
@@ -5656,41 +5683,68 @@ function openCuadreCaja(){
     if(!rows.length) return `<div style="padding:10px;color:#64748b;font-style:italic;text-align:center;font-size:11px">Sin gastos en el rango</div>`;
     return `<table style="width:100%;border-collapse:collapse;font-size:12px;margin:4px 0"><tbody>${rows.map(([k,v])=>`<tr style="border-bottom:1px solid #1e293b"><td style="padding:4px 10px;color:#f472b6">${escapeHtml(k)}</td><td style="padding:4px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(v)}</td></tr>`).join('')}</tbody></table>`;
   };
-  const renderCompany = (compData, compName, color) => {
-    // Cada empresa se muestra AISLADA: saldo, ingresos, gastos, caja/banco y diferencia PROPIOS
-    const saldoActualComp = compData.saldoAnt + compData.ingresos - compData.gastos;
-    const sumaCB = compData.cajaActual + compData.bancActual;
+  // Renderiza una cifra editable con ✏️ (y ↺ si tiene override)
+  // fontSize/color/weight controlan el estilo del número
+  const editableNum = (comp, cutoff, field, value, isOverridden, opts={}) => {
+    const fs = opts.fontSize || '13px';
+    const col = isOverridden ? '#fbbf24' : (opts.color || '#e2e8f0');
+    const weight = opts.weight || 700;
+    const val = fmt(value);
+    return `<span style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-end">
+      <span style="font-family:'Courier New',monospace;font-weight:${weight};color:${col};font-size:${fs}${isOverridden?';font-style:italic':''}">${val}</span>
+      ${isOverridden ? `<button class="cc-clear" data-comp="${comp}" data-cutoff="${cutoff}" data-field="${field}" title="Volver al valor calculado" style="background:none;border:none;color:#fbbf24;cursor:pointer;font-size:12px;padding:0 2px" data-testid="cc-clear-${field}">↺</button>` : ''}
+      <button class="cc-edit" data-comp="${comp}" data-cutoff="${cutoff}" data-field="${field}" data-current="${value}" title="Editar a mano" style="background:none;border:none;color:${isOverridden?'#fbbf24':'#64748b'};cursor:pointer;font-size:12px;padding:0 2px" data-testid="cc-edit-${field}">✏️</button>
+    </span>`;
+  };
+  const renderCompany = (compData, compName, color, comp, cutoff) => {
+    // Aplicar overrides si existen. Cualquier campo puede sobrescribirse a mano.
+    const ovSaldoAnt = _ccGetOv(comp, cutoff, 'saldoAnt');
+    const ovIngresos = _ccGetOv(comp, cutoff, 'ingresos');
+    const ovGastos = _ccGetOv(comp, cutoff, 'gastos');
+    const ovSaldoAct = _ccGetOv(comp, cutoff, 'saldoActual');
+    const ovCaja = _ccGetOv(comp, cutoff, 'cajaActual');
+    const ovBanc = _ccGetOv(comp, cutoff, 'bancActual');
+    const ovSuma = _ccGetOv(comp, cutoff, 'sumaCB');
+    const saldoAnt = ovSaldoAnt!=null ? ovSaldoAnt : compData.saldoAnt;
+    const ingresos = ovIngresos!=null ? ovIngresos : compData.ingresos;
+    const gastos = ovGastos!=null ? ovGastos : compData.gastos;
+    const cajaActual = ovCaja!=null ? ovCaja : compData.cajaActual;
+    const bancActual = ovBanc!=null ? ovBanc : compData.bancActual;
+    const saldoActualCalc = saldoAnt + ingresos - gastos;
+    const saldoActualComp = ovSaldoAct!=null ? ovSaldoAct : saldoActualCalc;
+    const sumaCBCalc = cajaActual + bancActual;
+    const sumaCB = ovSuma!=null ? ovSuma : sumaCBCalc;
     const diff = saldoActualComp - sumaCB;
     const cuadraOk = Math.abs(diff) < 0.01;
     return `
       <div style="background:#1e293b;border:1px solid ${color};border-radius:6px;padding:12px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
         <span style="color:${color};font-weight:800">🏢 ${escapeHtml(compName)} · SALDO ANTERIOR</span>
-        <span style="font-family:'Courier New',monospace;font-weight:800;color:#e2e8f0;font-size:16px">${fmt(compData.saldoAnt)}</span>
+        ${editableNum(comp, cutoff, 'saldoAnt', saldoAnt, ovSaldoAnt!=null, {fontSize:'16px', weight:800})}
       </div>
       <div style="background:#1e293b;border-left:3px solid ${color};border-radius:6px;padding:10px 14px;margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" data-toggle="ing-detail">
-          <span style="color:${color};font-weight:700">📥 INGRESOS</span>
-          <span style="font-family:'Courier New',monospace;font-weight:800;color:#22c55e">${fmt(compData.ingresos)}</span>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="color:${color};font-weight:700;cursor:pointer" data-toggle="ing-detail">📥 INGRESOS</span>
+          ${editableNum(comp, cutoff, 'ingresos', ingresos, ovIngresos!=null, {color:'#22c55e', fontSize:'14px', weight:800})}
         </div>
         <div id="ing-detail" style="display:none;margin-top:6px">${detailIng(compData.detail.ingresos)}</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-top:8px;padding-top:8px;border-top:1px dashed #334155" data-toggle="gas-detail">
-          <span style="color:${color};font-weight:700">📤 GASTOS</span>
-          <span style="font-family:'Courier New',monospace;font-weight:800;color:#f472b6">${fmt(compData.gastos)}</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed #334155">
+          <span style="color:${color};font-weight:700;cursor:pointer" data-toggle="gas-detail">📤 GASTOS</span>
+          ${editableNum(comp, cutoff, 'gastos', gastos, ovGastos!=null, {color:'#f472b6', fontSize:'14px', weight:800})}
         </div>
         <div id="gas-detail" style="display:none;margin-top:6px">${detailGas(compData.detail.gastos)}</div>
       </div>
-      <div style="background:#0f766e;border:2px solid #14b8a6;border-radius:6px;padding:12px 16px;margin:12px 0;display:flex;justify-content:space-between">
+      <div style="background:#0f766e;border:2px solid #14b8a6;border-radius:6px;padding:12px 16px;margin:12px 0;display:flex;justify-content:space-between;align-items:center">
         <span style="color:#fff;font-weight:800;font-size:15px">SALDO ACTUAL · ${escapeHtml(compName)}</span>
-        <span style="font-family:'Courier New',monospace;font-weight:800;color:#fff;font-size:18px">${fmt(saldoActualComp)}</span>
+        ${editableNum(comp, cutoff, 'saldoActual', saldoActualComp, ovSaldoAct!=null, {color:'#fff', fontSize:'18px', weight:800})}
       </div>
       <div style="margin-top:16px;padding:12px 14px;background:#1e293b;border-radius:6px">
         <div style="color:#94a3b8;font-size:11px;letter-spacing:1px;margin-bottom:8px">💰 CAJA FÍSICA + BANCO (real) · ${escapeHtml(compName)}</div>
         <table style="width:100%;font-size:13px;border-collapse:collapse">
           <tbody>
-            <tr style="border-bottom:1px solid #334155"><td style="padding:5px 10px">CAJA FÍSICA</td><td style="padding:5px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(compData.cajaActual)}</td></tr>
-            <tr><td style="padding:5px 10px">BANCO</td><td style="padding:5px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(compData.bancActual)}</td></tr>
+            <tr style="border-bottom:1px solid #334155"><td style="padding:5px 10px">CAJA FÍSICA</td><td style="padding:5px 10px;text-align:right">${editableNum(comp, cutoff, 'cajaActual', cajaActual, ovCaja!=null, {fontSize:'13px', weight:700})}</td></tr>
+            <tr><td style="padding:5px 10px">BANCO</td><td style="padding:5px 10px;text-align:right">${editableNum(comp, cutoff, 'bancActual', bancActual, ovBanc!=null, {fontSize:'13px', weight:700})}</td></tr>
           </tbody>
-          <tfoot><tr style="border-top:2px solid ${color};background:#0f172a"><td style="padding:8px 10px;font-weight:800;color:${color}">SUMA CAJA + BANCO</td><td style="padding:8px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:800;color:${color};font-size:16px">${fmt(sumaCB)}</td></tr></tfoot>
+          <tfoot><tr style="border-top:2px solid ${color};background:#0f172a"><td style="padding:8px 10px;font-weight:800;color:${color}">SUMA CAJA + BANCO</td><td style="padding:8px 10px;text-align:right">${editableNum(comp, cutoff, 'sumaCB', sumaCB, ovSuma!=null, {color:color, fontSize:'16px', weight:800})}</td></tr></tfoot>
         </table>
       </div>
       <div style="margin-top:12px;padding:14px;background:${cuadraOk?'#166534':'#7f1d1d'};border-radius:6px;text-align:center">
@@ -5709,13 +5763,41 @@ function openCuadreCaja(){
     const activeData = active === 'e2' ? c2 : c1;
     const activeName = active === 'e2' ? c2Name : c1Name;
     const activeColor = active === 'e2' ? '#ec4899' : '#f5b301';
+    const activeComp = active === 'e2' ? 'cempla' : 'trafic';
     back.querySelector('#ccBody').innerHTML = `
       <div style="text-align:center;font-family:Georgia,serif;font-size:16px;color:#fbbf24;margin-bottom:14px">DEL 01/${cutoff.slice(5,7)}/${cutoff.slice(0,4)} AL ${cutoffLabel} <span style="color:#94a3b8;font-size:12px">· ${monthLabel}</span></div>
-      ${renderCompany(activeData, activeName, activeColor)}`;
+      ${renderCompany(activeData, activeName, activeColor, activeComp, cutoff)}`;
     back.querySelectorAll('[data-toggle]').forEach(el => {
       el.onclick = () => {
         const target = back.querySelector('#'+el.dataset.toggle);
         if(target) target.style.display = target.style.display==='none'?'block':'none';
+      };
+    });
+    // ✏️ Edición manual: prompt sencillo con el valor actual pre-cargado
+    back.querySelectorAll('.cc-edit').forEach(btn => {
+      btn.onclick = (ev) => {
+        ev.stopPropagation();
+        const comp = btn.dataset.comp;
+        const cf = btn.dataset.cutoff;
+        const field = btn.dataset.field;
+        const current = parseFloat(btn.dataset.current)||0;
+        const labels = {saldoAnt:'Saldo anterior', ingresos:'Ingresos', gastos:'Gastos', saldoActual:'Saldo actual', cajaActual:'Caja física', bancActual:'Banco', sumaCB:'Suma Caja + Banco'};
+        const input = prompt(`Editar ${labels[field]||field} (deja vacío para volver al valor calculado):`, current.toString().replace('.',','));
+        if(input === null) return; // cancelado
+        const trimmed = input.trim().replace(',', '.');
+        if(trimmed === ''){ _ccClearOv(comp, cf, field); render(); return; }
+        const num = parseFloat(trimmed);
+        if(isNaN(num)){ toast('Valor no válido', 2000); return; }
+        _ccSetOv(comp, cf, field, num);
+        render();
+      };
+    });
+    // ↺ Volver al valor calculado
+    back.querySelectorAll('.cc-clear').forEach(btn => {
+      btn.onclick = (ev) => {
+        ev.stopPropagation();
+        _ccClearOv(btn.dataset.comp, btn.dataset.cutoff, btn.dataset.field);
+        render();
       };
     });
     // Actualizar estado visual de tabs
@@ -5728,10 +5810,24 @@ function openCuadreCaja(){
       });
     }
     back.querySelector('#ccPrint').onclick = () => {
-      const saldoActualComp = activeData.saldoAnt + activeData.ingresos - activeData.gastos;
-      const sumaCB = activeData.cajaActual + activeData.bancActual;
+      // Aplicar overrides también al imprimir
+      const ovSaldoAnt = _ccGetOv(activeComp, cutoff, 'saldoAnt');
+      const ovIng = _ccGetOv(activeComp, cutoff, 'ingresos');
+      const ovGas = _ccGetOv(activeComp, cutoff, 'gastos');
+      const ovSaldoAct = _ccGetOv(activeComp, cutoff, 'saldoActual');
+      const ovCaja = _ccGetOv(activeComp, cutoff, 'cajaActual');
+      const ovBanc = _ccGetOv(activeComp, cutoff, 'bancActual');
+      const ovSuma = _ccGetOv(activeComp, cutoff, 'sumaCB');
+      const saldoAnt = ovSaldoAnt!=null ? ovSaldoAnt : activeData.saldoAnt;
+      const ing = ovIng!=null ? ovIng : activeData.ingresos;
+      const gas = ovGas!=null ? ovGas : activeData.gastos;
+      const caja = ovCaja!=null ? ovCaja : activeData.cajaActual;
+      const banc = ovBanc!=null ? ovBanc : activeData.bancActual;
+      const saldoActualComp = ovSaldoAct!=null ? ovSaldoAct : (saldoAnt + ing - gas);
+      const sumaCB = ovSuma!=null ? ovSuma : (caja + banc);
       const diff = saldoActualComp - sumaCB;
       const cuadraOk = Math.abs(diff) < 0.01;
+      const mark = v => v!=null ? ' <span style="color:#b45309;font-size:9px">✏️</span>' : '';
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Cuadre · ${escapeHtml(activeName)} · ${monthLabel}</title>
         <style>@page{size:A4;margin:12mm}*{box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;color:#111;margin:0;font-size:12px}
         h1{color:#0369a1;text-align:center;margin:0 0 6px;font-family:Georgia,serif;font-size:22px}
@@ -5740,21 +5836,23 @@ function openCuadreCaja(){
         td{padding:6px 8px;border-bottom:1px solid #cbd5e1}
         .num{text-align:right;font-family:'Courier New',monospace;font-weight:700}
         .final{background:#0f766e;color:#fff;font-weight:800;font-size:15px}
-        .cuadra{background:${cuadraOk?'#166534':'#7f1d1d'};color:#fff;padding:12px;text-align:center;font-family:'Courier New',monospace;font-weight:800;font-size:18px;border-radius:6px;margin-top:12px}</style></head><body>
+        .cuadra{background:${cuadraOk?'#166534':'#7f1d1d'};color:#fff;padding:12px;text-align:center;font-family:'Courier New',monospace;font-weight:800;font-size:18px;border-radius:6px;margin-top:12px}
+        .foot{margin-top:14px;font-size:10px;color:#64748b;font-style:italic}</style></head><body>
         <h1>🧮 Cuadre de Caja · ${escapeHtml(activeName)}</h1>
         <div class="sub">Del 01/${cutoff.slice(5,7)}/${cutoff.slice(0,4)} al ${cutoffLabel} · ${monthLabel} · Generado el ${new Date().toLocaleString('es-ES')}</div>
         <table><tbody>
-          <tr><td>SALDO ANTERIOR</td><td class="num">${fmt(activeData.saldoAnt)}</td></tr>
-          <tr><td>INGRESOS</td><td class="num" style="color:#166534">${fmt(activeData.ingresos)}</td></tr>
-          <tr><td>GASTOS</td><td class="num" style="color:#b91c1c">${fmt(activeData.gastos)}</td></tr>
-          <tr class="final"><td>SALDO ACTUAL</td><td class="num">${fmt(saldoActualComp)}</td></tr>
+          <tr><td>SALDO ANTERIOR${mark(ovSaldoAnt)}</td><td class="num">${fmt(saldoAnt)}</td></tr>
+          <tr><td>INGRESOS${mark(ovIng)}</td><td class="num" style="color:#166534">${fmt(ing)}</td></tr>
+          <tr><td>GASTOS${mark(ovGas)}</td><td class="num" style="color:#b91c1c">${fmt(gas)}</td></tr>
+          <tr class="final"><td>SALDO ACTUAL${mark(ovSaldoAct)}</td><td class="num">${fmt(saldoActualComp)}</td></tr>
         </tbody></table>
         <table><tbody>
-          <tr><td>CAJA FÍSICA</td><td class="num">${fmt(activeData.cajaActual)}</td></tr>
-          <tr><td>BANCO</td><td class="num">${fmt(activeData.bancActual)}</td></tr>
-          <tr class="final"><td>SUMA CAJA + BANCO</td><td class="num">${fmt(sumaCB)}</td></tr>
+          <tr><td>CAJA FÍSICA${mark(ovCaja)}</td><td class="num">${fmt(caja)}</td></tr>
+          <tr><td>BANCO${mark(ovBanc)}</td><td class="num">${fmt(banc)}</td></tr>
+          <tr class="final"><td>SUMA CAJA + BANCO${mark(ovSuma)}</td><td class="num">${fmt(sumaCB)}</td></tr>
         </tbody></table>
         <div class="cuadra">DIFERENCIA: ${cuadraOk?'✓ 0,00 — TODO CUADRA':(diff>=0?'+':'')+fmt(diff)+' — REVISAR'}</div>
+        ${(ovSaldoAnt!=null||ovIng!=null||ovGas!=null||ovSaldoAct!=null||ovCaja!=null||ovBanc!=null||ovSuma!=null)?'<div class="foot">✏️ Cifras marcadas: ajustadas manualmente en este PC.</div>':''}
         </body></html>`;
       try{ printHtml(html, {title:`Cuadre ${activeName} ${monthLabel}`}); }
       catch(err){ toast('Error impresión: '+err.message, 3500); }
@@ -12319,7 +12417,7 @@ setTimeout(()=>{
     'caja.license.lastcheck.v1','caja.sync.admfavs.v1',
   ]);
   // 🔒 Claves LOCALES de cada PC: NUNCA viajan por sync (mismo criterio que el cliente inline)
-  const NON_SYNCABLE_PREFIXES = ['caja.saldoInicial.','caja.install.','caja.sync.','caja.license.','caja.plan.preview.','caja.apibase.'];
+  const NON_SYNCABLE_PREFIXES = ['caja.saldoInicial.','caja.install.','caja.sync.','caja.license.','caja.plan.preview.','caja.apibase.','caja.cuadre.'];
   const isSyncable = (k) => typeof k === 'string' && k.startsWith('caja.') && !NON_SYNCABLE.has(k) && !NON_SYNCABLE_PREFIXES.some(p=>k.startsWith(p));
   const getApiUrl = (path) => {
     let base = '';

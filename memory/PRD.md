@@ -1,5 +1,26 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-08 (parte 3) · Cuadre de Caja editable a mano (overrides LOCALES)
+
+**Nueva funcionalidad `openCuadreCaja()` (`frontend/public/v2.html`):**
+- **Lápiz ✏️ en las 7 cifras del Cuadre**: SALDO ANTERIOR, INGRESOS, GASTOS, SALDO ACTUAL, CAJA FÍSICA, BANCO, SUMA CAJA+BANCO. Al pulsar aparece un `prompt()` con el valor actual pre-cargado.
+- **Botón ↺** al lado del ✏️ (solo si hay override activo) → vuelve al valor calculado.
+- **Valores editados** se muestran en **amarillo cursivo (#fbbf24 + italic)** para distinguirlos claramente del valor calculado.
+- **SALDO ACTUAL y DIFERENCIA se recalculan** automáticamente usando los overrides si existen (fórmula: `saldoAnt + ingresos - gastos - (caja+banco)`).
+- **Impresión** respeta los overrides y añade nota al pie: "✏️ Cifras marcadas: ajustadas manualmente en este PC".
+- **Storage**: `caja.cuadre.overrides.v1` con estructura `{ comp: { cutoff: { field: value } } }`.
+
+**Sincronización — LOCALES por PC:**
+- Añadido prefijo `'caja.cuadre.'` a `SYNC_EXCLUDE_PREFIXES` (línea 251) y a `NON_SYNCABLE_PREFIXES` (línea 12322).
+- Los ajustes manuales del gerente NO se envían al PC del trabajador y viceversa (confirmado explícitamente por el usuario).
+- Cada PC guarda sus propios ajustes → coherente con la lógica de saldo inicial local.
+
+**Test verificado (screenshot):**
+- 7 lápices detectados correctamente.
+- Override "999,50 €" en INGRESOS → muestra amarillo cursivo, SALDO ACTUAL pasa de 1700€ → 2699,50€, DIFERENCIA sale +999,50€ REVISAR (rojo). ✅
+- `localStorage['caja.cuadre.overrides.v1']` guardado como `{trafic: {'2026-09-08': {ingresos: 999.5}}}` ✅
+
+
 ## 2026-02-08 (parte 2) · Novedades movidas a Configuración + Changelog v2.2.1 orientado al cliente
 
 **Novedades ya no en la barra superior:**
