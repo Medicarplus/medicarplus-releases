@@ -1,5 +1,33 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-08 (parte 2) · Novedades movidas a Configuración + Changelog v2.2.1 orientado al cliente
+
+**Novedades ya no en la barra superior:**
+- Botón `#btnWhatsNewMenu` **eliminado** de la barra superior (línea 561 → sustituido por comentario).
+- Handler antiguo (`$('#btnWhatsNewMenu').onclick = ...`) convertido en `addEventListener` con optional chaining para no romper.
+
+**Novedades ahora dentro de Configuración:**
+- Nuevo bloque en `showConfigWizard()` (después del bloque Sync): sección naranja con icono 🎁, descripción y botón "Ver novedades" (`data-testid="cfg-open-novedades"`).
+- Al pulsar → llama a `showWhatsNew(true)` (modo forzado).
+
+**Changelog v2.2.1 (08/02/2026) añadido — orientado al cliente, sin tecnicismos:**
+- Cuadre de Caja con pestañas + selector de fecha exacto (destaca los 3 puntos que pidió el usuario)
+- Aviso claro de que el Cuadre NO se comparte entre PCs y el Saldo Inicial es siempre local
+- Imprimir Cuadre exporta solo la pestaña activa
+- Novedades trasladadas a Configuración
+- Selector de mes en Informe Anual
+- Mejoras IRPF (auto-rellenar trabajadores, columnas SS retiradas, chip IRPF automático)
+- Empresa 2 sin Tasas
+- Chips deportivos en español
+- Sync "Solo un día" por defecto
+- Impresiones revisadas
+- Debe/Haber limpiado
+- Detección Canje automática (66,50€)
+- Total: 14 highlights, todos con emoji y frase corta legible.
+
+**Versión bumpeada** a 2.2.1 en el fallback (`_currentAppVersion`).
+
+
 ## 2026-02-08 · Cuadre de Caja: Pestañas por empresa + Selector de fecha exacto
 
 **Cambios en `openCuadreCaja()` (`frontend/public/v2.html`):**

@@ -558,7 +558,7 @@
         <button class="btn" id="btnBuscarOps" data-testid="btn-buscar-ops" style="background:#152a25;border-color:#22d3ee;color:#22d3ee;font-weight:600;width:100%;text-align:left">🔎 Buscar operaciones</button>
       </div>
     </div>
-    <button class="btn" id="btnWhatsNewMenu" data-testid="btn-whats-new" title="Ver novedades y últimas mejoras" style="background:linear-gradient(135deg,#c2410c,#f97316);border-color:#fed7aa;color:#fff;font-weight:800;padding:6px 14px;box-shadow:0 2px 8px rgba(249,115,22,.4)">🎁 <span>Novedades</span></button>
+    <!-- 🎁 Novedades: movido a Configuración → sección Novedades -->
     <!-- Estadísticas dropdown · Facturación + Autoescuelas + Tráfico + SMS + Citas + Comparativa años -->
     <div class="btn-dropdown" id="btnStatsBox" style="position:relative;display:inline-block">
       <button class="btn" id="btnStatsToggle" style="background:linear-gradient(90deg,#8b5e2a 0%,#c2841c 100%);border-color:transparent;color:#fff;font-weight:700" data-testid="btn-stats">📊 <span data-i18n="stats_menu">Estadísticas</span> <span style="font-size:9px;margin-left:4px">▼</span></button>
@@ -4836,7 +4836,7 @@ function openHonorariosPanel(){
   rerender();
 }
 
-$('#btnWhatsNewMenu').onclick=()=>{$('#btnAccountingMenu').style.display='none';showWhatsNew(true)};
+$('#btnWhatsNewMenu')?.addEventListener('click',()=>{$('#btnAccountingMenu').style.display='none';showWhatsNew(true)});
 $('#btnAccountingToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnAccountingMenu');const willOpen=(m.style.display==='none'||!m.style.display);if(willOpen)closeTopMenus('btnAccountingMenu');m.style.display=willOpen?'flex':'none'};
 document.addEventListener('click',(e)=>{const box=$('#btnAccounting');const menu=$('#btnAccountingMenu');if(menu&&box&&!box.contains(e.target))menu.style.display='none'});
 
@@ -10744,7 +10744,7 @@ try{setInterval(function(){try{window.updateTrialBadge()}catch(e){}}, 60000)}cat
 // Mostra la versió del programa a la cantonada superior dreta (des d'Electron via preload)
 (function initVersion(){
   try{
-    var v = (window.appInfo && window.appInfo.version) ? window.appInfo.version : '2.1.12';
+    var v = (window.appInfo && window.appInfo.version) ? window.appInfo.version : '2.2.1';
     var isElectron = !!(window.appInfo && window.appInfo.isDesktop);
     var HTML_BUILD = '03.09'; // fecha de publicación de este v2.html (dd.mm) para diagnóstico
     var el = document.getElementById('appVersion');
@@ -10762,6 +10762,22 @@ const LAST_SEEN_VERSION_KEY = 'caja.last_seen_version';
 // IMPORTANT: L'ordre importa. La primera entrada ha de ser la MÉS RECENT.
 // Cada versió té: { version, date (dd/mm/aaaa), highlights (array de strings HTML curts) }
 const CHANGELOG = [
+  { version:'2.2.1', date:'08/02/2026', highlights:[
+    '🧮 <b>Cuadre de Caja renovado · pestañas por empresa</b>: ahora cada empresa se muestra en su propia pestaña con sus cifras totalmente separadas · pulsa <b>AutoEscola</b> o <b>CEMPLA</b> arriba del cuadre para cambiar de una a otra.',
+    '📅 <b>Selector de fecha exacto en el Cuadre</b>: elige un día concreto y el cuadre suma <b>del día 1 del mes hasta ese día</b>. Ideal para cortes de caja a mediados de mes o cuadres semanales.',
+    '🔒 <b>El Cuadre de Caja nunca se comparte entre PCs</b>: es una vista que se calcula al vuelo · tu <b>Saldo Inicial</b> siempre es el que tú has puesto en tu ordenador, nunca el del otro PC (igual que ya pasaba cuando envías copias entre ordenadores).',
+    '🖨️ <b>Imprimir Cuadre</b> ahora imprime SOLO la empresa activa (la pestaña que tienes abierta) con el rango de fechas exacto en el encabezado.',
+    '🎁 <b>Novedades trasladadas a Configuración</b>: pulsa <b>⚙️ Configuración → 🎁 Ver novedades</b> para consultar los últimos cambios (antes estaba en la barra superior).',
+    '📊 <b>Informe Anual con selector de mes</b>: además del año completo, ahora puedes ver el informe filtrado por un solo mes (útil para revisar un mes suelto sin datos de otros).',
+    '📋 <b>IRPF Modelo 111 más claro</b>: la tabla se rellena sola con los trabajadores a los que has pagado nómina/honoraris ese mes · cada uno con checkbox individual · retiradas las columnas NET S.S. y TOTAL FINAL que confundían.',
+    '💸 <b>Chip IRPF automático en Debe/Haber</b>: al escribir "IRPF Q1 2026" o "IRPF T2" el trimestre se marca automáticamente como pagado en la sección IRPF.',
+    '🏥 <b>Empresa 2 sin Tasas DGT</b>: retiradas todas las referencias a tasas cuando trabajas con la Empresa 2 (revisiones/certificados médicos) · el botón "Devolución tasa DGT" ahora dice sólo "Devolución".',
+    '⚽ <b>Chips deportivos traducidos al español</b>: Fútbol, Baloncesto, Balonmano, Escribir a mano, Pádel, Tenis se muestran en el idioma que tengas configurado.',
+    '📤 <b>Sync "Solo un día" por defecto</b>: al enviar copia a otro PC se marca automáticamente la opción de un día concreto para evitar mandar la copia completa por error.',
+    '🖨️ <b>Impresiones revisadas</b>: todas las estadísticas y libros salen bien en A4 (orientación horizontal donde corresponde) sin recortes.',
+    '🧹 <b>Debe/Haber más limpio</b>: retirados chips que sobraban (Mercadona, Ciclista) y fusionados Nómina + Honoraris en un solo chip.',
+    '🎯 <b>Detección automática de "Canje"</b>: los trámites de Expedición + Conducción con importe 66,50€ se clasifican automáticamente como Canje en las estadísticas.',
+  ]},
   { version:'2.0.69', date:'16/07/2026', highlights:[
     '📚 <b>Informe anual · Modelo contable REAL del negocio</b>: tras revisar cómo compras las tasas DGT (en bloques de 4.000€ como stock por adelantado), el informe ahora refleja correctamente que:<br>&nbsp;&nbsp;&nbsp;&nbsp;• <b>Tasas cobradas al cliente = ingreso propio</b> (suman en Facturación)<br>&nbsp;&nbsp;&nbsp;&nbsp;• <b>Compras en bloque = gasto DEBE (COGS)</b> · anota como DEBE con concepto "Compra tasas DGT"<br>&nbsp;&nbsp;&nbsp;&nbsp;• <b>HABER manual</b> (honorarios, fotos, ciclistas) → suma en ingresos<br>&nbsp;&nbsp;&nbsp;&nbsp;• <b>DEBE</b> (IRPF, material, compras tasas) → gastos deducibles',
     '🎯 <b>Nueva sección · Resultado Contable</b>: al final del informe anual verás un resumen tipo cuenta de resultados: <b>Ingresos brutos − Gastos = Beneficio neto</b> (antes de IRPF). Es la cifra real que ganas.',
@@ -10810,7 +10826,6 @@ const CHANGELOG = [
     '📊 <b>Estadísticas Empresa 2 · Imprimir</b> ahora funciona (bug corregido, antes no hacía nada) · sale PDF landscape completo con KPIs, tabla y mejor mes.',
     '⚽ <b>Chips deportivos Empresa 2 traducidos</b>: Fútbol/Baloncesto/Balonmano/Escribir a mano/Pádel/Tenis en castellano cuando eliges el idioma español.',
     '📤 <b>Sync "Solo un día" por defecto</b>: al enviar copia a otro PC se marca automáticamente la opción de un día concreto (evita mandar la copia total por error).',
-    '🎁 <b>Novedades movidas a la barra superior</b> (icono naranja al lado de ⚙️ Configuración) — antes estaba en Contabilidad, ahora más accesible.',
     '🧹 <b>Debe/Haber más limpio</b>: eliminados chips que sobraban (Mercadona, Ciclista, chip Devolución antiguo duplicado, chip Nómina fusionado con Honoraris).',
   ]},
   { version:'2.1.1', date:'14/07/2026', highlights:[
@@ -12094,6 +12109,15 @@ function showConfigWizard(isFirstRun){
     +'<button id="cfgOpenSync" type="button" data-testid="cfg-open-sync" style="padding:9px 14px;background:linear-gradient(135deg,#38bdf8,#0284c7);color:#0f172a;border:none;border-radius:8px;font-family:Georgia,serif;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap">'+L('Configurar-la','Configurarla')+'</button>'
     +'</div>'
     +'</div>'
+    +'<div style="background:#2a1a0a;border:1px solid #f97316;border-radius:10px;padding:14px;margin-bottom:22px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">'
+    +'<div>'
+    +'<label style="font-size:11px;color:#f97316;letter-spacing:1.5px;font-weight:700">🎁 '+L('NOVETATS DE L\'APP','NOVEDADES DE LA APP')+'</label>'
+    +'<div style="font-size:12px;color:#94a3b8;margin-top:6px;line-height:1.5">'+L('Descobreix les últimes millores i canvis afegits a l\'app.','Descubre las últimas mejoras y cambios añadidos a la app.')+'</div>'
+    +'</div>'
+    +'<button id="cfgOpenNovedades" type="button" data-testid="cfg-open-novedades" style="padding:9px 14px;background:linear-gradient(135deg,#f97316,#c2410c);color:#fff;border:none;border-radius:8px;font-family:Georgia,serif;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap">'+L('Veure novetats','Ver novedades')+'</button>'
+    +'</div>'
+    +'</div>'
     +'<div id="cfgErr" style="color:#ef4444;font-size:12px;margin-bottom:12px;display:none"></div>'
     +'<div style="display:flex;gap:10px;justify-content:'+(isFirstRun?'center':'flex-end')+'">'
     +(!isFirstRun?'<button id="cfgCancel" style="padding:12px 22px;background:transparent;border:1.5px solid #64748b;border-radius:8px;color:#cbd5e1;cursor:pointer;font-family:Georgia,serif">'+L('Cancel·la','Cancelar')+'</button>':'')
@@ -12188,6 +12212,13 @@ function showConfigWizard(isFirstRun){
         }, 300);
         setTimeout(()=>clearInterval(chk), 60000);
       }catch(e){ console.warn(e); }
+    };
+  }
+  // 🎁 Novedades
+  const cfgOpenNovedades = back.querySelector('#cfgOpenNovedades');
+  if(cfgOpenNovedades){
+    cfgOpenNovedades.onclick = ()=>{
+      try{ showWhatsNew(true); }catch(e){ console.warn('showWhatsNew', e); }
     };
   }
   const save=()=>{
