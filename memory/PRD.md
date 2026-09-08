@@ -1,5 +1,16 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-08 · Cuadre de Caja: Pestañas por empresa + Selector de fecha exacto
+
+**Cambios en `openCuadreCaja()` (`frontend/public/v2.html`):**
+- **Selector `<input type="date">`** (antes `type="month"`): el usuario elige un día concreto y el rango es del **día 1 del mes** hasta el **día seleccionado** (inclusive). `max` limitado a hoy.
+- **Pestañas AutoEscola / CEMPLA** (data-testid `cc-tab-e1` / `cc-tab-e2`) — solo aparecen si `CFG.company2.name` está definido. Cada pestaña muestra su empresa **totalmente AISLADA**: SALDO ANTERIOR, INGRESOS, GASTOS, SALDO ACTUAL, CAJA FÍSICA + BANCO y DIFERENCIA propios (nunca se mezclan cifras).
+- **No hay totales globales** (antes había SALDO ANTERIOR global y SALDO ACTUAL global que sumaba ambas empresas). Ahora cada pestaña es independiente por decisión de negocio del usuario.
+- **Impresión** exporta SOLO la pestaña activa (título incluye nombre de empresa + rango exacto).
+- **Sync**: el modal solo LEE `localStorage`, nunca escribe. `caja.saldoInicial.*` sigue en `SYNC_EXCLUDE_PREFIXES` (línea 251) y `NON_SYNCABLE_PREFIXES` (línea 12291), por lo que el saldo anterior mostrado es siempre el LOCAL de cada PC — nunca el del PC emisor de una copia (confirmado explícitamente por el usuario en msg #568).
+- Test verificado con screenshots: pestañas cambian de color, cifras se aíslan, fecha 05/02/2026 rinde "DEL 01/02/2026 AL 05/02/2026". ✅
+
+
 ## 2026-02-04 (parte 5) · Selector mensual en Informe Anual + Revisión prints
 
 **Selector mensual añadido en Informe Anual:**
