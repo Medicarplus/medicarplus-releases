@@ -1,5 +1,32 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-08 (parte 4) · Informe Anual: 2 KPIs nuevos + IRPF simplificado + fix cálculos
+
+**A) IRPF Modelo 111 rehecho (solo pagos reales):**
+- Antes: mostraba retenciones teóricas (Modelo 111) + pagos + diferencia con "pendiente por ingresar" — confuso.
+- Ahora: **SOLO muestra lo que se ha PAGADO a Hacienda** (chip IRPF en DH DEBE). Cada pago trimestral se **reparte proporcionalmente entre trabajadores** según su retención en ese trimestre. Si un pago llega sin retenciones registradas → "(Pagos sin atribuir a trabajador)".
+- Si no hay ningún pago → mensaje "Sin pagos IRPF a Hacienda registrados". Retenciones no pagadas no ensucian la vista.
+
+**B) 2 KPI cards nuevos arriba: GASTOS TOTALES + BENEFICIO NETO:**
+- Antes: solo 4 KPIs (Facturación, Entradas, Tasas DGT, Media). El usuario se quejaba de que Gastos estaba escondido abajo.
+- Ahora: **6 KPIs para E1 (5 para E2)** — se ven de un vistazo Facturación, Entradas, [Tasas DGT], Media, **Gastos totales (rojo)**, **Beneficio neto (verde/rojo)**.
+
+**C) BUG CRÍTICO fixed: cálculos contaminados de `grandTotals.neto`:**
+- `computeTotals` resta DEBE de `t.neto` → `grandTotals.neto = ingresos - gastos` (mal etiquetado como "Facturación total").
+- Antes las KPI cards y el gráfico mensual mostraban valores negativos cuando los gastos superaban los ingresos, engañando al usuario.
+- **Fix**: creado `_totalServiciosKPI = Σ grandTotals.byConcept` + `_totalHaberKPI` + `_totalGastosKPI` como fuentes de verdad separadas. Facturación total ahora es SUMA PURA de servicios + HABER (sin restar DEBE).
+- Añadido tracking `grandTotals.byMonthFacturacion` (mensual puro sin DEBE) y `grandTotals.byMonthGastos` (mensual solo DEBE).
+- Tabla "Facturación mensual" renombrada a **"Facturación y gastos mensuales"** con 4 columnas: Facturación, Gastos, Beneficio, Entradas. Ahora muestra el neto mensual real.
+- Porcentajes de "Facturación por concepto" ahora usan `_totalServiciosKPI` → siempre positivos y suman ~100%.
+
+**Test verificado matemáticamente con datos: 2 renov + foto + HABER 50 + DEBE nómina 800 →**
+- Facturación total = 266€ ✅ (200+50+16)
+- Gastos = 800€ ✅
+- Beneficio = -534€ ✅
+- Porcentajes: Renov 92.6% + Foto 7.4% = 100% ✅
+- 0 errores JS ✅
+
+
 ## 2026-02-08 (parte 3) · Cuadre de Caja editable a mano (overrides LOCALES)
 
 **Nueva funcionalidad `openCuadreCaja()` (`frontend/public/v2.html`):**

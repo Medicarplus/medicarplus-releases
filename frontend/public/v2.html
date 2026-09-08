@@ -6560,7 +6560,7 @@ function _buildAnnualReport(year, monthFilterIdx){
   const dfMapByComp = {};
   try{ dfMapByComp['trafic'] = JSON.parse(localStorage.getItem('caja.datafono')||'{}') }catch(e){ dfMapByComp['trafic'] = {} }
   try{ dfMapByComp['cempla'] = JSON.parse(localStorage.getItem('caja.cempla.datafono')||'{}') }catch(e){ dfMapByComp['cempla'] = {} }
-  const grandTotals={bruto:0,tasas:0,neto:0,cnt:0,byMonth:Array(12).fill(0),byMonthCnt:Array(12).fill(0),byFp:{E:0,T:0,B:0,X:0},byConcept:{},byCompany:{}};
+  const grandTotals={bruto:0,tasas:0,neto:0,cnt:0,byMonth:Array(12).fill(0),byMonthCnt:Array(12).fill(0),byMonthFacturacion:Array(12).fill(0),byMonthGastos:Array(12).fill(0),byFp:{E:0,T:0,B:0,X:0},byConcept:{},byCompany:{}};
   comps.forEach(comp=>{
     let compRaw;try{compRaw=JSON.parse(localStorage.getItem(KEYS[comp.key]))||{byDate:{}}}catch(e){compRaw={byDate:{}}}
     const dfMap = dfMapByComp[comp.key] || {};
@@ -6612,6 +6612,8 @@ function _buildAnnualReport(year, monthFilterIdx){
           const gc = grandTotals.gastos[gCat] = grandTotals.gastos[gCat] || {count:0, total:0};
           gc.count += 1;
           gc.total += (e.importe || 0);
+          // Tracking por mes para el "Gastos mensuales" del informe (evita ensuciar byMonth)
+          grandTotals.byMonthGastos[m] = (grandTotals.byMonthGastos[m]||0) + (e.importe || 0);
           return;
         }
         // HABER (ingrés manual) → suma en facturación com a "Ingresos manuales (HABER)"
@@ -6623,6 +6625,7 @@ function _buildAnnualReport(year, monthFilterIdx){
           hc.total += (e.importe || 0);
           // També suma al total facturació general (com que l'usuari les cobra)
           grandTotals.haberTotal = (grandTotals.haberTotal || 0) + (e.importe || 0);
+          grandTotals.byMonthFacturacion[m] = (grandTotals.byMonthFacturacion[m]||0) + (e.importe || 0);
           return;
         }
         // Entrada normal (TRAF, servei, etc.)
@@ -6638,6 +6641,8 @@ function _buildAnnualReport(year, monthFilterIdx){
         const amtTasa = (e.tasa || 0);
         const amtTotal = amtServicio + amtTasa;
         grandTotals.byConcept[cat] = (grandTotals.byConcept[cat]||0) + amtTotal;
+        // Tracking mensual PURO de facturación (sin restar DEBE)
+        grandTotals.byMonthFacturacion[m] = (grandTotals.byMonthFacturacion[m]||0) + amtTotal;
         grandTotals.byConceptCnt = grandTotals.byConceptCnt || {};
         grandTotals.byConceptCnt[cat] = (grandTotals.byConceptCnt[cat]||0) + 1;
         // Tasas cobradas (separades per referència: quant se n'ha venut de stock)
@@ -6655,11 +6660,25 @@ function _buildAnnualReport(year, monthFilterIdx){
 
   // Panell "resum principal" · en Empresa 2 (cempla) no hay tasas DGT
   const isC2 = comps[0].key === 'cempla';
-  html+=`<div style="display:grid;grid-template-columns:repeat(${isC2?3:4},1fr);gap:10px;margin-bottom:20px">
-    ${_arCard(L('Facturació total','Facturación total'),fmt(grandTotals.neto),'#f5b301','#0f172a')}
+  // 💸 Cálculos correctos para las KPI cards:
+  // - grandTotals.byConcept: suma servicios (TRAF/PRIV/OTROS) + tasas cobradas → Facturación PURA
+  // - grandTotals.haberTotal: ingresos manuales HABER
+  // - grandTotals.gastos: DEBE por concepto (nóminas, IRPF, gastos, etc.)
+  // ⚠️ NO usar grandTotals.neto aquí: computeTotals ya resta DEBE de t.neto,
+  //    lo que causaría doble descuento en BENEFICIO NETO.
+  const _totalServiciosKPI = Object.values(grandTotals.byConcept||{}).reduce((s,n)=>s+n,0);
+  const _totalHaberKPI = grandTotals.haberTotal || 0;
+  const _totalGastosKPI = Object.values(grandTotals.gastos||{}).reduce((s,g)=>s+g.total,0);
+  const _ingresosBrutosKPI = _totalServiciosKPI + _totalHaberKPI;
+  const _beneficioKPI = _ingresosBrutosKPI - _totalGastosKPI;
+  const _kpiCols = isC2 ? 5 : 6;
+  html+=`<div style="display:grid;grid-template-columns:repeat(${_kpiCols},minmax(0,1fr));gap:10px;margin-bottom:20px">
+    ${_arCard(L('Facturació total','Facturación total'),fmt(_ingresosBrutosKPI),'#f5b301','#0f172a')}
     ${_arCard(L('Entrades totals','Entradas totales'),grandTotals.cnt,'#22c55e','#0f172a')}
     ${isC2 ? '' : _arCard(L('Taxes DGT','Tasas DGT'),fmt(grandTotals.tasas),'#3b82f6','#0f172a')}
-    ${_arCard(L('Mitjana mensual','Media mensual'),fmt(grandTotals.neto/12),'#8b5cf6','#0f172a')}
+    ${_arCard(L('Mitjana mensual','Media mensual'),fmt(_ingresosBrutosKPI/12),'#8b5cf6','#0f172a')}
+    ${_arCard(L('Despeses totals','Gastos totales'),fmt(_totalGastosKPI),'#ef4444','#0f172a')}
+    ${_arCard(L('Benefici net','Beneficio neto'),fmt(_beneficioKPI),_beneficioKPI>=0?'#16a34a':'#dc2626','#0f172a')}
   </div>`;
 
   // Empreses (si n'hi ha 2)
@@ -6671,44 +6690,40 @@ function _buildAnnualReport(year, monthFilterIdx){
       </table>`;
   }
 
-  // 📋 IRPF Modelo 111 — retenciones IRPF a trabajadores (por trabajador × trimestre).
-  // NOTA IMPORTANTE: aquí NO se calcula IRPF sobre la facturación (eso es incorrecto:
-  // una SL/CB paga IS, no IRPF, y un autónomo tributa por beneficio neto, no bruto).
-  // Este bloque muestra únicamente las RETENCIONES IRPF que has aplicado a los
-  // trabajadores (Modelo 111) del año, tal como están en 📋 IRPF con IRPF activo.
-  // También lista los pagos REALES a Hacienda desde Debe/Haber (chip IRPF) para cotejar.
+  // 📋 IRPF Modelo 111 · Pagos REALES a Hacienda por trabajador × trimestre.
+  // La retención "teórica" del Modelo 111 NO se muestra aquí — solo aparece lo que ya se ha
+  // pagado (chip IRPF en Debe/Haber). El pago trimestral a Hacienda se atribuye por trabajador
+  // proporcionalmente a su retención de ese trimestre. Si un trimestre está sin pagar → "—".
   html += (function(){
     try{
       const irpfAll = loadIrpf();
       const compKey = comps[0].key; // empresa activa
       const cData = irpfAll[compKey] || {months:{}, quarters:{}};
       const pctYr = irpfPct(compKey);
-      const byWorker = {}; // {nomKey: {name, perQ[4], perQCert[4], year, yearCert}}
-      const perQuarter = [0,0,0,0];
-      let annualRet = 0;
+      // 1) Retenciones por trabajador × trimestre (base para la atribución proporcional)
+      const byWorker = {}; // {nomKey: {name, perQ[4], perQCert[4], yearCert}}
+      const perQuarterRet = [0,0,0,0];
       for(let mi=0; mi<12; mi++){
         const ym = `${year}-${String(mi+1).padStart(2,'0')}`;
         const md = cData.months[ym];
         if(!md || !Array.isArray(md.entries)) continue;
         const qi = Math.floor(mi/3);
         md.entries.forEach(e => {
-          if(e.active === false) return; // sólo trabajadores marcados IRPF activo
+          if(e.active === false) return;
           const nom = (e.nom||'').trim() || '(sin nombre)';
           const key = _normalizeWorkerKey(nom) || nom;
           const c = irpfCalc(e, pctYr);
           const ret = +c.irpf || 0;
           const certN = +e.cert || 0;
-          if(!byWorker[key]) byWorker[key] = {name:nom, perQ:[0,0,0,0], perQCert:[0,0,0,0], year:0, yearCert:0};
+          if(!byWorker[key]) byWorker[key] = {name:nom, perQ:[0,0,0,0], perQCert:[0,0,0,0], yearCert:0};
           byWorker[key].perQ[qi] += ret;
           byWorker[key].perQCert[qi] += certN;
-          byWorker[key].year += ret;
           byWorker[key].yearCert += certN;
-          perQuarter[qi] += ret;
-          annualRet += ret;
+          perQuarterRet[qi] += ret;
         });
       }
-      // Pagos reales a Hacienda (Modelo 111) desde Debe/Haber con flag _irpfPayment
-      const paymentsByQ = {};
+      // 2) Pagos REALES a Hacienda por trimestre (chip IRPF en DH DEBE)
+      const paymentsByQ = {}; // {q0..q3: totalPagado}
       let annualPaid = 0;
       try{
         const rawCash = JSON.parse(localStorage.getItem(compKey==='cempla'?'caja.cempla.v1':'caja.v1')||'{"byDate":{}}');
@@ -6717,62 +6732,85 @@ function _buildAnnualReport(year, monthFilterIdx){
           if(iso.slice(0,4) !== String(year)) return;
           (bd[iso]||[]).forEach(e => {
             if(e.kind !== 'DH' || e.tipo !== 'DEBE' || !e._irpfPayment) return;
-            const q = e._irpfPayment;
-            paymentsByQ[q] = (paymentsByQ[q]||0) + (+e.importe||0);
+            // _irpfPayment tiene formato "2026-Q3" → extraer Q index (0..3)
+            const m = /Q([1-4])/.exec(e._irpfPayment);
+            if(!m) return;
+            const qi = +m[1] - 1;
+            paymentsByQ[qi] = (paymentsByQ[qi]||0) + (+e.importe||0);
             annualPaid += (+e.importe||0);
           });
         });
       }catch(_){}
-      const workers = Object.values(byWorker).sort((a,b)=>b.year - a.year);
-      const hasData = workers.length > 0 || annualPaid > 0;
-      if(!hasData){
-        return `<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">📋 ${L('IRPF Modelo 111 · Retencions a treballadors','IRPF Modelo 111 · Retenciones a trabajadores')} · ${escapeHtml(comps[0].name)}</h4>
+      // Si no hay ningún pago → no mostrar la sección
+      if(annualPaid <= 0){
+        return `<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">📋 ${L('IRPF Modelo 111 · Pagaments a Hisenda','IRPF Modelo 111 · Pagos a Hacienda')} · ${escapeHtml(comps[0].name)}</h4>
           <div style="background:#e0f2fe;border:1px solid #0369a1;border-radius:6px;padding:14px;margin-bottom:18px;color:#0369a1;font-size:12.5px;line-height:1.55">
-            <b>Sin retenciones IRPF registradas en ${year} para ${escapeHtml(comps[0].name)}.</b><br>
-            Añade trabajadores con IRPF activo desde <b>Contabilidad → 📋 IRPF</b> y apunta los pagos trimestrales con el chip <b>IRPF</b> en Debe/Haber.
+            <b>Sin pagos IRPF a Hacienda registrados en ${year} para ${escapeHtml(comps[0].name)}.</b><br>
+            Cuando pagues el Modelo 111 a Hacienda, apúntalo como <b>DEBE</b> con el chip <b>IRPF</b> en Debe/Haber y aparecerá aquí.
           </div>`;
       }
+      // 3) Atribución proporcional: cada pago del trimestre se reparte entre trabajadores
+      //    según su retención en ese trimestre. Si no hay retenciones registradas para
+      //    ese trimestre pero sí hay pago → todo va a "(No atribuible)".
+      const paidByWorkerQ = {}; // {workerKey: [q0..q3]}
+      let unattributedByQ = [0,0,0,0];
+      Object.keys(byWorker).forEach(k => paidByWorkerQ[k] = [0,0,0,0]);
+      for(let qi=0; qi<4; qi++){
+        const paidQ = paymentsByQ[qi] || 0;
+        if(paidQ <= 0) continue;
+        const totalRetQ = perQuarterRet[qi];
+        if(totalRetQ <= 0){
+          unattributedByQ[qi] = paidQ; // pago sin retenciones → sin atribuir
+          continue;
+        }
+        Object.keys(byWorker).forEach(k => {
+          const ratio = byWorker[k].perQ[qi] / totalRetQ;
+          paidByWorkerQ[k][qi] = paidQ * ratio;
+        });
+      }
+      // 4) Filtrar trabajadores que tengan al menos un € pagado
+      const workersWithPay = Object.keys(byWorker).filter(k => paidByWorkerQ[k].some(v=>v>0.005));
+      const workersSorted = workersWithPay.sort((a,b)=>{
+        const totA = paidByWorkerQ[a].reduce((s,v)=>s+v,0);
+        const totB = paidByWorkerQ[b].reduce((s,v)=>s+v,0);
+        return totB - totA;
+      });
       const trimHead = TRIM_LABEL.map(lbl=>`<th style="padding:8px;text-align:right">${lbl}</th>`).join('');
-      const rows = workers.map(w => {
-        const qCells = w.perQ.map(v=>`<td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:#dc2626">${v>0?fmt(v):'—'}</td>`).join('');
-        return `<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:6px 8px"><b>${escapeHtml(w.name)}</b>${w.yearCert>0?` <span style="color:#64748b;font-size:11px">· ${w.yearCert} cert.</span>`:''}</td>${qCells}<td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#78350f">${fmt(w.year)}</td></tr>`;
+      const rows = workersSorted.map(k => {
+        const w = byWorker[k];
+        const qs = paidByWorkerQ[k];
+        const total = qs.reduce((s,v)=>s+v,0);
+        const qCells = qs.map(v=>`<td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:#166534">${v>0.005?fmt(v):'—'}</td>`).join('');
+        return `<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:6px 8px"><b>${escapeHtml(w.name)}</b>${w.yearCert>0?` <span style="color:#64748b;font-size:11px">· ${w.yearCert} cert.</span>`:''}</td>${qCells}<td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#166534">${fmt(total)}</td></tr>`;
       }).join('');
-      const totalsRow = `<tr style="border-top:2px solid #0f172a;background:#fef3c7;font-weight:700"><td style="padding:10px">TOTAL RETENIDO (${pctYr}%)</td>${perQuarter.map(v=>`<td style="padding:10px;text-align:right;font-family:'Courier New',monospace;color:#dc2626">${fmt(v)}</td>`).join('')}<td style="padding:10px;text-align:right;font-family:'Courier New',monospace;color:#78350f;font-size:15px">${fmt(annualRet)}</td></tr>`;
-      const paidCells = [0,1,2,3].map(i=>{
-        const q = `${year}-Q${i+1}`; const paid = paymentsByQ[q]||0;
-        return `<td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#166534">${paid>0?fmt(paid):'—'}</td>`;
-      }).join('');
-      const diffAnnual = annualPaid - annualRet;
-      const diffColor = Math.abs(diffAnnual) < 0.01 ? '#166534' : (diffAnnual > 0 ? '#0369a1' : '#b91c1c');
-      const diffLabel = Math.abs(diffAnnual) < 0.01 ? '✓ Cuadra con lo retenido' : (diffAnnual > 0 ? `+${fmt(diffAnnual)} pagado de más` : `${fmt(diffAnnual)} pendiente por ingresar`);
-      return `<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">📋 ${L('IRPF Modelo 111 · Retencions a treballadors','IRPF Modelo 111 · Retenciones a trabajadores')} · ${escapeHtml(comps[0].name)}</h4>
-        <div style="background:#f0f9ff;border:1px solid #0369a1;border-radius:6px;padding:10px 12px;margin-bottom:10px;color:#0369a1;font-size:11.5px;line-height:1.55">
-          💡 <b>Este es el IRPF real del negocio</b>: retenciones aplicadas a trabajadores (Modelo 111), no un % sobre la facturación. Se calcula desde 📋 IRPF (sólo trabajadores con IRPF activo). Los pagos a Hacienda vienen del chip <b>IRPF</b> en Debe/Haber.
+      const unattributedRow = unattributedByQ.some(v=>v>0.005) ? `<tr style="border-bottom:1px solid #e5e7eb;background:#fef9c3"><td style="padding:6px 8px;font-style:italic;color:#78350f">(Pagos sin atribuir a trabajador)</td>${unattributedByQ.map(v=>`<td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:#a16207">${v>0.005?fmt(v):'—'}</td>`).join('')}<td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#a16207">${fmt(unattributedByQ.reduce((s,v)=>s+v,0))}</td></tr>` : '';
+      const totalsRow = `<tr style="border-top:2px solid #0f172a;background:#dcfce7;font-weight:700"><td style="padding:10px">TOTAL PAGADO A HACIENDA</td>${[0,1,2,3].map(qi=>`<td style="padding:10px;text-align:right;font-family:'Courier New',monospace;color:#166534">${(paymentsByQ[qi]||0)>0.005?fmt(paymentsByQ[qi]):'—'}</td>`).join('')}<td style="padding:10px;text-align:right;font-family:'Courier New',monospace;color:#14532d;font-size:15px">${fmt(annualPaid)}</td></tr>`;
+      return `<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">📋 ${L('IRPF Modelo 111 · Pagaments a Hisenda','IRPF Modelo 111 · Pagos a Hacienda')} · ${escapeHtml(comps[0].name)}</h4>
+        <div style="background:#f0fdf4;border:1px solid #16a34a;border-radius:6px;padding:10px 12px;margin-bottom:10px;color:#14532d;font-size:11.5px;line-height:1.55">
+          💡 <b>Solo aparece el IRPF que ya se ha PAGADO a Hacienda</b> (chip IRPF en Debe/Haber). Cada pago trimestral se reparte entre los trabajadores en proporción a su retención de ese trimestre. Si un trimestre está retenido pero sin pagar aún, no sale hasta que lo apuntes en Debe/Haber.
         </div>
-        <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:8px">
+        <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
           <thead><tr style="background:#0f172a;color:#f5b301"><th style="padding:8px;text-align:left">${L('Treballador','Trabajador')}</th>${trimHead}<th style="padding:8px;text-align:right">${L('Total any','Total año')}</th></tr></thead>
-          <tbody>${rows}${totalsRow}</tbody>
-        </table>
-        <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:12.5px;margin-bottom:18px;background:#ecfdf5">
-          <thead><tr style="background:#166534;color:#fff"><th style="padding:8px;text-align:left">📊 Ingresado a Hacienda (Debe/Haber)</th>${TRIM_LABEL.map(lbl=>`<th style="padding:8px;text-align:right">${lbl}</th>`).join('')}<th style="padding:8px;text-align:right">Total año</th></tr></thead>
-          <tbody><tr>
-            <td style="padding:8px;color:#166534;font-style:italic">Pagos reales</td>
-            ${paidCells}
-            <td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#166534;font-size:14px">${fmt(annualPaid)}</td>
-          </tr><tr style="border-top:1px solid #86efac">
-            <td style="padding:8px;color:${diffColor};font-weight:700">Diferencia (pagado − retenido)</td>
-            <td colspan="4" style="padding:8px;text-align:right;color:${diffColor};font-weight:700;font-family:'Courier New',monospace">${diffLabel}</td>
-            <td style="padding:8px;text-align:right;color:${diffColor};font-weight:700;font-family:'Courier New',monospace">${diffAnnual>=0?'+':''}${fmt(diffAnnual)}</td>
-          </tr></tbody>
+          <tbody>${rows}${unattributedRow}${totalsRow}</tbody>
         </table>`;
     }catch(err){ console.warn('IRPF Modelo 111 render:', err); return ''; }
   })();
 
-  // Mesos
-  html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">📅 ${L('Facturació mensual','Facturación mensual')}</h4>
+  // Mesos · Facturación PURA + Gastos por mes (usa byMonthFacturacion/byMonthGastos, no t.neto)
+  html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">📅 ${L('Facturació i despeses mensuals','Facturación y gastos mensuales')}</h4>
     <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
-      <thead><tr style="background:#0f172a;color:#f5b301"><th style="padding:8px;text-align:left">${L('Mes','Mes')}</th><th style="padding:8px;text-align:right">${L('Facturació','Facturación')}</th><th style="padding:8px;text-align:right">${L('Entrades','Entradas')}</th></tr></thead>
-      <tbody>${MESES.map((m,i)=>`<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:6px 8px">${m}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:600">${fmt(grandTotals.byMonth[i])}</td><td style="padding:6px 8px;text-align:right">${grandTotals.byMonthCnt[i]}</td></tr>`).join('')}</tbody>
+      <thead><tr style="background:#0f172a;color:#f5b301"><th style="padding:8px;text-align:left">${L('Mes','Mes')}</th><th style="padding:8px;text-align:right">${L('Facturació','Facturación')}</th><th style="padding:8px;text-align:right">${L('Despeses','Gastos')}</th><th style="padding:8px;text-align:right">${L('Benefici','Beneficio')}</th><th style="padding:8px;text-align:right">${L('Entrades','Entradas')}</th></tr></thead>
+      <tbody>${MESES.map((mLbl,i)=>{
+        const fac = grandTotals.byMonthFacturacion[i]||0;
+        const gas = grandTotals.byMonthGastos[i]||0;
+        const ben = fac - gas;
+        const cnt = grandTotals.byMonthCnt[i]||0;
+        if(fac===0 && gas===0 && cnt===0) return `<tr style="border-bottom:1px solid #e5e7eb;color:#94a3b8"><td style="padding:6px 8px">${mLbl}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace">0,00 €</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace">0,00 €</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace">0,00 €</td><td style="padding:6px 8px;text-align:right">0</td></tr>`;
+        const benCol = ben>=0?'#166534':'#dc2626';
+        return `<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:6px 8px">${mLbl}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#166534">${fmt(fac)}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:#dc2626">${gas>0?'-'+fmt(gas):'0,00 €'}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:${benCol}">${fmt(ben)}</td><td style="padding:6px 8px;text-align:right">${cnt}</td></tr>`;
+      }).join('')}
+      <tr style="border-top:2px solid #0f172a;background:#fef3c7;font-weight:700"><td style="padding:8px">${L('TOTAL ANY','TOTAL AÑO')}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#166534">${fmt(grandTotals.byMonthFacturacion.reduce((s,v)=>s+v,0))}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#dc2626">-${fmt(grandTotals.byMonthGastos.reduce((s,v)=>s+v,0))}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:${grandTotals.byMonthFacturacion.reduce((s,v)=>s+v,0)-grandTotals.byMonthGastos.reduce((s,v)=>s+v,0)>=0?'#166534':'#dc2626'}">${fmt(grandTotals.byMonthFacturacion.reduce((s,v)=>s+v,0)-grandTotals.byMonthGastos.reduce((s,v)=>s+v,0))}</td><td style="padding:8px;text-align:right">${grandTotals.byMonthCnt.reduce((s,v)=>s+v,0)}</td></tr>
+      </tbody>
     </table>`;
 
   // Concepte (amb comptes)
@@ -6782,7 +6820,7 @@ function _buildAnnualReport(year, monthFilterIdx){
     html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">📝 ${L('Facturació per concepte','Facturación por concepto')}</h4>
       <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
         <thead><tr style="background:#0f172a;color:#f5b301"><th style="padding:8px;text-align:left">${L('Concepte','Concepto')}</th><th style="padding:8px;text-align:right">${L('Uds.','Uds.')}</th><th style="padding:8px;text-align:right">${L('Total','Total')}</th><th style="padding:8px;text-align:right">%</th></tr></thead>
-        <tbody>${conceptEntries.map(([k,v])=>`<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:6px 8px">${escapeHtml(k)}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:#0891b2;font-weight:600">${conceptCnt[k]||0}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:600">${fmt(v)}</td><td style="padding:6px 8px;text-align:right;color:#64748b">${grandTotals.neto?((v/grandTotals.neto)*100).toFixed(1):'0'}%</td></tr>`).join('')}</tbody>
+        <tbody>${conceptEntries.map(([k,v])=>`<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:6px 8px">${escapeHtml(k)}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:#0891b2;font-weight:600">${conceptCnt[k]||0}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:600">${fmt(v)}</td><td style="padding:6px 8px;text-align:right;color:#64748b">${_totalServiciosKPI>0?((v/_totalServiciosKPI)*100).toFixed(1):'0'}%</td></tr>`).join('')}</tbody>
       </table>`;
   }
 
