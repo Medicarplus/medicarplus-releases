@@ -5696,8 +5696,8 @@ function openCuadreCaja(){
       </div>
     </div>
     <div style="background:#0c4a6e;border:1px solid #38bdf8;border-radius:6px;padding:10px 14px;color:#bae6fd;font-size:12px;line-height:1.55;margin-bottom:14px">
-      💡 <b>Vista personal de cuadre</b> · Elige el rango <b>DESDE / HASTA</b>. El <b>SALDO ANTERIOR</b> es el cierre del día antes del DESDE. Cada empresa aislada en su pestaña.<br>
-      ✏️ <b>Puedes editar cualquier cifra a mano</b> (útil por ejemplo si añades dinero de tu bolsillo para cuadrar caja cuando no encuentras el fallo). Estas ediciones son <b>SOLO tuyas y SOLO viven aquí</b>: <u>no afectan a la facturación, ni a estadísticas, ni al IRPF, ni se sincronizan al otro PC, ni tocan los datos reales</u>. Al reabrir el Cuadre con el mismo rango, las verás igual.
+      💡 <b>Cómo se usa</b>: 1) Elige el rango <b>DESDE / HASTA</b>. 2) La columna izquierda te dice lo que <b>según el Excel/app</b> deberías tener. 3) En la columna derecha <b>escribes lo que has contado</b> a mano: el <b>efectivo</b> físico (caja + cambio) y el <b>saldo del banco</b>. 4) La <b>DIFERENCIA</b> te dice si CUADRA o si FALTAN/SOBRAN euros.<br>
+      ✏️ Puedes editar cifras del Excel si algo estaba mal apuntado (útil para dejar constancia). <u>Todo es SOLO tuyo y SOLO vive aquí</u>: no afecta a la facturación, estadísticas, IRPF, ni se sincroniza al otro PC. Al reabrir el Cuadre con el mismo rango, verás lo mismo.
     </div>
     ${hasC2 ? `<div id="ccTabs" style="display:flex;gap:4px;margin-bottom:10px;border-bottom:2px solid #1e293b">
       <button class="cc-tab" data-tab="e1" data-testid="cc-tab-e1" style="padding:8px 16px;background:#f5b301;color:#0f172a;border:none;border-radius:6px 6px 0 0;font-weight:800;cursor:pointer">🏢 ${escapeHtml(c1Name)}</button>
@@ -5794,67 +5794,78 @@ function openCuadreCaja(){
       if(ev.key === 'Escape'){ dlg.remove(); }
     }));
   };
+  // Input "contado a mano" (efectivo/banco reales que el usuario cuenta físicamente)
+  const countedInput = (comp, cutoff, field, placeholder) => {
+    const savedVal = _ccGetOv(comp, cutoff, field);
+    const val = savedVal != null ? fmt(savedVal).replace(' €','') : '';
+    return `<input type="text" class="cc-counted" data-comp="${comp}" data-cutoff="${cutoff}" data-field="${field}" data-testid="cc-counted-${field}" placeholder="${placeholder}" value="${val}" style="width:100%;padding:8px 10px;background:#0f172a;border:1px solid #38bdf8;border-radius:6px;color:#fff;font-family:'Courier New',monospace;font-size:16px;font-weight:700;text-align:right"/>`;
+  };
   const renderCompany = (compData, compName, color, comp, cutoff) => {
-    // Aplicar overrides si existen. Cualquier campo puede sobrescribirse a mano.
+    // Overrides en el lado izquierdo (Excel) — el usuario puede corregir aquí si algo estaba mal apuntado
     const ovSaldoAnt = _ccGetOv(comp, cutoff, 'saldoAnt');
     const ovIngresos = _ccGetOv(comp, cutoff, 'ingresos');
     const ovGastos = _ccGetOv(comp, cutoff, 'gastos');
-    const ovSaldoAct = _ccGetOv(comp, cutoff, 'saldoActual');
-    const ovCaja = _ccGetOv(comp, cutoff, 'cajaActual');
-    const ovBanc = _ccGetOv(comp, cutoff, 'bancActual');
-    const ovSuma = _ccGetOv(comp, cutoff, 'sumaCB');
     const cSaldoAnt = _ccGetOvConcepto(comp, cutoff, 'saldoAnt');
     const cIngresos = _ccGetOvConcepto(comp, cutoff, 'ingresos');
     const cGastos = _ccGetOvConcepto(comp, cutoff, 'gastos');
-    const cSaldoAct = _ccGetOvConcepto(comp, cutoff, 'saldoActual');
-    const cCaja = _ccGetOvConcepto(comp, cutoff, 'cajaActual');
-    const cBanc = _ccGetOvConcepto(comp, cutoff, 'bancActual');
-    const cSuma = _ccGetOvConcepto(comp, cutoff, 'sumaCB');
     const saldoAnt = ovSaldoAnt!=null ? ovSaldoAnt : compData.saldoAnt;
     const ingresos = ovIngresos!=null ? ovIngresos : compData.ingresos;
     const gastos = ovGastos!=null ? ovGastos : compData.gastos;
-    const cajaActual = ovCaja!=null ? ovCaja : compData.cajaActual;
-    const bancActual = ovBanc!=null ? ovBanc : compData.bancActual;
-    const saldoActualCalc = saldoAnt + ingresos - gastos;
-    const saldoActualComp = ovSaldoAct!=null ? ovSaldoAct : saldoActualCalc;
-    const sumaCBCalc = cajaActual + bancActual;
-    const sumaCB = ovSuma!=null ? ovSuma : sumaCBCalc;
-    const diff = saldoActualComp - sumaCB;
-    const cuadraOk = Math.abs(diff) < 0.01;
+    const saldoExcel = saldoAnt + ingresos - gastos;
+    // Lado derecho: lo que el usuario CUENTA (efectivo físico + saldo banco real)
+    const cajaReal = _ccGetOv(comp, cutoff, 'cajaReal');
+    const bancoReal = _ccGetOv(comp, cutoff, 'bancoReal');
+    const hasCount = cajaReal != null || bancoReal != null;
+    const totalReal = (cajaReal||0) + (bancoReal||0);
+    const diff = saldoExcel - totalReal;
+    const cuadraOk = hasCount && Math.abs(diff) < 0.01;
+    const diffLabel = !hasCount ? '⏳ Cuenta el efectivo y el banco para ver el cuadre' : (cuadraOk ? '✓ 0,00 — TODO CUADRA' : (diff>0?'FALTA '+fmt(Math.abs(diff)):'SOBRA '+fmt(Math.abs(diff)))+' — REVISAR');
+    const diffColor = !hasCount ? '#475569' : (cuadraOk ? '#166534' : '#7f1d1d');
     return `
-      <div style="background:#1e293b;border:1px solid ${color};border-radius:6px;padding:12px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-        <span style="color:${color};font-weight:800">🏢 ${escapeHtml(compName)} · SALDO ANTERIOR</span>
-        ${editableNum(comp, cutoff, 'saldoAnt', saldoAnt, ovSaldoAnt!=null, cSaldoAnt, {fontSize:'16px', weight:800})}
-      </div>
-      <div style="background:#1e293b;border-left:3px solid ${color};border-radius:6px;padding:10px 14px;margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-          <span style="color:${color};font-weight:700;cursor:pointer" data-toggle="ing-detail">📥 INGRESOS</span>
-          ${editableNum(comp, cutoff, 'ingresos', ingresos, ovIngresos!=null, cIngresos, {color:'#22c55e', fontSize:'14px', weight:800})}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <!-- COLUMNA IZQUIERDA: SEGÚN EXCEL (teórico) -->
+        <div style="background:#1e293b;border:2px solid ${color};border-radius:8px;padding:14px">
+          <div style="text-align:center;font-family:Georgia,serif;color:${color};font-weight:800;font-size:14px;letter-spacing:1px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px dashed ${color}">📊 SEGÚN EL EXCEL<br><span style="font-size:10px;color:#94a3b8;letter-spacing:.5px;font-family:'Segoe UI',sans-serif;font-weight:600;text-transform:none">(lo que dice la app)</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;gap:10px;flex-wrap:wrap">
+            <span style="color:#cbd5e1">Saldo anterior</span>
+            ${editableNum(comp, cutoff, 'saldoAnt', saldoAnt, ovSaldoAnt!=null, cSaldoAnt, {fontSize:'13px', weight:700})}
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;gap:10px;flex-wrap:wrap">
+            <span style="color:#cbd5e1;cursor:pointer" data-toggle="ing-detail">📥 Ingresos <span style="color:#64748b;font-size:10px">(ver detalle)</span></span>
+            ${editableNum(comp, cutoff, 'ingresos', ingresos, ovIngresos!=null, cIngresos, {color:'#22c55e', fontSize:'13px', weight:700})}
+          </div>
+          <div id="ing-detail" style="display:none;margin:0 -6px 6px">${detailIng(compData.detail.ingresos)}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;gap:10px;flex-wrap:wrap">
+            <span style="color:#cbd5e1;cursor:pointer" data-toggle="gas-detail">📤 Gastos <span style="color:#64748b;font-size:10px">(ver detalle)</span></span>
+            ${editableNum(comp, cutoff, 'gastos', gastos, ovGastos!=null, cGastos, {color:'#f472b6', fontSize:'13px', weight:700})}
+          </div>
+          <div id="gas-detail" style="display:none;margin:0 -6px 6px">${detailGas(compData.detail.gastos)}</div>
+          <div style="border-top:2px solid ${color};margin-top:10px;padding-top:10px;background:#0f766e;border-radius:6px;padding:12px;display:flex;justify-content:space-between;align-items:center">
+            <span style="color:#fff;font-weight:800;font-size:13px">TOTAL (teórico)</span>
+            <span style="font-family:'Courier New',monospace;font-weight:800;color:#fff;font-size:20px">${fmt(saldoExcel)}</span>
+          </div>
         </div>
-        <div id="ing-detail" style="display:none;margin-top:6px">${detailIng(compData.detail.ingresos)}</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed #334155;gap:10px;flex-wrap:wrap">
-          <span style="color:${color};font-weight:700;cursor:pointer" data-toggle="gas-detail">📤 GASTOS</span>
-          ${editableNum(comp, cutoff, 'gastos', gastos, ovGastos!=null, cGastos, {color:'#f472b6', fontSize:'14px', weight:800})}
+        <!-- COLUMNA DERECHA: LO QUE HAS CONTADO -->
+        <div style="background:#1e293b;border:2px solid #38bdf8;border-radius:8px;padding:14px">
+          <div style="text-align:center;font-family:Georgia,serif;color:#38bdf8;font-weight:800;font-size:14px;letter-spacing:1px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px dashed #38bdf8">💰 LO QUE HAS CONTADO<br><span style="font-size:10px;color:#94a3b8;letter-spacing:.5px;font-family:'Segoe UI',sans-serif;font-weight:600;text-transform:none">(dinero real que tienes)</span></div>
+          <div style="padding:6px 0;margin-bottom:8px">
+            <label style="display:block;font-size:11px;color:#94a3b8;letter-spacing:.5px;margin-bottom:4px;font-weight:700">💵 EFECTIVO EN CAJA + CAMBIO (€)</label>
+            ${countedInput(comp, cutoff, 'cajaReal', 'Cuenta todo el metálico...')}
+          </div>
+          <div style="padding:6px 0;margin-bottom:12px">
+            <label style="display:block;font-size:11px;color:#94a3b8;letter-spacing:.5px;margin-bottom:4px;font-weight:700">🏦 SALDO DEL BANCO (€)</label>
+            ${countedInput(comp, cutoff, 'bancoReal', 'Mira lo que tienes en el banco...')}
+          </div>
+          <div style="border-top:2px solid #38bdf8;margin-top:10px;padding-top:10px;background:#0369a1;border-radius:6px;padding:12px;display:flex;justify-content:space-between;align-items:center">
+            <span style="color:#fff;font-weight:800;font-size:13px">TOTAL (real)</span>
+            <span style="font-family:'Courier New',monospace;font-weight:800;color:#fff;font-size:20px">${hasCount ? fmt(totalReal) : '— €'}</span>
+          </div>
         </div>
-        <div id="gas-detail" style="display:none;margin-top:6px">${detailGas(compData.detail.gastos)}</div>
       </div>
-      <div style="background:#0f766e;border:2px solid #14b8a6;border-radius:6px;padding:12px 16px;margin:12px 0;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-        <span style="color:#fff;font-weight:800;font-size:15px">SALDO ACTUAL · ${escapeHtml(compName)}</span>
-        ${editableNum(comp, cutoff, 'saldoActual', saldoActualComp, ovSaldoAct!=null, cSaldoAct, {color:'#fff', fontSize:'18px', weight:800})}
-      </div>
-      <div style="margin-top:16px;padding:12px 14px;background:#1e293b;border-radius:6px">
-        <div style="color:#94a3b8;font-size:11px;letter-spacing:1px;margin-bottom:8px">💰 CAJA FÍSICA + BANCO (real) · ${escapeHtml(compName)}</div>
-        <table style="width:100%;font-size:13px;border-collapse:collapse">
-          <tbody>
-            <tr style="border-bottom:1px solid #334155"><td style="padding:5px 10px">CAJA FÍSICA</td><td style="padding:5px 10px;text-align:right">${editableNum(comp, cutoff, 'cajaActual', cajaActual, ovCaja!=null, cCaja, {fontSize:'13px', weight:700})}</td></tr>
-            <tr><td style="padding:5px 10px">BANCO</td><td style="padding:5px 10px;text-align:right">${editableNum(comp, cutoff, 'bancActual', bancActual, ovBanc!=null, cBanc, {fontSize:'13px', weight:700})}</td></tr>
-          </tbody>
-          <tfoot><tr style="border-top:2px solid ${color};background:#0f172a"><td style="padding:8px 10px;font-weight:800;color:${color}">SUMA CAJA + BANCO</td><td style="padding:8px 10px;text-align:right">${editableNum(comp, cutoff, 'sumaCB', sumaCB, ovSuma!=null, cSuma, {color:color, fontSize:'16px', weight:800})}</td></tr></tfoot>
-        </table>
-      </div>
-      <div style="margin-top:12px;padding:14px;background:${cuadraOk?'#166534':'#7f1d1d'};border-radius:6px;text-align:center">
-        <div style="color:#fff;font-size:12px;letter-spacing:1px;margin-bottom:4px">DIFERENCIA · ${escapeHtml(compName)}</div>
-        <div style="font-family:'Courier New',monospace;font-weight:800;color:#fff;font-size:22px">${cuadraOk?'✓ 0,00 — TODO CUADRA':(diff>0?'FALTA '+fmt(Math.abs(diff)):'SOBRA '+fmt(Math.abs(diff)))+' — REVISAR'}</div>
+      <div style="padding:16px;background:${diffColor};border-radius:8px;text-align:center;border:2px solid ${cuadraOk?'#16a34a':(hasCount?'#dc2626':'#64748b')}">
+        <div style="color:#fff;font-size:12px;letter-spacing:1px;margin-bottom:6px;font-weight:700">DIFERENCIA · ${escapeHtml(compName)}</div>
+        <div style="font-family:'Courier New',monospace;font-weight:800;color:#fff;font-size:22px">${diffLabel}</div>
+        ${hasCount && !cuadraOk ? `<div style="margin-top:8px;color:#fecaca;font-size:11px;font-style:italic">Excel dice ${fmt(saldoExcel)} · Tú tienes ${fmt(totalReal)}</div>` : ''}
       </div>`;
   };
   const render = () => {
@@ -5906,6 +5917,21 @@ function openCuadreCaja(){
         render();
       };
     });
+    // 💰 Inputs "contado a mano" (Efectivo + Banco reales)
+    back.querySelectorAll('.cc-counted').forEach(inp => {
+      const commit = () => {
+        const raw = inp.value.trim().replace(',', '.').replace(/[€\s]/g,'');
+        if(raw === ''){ _ccClearOv(inp.dataset.comp, inp.dataset.cutoff, inp.dataset.field); render(); return; }
+        const num = parseFloat(raw);
+        if(isNaN(num)){ toast('Valor no válido', 2000); return; }
+        _ccSetOv(inp.dataset.comp, inp.dataset.cutoff, inp.dataset.field, num, '');
+        render();
+      };
+      inp.addEventListener('blur', commit);
+      inp.addEventListener('keydown', ev => {
+        if(ev.key === 'Enter'){ ev.preventDefault(); inp.blur(); }
+      });
+    });
     // Actualizar estado visual de tabs
     if(hasC2){
       back.querySelectorAll('.cc-tab').forEach(tb => {
@@ -5948,21 +5974,18 @@ function openCuadreCaja(){
           const ovSaldoAnt = _ccGetOv(activeComp, ovK, 'saldoAnt');
           const ovIng = _ccGetOv(activeComp, ovK, 'ingresos');
           const ovGas = _ccGetOv(activeComp, ovK, 'gastos');
-          const ovSaldoAct = _ccGetOv(activeComp, ovK, 'saldoActual');
-          const ovCaja = _ccGetOv(activeComp, ovK, 'cajaActual');
-          const ovBanc = _ccGetOv(activeComp, ovK, 'bancActual');
-          const ovSuma = _ccGetOv(activeComp, ovK, 'sumaCB');
+          const cajaReal = _ccGetOv(activeComp, ovK, 'cajaReal');
+          const bancoReal = _ccGetOv(activeComp, ovK, 'bancoReal');
           const saldoAnt = ovSaldoAnt!=null ? ovSaldoAnt : data.saldoAnt;
           const ing = ovIng!=null ? ovIng : data.ingresos;
           const gas = ovGas!=null ? ovGas : data.gastos;
-          const caja = ovCaja!=null ? ovCaja : data.cajaActual;
-          const banc = ovBanc!=null ? ovBanc : data.bancActual;
-          const saldoAct = ovSaldoAct!=null ? ovSaldoAct : (saldoAnt + ing - gas);
-          const suma = ovSuma!=null ? ovSuma : (caja + banc);
-          const dif = saldoAct - suma;
-          const cuadra = Math.abs(dif) < 0.01;
-          const hasEdits = [ovSaldoAnt,ovIng,ovGas,ovSaldoAct,ovCaja,ovBanc,ovSuma].some(x => x != null);
-          return {m, fromM, toM, ing, gas, saldoAct, suma, dif, cuadra, hasEdits};
+          const saldoExcel = saldoAnt + ing - gas;
+          const hasCount = cajaReal != null || bancoReal != null;
+          const totalReal = (cajaReal||0) + (bancoReal||0);
+          const dif = saldoExcel - totalReal;
+          const cuadra = hasCount && Math.abs(dif) < 0.01;
+          const hasEdits = [ovSaldoAnt,ovIng,ovGas,cajaReal,bancoReal].some(x => x != null);
+          return {m, fromM, toM, ing, gas, saldoExcel, totalReal, dif, cuadra, hasCount, hasEdits};
         });
         const back2 = document.createElement('div');
         back2.className = 'modal-back';
@@ -5977,18 +6000,22 @@ function openCuadreCaja(){
           </div>
           <table style="width:100%;border-collapse:collapse;font-size:13px">
             <thead>
-              <tr style="background:#1e293b"><th style="padding:8px;text-align:left">Mes</th><th style="padding:8px;text-align:right">Ingresos</th><th style="padding:8px;text-align:right">Gastos</th><th style="padding:8px;text-align:right">Saldo actual</th><th style="padding:8px;text-align:right">Estado</th><th style="padding:8px;text-align:right">Notas</th><th style="padding:8px"></th></tr>
+              <tr style="background:#1e293b"><th style="padding:8px;text-align:left">Mes</th><th style="padding:8px;text-align:right">Ingresos</th><th style="padding:8px;text-align:right">Gastos</th><th style="padding:8px;text-align:right">Excel</th><th style="padding:8px;text-align:right">Contado</th><th style="padding:8px;text-align:right">Estado</th><th style="padding:8px;text-align:right">Notas</th><th style="padding:8px"></th></tr>
             </thead>
             <tbody>
-              ${rows.length === 0 ? `<tr><td colspan="7" style="padding:24px;text-align:center;color:#64748b;font-style:italic">Sin meses con datos aún</td></tr>` : rows.map(r => {
+              ${rows.length === 0 ? `<tr><td colspan="8" style="padding:24px;text-align:center;color:#64748b;font-style:italic">Sin meses con datos aún</td></tr>` : rows.map(r => {
                 const mLabel = new Date(r.m+'-01').toLocaleString('es-ES', {month:'long', year:'numeric'});
-                const estado = r.cuadra ? `<span style="background:#166534;color:#fff;padding:3px 10px;border-radius:12px;font-weight:700;font-size:11px">✓ CUADRA</span>` : `<span style="background:#7f1d1d;color:#fff;padding:3px 10px;border-radius:12px;font-weight:700;font-size:11px">${(r.dif>=0?'+':'')+fmt(r.dif)}</span>`;
+                let estado;
+                if(!r.hasCount) estado = `<span style="background:#334155;color:#94a3b8;padding:3px 10px;border-radius:12px;font-weight:700;font-size:11px">⏳ SIN CONTAR</span>`;
+                else if(r.cuadra) estado = `<span style="background:#166534;color:#fff;padding:3px 10px;border-radius:12px;font-weight:700;font-size:11px">✓ CUADRA</span>`;
+                else estado = `<span style="background:#7f1d1d;color:#fff;padding:3px 10px;border-radius:12px;font-weight:700;font-size:11px">${r.dif>0?'FALTA '+fmt(Math.abs(r.dif)):'SOBRA '+fmt(Math.abs(r.dif))}</span>`;
                 const notaTag = r.hasEdits ? `<span title="Este mes tiene notas manuales ✏️" style="background:#fbbf24;color:#78350f;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700">✏️</span>` : '';
                 return `<tr style="border-bottom:1px solid #1e293b" data-testid="hist-row-${r.m}">
                   <td style="padding:8px;text-transform:capitalize"><b>${mLabel}</b></td>
                   <td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#22c55e">${fmt(r.ing)}</td>
                   <td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#f472b6">${r.gas>0?'-'+fmt(r.gas):fmt(0)}</td>
-                  <td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(r.saldoAct)}</td>
+                  <td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(r.saldoExcel)}</td>
+                  <td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:${r.hasCount?'#38bdf8':'#475569'}">${r.hasCount?fmt(r.totalReal):'—'}</td>
                   <td style="padding:8px;text-align:right">${estado}</td>
                   <td style="padding:8px;text-align:right">${notaTag}</td>
                   <td style="padding:8px;text-align:right"><button class="cc-hist-open" data-from="${r.fromM}" data-to="${r.toM}" style="background:#0369a1;color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px">Abrir</button></td>
@@ -6014,23 +6041,20 @@ function openCuadreCaja(){
     const aiBtnEl = back.querySelector('#ccAskAi');
     if(aiBtnEl){
       aiBtnEl.onclick = () => {
-        // Recalcular con los overrides aplicados para pasar los valores reales que ve el usuario
+        // Recalcular con los overrides aplicados (Excel + Contado)
         const ovSaldoAnt = _ccGetOv(activeComp, ovKey, 'saldoAnt');
         const ovIng = _ccGetOv(activeComp, ovKey, 'ingresos');
         const ovGas = _ccGetOv(activeComp, ovKey, 'gastos');
-        const ovSaldoAct = _ccGetOv(activeComp, ovKey, 'saldoActual');
-        const ovCaja = _ccGetOv(activeComp, ovKey, 'cajaActual');
-        const ovBanc = _ccGetOv(activeComp, ovKey, 'bancActual');
-        const ovSuma = _ccGetOv(activeComp, ovKey, 'sumaCB');
+        const cajaReal = _ccGetOv(activeComp, ovKey, 'cajaReal');
+        const bancoReal = _ccGetOv(activeComp, ovKey, 'bancoReal');
         const saldoAnt = ovSaldoAnt!=null ? ovSaldoAnt : activeData.saldoAnt;
         const ing = ovIng!=null ? ovIng : activeData.ingresos;
         const gas = ovGas!=null ? ovGas : activeData.gastos;
-        const caja = ovCaja!=null ? ovCaja : activeData.cajaActual;
-        const banc = ovBanc!=null ? ovBanc : activeData.bancActual;
-        const saldoActualComp = ovSaldoAct!=null ? ovSaldoAct : (saldoAnt + ing - gas);
-        const sumaCB = ovSuma!=null ? ovSuma : (caja + banc);
-        const diff = saldoActualComp - sumaCB;
-        const cuadraOk = Math.abs(diff) < 0.01;
+        const hasCount = cajaReal != null || bancoReal != null;
+        const totalReal = (cajaReal||0) + (bancoReal||0);
+        const saldoExcel = saldoAnt + ing - gas;
+        const diff = saldoExcel - totalReal;
+        const cuadraOk = hasCount && Math.abs(diff) < 0.01;
         const aiBtn = document.getElementById('btnAiAsk');
         if(!aiBtn){ toast('Asesor IA no disponible'); return; }
         aiBtn.click();
@@ -6043,11 +6067,27 @@ function openCuadreCaja(){
           if(q){
             const empresa = activeName;
             let prompt;
-            if(cuadraOk){
-              prompt = `Cuadre de Caja · ${empresa} · Del ${fromLabel} al ${cutoffLabel}.\n\nCIFRAS ACTUALES:\n- Saldo anterior: ${fmt(saldoAnt)}\n- Ingresos: ${fmt(ing)}\n- Gastos: ${fmt(gas)}\n- Saldo actual (teórico): ${fmt(saldoActualComp)}\n- Caja física + Banco (real): ${fmt(sumaCB)}\n- DIFERENCIA: 0€ (cuadra ✓)\n\nLa caja cuadra en el papel, pero repasa igualmente el rango en busca de posibles inconsistencias: tasas duplicadas para el mismo cliente, tasas olvidadas (Renovación/Expedición sin tasa DGT), entradas con 0€, importes atípicos, o entradas sin nombre. Dime si algo te llama la atención.`;
+            if(!hasCount){
+              prompt = `Cuadre de Caja · ${empresa} · Del ${fromLabel} al ${cutoffLabel}.\n\nEl usuario aún NO ha contado el efectivo ni ha anotado el saldo del banco, así que no se puede validar el cuadre. Sugiérele que cuente el efectivo (caja + cambio) y anote el saldo del banco en la columna derecha del Cuadre para comparar con el teórico (${fmt(saldoExcel)}).`;
+            } else if(cuadraOk){
+              prompt = `Cuadre de Caja · ${empresa} · Del ${fromLabel} al ${cutoffLabel}.\n\nCIFRAS:\n- SEGÚN EXCEL (teórico): saldo ant. ${fmt(saldoAnt)} + ingresos ${fmt(ing)} - gastos ${fmt(gas)} = ${fmt(saldoExcel)}\n- CONTADO (real): efectivo ${fmt(cajaReal||0)} + banco ${fmt(bancoReal||0)} = ${fmt(totalReal)}\n- DIFERENCIA: 0€ (cuadra ✓)\n\nLa caja cuadra en el papel, pero repasa igualmente el rango en busca de posibles inconsistencias: tasas duplicadas para el mismo cliente, tasas olvidadas (Renovación/Expedición sin tasa DGT), entradas con 0€, importes atípicos, o entradas sin nombre. Dime si algo te llama la atención.`;
             } else {
               const signo = diff > 0 ? 'FALTA' : 'SOBRA';
-              prompt = `Cuadre de Caja · ${empresa} · Del ${fromLabel} al ${cutoffLabel}.\n\nCIFRAS ACTUALES:\n- Saldo anterior: ${fmt(saldoAnt)}\n- Ingresos: ${fmt(ing)}\n- Gastos: ${fmt(gas)}\n- Saldo actual (teórico): ${fmt(saldoActualComp)}\n- Caja física + Banco (real): ${fmt(sumaCB)}\n- DIFERENCIA: ${(diff>=0?'+':'')+fmt(diff)} → ${signo} ${fmt(Math.abs(diff))} en la caja/banco real\n\nAyúdame a encontrar el descuadre. Repasa en este orden los MOTIVOS TÍPICOS DE DESCUADRE (de más frecuente a menos):\n1. **Tasas DGT duplicadas al mismo nombre** — Busca clientes que aparezcan 2 veces el mismo día con tasa DGT (típico: se apuntó 2 veces por error).\n2. **Tasas olvidadas** — Entradas de Renovación/Expedición SIN tasa DGT que normalmente sí llevan (comparar con otras entradas del mismo tipo).\n3. **Entradas interrumpidas / incompletas** — Con nombre vacío, importe 0€, o falta forma de pago.\n4. **Devoluciones DGT olvidadas** — Cliente que se le apuntó una tasa pero pidió el dinero de vuelta (buscar HABER/DEBE pendientes).\n5. **Gastos sin apuntar** — Salidas de caja (nóminas, IRPF, material) que no estén en Debe/Haber.\n6. **Datáfono mal introducido** — La cifra manual del datáfono no coincide con lo cobrado por tarjeta.\n\nDime qué encuentras, con nombres y fechas concretas si es posible.`;
+              const abs = Math.abs(diff);
+              // 💡 Pistas concretas según el importe típico del descuadre
+              const importesTipicos = [
+                {min:3, max:5, sug:'💡 Descuadre entre 3-5€ → suele ser una FOTO olvidada (~4€) o una tasa DGT parcial. Busca clientes con foto/duplicado del rango sin importe.'},
+                {min:8, max:12, sug:'💡 Descuadre entre 8-12€ → puede ser una TASA DGT olvidada (10€) o una foto doble.'},
+                {min:18, max:22, sug:'💡 Descuadre entre 18-22€ → posible CERTIFICADO OFICIAL / C.O. olvidado (20€) o tasa DGT duplicada.'},
+                {min:23, max:27, sug:'💡 Descuadre entre 23-27€ → posible DUPLICADO olvidado (25€) o tasa PPC (25,80€).'},
+                {min:28, max:32, sug:'💡 Descuadre entre 28-32€ → posible RENOVACIÓN de moto (30€) o certificado oficial.'},
+                {min:65, max:70, sug:'💡 Descuadre entre 65-70€ → posible CANJE (66,50€), tasa DGT B (66€) o tasa vehículo.'},
+                {min:79, max:82, sug:'💡 Descuadre entre 79-82€ → posible EXPEDICIÓN completa (80€ + tasa DGT).'},
+                {min:99, max:104, sug:'💡 Descuadre entre 99-104€ → posible RENOVACIÓN completa (80€ + 20€ tasa = 100€ o 102,50€).'},
+              ];
+              const pista = importesTipicos.find(p => abs >= p.min && abs <= p.max);
+              const pistaTxt = pista ? `\n\n**PISTA POR IMPORTE**: ${pista.sug}\n` : '';
+              prompt = `Cuadre de Caja · ${empresa} · Del ${fromLabel} al ${cutoffLabel}.\n\nCIFRAS:\n- SEGÚN EXCEL (teórico): saldo ant. ${fmt(saldoAnt)} + ingresos ${fmt(ing)} - gastos ${fmt(gas)} = ${fmt(saldoExcel)}\n- CONTADO (real): efectivo ${fmt(cajaReal||0)} + banco ${fmt(bancoReal||0)} = ${fmt(totalReal)}\n- DIFERENCIA: ${signo} ${fmt(abs)}${pistaTxt}\n\nAyúdame a encontrar el descuadre en el rango indicado. Revisa las entradas de este periodo y busca:\n\n1. **Tasas DGT duplicadas al mismo cliente** — si el mismo nombre aparece 2 veces el mismo día con tasa DGT (típico error de doble apunte).\n2. **Tasas olvidadas** — entradas de Renovación/Expedición SIN tasa DGT que normalmente sí llevan.\n3. **Servicios olvidados con importes típicos**: Foto ≈ 4€ · Duplicado ≈ 25€ · C.O./Certificado Oficial ≈ 20€ · Tasa DGT ≈ 10€/20€ · Renovación conducción ≈ 80-100€ · Canje ≈ 66,50€.\n4. **Entradas incompletas** — nombre vacío, importe 0€, sin forma de pago.\n5. **Devoluciones DGT sin apuntar** — cliente que pagó tasa pero pidió el dinero de vuelta.\n6. **Gastos no registrados** — pagos en efectivo (materiales, nómina cash) que no están en Debe/Haber.\n7. **Datáfono mal introducido** — si la cifra del cierre del datáfono no coincide con la suma de cobros por tarjeta del día.\n\n**MUY IMPORTANTE**: si encuentras candidatos, dame el nombre del cliente, la fecha exacta y el importe. Prioriza los candidatos cuyo importe cuadre exactamente con el descuadre de ${fmt(abs)}.`;
             }
             q.value = prompt;
             q.focus();
@@ -6063,53 +6103,54 @@ function openCuadreCaja(){
       const ovSaldoAnt = _ccGetOv(activeComp, ovK, 'saldoAnt');
       const ovIng = _ccGetOv(activeComp, ovK, 'ingresos');
       const ovGas = _ccGetOv(activeComp, ovK, 'gastos');
-      const ovSaldoAct = _ccGetOv(activeComp, ovK, 'saldoActual');
-      const ovCaja = _ccGetOv(activeComp, ovK, 'cajaActual');
-      const ovBanc = _ccGetOv(activeComp, ovK, 'bancActual');
-      const ovSuma = _ccGetOv(activeComp, ovK, 'sumaCB');
-      // Conceptos (motivos de ajuste manual)
+      const cajaReal = _ccGetOv(activeComp, ovK, 'cajaReal');
+      const bancoReal = _ccGetOv(activeComp, ovK, 'bancoReal');
       const cSaldoAnt = _ccGetOvConcepto(activeComp, ovK, 'saldoAnt');
       const cIng = _ccGetOvConcepto(activeComp, ovK, 'ingresos');
       const cGas = _ccGetOvConcepto(activeComp, ovK, 'gastos');
-      const cSaldoAct = _ccGetOvConcepto(activeComp, ovK, 'saldoActual');
-      const cCaja = _ccGetOvConcepto(activeComp, ovK, 'cajaActual');
-      const cBanc = _ccGetOvConcepto(activeComp, ovK, 'bancActual');
-      const cSuma = _ccGetOvConcepto(activeComp, ovK, 'sumaCB');
       const saldoAnt = ovSaldoAnt!=null ? ovSaldoAnt : activeData.saldoAnt;
       const ing = ovIng!=null ? ovIng : activeData.ingresos;
       const gas = ovGas!=null ? ovGas : activeData.gastos;
-      const caja = ovCaja!=null ? ovCaja : activeData.cajaActual;
-      const banc = ovBanc!=null ? ovBanc : activeData.bancActual;
-      const saldoActualComp = ovSaldoAct!=null ? ovSaldoAct : (saldoAnt + ing - gas);
-      const sumaCB = ovSuma!=null ? ovSuma : (caja + banc);
-      const diff = saldoActualComp - sumaCB;
-      const cuadraOk = Math.abs(diff) < 0.01;
+      const saldoExcel = saldoAnt + ing - gas;
+      const hasCount = cajaReal != null || bancoReal != null;
+      const totalReal = (cajaReal||0) + (bancoReal||0);
+      const diff = saldoExcel - totalReal;
+      const cuadraOk = hasCount && Math.abs(diff) < 0.01;
       const mark = (v, cpt) => v!=null ? ` <span style="color:#b45309;font-size:9px">✏️</span>${cpt?` <span style="background:#fef3c7;color:#78350f;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700">${escapeHtml(cpt)}</span>`:''}` : '';
+      const cuadraTxt = !hasCount ? '⏳ SIN CONTAR' : (cuadraOk ? '✓ 0,00 — TODO CUADRA' : (diff>0?'FALTA '+fmt(Math.abs(diff)):'SOBRA '+fmt(Math.abs(diff)))+' — REVISAR');
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Cuadre · ${escapeHtml(activeName)} · ${monthLabel}</title>
         <style>@page{size:A4;margin:12mm}*{box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;color:#111;margin:0;font-size:12px}
         h1{color:#0369a1;text-align:center;margin:0 0 6px;font-family:Georgia,serif;font-size:22px}
         .sub{text-align:center;color:#64748b;margin-bottom:16px;font-size:11px}
-        table{width:100%;border-collapse:collapse;margin-bottom:12px}
-        td{padding:6px 8px;border-bottom:1px solid #cbd5e1}
+        .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+        .col{border:1px solid #cbd5e1;border-radius:6px;padding:10px}
+        .col h2{margin:0 0 8px;font-family:Georgia,serif;font-size:13px;text-align:center;border-bottom:1px dashed #cbd5e1;padding-bottom:5px;color:#0369a1}
+        table{width:100%;border-collapse:collapse}
+        td{padding:5px 4px;border-bottom:1px solid #e5e7eb;font-size:11.5px}
         .num{text-align:right;font-family:'Courier New',monospace;font-weight:700}
-        .final{background:#0f766e;color:#fff;font-weight:800;font-size:15px}
-        .cuadra{background:${cuadraOk?'#166534':'#7f1d1d'};color:#fff;padding:12px;text-align:center;font-family:'Courier New',monospace;font-weight:800;font-size:18px;border-radius:6px;margin-top:12px}
+        .final{background:#0f766e;color:#fff;font-weight:800;font-size:13px}
+        .final-r{background:#0369a1;color:#fff;font-weight:800;font-size:13px}
+        .cuadra{background:${hasCount?(cuadraOk?'#166534':'#7f1d1d'):'#475569'};color:#fff;padding:12px;text-align:center;font-family:'Courier New',monospace;font-weight:800;font-size:16px;border-radius:6px;margin-top:10px}
         .foot{margin-top:14px;font-size:10px;color:#64748b;font-style:italic}</style></head><body>
         <h1>🧮 Cuadre de Caja · ${escapeHtml(activeName)}</h1>
         <div class="sub">Del ${fromLabel} al ${cutoffLabel} · ${monthLabel} · Generado el ${new Date().toLocaleString('es-ES')}</div>
-        <table><tbody>
-          <tr><td>SALDO ANTERIOR${mark(ovSaldoAnt)}</td><td class="num">${fmt(saldoAnt)}</td></tr>
-          <tr><td>INGRESOS${mark(ovIng)}</td><td class="num" style="color:#166534">${fmt(ing)}</td></tr>
-          <tr><td>GASTOS${mark(ovGas)}</td><td class="num" style="color:#b91c1c">${fmt(gas)}</td></tr>
-          <tr class="final"><td>SALDO ACTUAL${mark(ovSaldoAct)}</td><td class="num">${fmt(saldoActualComp)}</td></tr>
-        </tbody></table>
-        <table><tbody>
-          <tr><td>CAJA FÍSICA${mark(ovCaja)}</td><td class="num">${fmt(caja)}</td></tr>
-          <tr><td>BANCO${mark(ovBanc)}</td><td class="num">${fmt(banc)}</td></tr>
-          <tr class="final"><td>SUMA CAJA + BANCO${mark(ovSuma)}</td><td class="num">${fmt(sumaCB)}</td></tr>
-        </tbody></table>
-        <div class="cuadra">DIFERENCIA: ${cuadraOk?'✓ 0,00 — TODO CUADRA':(diff>0?'FALTA '+fmt(Math.abs(diff)):'SOBRA '+fmt(Math.abs(diff)))+' — REVISAR'}</div>
-        ${(ovSaldoAnt!=null||ovIng!=null||ovGas!=null||ovSaldoAct!=null||ovCaja!=null||ovBanc!=null||ovSuma!=null)?'<div class="foot">✏️ Cifras marcadas: ajustadas manualmente en este PC.</div>':''}
+        <div class="cols">
+          <div class="col"><h2>📊 SEGÚN EL EXCEL</h2>
+            <table><tbody>
+              <tr><td>Saldo anterior${mark(ovSaldoAnt, cSaldoAnt)}</td><td class="num">${fmt(saldoAnt)}</td></tr>
+              <tr><td>Ingresos${mark(ovIng, cIng)}</td><td class="num" style="color:#166534">${fmt(ing)}</td></tr>
+              <tr><td>Gastos${mark(ovGas, cGas)}</td><td class="num" style="color:#b91c1c">${gas>0?'-'+fmt(gas):fmt(0)}</td></tr>
+              <tr class="final"><td>TOTAL TEÓRICO</td><td class="num">${fmt(saldoExcel)}</td></tr>
+            </tbody></table></div>
+          <div class="col"><h2>💰 LO QUE HAS CONTADO</h2>
+            <table><tbody>
+              <tr><td>Efectivo (caja + cambio)</td><td class="num">${cajaReal!=null?fmt(cajaReal):'—'}</td></tr>
+              <tr><td>Saldo del banco</td><td class="num">${bancoReal!=null?fmt(bancoReal):'—'}</td></tr>
+              <tr class="final-r"><td>TOTAL REAL</td><td class="num">${hasCount?fmt(totalReal):'—'}</td></tr>
+            </tbody></table></div>
+        </div>
+        <div class="cuadra">DIFERENCIA: ${cuadraTxt}</div>
+        ${(ovSaldoAnt!=null||ovIng!=null||ovGas!=null)?'<div class="foot">✏️ Cifras marcadas: ajustadas manualmente en este PC.</div>':''}
         </body></html>`;
       try{ printHtml(html, {title:`Cuadre ${activeName} ${monthLabel}`}); }
       catch(err){ toast('Error impresión: '+err.message, 3500); }
