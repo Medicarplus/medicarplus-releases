@@ -5561,7 +5561,7 @@ function _cuadreCajaCompute(comp, month, cutoffIso){
   try{ const raw = localStorage.getItem(siKey); if(raw){ const o=JSON.parse(raw); si.caja=+o.caja||0; si.banc=+o.banc||0; si.from=o.from||null; } }catch(_){}
   const firstDay = month + '-01';
   const isC = comp === 'cempla';
-  const detail = { ingresos: { traf:0, priv:0, otros:0, dhHaber:0 }, gastos: {} };
+  const detail = { ingresos: { traf:0, priv:0, otros:0, dhHaber:0, privByTipo:{} }, gastos: {} };
   let saldoAntCaja = si.caja, saldoAntBanc = si.banc;
   let ingresos = 0, gastos = 0;
   let cajaActual = si.caja, bancActual = si.banc;
@@ -5590,7 +5590,14 @@ function _cuadreCajaCompute(comp, month, cutoffIso){
         const imp = (+e.importe||0) - (+e.descuento||0);
         const tasa = +e.tasa || 0;
         if(e.kind === 'TRAF'){ detail.ingresos.traf += imp + tasa; ingresos += imp + tasa; }
-        else if(e.kind === 'PRIV'){ detail.ingresos.priv += imp + tasa; ingresos += imp + tasa; }
+        else if(e.kind === 'PRIV'){
+          const total = imp + tasa;
+          detail.ingresos.priv += total;
+          ingresos += total;
+          // Desglose por tipo (Revisió, Certificat, Foto, Duplicat, C.O., etc.)
+          const t = (e.tipo || '(sin tipo)').trim() || '(sin tipo)';
+          detail.ingresos.privByTipo[t] = (detail.ingresos.privByTipo[t] || 0) + total;
+        }
         else if(e.kind === 'OTROS'){ detail.ingresos.otros += imp + tasa; ingresos += imp + tasa; }
         else if(e.kind === 'DH'){
           if(e.tipo === 'HABER'){ detail.ingresos.dhHaber += imp; ingresos += imp; }
@@ -5670,13 +5677,20 @@ function openCuadreCaja(){
   const dateInp = back.querySelector('#ccDate');
   const detailIng = data => {
     const rows = [
-      ['Tráfico', data.traf, '#22c55e'],
-      ['Revisiones/Cert.', data.priv, '#ec4899'],
-      ['Otros (fotos, dup...)', data.otros, '#8b5cf6'],
-      ['Debe/Haber HABER', data.dhHaber, '#38bdf8']
+      ['Tráfico', data.traf, '#22c55e', null],
+      ['Servicios privados (Rev./Cert./Fotos/Dup./C.O.)', data.priv, '#ec4899', data.privByTipo],
+      ['Otros', data.otros, '#8b5cf6', null],
+      ['Debe/Haber HABER', data.dhHaber, '#38bdf8', null]
     ].filter(r => r[1] > 0);
     if(!rows.length) return `<div style="padding:10px;color:#64748b;font-style:italic;text-align:center;font-size:11px">Sin ingresos en el rango</div>`;
-    return `<table style="width:100%;border-collapse:collapse;font-size:12px;margin:4px 0"><tbody>${rows.map(([lbl,v,col])=>`<tr style="border-bottom:1px solid #1e293b"><td style="padding:4px 10px;color:${col}">${escapeHtml(lbl)}</td><td style="padding:4px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(v)}</td></tr>`).join('')}</tbody></table>`;
+    return `<table style="width:100%;border-collapse:collapse;font-size:12px;margin:4px 0"><tbody>${rows.map(([lbl,v,col,sub])=>{
+      let subRows = '';
+      if(sub && Object.keys(sub).length){
+        const entries = Object.entries(sub).sort((a,b)=>b[1]-a[1]);
+        subRows = entries.map(([k,val])=>`<tr style="background:#0f172a"><td style="padding:3px 10px 3px 26px;color:#94a3b8;font-size:11px">↳ ${escapeHtml(k)}</td><td style="padding:3px 10px;text-align:right;font-family:'Courier New',monospace;color:#cbd5e1;font-size:11px">${fmt(val)}</td></tr>`).join('');
+      }
+      return `<tr style="border-bottom:1px solid #1e293b"><td style="padding:4px 10px;color:${col}">${escapeHtml(lbl)}</td><td style="padding:4px 10px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${fmt(v)}</td></tr>${subRows}`;
+    }).join('')}</tbody></table>`;
   };
   const detailGas = data => {
     const rows = Object.entries(data).sort((a,b)=>b[1]-a[1]);
