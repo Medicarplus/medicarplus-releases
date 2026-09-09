@@ -6855,13 +6855,15 @@ function _buildAnnualReport(year, monthFilterIdx){
       //   Tarjeta = df manual si existeix, si no: sum auto (servei + tasa via T)
       //   Efectiu = efectiu auto − delta (reclassificació entre caixa/banc)
       const dfManual = parseFloat(dfMap[d] || 0);
-      const autoT = (t.byFp.T||0) + (t.tasasByFp.T||0);
-      const efAuto = (t.byFp.E||0) + (t.tasasByFp.E||0);
+      const autoT = (t.byFp.T||0) + (t.tasasByFp.T||0) + (t.debeByFp.T||0);
+      const efAuto = (t.byFp.E||0) + (t.tasasByFp.E||0) + (t.debeByFp.E||0);
       const trDay = dfManual > 0 ? dfManual : autoT;
       const deltaT = dfManual > 0 ? (dfManual - autoT) : 0;
       const efDay = efAuto - deltaT;
-      const bizumDay = (t.byFp.B||0) + (t.tasasByFp.B||0);
-      const transDay = (t.byFp.X||0) + (t.tasasByFp.X||0);
+      // 🐛 FIX Feb 2026: tarjetas por FP muestran INGRESOS (no restan gastos DEBE).
+      // Los gastos DEBE se listan en la sección "Gastos" del informe con su propia cifra.
+      const bizumDay = (t.byFp.B||0) + (t.tasasByFp.B||0) + (t.debeByFp.B||0);
+      const transDay = (t.byFp.X||0) + (t.tasasByFp.X||0) + (t.debeByFp.X||0);
       grandTotals.byFp.T += trDay;
       grandTotals.byFp.E += efDay;
       grandTotals.byFp.B += bizumDay;
