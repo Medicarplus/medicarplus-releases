@@ -1351,6 +1351,69 @@ async function openDetail(install_id){
       </div>
     </details>
 
+    <!-- 💼 Facturación anual (privada · solo admin) -->
+    <details style="background:#0b1121" data-testid="details-facturacion">
+      <summary style="padding:14px 26px;cursor:pointer;font-size:12px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #1e293b">💼 Facturación anual (privada) <span style="color:#f59e0b;font-size:10px;margin-left:4px">🔒 blur activo · pasa el ratón para ver</span></summary>
+      <div style="padding:14px 26px">
+        ${(() => {
+          const fby = (l && l.facturacion_by_year) || {};
+          const years = Object.keys(fby).map(y=>parseInt(y,10)).filter(y=>y>=2000&&y<=2100).sort((a,b)=>a-b);
+          if(!years.length){
+            return `<div style="color:var(--muted);font-style:italic;padding:10px 0">⚪ Aún no ha llegado ningún dato. Se rellenará automáticamente cuando el cliente abra la app (el propio cliente no sabe que se envía · discreción total).</div>`;
+          }
+          // Bucket helper: <100K → +10K steps; >=100K → +100K; >=1M → +100K (formato M)
+          const bucket = (v) => {
+            v = Math.max(0, Math.round(v||0));
+            if(v < 10000) return v === 0 ? '0' : '&lt;+10K';
+            if(v < 100000){
+              const k = Math.floor(v/10000)*10;
+              return '+'+k+'K';
+            }
+            if(v < 1000000){
+              const k = Math.floor(v/100000)*100;
+              return '+'+k+'K';
+            }
+            // >= 1M → mostrar como +X.XM
+            const m = Math.floor(v/100000)/10;
+            return '+'+m.toFixed(1).replace(/\.0$/,'')+'M';
+          };
+          const upd = l.facturacion_updated_at ? new Date(l.facturacion_updated_at).toLocaleString('es-ES') : '—';
+          // Comparativa: si hay ≥2 años, calcular delta % del último vs anterior
+          let trendHtml = '';
+          if(years.length >= 2){
+            const y1 = years[years.length-2];
+            const y2 = years[years.length-1];
+            const v1 = fby[String(y1)]||0;
+            const v2 = fby[String(y2)]||0;
+            if(v1 > 0){
+              const pct = ((v2-v1)/v1)*100;
+              const up = pct >= 0;
+              trendHtml = `<div style="margin-top:12px;padding:10px 14px;background:${up?'#052e1a':'#3a1310'};border:1px solid ${up?'#166534':'#7f1d1d'};border-radius:8px;font-size:12px;color:${up?'#86efac':'#fca5a5'}">
+                📈 <b>${y2} vs ${y1}</b>: <span class="fact-blur" style="filter:blur(6px);transition:filter .2s;cursor:help;font-weight:800;font-family:Consolas,monospace" onmouseenter="this.style.filter='none'" onmouseleave="this.style.filter='blur(6px)'">${up?'+':''}${pct.toFixed(1)}%</span> ${up?'📈 mejorando':'📉 bajando'}
+              </div>`;
+            }
+          }
+          const nowYear = new Date().getFullYear();
+          const cards = years.map(y => {
+            const v = fby[String(y)]||0;
+            const isNow = (y === nowYear);
+            const label = bucket(v);
+            return `<div style="background:${isNow?'#1a1210':'#0f172a'};border:1px solid ${isNow?'#f59e0b':'#334155'};border-radius:8px;padding:12px;position:relative">
+              <div style="font-size:10px;color:${isNow?'#f59e0b':'#94a3b8'};text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:4px">${y} ${isNow?'· AÑO ACTUAL':''}</div>
+              <div class="fact-blur" style="filter:blur(8px);transition:filter .2s;cursor:help;font-size:20px;color:${isNow?'#f5b301':'#7ee3aa'};font-weight:800;font-family:Consolas,monospace" onmouseenter="this.style.filter='none'" onmouseleave="this.style.filter='blur(8px)'" title="Pasa el ratón para revelar la horquilla">${label}</div>
+              <div style="font-size:9px;color:var(--muted);margin-top:4px">horquilla · discreción</div>
+            </div>`;
+          }).join('');
+          return `<div style="background:#1e1b0a;border:1px solid #f59e0b33;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#fde68a;line-height:1.5">
+            🔒 <b>Uso interno exclusivo del admin.</b> Los valores están desenfocados por defecto y solo aparecen al pasar el ratón. Nadie más los ve · el cliente ni sabe que se envían.
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px" data-testid="facturacion-cards">${cards}</div>
+          ${trendHtml}
+          <div style="margin-top:10px;font-size:10px;color:var(--muted);text-align:right">Última actualización: <b class="mono">${upd}</b> · ${years.length} año${years.length===1?'':'s'} registrado${years.length===1?'':'s'}</div>`;
+        })()}
+      </div>
+    </details>
+
     <!-- Datos técnicos originales (colapsable) -->
     <details style="background:#0b1121">
       <summary style="padding:14px 26px;cursor:pointer;font-size:12px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #1e293b">📋 Datos técnicos y trazabilidad</summary>

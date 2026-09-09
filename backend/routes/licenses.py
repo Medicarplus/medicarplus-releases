@@ -816,6 +816,30 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
 
         # 4) Tot OK → actualitzem estadístiques
         _upd_set = {"last_verified_at": _now().isoformat()}
+        # 📊 Facturación anual (privada, solo admin): merge sanitizado por año
+        # El cliente envía {by_year: {"2024": 152340, "2025": 87220}} en cada verify.
+        # Guardamos solo enteros positivos y años razonables (2000-2100).
+        try:
+            fstats = body.facturacion_stats or {}
+            by_year = fstats.get("by_year") if isinstance(fstats, dict) else None
+            if isinstance(by_year, dict) and by_year:
+                clean_by_year: dict = {}
+                for yk, yv in list(by_year.items())[:60]:
+                    try:
+                        y = int(str(yk).strip())
+                        v = int(round(float(yv)))
+                        if 2000 <= y <= 2100 and 0 <= v < 10_000_000_000:
+                            clean_by_year[str(y)] = v
+                    except Exception:
+                        continue
+                if clean_by_year:
+                    # Merge con lo ya guardado para no perder años pasados
+                    prev = (doc.get("facturacion_by_year") or {}) if isinstance(doc.get("facturacion_by_year"), dict) else {}
+                    merged = {**prev, **clean_by_year}
+                    _upd_set["facturacion_by_year"] = merged
+                    _upd_set["facturacion_updated_at"] = _now().isoformat()
+        except Exception:
+            pass
         # Guardar meta info que el cliente sincroniza (empresas configuradas, versión, etc.)
         if body.client_meta and isinstance(body.client_meta, dict):
             # Sanea a strings/números básicos para evitar objetos pesados

@@ -59,6 +59,13 @@ class LicenseVerify(BaseModel):
         None,
         description="Metadata sincronizada por el cliente (empresas configuradas, versión app, etc.)"
     )
+    # Estadísticas privadas de facturación por año (Feb 2026)
+    # El cliente las envía silenciosamente en el ping diario. Solo el admin las ve
+    # (con blur en el panel) → uso interno confidencial para métricas de retención.
+    facturacion_stats: Optional[dict] = Field(
+        None,
+        description="Facturación anual bruta {by_year: {'2024': 152340, '2025': 87220}}"
+    )
 
     @field_validator("install_id")
     @classmethod

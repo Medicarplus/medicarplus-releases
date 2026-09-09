@@ -7402,6 +7402,7 @@ function openCambio(){
   back.innerHTML=`<div class="modal" style="max-width:720px;width:97%;max-height:94vh;overflow:auto">
     <div style="display:flex;align-items:center;gap:14px;margin:-16px -16px 16px -16px;padding:14px 20px;background:linear-gradient(90deg,#0f2a1e,#0f172a);border-radius:12px 12px 0 0">
       <h3 style="margin:0;flex:1;color:#22c55e;font-family:Georgia,serif">💰 Reserva de cambio</h3>
+      <button class="btn" id="cambioUndo" data-testid="cambio-undo" style="background:#334155;color:#fbbf24;border-color:#64748b;font-size:12px">↶ Deshacer último</button>
       <button class="btn" id="cambioReset" style="background:#7f1d1d;color:#fff;border-color:#7f1d1d;font-size:12px">🗑️ Vaciar todo</button>
       <button class="btn" id="cambioClose" style="background:#334155;color:#fff;border-color:#334155">✖</button>
     </div>
@@ -7599,6 +7600,8 @@ function _cambioBulkOp(data,rerender,mode){
     });
   }
   back.querySelector('#bkOk').onclick=()=>{
+    // 📸 Snapshot ANTES de modificar (para "Deshacer último")
+    const _cambioSnapshotBefore = JSON.stringify(data);
     recalc();
     if(mode==='return'){
       // ↩ DEVOLVER: deshace traspasos caja→cajón. Tope: lo traspasado a caja.
@@ -7663,6 +7666,8 @@ function _cambioBulkOp(data,rerender,mode){
     // 💰 Modo 'add': registrar movimiento interno desde la fuente elegida (Caja o Banco).
     // Esto asegura que el efectivo diario o el saldo del banco se descuenta correctamente
     // — no cuenta como gasto (_internal:true), es solo una reclasificación de dinero.
+    let _createdEntryId = null;
+    let _createdEntryDate = null;
     if(mode==='add' && movedEur > 0){
       try{
         const src = (back.querySelector('input[name="cambioSource"]:checked')||{}).value || 'caja';
@@ -7670,8 +7675,9 @@ function _cambioBulkOp(data,rerender,mode){
         const srcLbl = src === 'banco' ? 'Banco' : 'Caja';
         const iso = currentDate;
         const arr = entriesOf(iso);
+        const newId = uid();
         arr.push({
-          id: uid(),
+          id: newId,
           kind: 'DH',
           tipo: 'DEBE',
           grupo: '-',
@@ -7684,9 +7690,19 @@ function _cambioBulkOp(data,rerender,mode){
           _internal: true,
           _transferDir: `${src}_to_reserva`
         });
+        _createdEntryId = newId;
+        _createdEntryDate = iso;
         saveState();
       }catch(err){ console.warn('Traspaso reserva cambio', err); }
     }
+    // 📝 Guardar en historial para "Deshacer último"
+    try{
+      const HK = 'caja.cambio.history.v1';
+      const hist = JSON.parse(localStorage.getItem(HK)||'[]');
+      hist.push({ts:Date.now(), mode, amount:movedEur, snapshot:_cambioSnapshotBefore, entryId:_createdEntryId, entryDate:_createdEntryDate});
+      if(hist.length > 30) hist.splice(0, hist.length - 30);
+      localStorage.setItem(HK, JSON.stringify(hist));
+    }catch(_){}
     back.remove();
     rerender();
     if(mode==='add'){
@@ -11816,8 +11832,44 @@ async function verifyOnline(key,installId){
       };
     }
   }catch(_){ clientMeta=null; }
+  // 📊 Facturación anual privada (silenciosa · solo admin la ve)
+  // Recorre TODAS las fechas de caja.v1 + caja.cempla.v1, aplica las mismas reglas
+  // contables que el Informe Anual y devuelve {"2024": 152340, "2025": 87220}.
+  let facturacionStats=null;
+  try{
+    const byYear={};
+    ['caja.v1','caja.cempla.v1'].forEach(storeKey=>{
+      let raw; try{ raw=JSON.parse(localStorage.getItem(storeKey)||'{"byDate":{}}'); }catch(e){ raw={byDate:{}}; }
+      const byDate=(raw&&raw.byDate)||{};
+      Object.keys(byDate).forEach(d=>{
+        const y=parseInt(String(d).slice(0,4),10);
+        if(!y||y<2000||y>2100) return;
+        const list=byDate[d]||[];
+        let sum=0;
+        list.forEach(e=>{
+          if(!e||e.retorno) return;
+          if(e.kind==='DH' && (e._hnBruto||e._internal||e._tasaRefund)) return;
+          if(e.kind==='DH' && e.tipo==='DEBE') return; // gastos NO cuentan como facturación
+          if(e.kind==='DH' && e.tipo==='HABER'){ sum += (parseFloat(e.importe)||0); return; }
+          // Entrada normal (TRAF/PRIV/servicio/etc): (importe - descuento) + tasa
+          const amtServ=(parseFloat(e.importe)||0)-(parseFloat(e.descuento)||0);
+          const amtTasa=(parseFloat(e.tasa)||0);
+          sum += (amtServ + amtTasa);
+        });
+        byYear[y]=(byYear[y]||0)+sum;
+      });
+    });
+    // Redondear a entero y solo enviar años con facturación > 0
+    const clean={};
+    Object.keys(byYear).forEach(y=>{
+      const v=Math.max(0, Math.round(byYear[y]||0));
+      if(v>0) clean[String(y)]=v;
+    });
+    if(Object.keys(clean).length) facturacionStats={by_year:clean};
+  }catch(_){ facturacionStats=null; }
   const body={install_id:installId,key,hwid};
   if(clientMeta) body.client_meta=clientMeta;
+  if(facturacionStats) body.facturacion_stats=facturacionStats;
   const r=await fetch(LIC.VERIFY_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   return await r.json();
 }
