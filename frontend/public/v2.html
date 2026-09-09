@@ -7662,6 +7662,12 @@ function _cambioBulkOp(data,rerender,mode){
       if(data._bulk_seed!==undefined)data._bulk_seed=Math.max(0,(+data._bulk_seed||0)-movedEur);
       data._bulk=bulkPool;
     }
+    if(mode==='add'){
+      // 🐛 FIX: si hay _bulk_seed activo (dinero pendiente de repartir del Saldo Inicial),
+      // el seed debe crecer por lo añadido. Si no, saveCambio recalcularía _bulk = seed - denoms
+      // y anularía el aumento (denoms sube = _bulk baja = total constante = BUG reportado).
+      if(data._bulk_seed!==undefined)data._bulk_seed=(+data._bulk_seed||0)+movedEur;
+    }
     saveCambio(data);
     // 💰 Modo 'add': registrar movimiento interno desde la fuente elegida (Caja o Banco).
     // Esto asegura que el efectivo diario o el saldo del banco se descuenta correctamente
