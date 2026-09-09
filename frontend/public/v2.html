@@ -7515,6 +7515,41 @@ function openCambio(){
     if(tr<=0){toast('No hay nada traspasado a caja que devolver');return}
     _cambioBulkOp(data,render,'return');
   };
+  // ↶ Deshacer último: revierte el snapshot guardado + borra el asiento DH (solo modo 'add')
+  back.querySelector('#cambioUndo').onclick=()=>{
+    const HK='caja.cambio.history.v1';
+    let hist=[]; try{ hist=JSON.parse(localStorage.getItem(HK)||'[]'); }catch(_){ hist=[]; }
+    if(!hist.length){ toast('No hay ninguna operación reciente que deshacer'); return; }
+    const last=hist[hist.length-1];
+    const modeLbl=last.mode==='add'?'Añadir cambio':(last.mode==='remove'?'Retirar cambio':'Devolver a la reserva');
+    const srcLbl=last.entryId?(last.entryDate?(' · asiento del '+last.entryDate.split('-').reverse().join('/')):' · asiento en Data History'):'';
+    if(!confirm(`¿Deshacer la última operación?\n\n· Tipo: ${modeLbl}\n· Importe: ${fmt(last.amount||0)}${srcLbl}\n\nSe revertirá la Reserva al estado anterior${last.entryId?' Y se borrará el asiento correspondiente':''}.`)) return;
+    // 1) Restaurar la Reserva al snapshot previo
+    try{
+      const restored=JSON.parse(last.snapshot||'{}');
+      Object.keys(data).forEach(k=>{ delete data[k]; });
+      Object.assign(data, restored);
+      // Guardar el snapshot tal cual (bypass saveCambio para conservar _bulk explícito).
+      // Actualizamos _mtime para que la sync multi-PC propague el rollback.
+      data._mtime=Date.now();
+      localStorage.setItem(cambioKey(), JSON.stringify(data));
+    }catch(err){ console.warn('undo restore fallback', err); saveCambio(data); }
+    // 2) Borrar el asiento DH creado (solo existe en modo 'add')
+    if(last.entryId && last.entryDate){
+      try{
+        const arr=entriesOf(last.entryDate);
+        const idx=arr.findIndex(e=>e && e.id===last.entryId);
+        if(idx>=0){ arr.splice(idx,1); saveState(); }
+      }catch(err){ console.warn('undo remove entry', err); }
+    }
+    // 3) Sacar la operación del historial
+    hist.pop();
+    try{ localStorage.setItem(HK, JSON.stringify(hist)); }catch(_){}
+    // 4) Repintar modal + dashboard principal
+    render();
+    try{ window.render&&window.render(); }catch(_){}
+    toast(`↶ Operación deshecha: ${modeLbl} de ${fmt(last.amount||0)}${last.entryId?' · asiento borrado':''}`, 4500);
+  };
 }
 
 function _cambioBulkOp(data,rerender,mode){
