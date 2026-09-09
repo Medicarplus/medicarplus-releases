@@ -7523,6 +7523,18 @@ function _cambioBulkOp(data,rerender,mode){
       <button class="btn" id="bkClose" style="background:#0f172a;color:#fff;border-color:#0f172a">✖</button>
     </div>
     <p class="small" style="color:#94a3b8;margin:0 0 12px">${desc}</p>
+    ${mode==='add' ? `<div style="background:#0f172a;border:1px solid #16a34a;border-radius:8px;padding:10px 12px;margin-bottom:14px">
+      <label style="color:#94a3b8;font-size:11px;letter-spacing:.5px;font-weight:700;display:block;margin-bottom:6px">💰 ¿De dónde sale el dinero?</label>
+      <div style="display:flex;gap:8px">
+        <label class="cambio-src-lbl" data-src="caja" style="flex:1;padding:10px;background:#1e293b;border:2px solid #16a34a;border-radius:6px;cursor:pointer;text-align:center;color:#7ee3aa;font-weight:700;font-size:13px">
+          <input type="radio" name="cambioSource" value="caja" checked style="margin-right:6px"/>💵 CAJA FÍSICA
+        </label>
+        <label class="cambio-src-lbl" data-src="banco" style="flex:1;padding:10px;background:#1e293b;border:2px solid #334155;border-radius:6px;cursor:pointer;text-align:center;color:#94a3b8;font-weight:600;font-size:13px">
+          <input type="radio" name="cambioSource" value="banco" style="margin-right:6px"/>🏦 BANCO
+        </label>
+      </div>
+      <div style="color:#64748b;font-size:11px;margin-top:6px;line-height:1.4">Se descontará automáticamente de la fuente elegida el mismo día (movimiento interno, no cuenta como gasto).</div>
+    </div>` : ''}
     <div id="bkBody" style="max-height:60vh;overflow:auto"></div>
     <div style="text-align:center;padding:14px 0;border-top:1px solid #1e293b;margin-top:10px">
       <div class="small" style="color:#94a3b8">Total operación</div>
@@ -7565,6 +7577,20 @@ function _cambioBulkOp(data,rerender,mode){
     bkTotal.textContent=fmt(t);
   };
   bkBody.querySelectorAll('[data-bk]').forEach(inp=>inp.oninput=recalc);
+  // 💡 Radios de origen (solo modo 'add'): actualiza estilo al cambiar
+  if(mode==='add'){
+    back.querySelectorAll('input[name="cambioSource"]').forEach(rd=>{
+      rd.onchange=()=>{
+        back.querySelectorAll('.cambio-src-lbl').forEach(lbl=>{
+          const sel=lbl.dataset.src===rd.value && rd.checked;
+          lbl.style.borderColor = sel ? '#16a34a' : '#334155';
+          lbl.style.color = sel ? (lbl.dataset.src==='caja'?'#7ee3aa':'#86b6ff') : '#94a3b8';
+          lbl.style.fontWeight = sel ? '700' : '600';
+          if(sel) lbl.style.borderColor = lbl.dataset.src==='banco' ? '#3b82f6' : '#16a34a';
+        });
+      };
+    });
+  }
   back.querySelector('#bkOk').onclick=()=>{
     recalc();
     if(mode==='return'){
@@ -7627,9 +7653,40 @@ function _cambioBulkOp(data,rerender,mode){
       data._bulk=bulkPool;
     }
     saveCambio(data);
+    // 💰 Modo 'add': registrar movimiento interno desde la fuente elegida (Caja o Banco).
+    // Esto asegura que el efectivo diario o el saldo del banco se descuenta correctamente
+    // — no cuenta como gasto (_internal:true), es solo una reclasificación de dinero.
+    if(mode==='add' && movedEur > 0){
+      try{
+        const src = (back.querySelector('input[name="cambioSource"]:checked')||{}).value || 'caja';
+        const fp = src === 'banco' ? 'X' : 'E';
+        const srcLbl = src === 'banco' ? 'Banco' : 'Caja';
+        const iso = currentDate;
+        const arr = entriesOf(iso);
+        arr.push({
+          id: uid(),
+          kind: 'DH',
+          tipo: 'DEBE',
+          grupo: '-',
+          nombre: `Traspaso ${srcLbl} → Reserva de cambio`,
+          importe: movedEur,
+          descuento: 0,
+          tasa: 0,
+          fp: fp,
+          retorno: false,
+          _internal: true,
+          _transferDir: `${src}_to_reserva`
+        });
+        saveState();
+      }catch(err){ console.warn('Traspaso reserva cambio', err); }
+    }
     back.remove();
     rerender();
-    if(mode==='add')toast('✓ Cambio añadido a la reserva');
+    if(mode==='add'){
+      const src = (back.querySelector && back.querySelector('input[name="cambioSource"]:checked')||{}).value || 'caja';
+      const srcLbl = src === 'banco' ? '🏦 del BANCO' : '💵 de la CAJA';
+      toast(`✓ ${fmt(movedEur)} añadidos a reserva ${srcLbl}`, 4500);
+    }
     else toast(`🔁 ${fmt(movedEur)} traspasados a caja${capped?' (ajustado al disponible)':''} · el saldo total NO cambia`,4500);
   };
 }
@@ -11625,7 +11682,7 @@ const LIC={
   INSTALL_KEY:'caja.install.id.v1',
   INSTALL_DATE:'caja.install.date.v1',
   LAST_CHECK:'caja.license.lastcheck.v1',
-  CHECK_INTERVAL_DAYS:15,
+  CHECK_INTERVAL_DAYS:1,
   MAX_OFFLINE_DAYS:30,
   // TOTS els URLs funcionals de l'app deriven de getApiBase() → resistent a rotacions d'Emergent.
   // El domini medicarplus.es només s'usa per la landing pública (marketing).
