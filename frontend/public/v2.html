@@ -3489,6 +3489,13 @@ function computeTotals(list){const t={bruto:0,dto:0,tasas:0,neto:0,byFp:{E:0,T:0
     } else if(e._transferDir === 'banco2caja'){
       t.internalBanco -= amt;  // sale del banco
       t.internalCaja += amt;   // entra en caja física
+    } else if(e._transferDir === 'caja_to_reserva'){
+      // El dinero sale del efectivo de caja pero entra en la reserva de cambio.
+      // Como CAJA FÍSICA (display) = caja + reserva, el total físico no cambia.
+      t.internalCaja -= amt;
+    } else if(e._transferDir === 'banco_to_reserva'){
+      // El dinero sale del banco y va a la reserva de cambio (dentro de caja física).
+      t.internalBanco -= amt;
     }
     return; // NO toca facturación (neto), NO altera datáfono ni byFp
   }
