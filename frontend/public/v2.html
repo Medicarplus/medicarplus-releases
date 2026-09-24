@@ -4889,19 +4889,16 @@ const _btnStatE2 = document.getElementById('btnStatEmpresa2'); if(_btnStatE2) _b
 // 🏥 Normalizador de sinónimos para TIPOS de Empresa 2 (revisiones deportivas)
 // Une variantes de escritura al mismo canónico. Ej: P.esforç, Prueba esfuerzo,
 // Prova esforç → "Prueba de esfuerzo".
-// 🔄 Canje automático: si es Expedición + Grupo Conducción + 66,50€ → cuenta como Canje.
-// Función virtual (no modifica el entry guardado, solo devuelve el tipo efectivo para stats).
-// 🔄 Canje automático: si es Expedición + Grupo Conducción + 66,50€ → cuenta como Canje.
+// 🔄 Canje automático: si el tipo es Expedición/Obtención + importe 66,50€ → cuenta como Canje.
+// (Regla simplificada feb 2026: ya no requiere grupo Conducción, cualquier grupo cuenta).
 // Función virtual (no modifica el entry guardado, solo devuelve el tipo efectivo para stats).
 window._effectiveTipo = function(e){
   if(!e || e.kind !== 'TRAF') return e && e.tipo;
   const tipoNorm = (e.tipo||'').toString().toLowerCase();
-  const grupoNorm = (e.grupo||'').toString().toLowerCase();
   const imp = +e.importe || 0;
   const isExped = tipoNorm.startsWith('exped') || tipoNorm.startsWith('obten');
-  const isConduc = /conduc/.test(grupoNorm);
   const is66_50 = Math.abs(imp - 66.5) < 0.005;
-  if(isExped && isConduc && is66_50) return 'Canje';
+  if(isExped && is66_50) return 'Canje';
   return e.tipo;
 };
 window._normalizeTipoEmpresa2 = function(raw){
@@ -6873,7 +6870,7 @@ function _buildAnnualReport(year, monthFilterIdx){
         // 📚 MODEL DEL NEGOCI: les tases DGT es compren PER ANTICIPAT en bloc (4k€ cada cop)
         // com a stock. Quan es venen al client, SÓN INGRÉS del negoci (no són suplidos).
         // Les compres en bloc s'anoten com a DEBE amb concepte "Compra tasas DGT" (COGS).
-        const rawTipo = (e.tipo || 'Otro');
+        const rawTipo = (e.kind === 'TRAF' && window._effectiveTipo) ? window._effectiveTipo(e) : (e.tipo || 'Otro');
         const rawGrupo = (e.grupo || '').trim();
         const cat = _normalizeReportCat(rawTipo);
         const grupoLabel = rawGrupo && rawGrupo !== '-' ? _normalizeReportCat(rawGrupo) : (currentLang==='es'?'General':'General');
