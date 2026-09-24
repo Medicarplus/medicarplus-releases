@@ -6754,6 +6754,50 @@ function openAnnualReport(){
         row.setAttribute('data-open', isOpen ? '0' : '1');
       };
     });
+    // 📅 Clic en un concepto (gasto o haber) → popup con lista de días
+    bodyEl.querySelectorAll('.ar-clickable-item').forEach(row => {
+      row.onclick = (ev) => {
+        ev.stopPropagation();
+        let entries; try{ entries = JSON.parse(decodeURIComponent(row.dataset.entries||'[]')); }catch(e){ entries = []; }
+        const concept = row.dataset.concept || '';
+        if(!entries.length){ toast('Sin fechas registradas', 2000); return; }
+        entries.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+        const compLabel = (k) => k==='cempla' ? (window.CFG&&CFG.company2&&CFG.company2.name) || 'Empresa 2' : (window.CFG&&CFG.company1&&CFG.company1.name) || 'Empresa 1';
+        const pop = document.createElement('div');
+        pop.className='modal-back'; pop.style.zIndex='100090';
+        pop.innerHTML=`<div class="modal" style="max-width:520px;width:94%;padding:0;background:#fff;color:#1a1a1a;border-radius:10px;overflow:hidden">
+          <div style="padding:14px 18px;background:#0f172a;color:#fff;display:flex;align-items:center;gap:10px">
+            <span style="flex:1;font-family:Georgia,serif;font-size:15px">📅 <b>${escapeHtml(concept)}</b> · ${entries.length} ${entries.length===1?'día':'días'}</span>
+            <button class="btn" data-no style="background:#7f1d1d;color:#fff;border:none;padding:4px 10px;border-radius:4px">✕</button>
+          </div>
+          <div style="max-height:60vh;overflow:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead><tr style="background:#f1f5f9;color:#334155"><th style="padding:8px 12px;text-align:left">Fecha</th><th style="padding:8px 12px;text-align:left">Empresa</th><th style="padding:8px 12px;text-align:right">Importe</th></tr></thead>
+              <tbody>${entries.map(en => `<tr class="ar-goto-row" data-date="${en.date}" data-comp="${en.company}" style="border-bottom:1px solid #e5e7eb;cursor:pointer" title="Clic para ir a este día">
+                <td style="padding:8px 12px;font-family:'Courier New',monospace"><b>${(en.date||'').split('-').reverse().join('/')}</b></td>
+                <td style="padding:8px 12px;color:#64748b">${escapeHtml(compLabel(en.company))}</td>
+                <td style="padding:8px 12px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#dc2626">${fmt(en.importe||0)}</td>
+              </tr>`).join('')}</tbody>
+            </table>
+          </div>
+          <div style="padding:8px 14px;background:#f8fafc;font-size:11px;color:#64748b;font-style:italic;text-align:center">Clic en una fila para saltar a ese día · el informe se cerrará</div>
+        </div>`;
+        document.body.appendChild(pop);
+        pop.querySelector('[data-no]').onclick = () => pop.remove();
+        pop.addEventListener('click', e => { if(e.target===pop) pop.remove(); });
+        pop.querySelectorAll('.ar-goto-row').forEach(r => {
+          r.onclick = () => {
+            const dt = r.dataset.date;
+            const cmp = r.dataset.comp;
+            pop.remove();
+            back.remove(); // cerrar el informe anual
+            if(cmp && cmp !== currentCompany){ switchCompany(cmp); }
+            setTimeout(() => setDate(dt), 50);
+            toast(`↪ Saltando a ${dt.split('-').reverse().join('/')}`, 2500);
+          };
+        });
+      };
+    });
   };
   yearSel.onchange=render;
   monthSel.onchange=render;
@@ -6861,9 +6905,10 @@ function _buildAnnualReport(year, monthFilterIdx){
         if(e.kind==='DH' && e.tipo==='DEBE'){
           grandTotals.gastos = grandTotals.gastos || {};
           const gCat = (e.nombre || 'Gasto').trim();
-          const gc = grandTotals.gastos[gCat] = grandTotals.gastos[gCat] || {count:0, total:0};
+          const gc = grandTotals.gastos[gCat] = grandTotals.gastos[gCat] || {count:0, total:0, entries:[]};
           gc.count += 1;
           gc.total += (e.importe || 0);
+          gc.entries.push({date:d, importe:(e.importe||0), company:comp.key});
           // Tracking por mes para el "Gastos mensuales" del informe (evita ensuciar byMonth)
           grandTotals.byMonthGastos[m] = (grandTotals.byMonthGastos[m]||0) + (e.importe || 0);
           return;
@@ -6872,9 +6917,10 @@ function _buildAnnualReport(year, monthFilterIdx){
         if(e.kind==='DH' && e.tipo==='HABER'){
           grandTotals.haberByConcept = grandTotals.haberByConcept || {};
           const hCat = (e.nombre || 'Ingreso').trim();
-          const hc = grandTotals.haberByConcept[hCat] = grandTotals.haberByConcept[hCat] || {count:0, total:0};
+          const hc = grandTotals.haberByConcept[hCat] = grandTotals.haberByConcept[hCat] || {count:0, total:0, entries:[]};
           hc.count += 1;
           hc.total += (e.importe || 0);
+          hc.entries.push({date:d, importe:(e.importe||0), company:comp.key});
           // També suma al total facturació general (com que l'usuari les cobra)
           grandTotals.haberTotal = (grandTotals.haberTotal || 0) + (e.importe || 0);
           grandTotals.byMonthFacturacion[m] = (grandTotals.byMonthFacturacion[m]||0) + (e.importe || 0);
@@ -7123,10 +7169,16 @@ function _buildAnnualReport(year, monthFilterIdx){
   if(haberEntries.length){
     const totalHaberCnt = haberEntries.reduce((s,[,v]) => s + v.count, 0);
     const totalHaber = grandTotals.haberTotal || 0;
-    html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">💰 ${L('Ingresos manuales (HABER)','Ingresos manuales (HABER)')}</h4>
+    html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">💰 ${L('Ingressos manuals (HABER)','Ingresos manuales (HABER)')} <span style="font-size:11px;color:#64748b;font-weight:400;font-style:italic">${L('· Només entrades DEBE/HABER manuals · Clica per veure els dies','· Solo entradas DEBE/HABER manuales · Clic para ver los días')}</span></h4>
+      <div style="margin:-6px 0 10px 0;padding:8px 12px;background:#f0fdf4;border-left:3px solid #166534;border-radius:4px;font-size:11px;color:#166534;line-height:1.5">
+        ℹ️ <b>${L('Què és?','¿Qué es?')}</b> ${L('Els ingressos que has apuntat MANUALMENT amb el xip verd "HABER" al Debe/Haber (ingressos excepcionals, cobros extraordinaris). ELS SERVEIS NORMALS (fotos, certificats, revisions) ja compten a "Facturació per concepte" de dalt.','Los ingresos que has apuntado MANUALMENTE con el chip verde "HABER" en Debe/Haber (ingresos excepcionales, cobros extraordinarios). LOS SERVICIOS NORMALES (fotos, certificados, revisiones) ya cuentan en "Facturación por concepto" arriba.')}
+      </div>
       <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
         <thead><tr style="background:#0f4d2a;color:#a7f3d0"><th style="padding:8px;text-align:left">${L('Concepto','Concepto')}</th><th style="padding:8px;text-align:right">${L('Uds.','Uds.')}</th><th style="padding:8px;text-align:right">${L('Total','Total')}</th></tr></thead>
-        <tbody>${haberEntries.map(([k,v]) => `<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:6px 8px">${escapeHtml(k)}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:#0891b2;font-weight:600">${v.count}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#166534">+${fmt(v.total)}</td></tr>`).join('')}
+        <tbody>${haberEntries.map(([k,v]) => {
+          const _entJson = encodeURIComponent(JSON.stringify(v.entries||[]));
+          return `<tr class="ar-clickable-item" data-entries="${_entJson}" data-concept="${escapeHtml(k)}" style="border-bottom:1px solid #e5e7eb;cursor:pointer" title="${L('Clica per veure els dies i saltar-hi','Clic para ver los días e ir')}"><td style="padding:6px 8px">${escapeHtml(k)} <span style="color:#0891b2;font-size:10px">📅 ver días</span></td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:#0891b2;font-weight:600">${v.count}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#166534">+${fmt(v.total)}</td></tr>`;
+        }).join('')}
         <tr style="border-top:2px solid #0f4d2a;background:#f0fdf4;font-weight:700"><td style="padding:8px">${L('TOTAL HABER','TOTAL HABER')}</td><td style="padding:8px;text-align:right;color:#0891b2">${totalHaberCnt}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#166534">+${fmt(totalHaber)}</td></tr>
         </tbody>
       </table>`;
@@ -7172,7 +7224,7 @@ function _buildAnnualReport(year, monthFilterIdx){
       if(!byCat[cat]) byCat[cat] = { total:0, count:0, items:[] };
       byCat[cat].total += v.total;
       byCat[cat].count += v.count;
-      byCat[cat].items.push({ concepto, total:v.total, count:v.count });
+      byCat[cat].items.push({ concepto, total:v.total, count:v.count, entries:(v.entries||[]) });
     });
     // Ordenar categorías por total descendente, items internos también
     const catRows = Object.entries(byCat).sort((a,b) => b[1].total - a[1].total);
@@ -7218,9 +7270,10 @@ function _buildAnnualReport(year, monthFilterIdx){
       </tr>`;
       // Filas detalle (ocultas por defecto)
       d.items.forEach(it => {
-        html += `<tr class="cat-detail cat-${idx}" style="display:none;background:#fafafa;border-bottom:1px dashed #e5e7eb">
+        const _entJson = encodeURIComponent(JSON.stringify(it.entries||[]));
+        html += `<tr class="cat-detail cat-${idx} ar-clickable-item" data-entries="${_entJson}" data-concept="${escapeHtml(it.concepto)}" style="display:none;background:#fafafa;border-bottom:1px dashed #e5e7eb;cursor:pointer" title="${L('Clica per veure els dies i saltar-hi','Clic para ver los días e ir')}">
           <td></td>
-          <td style="padding:5px 8px 5px 32px;font-size:12px;color:#475569;font-style:italic">${escapeHtml(it.concepto)}</td>
+          <td style="padding:5px 8px 5px 32px;font-size:12px;color:#475569;font-style:italic">${escapeHtml(it.concepto)} <span style="color:#0891b2;font-size:10px">📅 ver días</span></td>
           <td style="padding:5px 8px;text-align:right;font-family:'Courier News',monospace;font-size:12px;color:#0891b2">${it.count}</td>
           <td style="padding:5px 8px;text-align:right;font-family:'Courier New',monospace;font-size:12px;color:#dc2626">-${fmt(it.total)}</td>
           <td></td>
