@@ -7230,6 +7230,14 @@ function _buildAnnualReport(year, monthFilterIdx){
     html += `<tr style="border-top:2px solid #7f1d1d;background:#fef3c7;font-weight:700"><td></td><td style="padding:8px">${L('TOTAL GASTOS','TOTAL GASTOS')}</td><td style="padding:8px;text-align:right;color:#0891b2">${totalGastosCnt}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#dc2626">-${fmt(totalGastos)}</td><td></td></tr>
         </tbody>
       </table>`;
+    // 🔒 Auditoría del cuadre: Σ categorías DEBE ser exactamente igual al TOTAL GASTOS
+    const _sumaCats = catRows.reduce((s,[,d]) => s + d.total, 0);
+    const _diff = Math.abs(_sumaCats - totalGastos);
+    const _ok = _diff < 0.005;
+    html += `<div style="margin:-14px 0 18px 0;padding:6px 12px;background:${_ok?'#f0fdf4':'#fef2f2'};border:1px solid ${_ok?'#166534':'#7f1d1d'};border-radius:4px;font-size:11px;color:${_ok?'#166534':'#7f1d1d'};font-family:'Courier New',monospace;display:flex;justify-content:space-between;align-items:center">
+      <span>🔒 ${L('Auditoria del quadre · cap gasto es queda sense categoritzar','Auditoría del cuadre · ningún gasto se queda sin categorizar')}</span>
+      <span><b>Σ categorías = ${fmt(_sumaCats)}</b> vs <b>TOTAL GASTOS = ${fmt(totalGastos)}</b> ${_ok?'✓':`❌ diff ${fmt(_diff)}`}</span>
+    </div>`;
   }
 
   // 🎯 RESULTAT COMPTABLE FINAL · Ingresos − Gastos = Beneficio
