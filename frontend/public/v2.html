@@ -480,9 +480,20 @@
   async function consumeBackup(backupId){
     return await _post('/api/sync/backup/consume', { license_key: cfg.licenseKey, install_id: cfg.installId, backup_id: backupId });
   }
+  // 🌤️ CLOUD BACKUP AUTOMÁTICO DIARIO (feb 2026) · archivo rotativo servidor (últimas 30)
+  async function sendCloudBackup(label){
+    const data = _snapshotLocalStorage();
+    return await _post('/api/sync/cloudbackup/send', { license_key: cfg.licenseKey, install_id: cfg.installId, data, label: label || 'auto-daily' });
+  }
+  async function listCloudBackups(){
+    return await _get(`/api/sync/cloudbackup/list?license_key=${encodeURIComponent(cfg.licenseKey)}&install_id=${encodeURIComponent(cfg.installId)}`);
+  }
+  async function getCloudBackup(backupId){
+    return await _get(`/api/sync/cloudbackup/get?license_key=${encodeURIComponent(cfg.licenseKey)}&install_id=${encodeURIComponent(cfg.installId)}&backup_id=${encodeURIComponent(backupId)}`);
+  }
   function getMode(){ return currentMode; }
   function getPeers(){ return currentPeers; }
-  global.mcSync = { init, setMode, getMode, getStatus, getPeers, pushNow, pullNow, startAutosync, stopAutosync, sendBackup, getPendingBackup, applyBackup, consumeBackup, safeWrite: _syncWrite, _mergeSnapshots };
+  global.mcSync = { init, setMode, getMode, getStatus, getPeers, pushNow, pullNow, startAutosync, stopAutosync, sendBackup, getPendingBackup, applyBackup, consumeBackup, sendCloudBackup, listCloudBackups, getCloudBackup, safeWrite: _syncWrite, _mergeSnapshots };
 })(window);
 </script>
 </head>
@@ -538,7 +549,12 @@
     <!-- Copias de seguridad dropdown · Guardar + Restaurar + Historial -->
     <div class="btn-dropdown" id="btnBackupBox" style="position:relative;display:inline-block">
       <button class="btn" id="btnBackupToggle" style="background:linear-gradient(90deg,#1f3a2e 0%,#2a5e44 100%);border-color:transparent;color:#bff0d6;font-weight:700" data-testid="btn-backup">🛡️ <span>Copias de seguridad</span> <span style="font-size:9px;margin-left:4px">▼</span></button>
-      <div id="btnBackupMenu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid #2a5e44;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.5);z-index:1000;min-width:210px;padding:6px;flex-direction:column;gap:4px">
+      <div id="btnBackupMenu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid #2a5e44;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.5);z-index:1000;min-width:230px;padding:6px;flex-direction:column;gap:4px">
+        <!-- 🌤️ Estado del cloud backup (feb 2026 · silencioso · solo Premium) -->
+        <div id="cbStatusBox" style="display:none;padding:8px 10px;background:linear-gradient(90deg,#0f2a1e,#0b1f14);border:1px solid #166534;border-radius:6px;margin:2px 0 6px 0;font-size:11px;color:#a7f3d0;line-height:1.4" data-testid="cb-status-box">
+          <div style="font-weight:700;color:#86efac">☁️ Copia en la nube</div>
+          <div id="cbStatusText" style="color:#cbd5e1;font-size:10px;margin-top:2px">Cargando…</div>
+        </div>
         <button class="btn" id="btnExport" style="background:#1a3a2a;border-color:#3ddc97;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-testid="btn-save-backup">💾 Guardar copia</button>
         <button class="btn" id="btnImportJson" style="background:#3a2f1a;border-color:#f5b301;color:#fed7aa;font-weight:600;width:100%;text-align:left" data-testid="btn-restore-backup">📂 Restaurar copia</button>
         <button class="btn" id="btnHistory" style="background:#1f3a2e;border-color:#2a5e44;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-testid="btn-history">🛡️ Historial de copias</button>
@@ -3963,7 +3979,34 @@ function closeTopMenus(exceptId){
 }
 window.closeTopMenus=closeTopMenus;
 // Copias de seguridad dropdown toggle
-$('#btnBackupToggle').onclick=(e)=>{e.stopPropagation();const m=$('#btnBackupMenu');const willOpen=(m.style.display==='none'||!m.style.display);if(willOpen)closeTopMenus('btnBackupMenu');m.style.display=willOpen?'flex':'none'};
+$('#btnBackupToggle').onclick=(e)=>{
+  e.stopPropagation();
+  const m=$('#btnBackupMenu');
+  const willOpen=(m.style.display==='none'||!m.style.display);
+  if(willOpen){
+    closeTopMenus('btnBackupMenu');
+    // 🌤️ Actualizar estado cloud backup al abrir el menú
+    try{
+      const lic = (typeof getLicense==='function') ? getLicense() : null;
+      const isPremium = lic && (String(lic.plan||'').toUpperCase().includes('PREMIUM') || lic.type==='MASTER');
+      const box = $('#cbStatusBox');
+      const txt = $('#cbStatusText');
+      if(box && isPremium){
+        box.style.display='block';
+        const last = parseInt(localStorage.getItem('caja.cloudbackup.last.v1')||'0');
+        if(!last){
+          txt.innerHTML='<span style="color:#f5b301">⏳ Pendiente · se enviará automáticamente</span>';
+        } else {
+          const hoursAgo = Math.round((Date.now()-last)/(1000*60*60));
+          const humanAgo = hoursAgo < 1 ? 'hace <1h' : (hoursAgo < 24 ? `hace ${hoursAgo}h` : `hace ${Math.floor(hoursAgo/24)}d`);
+          const dateHuman = new Date(last).toLocaleString('es-ES');
+          txt.innerHTML = `<span style="color:#86efac">✅ ${humanAgo}</span> · <span style="color:#94a3b8;font-size:9px">${dateHuman}</span>`;
+        }
+      } else if(box){ box.style.display='none'; }
+    }catch(_){/* silencioso */}
+  }
+  m.style.display=willOpen?'flex':'none'
+};
 document.addEventListener('click',(e)=>{const box=$('#btnBackupBox');const menu=$('#btnBackupMenu');if(menu&&box&&!box.contains(e.target))menu.style.display='none'});
 // Tanca el menú després de clicar Guardar/Restaurar (els handlers reals estan més avall)
 $('#btnExport').addEventListener('click',()=>{setTimeout(()=>{const m=$('#btnBackupMenu');if(m)m.style.display='none'},50)});
@@ -12164,6 +12207,21 @@ function isLicenseActive(){
             }
           }catch(er){ console.warn('No se pudo aplicar new_key en background:', er); }
         }
+        // 🌤️ CLOUD BACKUP DIARIO (feb 2026) · silencioso · última copia >20h → envío
+        try{
+          const LAST_CB = 'caja.cloudbackup.last.v1';
+          const lastCb = parseInt(localStorage.getItem(LAST_CB)||'0');
+          const hoursSinceCb = (Date.now()-lastCb)/(1000*60*60);
+          const isPremium = (lic.plan||'').toString().toUpperCase().includes('PREMIUM') || lic.type==='MASTER';
+          if(isPremium && hoursSinceCb >= 20 && window.mcSync && window.mcSync.sendCloudBackup){
+            window.mcSync.sendCloudBackup('auto-daily').then(r=>{
+              if(r && r.ok){
+                localStorage.setItem(LAST_CB, String(Date.now()));
+                console.info('☁️ Backup en la nube enviado ·', Math.round((r.size_bytes||0)/1024), 'KB · ID', (r.backup_id||'').slice(0,8));
+              }
+            }).catch(e=>console.warn('☁️ cloud backup silent fail (retry mañana):', e&&e.message||e));
+          }
+        }catch(e){ /* silencioso */ }
       }
     }).catch((e)=>{console.warn('Verify online fallit (retry més endavant):',e&&e.message||e)});
   }
@@ -13132,6 +13190,83 @@ function showConfigWizard(isFirstRun){
 // Inicialització: bloqueja l'app si no hi ha llicència; després pregunta noms
 if(!isLicenseActive()){showActivationModal()}
 else if(!isConfigured()){setTimeout(()=>showConfigWizard(true),200)}
+// 🛡️ RECUPERACIÓN AUTOMÁTICA DE CLOUD BACKUP (feb 2026)
+// Si el localStorage está vacío (fresh install / pérdida) pero la licencia YA tiene
+// historial en la nube → ofrece restaurar automáticamente. A prueba de pérdida catastrófica.
+setTimeout(async ()=>{
+  try{
+    if(!isLicenseActive()) return;
+    const lic = getLicense();
+    if(!lic || !lic.key || lic.type==='MASTER') return;
+    const isPremium = (lic.plan||'').toString().toUpperCase().includes('PREMIUM');
+    if(!isPremium) return;
+    // Chequea si hay datos locales significativos
+    let hasData = false;
+    try{
+      const v1 = JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}');
+      const cempla = JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}');
+      const nDays1 = Object.keys(v1.byDate||{}).length;
+      const nDays2 = Object.keys(cempla.byDate||{}).length;
+      hasData = (nDays1 + nDays2) > 0;
+    }catch(_){ hasData = false; }
+    // Evita bucle infinito con flag
+    if(hasData || localStorage.getItem('caja.cloud.recovery.skipped')==='1') return;
+    // Consultar backend por copias disponibles
+    if(!window.mcSync || !window.mcSync.listCloudBackups) return;
+    const r = await window.mcSync.listCloudBackups().catch(()=>null);
+    if(!r || !r.backups || !r.backups.length) return;
+    // ¡Hay copias en la nube! Ofrecer recuperación
+    const latest = r.backups[0];
+    const sizeKB = Math.round((latest.size_bytes||0)/1024);
+    const dateHuman = new Date(latest.created_at).toLocaleString('es-ES');
+    const back = document.createElement('div');
+    back.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.97);z-index:100200;display:flex;align-items:center;justify-content:center;padding:20px';
+    back.innerHTML = `<div style="background:linear-gradient(135deg,#1e293b,#0f172a);border:2px solid #f5b301;border-radius:14px;padding:28px 32px;max-width:560px;width:100%;color:#e2e8f0;font-family:Georgia,serif;box-shadow:0 20px 60px rgba(0,0,0,.6)">
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-size:44px">🛡️</div>
+        <h2 style="margin:8px 0 4px;color:#f5b301;font-size:22px">Detectamos posible pérdida de datos</h2>
+        <div style="color:#94a3b8;font-size:13px">Tienes ${r.count} copia${r.count===1?'':'s'} disponible${r.count===1?'':'s'} en la nube</div>
+      </div>
+      <div style="background:#0b1121;border:1px solid #334155;border-radius:8px;padding:14px;margin:16px 0">
+        <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Copia más reciente</div>
+        <div style="font-size:14px;color:#e2e8f0"><b>📅 ${dateHuman}</b></div>
+        <div style="font-size:12px;color:#94a3b8;margin-top:4px">💾 ${sizeKB} KB · ${latest.keys_count||0} claves guardadas</div>
+      </div>
+      <p style="font-size:13px;line-height:1.55;color:#cbd5e1;margin:16px 0">Parece que este ordenador ha perdido los datos locales. ¿Quieres <b style="color:#7ee3aa">restaurar automáticamente</b> desde la última copia guardada en la nube?</p>
+      <div style="display:flex;gap:10px;margin-top:20px">
+        <button id="cb-restore-yes" style="flex:1;padding:12px;background:linear-gradient(90deg,#166534,#15803d);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer" data-testid="cb-restore-yes">✅ Sí, restaurar ahora</button>
+        <button id="cb-restore-no" style="padding:12px 18px;background:#334155;color:#cbd5e1;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer" data-testid="cb-restore-no">Empezar limpio</button>
+      </div>
+      <div style="text-align:center;font-size:11px;color:#64748b;margin-top:14px;font-style:italic">La restauración es reversible — la copia sigue en la nube</div>
+    </div>`;
+    document.body.appendChild(back);
+    back.querySelector('#cb-restore-no').onclick = () => {
+      localStorage.setItem('caja.cloud.recovery.skipped','1');
+      back.remove();
+    };
+    back.querySelector('#cb-restore-yes').onclick = async () => {
+      const btn = back.querySelector('#cb-restore-yes');
+      btn.textContent = '⏳ Descargando…';
+      btn.disabled = true;
+      try{
+        const full = await window.mcSync.getCloudBackup(latest.backup_id);
+        if(!full || !full.data){ alert('❌ Error al descargar la copia. Reinténtalo.'); btn.disabled=false; btn.textContent='✅ Sí, restaurar ahora'; return; }
+        // Aplicar snapshot: escribir todas las claves
+        let restored = 0;
+        Object.entries(full.data).forEach(([k, v]) => {
+          const val = v && v.value != null ? v.value : v;
+          try{ localStorage.setItem(k, typeof val === 'string' ? val : JSON.stringify(val)); restored++; }catch(_){}
+        });
+        alert(`✅ Restauración completa · ${restored} elementos recuperados de la copia del ${dateHuman}.\n\nLa app se recargará ahora.`);
+        location.reload();
+      }catch(err){
+        alert('❌ Error inesperado: ' + (err && err.message || err));
+        btn.disabled=false;
+        btn.textContent='✅ Sí, restaurar ahora';
+      }
+    };
+  }catch(e){ console.warn('cloud recovery check fail:', e); }
+}, 2000);
 // Botons ⚙️ Configuració + 🔓 Sortir/Canviar llicència al header
 setTimeout(()=>{
   const sigParent=document.getElementById('licSigBox');

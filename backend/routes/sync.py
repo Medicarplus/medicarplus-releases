@@ -136,6 +136,8 @@ class AdminResetDevicesBody(BaseModel):
 
 
 COLL_BACKUPS = "sync_backups"
+COLL_CLOUD_BACKUPS = "sync_cloud_backups"  # 🌤️ Feb 2026: archivo rotativo diario (últimas 30 copias por install_id)
+CLOUD_BACKUP_KEEP = 30  # cuántas copias mantener por install_id
 
 
 def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
@@ -439,6 +441,107 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="backup_not_found")
         return {"ok": True, "backup_id": body.backup_id}
+
+    # ────────────────────────────────────────────────────────────────────
+    # 🌤️ CLOUD BACKUP AUTOMÁTICO DIARIO (feb 2026)
+    # Archivo rotativo de las últimas 30 copias por install_id.
+    # A prueba de pérdida catastrófica: SSD estropeado, formateo Windows,
+    # ransomware, borrado accidental → cliente recupera desde el servidor.
+    # ────────────────────────────────────────────────────────────────────
+    @router.post("/sync/cloudbackup/send")
+    async def cloud_backup_send(body: BackupSendBody):
+        """Guarda una NUEVA copia (no upsert). Mantiene rotativo las últimas 30
+        por install_id. Se llama silenciosamente 1 vez cada 24h desde la app.
+        """
+        lic = await _find_license(body.license_key)
+        if not lic:
+            raise HTTPException(status_code=404, detail="license_not_found")
+        if not _is_premium(lic):
+            raise HTTPException(status_code=403, detail="cloudbackup_requires_premium")
+        lkh = _key_hash(body.license_key)
+        if not await _is_device_authorized(lkh, body.install_id):
+            raise HTTPException(status_code=403, detail="device_not_authorized")
+        # Sanity: limitar tamaño (2 MB max por copia — más que suficiente)
+        try:
+            import json as _json
+            _size = len(_json.dumps(body.data or {}))
+        except Exception:
+            _size = 0
+        MAX_BYTES = 2 * 1024 * 1024
+        if _size > MAX_BYTES:
+            raise HTTPException(status_code=413, detail=f"payload_too_large ({_size} > {MAX_BYTES})")
+        now = _now()
+        backup_id = str(uuid.uuid4())
+        doc = {
+            "backup_id": backup_id,
+            "license_key_hash": lkh,
+            "install_id": body.install_id,
+            "label": (body.label or "").strip() or "auto-daily",
+            "data": body.data or {},
+            "size_bytes": _size,
+            "keys_count": len(body.data or {}),
+            "created_at": now,
+        }
+        await db[COLL_CLOUD_BACKUPS].insert_one(doc)
+        # Rotación: elimina las que sobran (mantén solo las últimas CLOUD_BACKUP_KEEP)
+        cursor = db[COLL_CLOUD_BACKUPS].find({
+            "license_key_hash": lkh,
+            "install_id": body.install_id,
+        }).sort("created_at", -1).skip(CLOUD_BACKUP_KEEP)
+        old_ids = [d["_id"] async for d in cursor]
+        if old_ids:
+            await db[COLL_CLOUD_BACKUPS].delete_many({"_id": {"$in": old_ids}})
+        logger.info("cloudbackup/send install=%s size=%d keys=%d rotated=%d",
+                    body.install_id, _size, len(body.data or {}), len(old_ids))
+        return {"ok": True, "backup_id": backup_id, "created_at": _iso(now),
+                "size_bytes": _size, "rotated": len(old_ids)}
+
+    @router.get("/sync/cloudbackup/list")
+    async def cloud_backup_list(license_key: str, install_id: str):
+        """Lista metadata de las últimas N copias en la nube (sin data).
+        Útil para el panel "Estado de tus copias" y para el flujo de restauración.
+        """
+        lic = await _find_license(license_key)
+        if not lic:
+            raise HTTPException(status_code=404, detail="license_not_found")
+        lkh = _key_hash(license_key)
+        cursor = db[COLL_CLOUD_BACKUPS].find({
+            "license_key_hash": lkh,
+            "install_id": install_id,
+        }, {"data": 0}).sort("created_at", -1)
+        out = []
+        async for d in cursor:
+            out.append({
+                "backup_id": d["backup_id"],
+                "label": d.get("label"),
+                "size_bytes": d.get("size_bytes", 0),
+                "keys_count": d.get("keys_count", 0),
+                "created_at": _iso(d["created_at"]),
+            })
+        return {"backups": out, "count": len(out), "keep": CLOUD_BACKUP_KEEP}
+
+    @router.get("/sync/cloudbackup/get")
+    async def cloud_backup_get(license_key: str, install_id: str, backup_id: str):
+        """Devuelve el snapshot completo de una copia concreta (para restaurar)."""
+        lic = await _find_license(license_key)
+        if not lic:
+            raise HTTPException(status_code=404, detail="license_not_found")
+        lkh = _key_hash(license_key)
+        d = await db[COLL_CLOUD_BACKUPS].find_one({
+            "license_key_hash": lkh,
+            "install_id": install_id,
+            "backup_id": backup_id,
+        })
+        if not d:
+            raise HTTPException(status_code=404, detail="backup_not_found")
+        return {
+            "backup_id": d["backup_id"],
+            "label": d.get("label"),
+            "size_bytes": d.get("size_bytes", 0),
+            "keys_count": d.get("keys_count", 0),
+            "created_at": _iso(d["created_at"]),
+            "data": d.get("data") or {},
+        }
 
     # ────────────────────────────────────────────────────────────────────
     # 🔍 Snapshot del "otro PC" para el Asesor IA · Buscar descuadre

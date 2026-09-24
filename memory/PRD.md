@@ -1742,3 +1742,19 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - **Backend (`LicenseVerify` + `verify_license`)**: nuevo campo opcional `facturacion_stats`. Sanitización: solo enteros positivos, año 2000-2100. **Merge** con lo existente en la licencia → conserva años pasados incluso si el cliente ya no los envía.
 - **Panel admin (`admin.html` · openDetail)**: nueva sección `<details data-testid="details-facturacion">` **💼 Facturación anual (privada)** entre Referidos y Datos técnicos. Grid de tarjetas 1 por año (borde dorado si es año actual), cifra desenfocada `filter:blur(8px)` que se revela onmouseenter. Bucket: <100K → +10K steps; 100K-1M → +100K steps; ≥1M → +X.XM. Comparativa año más reciente vs anterior (delta % también desenfocado) con 📈 mejorando (verde) / 📉 bajando (rojo). Banner amarillo de discreción.
 - **Verificado E2E**: verify sin stats → OK (baseline); verify con {2023,2024,2025} → guarda los 3; verify posterior con solo {2025:95000} → merge conserva 2023+2024 y actualiza 2025; verify con basura (año 1900, 3000, "abc", -100) → rechazados; solo se acepta {2026:50000}. Enriched devuelve `facturacion_by_year` + `facturacion_updated_at`. Panel muestra 4 cards con blur/hover, trend "2026 vs 2025" rojo bajando, timestamp de última actualización.
+
+### 🛡️ Cloud Backup Automático + Auditoría Contable — Feb 2026
+
+**Cloud backup daily (Capa 1 blindaje)**:
+- Backend `/api/sync/cloudbackup/{send,list,get}` con rotación automática (últimas 30 copias por install_id · MAX 2MB por copia)
+- Frontend piggyback en el ping diario de licencia → `mcSync.sendCloudBackup()` silencioso cada ≥20h
+- **Recuperación automática al arrancar**: si localStorage está vacío + hay copias en la nube → modal ofrece restaurar el último snapshot
+- **Estado visible**: al abrir menú "Copias de seguridad" muestra "☁️ ✅ hace 3h · 09/02/2026 08:15"
+- Flag `caja.cloud.recovery.skipped` previene loop del modal si el usuario declina
+- Solo Premium (verificado backend)
+
+**Auditoría contable exhaustiva** (`/app/frontend/public/tests/accounting_audit.js`):
+- 14 tests · 47 invariantes verificados · 3 años sintéticos (2024-26 · 14.163 entradas)
+- Cubre: conservación de dinero, transitividad Σdías=Σmeses=Σaños, categorización ingresos Emp1 (5 fijas), categorización gastos (auditoría cero pérdida), beneficio neto = ing-gas, traspasos internos NO alteran físico total, retornos NO cuentan, fotos PRIV+HABER unifican, canjes 66,50€ regla exacta, byFp/debeByFp segregation, datáfono reclassify sin pérdida, cuadre acumulado CAJA+BANCO, recuento entradas conservado, aislamiento Emp1/Emp2
+- Ejecutar: `node /app/frontend/public/tests/accounting_audit.js`
+- Resultado: **47/47 PASS**
