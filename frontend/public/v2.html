@@ -7169,9 +7169,10 @@ function _buildAnnualReport(year, monthFilterIdx){
   if(haberEntries.length){
     const totalHaberCnt = haberEntries.reduce((s,[,v]) => s + v.count, 0);
     const totalHaber = grandTotals.haberTotal || 0;
-    html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">💰 ${L('Ingressos manuals (HABER)','Ingresos manuales (HABER)')} <span style="font-size:11px;color:#64748b;font-weight:400;font-style:italic">${L('· Només entrades DEBE/HABER manuals · Clica per veure els dies','· Solo entradas DEBE/HABER manuales · Clic para ver los días')}</span></h4>
-      <div style="margin:-6px 0 10px 0;padding:8px 12px;background:#f0fdf4;border-left:3px solid #166534;border-radius:4px;font-size:11px;color:#166534;line-height:1.5">
-        ℹ️ <b>${L('Què és?','¿Qué es?')}</b> ${L('Els ingressos que has apuntat MANUALMENT amb el xip verd "HABER" al Debe/Haber (ingressos excepcionals, cobros extraordinaris). ELS SERVEIS NORMALS (fotos, certificats, revisions) ja compten a "Facturació per concepte" de dalt.','Los ingresos que has apuntado MANUALMENTE con el chip verde "HABER" en Debe/Haber (ingresos excepcionales, cobros extraordinarios). LOS SERVICIOS NORMALES (fotos, certificados, revisiones) ya cuentan en "Facturación por concepto" arriba.')}
+    html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">➕ ${L('Ingressos manuals ADICIONALS (HABER manual)','Ingresos manuales ADICIONALES (HABER manual)')} <span style="font-size:11px;color:#64748b;font-weight:400;font-style:italic">${L('· NO són els serveis normals · Clica per veure els dies','· NO son los servicios normales · Clic para ver los días')}</span></h4>
+      <div style="margin:-6px 0 10px 0;padding:10px 14px;background:#fef9c3;border-left:3px solid #ca8a04;border-radius:4px;font-size:12px;color:#78350f;line-height:1.55">
+        ⚠️ <b>${L('IMPORTANT — què és aquesta secció:','IMPORTANTE — qué es esta sección:')}</b><br>
+        ${L('Aquesta secció NO és tota la facturació. La teva facturació completa (renovacions, expedicions, fotos, etc.) ja apareix a dalt a <b>"Facturació per concepte"</b>. Aquí només surten els ingressos que has apuntat MANUALMENT amb el xip verd "HABER" al Debe/Haber (cobros extraordinaris, ingressos en metàl·lic manuals, regularitzacions puntuals). Si nomes surten 4 €, és perquè només tens 1 entrada HABER manual — la resta dels teus ingressos (30k+) ja compten en la taula de dalt.','Esta sección NO es toda la facturación. Tu facturación completa (renovaciones, expediciones, fotos, etc.) ya aparece arriba en <b>"Facturación por concepto"</b>. Aquí solo salen los ingresos que has apuntado MANUALMENTE con el chip verde "HABER" en Debe/Haber (cobros extraordinarios, ingresos en metálico manuales, regularizaciones puntuales). Si solo salen 4 €, es porque solo tienes 1 entrada HABER manual — el resto de tus ingresos (30k+) ya cuentan en la tabla de arriba.')}
       </div>
       <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
         <thead><tr style="background:#0f4d2a;color:#a7f3d0"><th style="padding:8px;text-align:left">${L('Concepto','Concepto')}</th><th style="padding:8px;text-align:right">${L('Uds.','Uds.')}</th><th style="padding:8px;text-align:right">${L('Total','Total')}</th></tr></thead>
@@ -7185,6 +7186,32 @@ function _buildAnnualReport(year, monthFilterIdx){
   }
 
   // 📚 GASTOS (DEBE) · abans del Resultat comptable
+  // 🎯 RESUMEN CONSOLIDADO DE INGRESOS TOTALES · antes de gastos, para claridad
+  const _totServ = Object.values(grandTotals.byConcept||{}).reduce((s,n)=>s+n,0);
+  const _totHaberMan = grandTotals.haberTotal || 0;
+  const _totIngresos = _totServ + _totHaberMan;
+  if(_totIngresos > 0){
+    html += `<div style="margin:14px 0 18px 0;padding:16px 20px;background:linear-gradient(135deg,#052e1a,#0f4d2a);border-radius:10px;color:#fff">
+      <div style="font-size:12px;color:#a7f3d0;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin-bottom:10px">🧾 ${L('Resum d\'ingressos totals','Resumen de ingresos totales')}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+        <div style="padding:10px 12px;background:rgba(255,255,255,.08);border-radius:6px;border-left:3px solid #86efac">
+          <div style="font-size:10px;color:#86efac;letter-spacing:.5px">📝 ${L('Facturació serveis','Facturación servicios')}</div>
+          <div style="font-size:22px;color:#fff;font-weight:800;font-family:'Courier New',monospace;margin-top:4px">${fmt(_totServ)}</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:2px;font-style:italic">TRAF + PRIV · ya en Facturación por concepto</div>
+        </div>
+        <div style="padding:10px 12px;background:rgba(255,255,255,.08);border-radius:6px;border-left:3px solid #fde047">
+          <div style="font-size:10px;color:#fde047;letter-spacing:.5px">➕ ${L('HABER manual (extra)','HABER manual (extra)')}</div>
+          <div style="font-size:22px;color:#fff;font-weight:800;font-family:'Courier New',monospace;margin-top:4px">${fmt(_totHaberMan)}</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:2px;font-style:italic">DH marcado como HABER manual</div>
+        </div>
+        <div style="padding:10px 12px;background:rgba(126,227,170,.15);border-radius:6px;border:2px solid #86efac">
+          <div style="font-size:10px;color:#86efac;letter-spacing:.5px">🏆 ${L('TOTAL INGRESSOS','TOTAL INGRESOS')}</div>
+          <div style="font-size:26px;color:#7ee3aa;font-weight:800;font-family:'Courier New',monospace;margin-top:4px">${fmt(_totIngresos)}</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:2px;font-style:italic">${L('Tot el que ha entrat','Todo lo que ha entrado')}</div>
+        </div>
+      </div>
+    </div>`;
+  }
   // 🐛 FIX feb 2026: agrupar por CATEGORÍAS (Nóminas, Seguros, Luz, Comisiones…)
   // para que el informe anual quepa en 1 pantalla / 1 hoja. Cada categoría es expandible
   // con clic → muestra los conceptos individuales dentro.
