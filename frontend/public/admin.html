@@ -1414,6 +1414,14 @@ async function openDetail(install_id){
       </div>
     </details>
 
+    <!-- ☁️ COPIAS EN LA NUBE (feb 2026) — admin puede enviar cualquiera al cliente -->
+    <details style="background:#0b1121" data-testid="details-cloud-backups" ontoggle="if(this.open) window._loadCloudBackupsForAdmin(this.dataset.iid, this.dataset.lkey)" data-iid="${(l.install_id||'').replace(/"/g,'&quot;')}" data-lkey="${(l.license_key||'').replace(/"/g,'&quot;')}">
+      <summary style="padding:14px 26px;cursor:pointer;font-size:12px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #1e293b">☁️ Copias en la nube <span style="color:#86efac;font-size:10px;margin-left:4px">soporte al cliente · envía cualquiera de las 30</span></summary>
+      <div style="padding:14px 26px" id="cbAdminBody-${l.install_id}">
+        <div style="color:var(--muted);font-style:italic;padding:8px 0">Cargando copias del cliente…</div>
+      </div>
+    </details>
+
     <!-- Datos técnicos originales (colapsable) -->
     <details style="background:#0b1121">
       <summary style="padding:14px 26px;cursor:pointer;font-size:12px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #1e293b">📋 Datos técnicos y trazabilidad</summary>
@@ -2236,6 +2244,71 @@ async function loadPaymentAlerts(){
     }
   }catch(e){/* silent */}
 }
+
+// ☁️ CLOUD BACKUP ADMIN — carga las 30 copias del cliente y permite enviar cualquiera (feb 2026)
+window._loadCloudBackupsForAdmin = function(iid, lkey){
+  const body = document.getElementById('cbAdminBody-' + iid);
+  if(!body || body.dataset.loaded === '1') return; // no recargar
+  body.dataset.loaded = '1';
+  const token = new URLSearchParams(location.hash.replace(/^#/,'')).get('token') || sessionStorage.getItem('mcp.admin.token') || 'MB-ADMIN-BRUGULAT-2026-4F8E2A1C';
+  fetch('/api/sync/admin/cloudbackup/list?target_install_id=' + encodeURIComponent(iid), {headers:{'X-Admin-Token':token}})
+    .then(r => r.json()).then(d => {
+      if(!d || !Array.isArray(d.backups)){
+        body.innerHTML = '<div style="color:#fca5a5;padding:10px 0">❌ Error cargando copias: ' + (d && d.detail || 'formato inesperado') + '</div>';
+        return;
+      }
+      if(!d.backups.length){
+        body.innerHTML = '<div style="color:var(--muted);font-style:italic;padding:10px 0">⚪ Este cliente aún no tiene copias en la nube. Se generarán automáticamente cuando abra la app (una cada 24h · máximo 30 rotativas).</div>';
+        return;
+      }
+      const fmtBytes = (n) => n < 1024 ? (n + ' B') : (n < 1048576 ? (Math.round(n/1024) + ' KB') : (Math.round(n/10485.76)/100 + ' MB'));
+      const rows = d.backups.map((b, i) => {
+        const dt = new Date(b.created_at);
+        const dh = dt.toLocaleDateString('es-ES', {day:'2-digit', month:'2-digit', year:'2-digit'});
+        const th = dt.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+        const isRecent = i === 0;
+        return '<tr style="border-bottom:1px solid #1e293b' + (isRecent?';background:#052e1a':'') + '">'
+          + '<td style="padding:8px 10px;font-family:Consolas,monospace;color:' + (isRecent?'#7ee3aa':'#e2e8f0') + ';font-weight:' + (isRecent?'700':'500') + '">' + dh + ' ' + th + (isRecent?' <span style="font-size:9px;color:#86efac">MÁS RECIENTE</span>':'') + '</td>'
+          + '<td style="padding:8px 10px;color:#94a3b8;font-size:11px">' + (b.label || '—') + '</td>'
+          + '<td style="padding:8px 10px;text-align:right;font-family:Consolas,monospace;color:#7dd3fc;font-size:11px">' + fmtBytes(b.size_bytes || 0) + '</td>'
+          + '<td style="padding:8px 10px;text-align:right;color:#94a3b8;font-family:Consolas,monospace;font-size:11px">' + (b.keys_count || 0) + ' claves</td>'
+          + '<td style="padding:8px 10px;text-align:right"><button data-testid="cb-send-' + b.backup_id.slice(0,8) + '" class="cb-send-btn" data-bid="' + b.backup_id + '" data-date="' + dh + ' ' + th + '" style="padding:5px 12px;background:linear-gradient(90deg,#0369a1,#0284c7);color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:700;font-size:11px">📤 Enviar</button></td>'
+          + '</tr>';
+      }).join('');
+      body.innerHTML = '<div style="background:#0a1f2e;border-left:3px solid #0284c7;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#7dd3fc;line-height:1.5">💡 <b>Envía una copia concreta al cliente</b>: al pulsar "📤 Enviar", esa copia aparecerá en su pending buzón al abrir la app. El cliente decidirá si aplicarla. Útil si el cliente ha perdido datos recientes y necesita una copia de hace X días.</div><div style="max-height:340px;overflow:auto;border:1px solid #1e293b;border-radius:6px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead style="position:sticky;top:0"><tr style="background:#0f172a;color:#94a3b8"><th style="padding:8px 10px;text-align:left">Fecha y hora</th><th style="padding:8px 10px;text-align:left">Etiqueta</th><th style="padding:8px 10px;text-align:right">Tamaño</th><th style="padding:8px 10px;text-align:right">Contenido</th><th style="padding:8px 10px;text-align:right">Acción</th></tr></thead><tbody>' + rows + '</tbody></table></div><div style="margin-top:8px;font-size:10px;color:var(--muted);text-align:right">' + d.count + ' de 30 copias · más antigua se rota al ingresar la 31</div>';
+      // Wire up botones "Enviar"
+      body.querySelectorAll('.cb-send-btn').forEach(btn => {
+        btn.onclick = () => {
+          const bid = btn.dataset.bid;
+          const dateStr = btn.dataset.date;
+          if(!confirm('¿Enviar la copia del ' + dateStr + ' al cliente?\n\nAparecerá en su buzón "pending" al abrir la app y le preguntará si quiere restaurarla.')) return;
+          btn.textContent = '⏳ Enviando…';
+          btn.disabled = true;
+          fetch('/api/sync/admin/cloudbackup/push', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json', 'X-Admin-Token':token},
+            body: JSON.stringify({target_license_key: lkey, target_install_id: iid, backup_id: bid})
+          }).then(r => r.json()).then(res => {
+            if(res && res.ok){
+              btn.textContent = '✅ Enviada';
+              btn.style.background = '#166534';
+              alert('✅ Copia enviada al cliente.\n\nCliente: ' + (res.target_client_name || res.target_client_email || '—') + '\nFecha origen: ' + (res.source_date || '—') + '\n\nAparecerá en su pending al abrir la app.');
+            } else {
+              btn.textContent = '❌ Error';
+              btn.disabled = false;
+              alert('❌ Error: ' + (res && res.detail || 'desconocido'));
+            }
+          }).catch(err => {
+            btn.textContent = '📤 Enviar';
+            btn.disabled = false;
+            alert('❌ Error de red: ' + err.message);
+          });
+        };
+      });
+    }).catch(err => {
+      body.innerHTML = '<div style="color:#fca5a5;padding:10px 0">❌ Error de red: ' + err.message + '</div>';
+    });
+};
 </script>
 </body>
 </html>

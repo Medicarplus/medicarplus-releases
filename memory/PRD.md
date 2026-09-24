@@ -1758,3 +1758,11 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - Cubre: conservación de dinero, transitividad Σdías=Σmeses=Σaños, categorización ingresos Emp1 (5 fijas), categorización gastos (auditoría cero pérdida), beneficio neto = ing-gas, traspasos internos NO alteran físico total, retornos NO cuentan, fotos PRIV+HABER unifican, canjes 66,50€ regla exacta, byFp/debeByFp segregation, datáfono reclassify sin pérdida, cuadre acumulado CAJA+BANCO, recuento entradas conservado, aislamiento Emp1/Emp2
 - Ejecutar: `node /app/frontend/public/tests/accounting_audit.js`
 - Resultado: **47/47 PASS**
+
+### ☁️ Panel Admin — Envío Manual de Copias Históricas al Cliente (Feb 2026)
+- **Backend**: 2 endpoints admin nuevos protegidos con X-Admin-Token o MASTER key:
+  - `GET /api/sync/admin/cloudbackup/list?target_install_id=X` → lista 30 copias del cliente
+  - `POST /api/sync/admin/cloudbackup/push` (body: target_license_key + target_install_id + backup_id) → copia el snapshot histórico al buzón pending del cliente para que lo vea al abrir la app
+- **Admin panel** (`/admin.html` → detalle cliente): nueva sección `<details data-testid="details-cloud-backups">` "☁️ COPIAS EN LA NUBE · soporte al cliente · envía cualquiera de las 30". Tabla ordenada por fecha con columnas [Fecha·hora · Etiqueta · Tamaño · Claves · Acción]. Fila más reciente destacada con badge "MÁS RECIENTE". Cada fila con botón "📤 Enviar" individual → confirma → push a pending buzón del cliente.
+- **UX**: la función `window._loadCloudBackupsForAdmin(iid, lkey)` lee el data-testid del `<details>` en `ontoggle`, hace fetch lazy (solo cuando el admin lo abre), renderiza tabla con 30 filas. `data-loaded='1'` evita recarga si se cierra/reabre.
+- **Verificado E2E**: admin auth 403 sin token · listar devuelve 30 items · push envía copia histórica concreta (backup_id=X) → pending mailbox del cliente muestra "📩 Copia enviada por soporte (del DD/MM/YYYY HH:MM)".

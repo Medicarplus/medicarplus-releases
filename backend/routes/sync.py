@@ -21,7 +21,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field
 
@@ -66,6 +66,21 @@ def _iso(dt) -> Optional[str]:
 
 def _key_hash(key: str) -> str:
     return hashlib.sha256(key.strip().encode()).hexdigest()
+
+
+def _check_admin_auth(request):
+    """Auth para endpoints admin: exige X-Admin-Token header o admin_license_key=MASTER en query.
+    Lanza HTTPException 403 si no autorizado.
+    """
+    import os as _os
+    admin_token_env = (_os.environ.get("LICENSE_ADMIN_TOKEN") or "").strip()
+    hdr = (request.headers.get("X-Admin-Token") or "").strip()
+    q_key = (request.query_params.get("admin_license_key") or "").strip()
+    if admin_token_env and hdr == admin_token_env:
+        return True
+    if q_key == MASTER_KEY:
+        return True
+    raise HTTPException(status_code=403, detail="admin_only")
 
 
 def _parse_iso(s) -> Optional[datetime]:
@@ -667,6 +682,93 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
         return {
             "ok": True,
             "backup_id": backup_id,
+            "target_client_email": target.get("client_email"),
+            "target_client_name": target.get("client_name"),
+            "created_at": _iso(now),
+        }
+
+    # ────────────────────────────────────────────────────────────────────
+    # 🛠️ ADMIN CLOUD BACKUP · listar las 30 copias del cliente + push individual
+    # (Feb 2026 · para que soporte pueda enviar CUALQUIER copia histórica al cliente)
+    # ────────────────────────────────────────────────────────────────────
+    @router.get("/sync/admin/cloudbackup/list")
+    async def admin_cloudbackup_list(target_install_id: str, request: Request):
+        """Lista las últimas 30 cloud backups de CUALQUIER cliente (metadata, sin data).
+        Auth: X-Admin-Token header (opcional, si está configurado) O MASTER key.
+        """
+        _check_admin_auth(request)
+        cursor = db[COLL_CLOUD_BACKUPS].find({
+            "install_id": target_install_id,
+        }, {"data": 0}).sort("created_at", -1)
+        out = []
+        async for d in cursor:
+            out.append({
+                "backup_id": d["backup_id"],
+                "label": d.get("label"),
+                "size_bytes": d.get("size_bytes", 0),
+                "keys_count": d.get("keys_count", 0),
+                "created_at": _iso(d["created_at"]),
+            })
+        return {"backups": out, "count": len(out), "target_install_id": target_install_id}
+
+    @router.post("/sync/admin/cloudbackup/push")
+    async def admin_cloudbackup_push(body: dict, request: Request):
+        """Envía una copia HISTÓRICA concreta (backup_id de sync_cloud_backups) al buzón
+        del cliente destino. El cliente la verá como "Copia enviada por soporte" al abrir la app.
+
+        Body: { target_license_key, target_install_id, backup_id, label? }
+        """
+        _check_admin_auth(request)
+        target_lk = (body.get("target_license_key") or "").strip()
+        target_iid = (body.get("target_install_id") or "").strip()
+        backup_id = (body.get("backup_id") or "").strip()
+        if not target_lk or not target_iid or not backup_id:
+            raise HTTPException(status_code=400, detail="missing_required_fields")
+        target = await _find_license(target_lk)
+        if not target:
+            raise HTTPException(status_code=404, detail="target_license_not_found")
+        # Cargar la copia histórica solicitada
+        cb = await db[COLL_CLOUD_BACKUPS].find_one({
+            "install_id": target_iid,
+            "backup_id": backup_id,
+        })
+        if not cb:
+            raise HTTPException(status_code=404, detail="cloudbackup_not_found")
+        # Depositarla en el buzón pending del cliente (upsert admin sender)
+        target_lkh = _key_hash(target_lk)
+        now = _now()
+        new_backup_id = str(uuid.uuid4())
+        created_human = cb["created_at"].strftime("%d/%m/%Y %H:%M") if isinstance(cb.get("created_at"), datetime) else str(cb.get("created_at",""))
+        label = (body.get("label") or "").strip() or f"📩 Copia enviada por soporte (del {created_human})"
+        admin_sender_id = "admin:support-cloud"
+        doc = {
+            "backup_id": new_backup_id,
+            "license_key_hash": target_lkh,
+            "from_install_id": admin_sender_id,
+            "from_admin": True,
+            "admin_source_backup_id": backup_id,  # trazabilidad
+            "admin_source_date": cb["created_at"].isoformat() if isinstance(cb.get("created_at"), datetime) else None,
+            "target_license_key": target_lk,
+            "target_install_id": target_iid,
+            "target_client_email": target.get("client_email"),
+            "target_client_name": target.get("client_name"),
+            "label": label,
+            "data": cb.get("data") or {},
+            "created_at": now,
+            "consumed_by": [],
+        }
+        await db[COLL_BACKUPS].replace_one(
+            {"license_key_hash": target_lkh, "from_install_id": admin_sender_id},
+            doc,
+            upsert=True,
+        )
+        logger.info("admin/cloudbackup/push target=%s source_bid=%s new_bid=%s",
+                    target_iid, backup_id[:8], new_backup_id[:8])
+        return {
+            "ok": True,
+            "backup_id": new_backup_id,
+            "source_backup_id": backup_id,
+            "source_date": doc["admin_source_date"],
             "target_client_email": target.get("client_email"),
             "target_client_name": target.get("client_name"),
             "created_at": _iso(now),
