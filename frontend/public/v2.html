@@ -6742,6 +6742,18 @@ function openAnnualReport(){
     const y = parseInt(yearSel.value);
     const m = parseInt(monthSel.value); // -1 = año completo, 0-11 = mes concreto
     bodyEl.innerHTML=_buildAnnualReport(y, m);
+    // 🔽 Expand/collapse de categorías de gastos
+    bodyEl.querySelectorAll('[data-cat-toggle]').forEach(row => {
+      row.onclick = () => {
+        const key = row.getAttribute('data-cat-toggle');
+        const isOpen = row.getAttribute('data-open') === '1';
+        const details = bodyEl.querySelectorAll('.cat-detail.' + key);
+        details.forEach(d => d.style.display = isOpen ? 'none' : 'table-row');
+        const caret = bodyEl.querySelector('[data-caret="' + key + '"]');
+        if(caret) caret.textContent = isOpen ? '▸' : '▾';
+        row.setAttribute('data-open', isOpen ? '0' : '1');
+      };
+    });
   };
   yearSel.onchange=render;
   monthSel.onchange=render;
@@ -7121,16 +7133,101 @@ function _buildAnnualReport(year, monthFilterIdx){
   }
 
   // 📚 GASTOS (DEBE) · abans del Resultat comptable
+  // 🐛 FIX feb 2026: agrupar por CATEGORÍAS (Nóminas, Seguros, Luz, Comisiones…)
+  // para que el informe anual quepa en 1 pantalla / 1 hoja. Cada categoría es expandible
+  // con clic → muestra los conceptos individuales dentro.
+  const _catGasto = (raw) => {
+    const s = String(raw||'').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    if(!s || s === 'gasto') return 'Otros / Varios';
+    // Orden: patrones más específicos primero
+    if(/\b(acomiada|indemniz|finiquit|despid|liquidaci)/.test(s)) return 'Indemnizaciones / Despidos';
+    if(/\b(nomina|nòmina|sueldo|salari|jornal|faena)\b|\bhonoraris?\s+[a-z]/.test(s)) return 'Nóminas y sueldos';
+    if(/\b(irpf|iva|hacienda|s\.?\s*s\.?|seguridad social|cotitzacio|cotizaci|tesoreria|cuota\s+aut|autonom)/.test(s)) return 'Impuestos y cotizaciones';
+    if(/ascreme|associaci|asociaci|cuota\s+col|colegi/.test(s)) return 'Cuotas y asociaciones';
+    if(/mapfre|axa|allianz|zurich|mutua|assegur|asegur|seguro|responsabilit|responsabil/.test(s)) return 'Seguros';
+    if(/asessor|assesor|asesor|gestori|gestor\b|abogad|advocat|notari|notario/.test(s)) return 'Asesoría y gestoría';
+    if(/hola\s*luz|iberdrol|endes|naturg|edp|repsol\s*luz|electric|luz|llum/.test(s)) return 'Luz / Electricidad';
+    if(/aigua|agua|canal\s+isabel|sorea|hidrogea|aiguas|aguas/.test(s)) return 'Agua';
+    if(/movistar|vodafone|orange|masmovil|jazztel|yoigo|telefonic|adsl|fibra|internet|telefon/.test(s)) return 'Teléfono / Internet';
+    if(/gas\s+natur|repsol\s*gas|cepsa\s*gas|butano|propano/.test(s)) return 'Gas';
+    if(/lloguer|alquiler|renta\s+local|arrendam/.test(s)) return 'Alquiler';
+    if(/pulit|neteja|limpi|clean/.test(s)) return 'Limpieza';
+    if(/copy|copies|copias|paper|papel|tinta|toner|impr|material|oficin|mercadona|carrefour|lidl|dia\b/.test(s)) return 'Material / Oficina';
+    if(/manteni|reparac|reparaci|averia|averi|gic\s*pro|general\s+asde|asde|informat|softw/.test(s)) return 'Mantenimiento y servicios';
+    if(/comissi|comisi[oó]n|comisio|tpv|c[aà]rrec\s+banc|banc\s+cargo|banc\s+cost|cost\s+banc/.test(s)) return 'Comisiones bancarias';
+    if(/devol|devoluci|reintegro/.test(s)) return 'Devoluciones';
+    if(/publici|marqueting|marketing|anunci/.test(s)) return 'Publicidad y marketing';
+    if(/transport|combustibl|gasolin|dies[eé]l|peatje|peaje|aparcam|parking/.test(s)) return 'Transporte';
+    if(/formaci|curs\b|cursos|cursillo/.test(s)) return 'Formación';
+    return 'Otros / Varios';
+  };
   const gastosData = grandTotals.gastos || {};
-  const gastosEntries = Object.entries(gastosData).sort((a,b) => b[1].total - a[1].total);
-  if(gastosEntries.length){
-    const totalGastos = gastosEntries.reduce((s,[,v]) => s + v.total, 0);
-    const totalGastosCnt = gastosEntries.reduce((s,[,v]) => s + v.count, 0);
-    html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">💸 ${L('Gastos (DEBE)','Gastos (DEBE)')}</h4>
-      <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
-        <thead><tr style="background:#7f1d1d;color:#fecaca"><th style="padding:8px;text-align:left">${L('Concepto','Concepto')}</th><th style="padding:8px;text-align:right">${L('Uds.','Uds.')}</th><th style="padding:8px;text-align:right">${L('Total','Total')}</th></tr></thead>
-        <tbody>${gastosEntries.map(([k,v]) => `<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:6px 8px">${escapeHtml(k)}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;color:#0891b2;font-weight:600">${v.count}</td><td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-weight:600;color:#dc2626">-${fmt(v.total)}</td></tr>`).join('')}
-        <tr style="border-top:2px solid #7f1d1d;background:#fef2f2;font-weight:700"><td style="padding:8px">${L('TOTAL GASTOS','TOTAL GASTOS')}</td><td style="padding:8px;text-align:right;color:#0891b2">${totalGastosCnt}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#dc2626">-${fmt(totalGastos)}</td></tr>
+  const gastosEntriesFlat = Object.entries(gastosData).sort((a,b) => b[1].total - a[1].total);
+  if(gastosEntriesFlat.length){
+    // Agrupar por categoría
+    const byCat = {};
+    gastosEntriesFlat.forEach(([concepto, v]) => {
+      const cat = _catGasto(concepto);
+      if(!byCat[cat]) byCat[cat] = { total:0, count:0, items:[] };
+      byCat[cat].total += v.total;
+      byCat[cat].count += v.count;
+      byCat[cat].items.push({ concepto, total:v.total, count:v.count });
+    });
+    // Ordenar categorías por total descendente, items internos también
+    const catRows = Object.entries(byCat).sort((a,b) => b[1].total - a[1].total);
+    catRows.forEach(([, d]) => d.items.sort((a,b) => b.total - a.total));
+    const totalGastos = gastosEntriesFlat.reduce((s,[,v]) => s + v.total, 0);
+    const totalGastosCnt = gastosEntriesFlat.reduce((s,[,v]) => s + v.count, 0);
+    // Icono por categoría
+    const catIcon = {
+      'Nóminas y sueldos':'👥',
+      'Indemnizaciones / Despidos':'💔',
+      'Impuestos y cotizaciones':'🏛️',
+      'Cuotas y asociaciones':'🏢',
+      'Seguros':'🛡️',
+      'Asesoría y gestoría':'📋',
+      'Luz / Electricidad':'💡',
+      'Agua':'💧',
+      'Teléfono / Internet':'📞',
+      'Gas':'🔥',
+      'Alquiler':'🏠',
+      'Limpieza':'🧹',
+      'Material / Oficina':'📎',
+      'Mantenimiento y servicios':'🔧',
+      'Comisiones bancarias':'🏦',
+      'Devoluciones':'↩️',
+      'Publicidad y marketing':'📣',
+      'Transporte':'🚗',
+      'Formación':'🎓',
+      'Otros / Varios':'📦'
+    };
+    html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">💸 ${L('Gastos (DEBE) · per categoria','Gastos (DEBE) · por categoría')} <span style="font-size:11px;color:#64748b;font-weight:400;font-style:italic">${L('· Clica una categoria per veure el detall','· Clic en una categoría para ver el detalle')}</span></h4>
+      <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px" data-testid="gastos-por-categoria">
+        <thead><tr style="background:#7f1d1d;color:#fecaca"><th style="padding:8px;text-align:left;width:36px"></th><th style="padding:8px;text-align:left">${L('Categoria','Categoría')}</th><th style="padding:8px;text-align:right;width:80px">${L('Uds.','Uds.')}</th><th style="padding:8px;text-align:right;width:140px">${L('Total','Total')}</th><th style="padding:8px;text-align:right;width:80px">%</th></tr></thead>
+        <tbody>`;
+    catRows.forEach(([cat, d], idx) => {
+      const pct = totalGastos > 0 ? (d.total/totalGastos*100).toFixed(1) : '0';
+      const ico = catIcon[cat] || '📦';
+      html += `<tr class="cat-row" data-cat-toggle="cat-${idx}" style="border-bottom:1px solid #e5e7eb;cursor:pointer;background:#fef2f2" title="${L('Clica per veure el detall','Clic para ver el detalle')}">
+        <td style="padding:8px;text-align:center;font-size:11px;color:#7f1d1d;font-weight:800" data-caret="cat-${idx}">▸</td>
+        <td style="padding:8px;font-weight:700;color:#7f1d1d">${ico} ${escapeHtml(cat)}</td>
+        <td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#0891b2;font-weight:600">${d.count}</td>
+        <td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#dc2626">-${fmt(d.total)}</td>
+        <td style="padding:8px;text-align:right;color:#64748b;font-family:'Courier New',monospace">${pct}%</td>
+      </tr>`;
+      // Filas detalle (ocultas por defecto)
+      d.items.forEach(it => {
+        html += `<tr class="cat-detail cat-${idx}" style="display:none;background:#fafafa;border-bottom:1px dashed #e5e7eb">
+          <td></td>
+          <td style="padding:5px 8px 5px 32px;font-size:12px;color:#475569;font-style:italic">${escapeHtml(it.concepto)}</td>
+          <td style="padding:5px 8px;text-align:right;font-family:'Courier News',monospace;font-size:12px;color:#0891b2">${it.count}</td>
+          <td style="padding:5px 8px;text-align:right;font-family:'Courier New',monospace;font-size:12px;color:#dc2626">-${fmt(it.total)}</td>
+          <td></td>
+        </tr>`;
+      });
+    });
+    html += `<tr style="border-top:2px solid #7f1d1d;background:#fef3c7;font-weight:700"><td></td><td style="padding:8px">${L('TOTAL GASTOS','TOTAL GASTOS')}</td><td style="padding:8px;text-align:right;color:#0891b2">${totalGastosCnt}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#dc2626">-${fmt(totalGastos)}</td><td></td></tr>
         </tbody>
       </table>`;
   }
