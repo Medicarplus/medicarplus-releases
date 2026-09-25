@@ -7166,13 +7166,16 @@ function _buildAnnualReport(year, monthFilterIdx){
   const conceptEntries=Object.entries(grandTotals.byConcept).sort((a,b)=>b[1]-a[1]);
   if(conceptEntries.length){
     const conceptCnt = grandTotals.byConceptCnt || {};
+    const conceptEnts = grandTotals.byConceptEntries || {};
     // 🎯 Feb 2026: agrupar en categorías para hacerlo digerible
     //   · Empresa 1 (trafic/autoescuela): 5 categorías fijas (Tráfico, Fotos, Duplicado, C.Oficial, Varios)
     //   · Empresa 2 (cempla/otra): detección automática — top 5 conceptos más facturados + resto → Varios
-    // NO expandible — solo totales.
+    // Expandible: al clicar una categoría se ven los conceptos individuales, y al clicar un
+    // concepto se muestran los días exactos (con salto al día como en la sección de gastos).
     const isEmp1 = (activeKey === 'trafic');
     let catRowsIng = [];
     let catCntMap = {};
+    let catConceptsMap = {};   // categoría → [ [concepto, total, count, entries[]], ... ]
     if(isEmp1){
       const _catIng = (raw) => {
         const s = String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -7184,10 +7187,12 @@ function _buildAnnualReport(year, monthFilterIdx){
       };
       const catTotals = {'Tráfico':0, 'Fotos':0, 'Duplicado':0, 'C.Oficial':0, 'Varios':0};
       catCntMap    = {'Tráfico':0, 'Fotos':0, 'Duplicado':0, 'C.Oficial':0, 'Varios':0};
+      catConceptsMap = {'Tráfico':[], 'Fotos':[], 'Duplicado':[], 'C.Oficial':[], 'Varios':[]};
       conceptEntries.forEach(([k, v]) => {
         const c = _catIng(k);
         catTotals[c] += v;
         catCntMap[c] += (conceptCnt[k]||0);
+        catConceptsMap[c].push([k, v, conceptCnt[k]||0, conceptEnts[k]||[]]);
       });
       catRowsIng = Object.entries(catTotals).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
     } else {
@@ -7196,30 +7201,60 @@ function _buildAnnualReport(year, monthFilterIdx){
       const sorted = conceptEntries.slice();
       const top = sorted.slice(0, TOP_N);
       const rest = sorted.slice(TOP_N);
-      top.forEach(([k, v]) => { catCntMap[k] = conceptCnt[k]||0; catRowsIng.push([k, v]); });
+      top.forEach(([k, v]) => {
+        catCntMap[k] = conceptCnt[k]||0;
+        catConceptsMap[k] = [[k, v, conceptCnt[k]||0, conceptEnts[k]||[]]];
+        catRowsIng.push([k, v]);
+      });
       if(rest.length){
         let vs = 0, cs = 0;
-        rest.forEach(([k, v]) => { vs += v; cs += (conceptCnt[k]||0); });
+        const varItems = [];
+        rest.forEach(([k, v]) => { vs += v; cs += (conceptCnt[k]||0); varItems.push([k, v, conceptCnt[k]||0, conceptEnts[k]||[]]); });
         catCntMap['Varios'] = cs;
+        catConceptsMap['Varios'] = varItems;
         catRowsIng.push(['Varios', vs]);
       }
     }
     const catIco = {'Tráfico':'🚦', 'Fotos':'📷', 'Duplicado':'📄', 'C.Oficial':'📜', 'Varios':'📦'};
     const _grandIng = catRowsIng.reduce((s,[,v])=>s+v, 0);
     const _grandCnt = Object.values(catCntMap).reduce((s,n)=>s+(n||0), 0);
-    const catLabel = isEmp1 ? L('Facturació per categoria · Empresa 1','Facturación por categoría · Empresa 1') : L('Facturació per concepte · Empresa 2 (auto)','Facturación por concepto · Empresa 2 (auto)');
+    // 🏢 Feb 2026: mostrar el NOMBRE REAL de la empresa (no un genérico "Empresa 1"/"2")
+    const _empName = comps[0].name || (isEmp1 ? 'Empresa 1' : 'Empresa 2');
+    const catLabel = isEmp1
+      ? L('Facturació per categoria · ' + _empName,'Facturación por categoría · ' + _empName)
+      : L('Facturació per concepte · ' + _empName + ' (auto)','Facturación por concepto · ' + _empName + ' (auto)');
     const catHint = isEmp1
-      ? L('· 5 grups fixos (Tràfic agrupat, la resta separada)','· 5 grupos fijos (Tráfico agrupado, el resto separado)')
-      : L('· top 5 conceptes automàtics · la resta agrupada a Varios','· top 5 conceptos automáticos · el resto agrupado en Varios');
+      ? L('· 5 grups fixos (Tràfic agrupat, la resta separada) · Clica una categoria per veure els conceptes','· 5 grupos fijos (Tráfico agrupado, el resto separado) · Clic en una categoría para ver los conceptos')
+      : L('· top 5 conceptes automàtics · la resta agrupada a Varios · Clica per veure el detall','· top 5 conceptos automáticos · el resto agrupado en Varios · Clic para ver el detalle');
     html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">📝 ${catLabel} <span style="font-size:11px;color:#64748b;font-weight:400;font-style:italic">${catHint}</span></h4>
       <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px" data-testid="ingresos-por-categoria">
-        <thead><tr style="background:#0f172a;color:#f5b301"><th style="padding:8px;text-align:left">${L('Categoría','Categoría')}</th><th style="padding:8px;text-align:right;width:120px">${L('Uds.','Uds.')}</th><th style="padding:8px;text-align:right;width:160px">${L('Total','Total')}</th><th style="padding:8px;text-align:right;width:80px">%</th></tr></thead>
-        <tbody>${catRowsIng.map(([cat,tot]) => {
-          const pct = _grandIng > 0 ? (tot/_grandIng*100).toFixed(1) : '0';
-          const ico = catIco[cat] || '📦';
-          return `<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px;font-weight:700;color:#0f172a">${ico} ${escapeHtml(cat)}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#0891b2;font-weight:600">${catCntMap[cat]||0}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#166534">${fmt(tot)}</td><td style="padding:8px;text-align:right;color:#64748b;font-family:'Courier New',monospace">${pct}%</td></tr>`;
-        }).join('')}
-        <tr style="border-top:2px solid #0f172a;background:#fef3c7;font-weight:700"><td style="padding:8px">${L('TOTAL FACTURAT','TOTAL FACTURADO')}</td><td style="padding:8px;text-align:right;color:#0891b2">${_grandCnt}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#166534">${fmt(_grandIng)}</td><td></td></tr>
+        <thead><tr style="background:#0f172a;color:#f5b301"><th style="padding:8px;text-align:left;width:36px"></th><th style="padding:8px;text-align:left">${L('Categoría','Categoría')}</th><th style="padding:8px;text-align:right;width:120px">${L('Uds.','Uds.')}</th><th style="padding:8px;text-align:right;width:160px">${L('Total','Total')}</th><th style="padding:8px;text-align:right;width:80px">%</th></tr></thead>
+        <tbody>`;
+    catRowsIng.forEach(([cat, tot], idx) => {
+      const pct = _grandIng > 0 ? (tot/_grandIng*100).toFixed(1) : '0';
+      const ico = catIco[cat] || '📦';
+      const cid = 'ing-' + idx;
+      html += `<tr class="cat-row" data-cat-toggle="${cid}" style="border-bottom:1px solid #e5e7eb;cursor:pointer;background:#f0fdf4" title="${L('Clica per veure el detall','Clic para ver el detalle')}">
+        <td style="padding:8px;text-align:center;font-size:11px;color:#166534;font-weight:800" data-caret="${cid}">▸</td>
+        <td style="padding:8px;font-weight:700;color:#0f172a">${ico} ${escapeHtml(cat)}</td>
+        <td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#0891b2;font-weight:600">${catCntMap[cat]||0}</td>
+        <td style="padding:8px;text-align:right;font-family:'Courier New',monospace;font-weight:700;color:#166534">${fmt(tot)}</td>
+        <td style="padding:8px;text-align:right;color:#64748b;font-family:'Courier New',monospace">${pct}%</td>
+      </tr>`;
+      // Filas de detalle: cada concepto individual dentro de la categoría (clic → días)
+      const concepts = catConceptsMap[cat] || [];
+      concepts.slice().sort((a,b)=>b[1]-a[1]).forEach(([conc, cTot, cCnt, cEnts]) => {
+        const _entJson = encodeURIComponent(JSON.stringify(cEnts||[]));
+        html += `<tr class="cat-detail ${cid} ar-clickable-item" data-entries="${_entJson}" data-concept="${escapeHtml(conc)}" style="display:none;background:#fafafa;border-bottom:1px dashed #e5e7eb;cursor:pointer" title="${L('Clica per veure els dies i saltar-hi','Clic para ver los días e ir')}">
+          <td></td>
+          <td style="padding:5px 8px 5px 32px;font-size:12px;color:#475569;font-style:italic">${escapeHtml(conc)} <span style="color:#0891b2;font-size:10px">📅 ver días</span></td>
+          <td style="padding:5px 8px;text-align:right;font-family:'Courier New',monospace;font-size:12px;color:#0891b2">${cCnt}</td>
+          <td style="padding:5px 8px;text-align:right;font-family:'Courier New',monospace;font-size:12px;color:#166534">${fmt(cTot)}</td>
+          <td></td>
+        </tr>`;
+      });
+    });
+    html += `<tr style="border-top:2px solid #0f172a;background:#fef3c7;font-weight:700"><td></td><td style="padding:8px">${L('TOTAL FACTURAT','TOTAL FACTURADO')}</td><td style="padding:8px;text-align:right;color:#0891b2">${_grandCnt}</td><td style="padding:8px;text-align:right;font-family:'Courier New',monospace;color:#166534">${fmt(_grandIng)}</td><td></td></tr>
         </tbody>
       </table>`;
   }
