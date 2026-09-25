@@ -6909,10 +6909,13 @@ function _buildAnnualReport(year, monthFilterIdx){
       const m=parseInt(d.split('-')[1])-1;
       const list=compRaw.byDate[d]||[];
       const t=computeTotals(list);
-      cTotal.bruto+=t.bruto;cTotal.tasas+=t.tasas;cTotal.neto+=t.neto;cTotal.cnt+=t.cnt;
+      cTotal.bruto+=t.bruto;cTotal.tasas+=t.tasas;cTotal.neto+=t.neto;
       cTotal.byMonth[m]=(cTotal.byMonth[m]||0)+t.neto;
-      grandTotals.bruto+=t.bruto;grandTotals.tasas+=t.tasas;grandTotals.neto+=t.neto;grandTotals.cnt+=t.cnt;
-      grandTotals.byMonth[m]+=t.neto;grandTotals.byMonthCnt[m]+=t.cnt;
+      grandTotals.bruto+=t.bruto;grandTotals.tasas+=t.tasas;grandTotals.neto+=t.neto;
+      grandTotals.byMonth[m]+=t.neto;
+      // 🔢 Recuento de entradas: SOLO se cuentan las que aportan ingreso real
+      // (no retornos, no gastos DEBE, no traspasos internos, no bruto IRPF, no refund tasas,
+      //  y con importe > 0). El bucle interno de abajo hace este conteo con filtros correctos.
       // 💳 Per forma de pago · replica la lògica exacta del panell diari:
       //   Tarjeta = df manual si existeix, si no: sum auto (servei + tasa via T)
       //   Efectiu = efectiu auto − delta (reclassificació entre caixa/banc)
@@ -6964,7 +6967,6 @@ function _buildAnnualReport(year, monthFilterIdx){
           const hCat = _normalizeReportCat((e.nombre || 'Ingreso').trim());
           grandTotals.byConcept[hCat] = (grandTotals.byConcept[hCat]||0) + (e.importe || 0);
           grandTotals.byConceptCnt = grandTotals.byConceptCnt || {};
-          grandTotals.byConceptCnt[hCat] = (grandTotals.byConceptCnt[hCat]||0) + 1;
           // Guarda entries para el clic → fechas (grandTotals.byConceptEntries)
           grandTotals.byConceptEntries = grandTotals.byConceptEntries || {};
           grandTotals.byConceptEntries[hCat] = grandTotals.byConceptEntries[hCat] || [];
@@ -6972,6 +6974,8 @@ function _buildAnnualReport(year, monthFilterIdx){
           // Suma al total facturación general (como que el usuario lo ha cobrado)
           grandTotals.haberTotal = (grandTotals.haberTotal || 0) + (e.importe || 0);
           grandTotals.byMonthFacturacion[m] = (grandTotals.byMonthFacturacion[m]||0) + (e.importe || 0);
+          // Uds. por concepto: solo si importe > 0
+          if((e.importe||0) > 0){ grandTotals.byConceptCnt[hCat] = (grandTotals.byConceptCnt[hCat]||0) + 1; }
           return;
         }
         // Entrada normal (TRAF, servei, etc.)
@@ -6990,7 +6994,19 @@ function _buildAnnualReport(year, monthFilterIdx){
         // Tracking mensual PURO de facturación (sin restar DEBE)
         grandTotals.byMonthFacturacion[m] = (grandTotals.byMonthFacturacion[m]||0) + amtTotal;
         grandTotals.byConceptCnt = grandTotals.byConceptCnt || {};
-        grandTotals.byConceptCnt[cat] = (grandTotals.byConceptCnt[cat]||0) + 1;
+        // Uds. por concepto: solo si tiene importe > 0
+        if(amtTotal > 0){ grandTotals.byConceptCnt[cat] = (grandTotals.byConceptCnt[cat]||0) + 1; }
+        // 👥 ENTRADAS TOTALES = SOLO PERSONAS (revisiones/renovaciones/expediciones/canjes)
+        // NO cuentan los extras: Foto, Duplicado, C.Oficial (no son "una persona nueva").
+        // Aplica igual a Empresa 1 (Tráfico) que a Empresa 2 (Revisiones médicas).
+        // Regla: importe > 0 AND concepto NO es Foto/Duplicado/C.Oficial.
+        const _catLow = String(cat||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        const _isExtra = /foto/.test(_catLow) || /duplic/.test(_catLow) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLow);
+        if(amtTotal > 0 && !_isExtra){
+          grandTotals.cnt += 1;
+          grandTotals.byMonthCnt[m] += 1;
+          cTotal.cnt += 1;
+        }
         // 📅 Guarda las fechas por concepto para el clic → salta al día (feb 2026)
         grandTotals.byConceptEntries = grandTotals.byConceptEntries || {};
         grandTotals.byConceptEntries[cat] = grandTotals.byConceptEntries[cat] || [];

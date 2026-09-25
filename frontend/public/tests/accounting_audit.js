@@ -683,6 +683,7 @@ function aggregateAnnualReport(entriesByDate){
     byMonthFacturacion: Array(12).fill(0),
     byMonthGastos: Array(12).fill(0),
     byMonthCnt: Array(12).fill(0),
+    cnt: 0,
     gastos:{},
     haberTotal:0,  // solo para verificar el bug — NO se usa ya en el cálculo
   };
@@ -692,7 +693,6 @@ function aggregateAnnualReport(entriesByDate){
       if(e.retorno) return;
       if(e.kind==='DH' && e._hnBruto) return;
       if(e.kind==='DH' && (e._internal || e._tasaRefund)) return;
-      g.byMonthCnt[m] += 1;
       // DEBE → gasto
       if(e.kind==='DH' && e.tipo==='DEBE'){
         const gCat = (e.nombre || 'Gasto').trim();
@@ -702,11 +702,11 @@ function aggregateAnnualReport(entriesByDate){
         g.byMonthGastos[m] += (e.importe || 0);
         return;
       }
-      // HABER → fusiona en byConcept + byMonthFacturacion
+      // HABER → fusiona en byConcept + byMonthFacturacion (NO cuenta como entrada TRAF)
       if(e.kind==='DH' && e.tipo==='HABER'){
         const hCat = _normalizeReportCat((e.nombre || 'Ingreso').trim());
         g.byConcept[hCat] = (g.byConcept[hCat]||0) + (e.importe||0);
-        g.byConceptCnt[hCat] = (g.byConceptCnt[hCat]||0) + 1;
+        if((e.importe||0) > 0) g.byConceptCnt[hCat] = (g.byConceptCnt[hCat]||0) + 1;
         g.haberTotal += (e.importe||0);
         g.byMonthFacturacion[m] += (e.importe||0);
         return;
@@ -716,8 +716,16 @@ function aggregateAnnualReport(entriesByDate){
       const cat = _normalizeReportCat(rawTipo);
       const amtTotal = ((e.importe||0) - (e.descuento||0)) + (e.tasa||0);
       g.byConcept[cat] = (g.byConcept[cat]||0) + amtTotal;
-      g.byConceptCnt[cat] = (g.byConceptCnt[cat]||0) + 1;
+      if(amtTotal > 0) g.byConceptCnt[cat] = (g.byConceptCnt[cat]||0) + 1;
       g.byMonthFacturacion[m] += amtTotal;
+      // 👥 ENTRADAS TOTALES = SOLO PERSONAS (Renovación/Expedición/Canje/Revisión…)
+      // NO cuentan extras: Foto, Duplicado, C.Oficial
+      const _catLow = String(cat||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      const _isExtra = /foto/.test(_catLow) || /duplic/.test(_catLow) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLow);
+      if(amtTotal > 0 && !_isExtra){
+        g.cnt += 1;
+        g.byMonthCnt[m] += 1;
+      }
     });
   });
   return g;
@@ -939,6 +947,148 @@ console.log('\n🧪 TEST 25 · Precisión céntimo perfecto (10.000 entradas · 
 }
 
 // ═══════════════════════════════════════════════════════════════
+// TEST 26 · ENTRADAS TOTALES = SOLO PERSONAS (excluye Foto/Duplicado/C.Oficial)
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 26 · Entradas totales = SOLO personas (Renovación/Expedición/Canje/Revisión)');
+console.log('   Excluye Foto, Duplicado, C.Oficial (son extras que se venden A la persona, no PERSONAS)');
+{
+  const data = {
+    '2026-06-10': [
+      // 4 personas Tráfico (cuentan)
+      {kind:'TRAF', tipo:'Renovación', importe:37, tasa:6.30, fp:'E'},
+      {kind:'TRAF', tipo:'Expedición', importe:47, tasa:6.30, fp:'T'},
+      {kind:'TRAF', tipo:'Canje', importe:66.5, fp:'E'},
+      {kind:'TRAF', tipo:'Recuperación', importe:87, fp:'E'},
+      // 3 Duplicados TRAF (NO cuentan — son extras)
+      {kind:'TRAF', tipo:'Duplicado', importe:25, fp:'E'},
+      {kind:'TRAF', tipo:'Duplicado', importe:25, fp:'E'},
+      {kind:'TRAF', tipo:'Duplicado', importe:25, fp:'E'},
+      // 5 C.Oficial TRAF (NO cuentan)
+      {kind:'TRAF', tipo:'C.Oficial', importe:20, fp:'E'},
+      {kind:'TRAF', tipo:'C.Oficial', importe:20, fp:'E'},
+      {kind:'TRAF', tipo:'C.Oficial', importe:20, fp:'E'},
+      {kind:'TRAF', tipo:'C.Oficial', importe:20, fp:'E'},
+      {kind:'TRAF', tipo:'C.Oficial', importe:20, fp:'E'},
+      // 1 Renovación a 0€ sin tasa → NO cuenta (coste 0)
+      {kind:'TRAF', tipo:'Renovación', importe:0, tasa:0, fp:'E'},
+      // 1 retorno → NO cuenta
+      {kind:'TRAF', tipo:'Renovación', importe:37, retorno:true, fp:'E'},
+      // 10 fotos PRIV (NO cuentan)
+      ...Array.from({length:10}, () => ({kind:'PRIV', tipo:'Foto', importe:4, fp:'E'})),
+      // 2 Revisión médica PRIV (SÍ cuentan — es Empresa 2 style)
+      {kind:'PRIV', tipo:'Revisión médica', importe:35, fp:'E'},
+      {kind:'PRIV', tipo:'Revisión médica', importe:35, fp:'E'},
+      // HABER manuales y DEBE gastos → NO cuentan
+      {kind:'DH', tipo:'HABER', nombre:'Cobro pendiente', importe:150, fp:'X'},
+      {kind:'DH', tipo:'DEBE', nombre:'Nómina', importe:800, fp:'X'},
+    ],
+  };
+  const g = aggregateAnnualReport(data);
+  // Solo personas: 4 TRAF (Renov+Exped+Canje+Recup) + 2 PRIV Revisión = 6
+  assertEq('Entradas totales == 6 (4 Tráfico personas + 2 Revisiones)', g.cnt, 6);
+  assertEq('byMonthCnt[5] == 6', g.byMonthCnt[5], 6);
+  // Extras NO cuentan
+  assertEq('Duplicado NO cuenta en byMonthCnt', (g.byConceptCnt['Duplicado']||0) > 0 && g.cnt === 6 ? 1 : 0, 1);
+  console.log(`   Entradas Totales = ${g.cnt} personas (Duplicados=${g.byConceptCnt['Duplicado']||0}, C.Oficial=${g.byConceptCnt['C.Oficial']||0}, Fotos=${g.byConceptCnt['Foto']||0} NO cuentan)`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TEST 27 · CUADRE INTEGRAL: 3 años · Entradas personas vs entradas raw
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 27 · Cuadre integral 3 años · Entradas = personas (Renov/Exped/Canje) sin extras');
+YEARS.forEach(year => {
+  const g = aggregateAnnualReport(dataset[year]);
+  // Recuento manual con la MISMA regla independiente
+  let manualCnt = 0;
+  Object.values(dataset[year]).forEach(list => {
+    list.forEach(e => {
+      if(e.retorno) return;
+      if(e.kind==='DH') return;
+      const rawTipo = (e.kind==='TRAF') ? _effectiveTipo(e) : (e.tipo||'Otro');
+      const catLow = String(rawTipo||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      const isExtra = /foto/.test(catLow) || /duplic/.test(catLow) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(catLow);
+      const amtTotal = ((e.importe||0) - (e.descuento||0)) + (e.tasa||0);
+      if(amtTotal > 0 && !isExtra) manualCnt++;
+    });
+  });
+  assertEq(`Año ${year}: g.cnt (producción) == manualCnt (independiente)`, g.cnt, manualCnt);
+  const sumMonthly = g.byMonthCnt.reduce((s,n)=>s+n,0);
+  assertEq(`Año ${year}: Σ byMonthCnt == g.cnt`, sumMonthly, g.cnt);
+  console.log(`   ${year}: Entradas = ${g.cnt} personas (Σ meses = ${sumMonthly}) ✓`);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// TEST 28 · Facturación NO cambia por la nueva regla de conteo (independientes)
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 28 · Facturación total independiente de la regla de conteo de entradas');
+YEARS.forEach(year => {
+  const g = aggregateAnnualReport(dataset[year]);
+  // Facturación DEBE incluir TODO (Foto, Duplicado, C.Oficial, tasas, HABER, etc.)
+  const totalFact = Object.values(g.byConcept).reduce((s,n)=>s+n,0);
+  // Debe coincidir con Σ byMonthFacturacion
+  const sumMonth = g.byMonthFacturacion.reduce((s,n)=>s+n,0);
+  assertEq(`Año ${year}: Facturación = Σ byMonthFacturacion (incluye extras)`, totalFact, sumMonth);
+  // Y también con Σ neto de computeTotals + gastos (cuadre contable universal)
+  let netoTotal = 0;
+  Object.values(dataset[year]).forEach(a => { netoTotal += computeTotals(a).neto; });
+  const gastosTotal = Object.values(g.gastos).reduce((s,x)=>s+x.total,0);
+  const benef = totalFact - gastosTotal;
+  assertEq(`Año ${year}: Beneficio (Fact-Gastos) == Σ neto computeTotals`, benef, netoTotal);
+});
+// ═══════════════════════════════════════════════════════════════
+// TEST 29 · Escenario REAL Empresa 2 (CEMPLA S.L.) · revisiones deportivas + extras
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 29 · CEMPLA S.L. · Revisiones deportivas cuentan, extras NO');
+{
+  const data = {
+    '2026-06-10': [
+      // 20 revisiones de deportes (chips CEMPLA) — TODAS son personas
+      {kind:'PRIV', tipo:'Recon. C/Dto', importe:40, fp:'E'},
+      {kind:'PRIV', tipo:'Recon. C', importe:40, fp:'E'},
+      {kind:'PRIV', tipo:'P.Esfuerzo', importe:77, fp:'T'},
+      {kind:'PRIV', tipo:'Ciclista', importe:40, fp:'E'},
+      {kind:'PRIV', tipo:'Fútbol', importe:36.5, fp:'E'},
+      {kind:'PRIV', tipo:'Baloncesto', importe:40, fp:'E'},
+      {kind:'PRIV', tipo:'Atletismo', importe:40, fp:'E'},
+      {kind:'PRIV', tipo:'Natación', importe:40, fp:'E'},
+      {kind:'PRIV', tipo:'Tenis', importe:40, fp:'E'},
+      {kind:'PRIV', tipo:'Pádel', importe:40, fp:'E'},
+      {kind:'PRIV', tipo:'Montaña', importe:40, fp:'E'},
+      {kind:'PRIV', tipo:'Triatlón', importe:40, fp:'E'},
+      {kind:'PRIV', tipo:'P.Submarina', importe:40, fp:'E'},
+      {kind:'PRIV', tipo:'Submarinismo', importe:40, fp:'E'},
+      {kind:'PRIV', tipo:'Balonmano', importe:40, fp:'E'},
+      {kind:'PRIV', tipo:'Patinaje', importe:40, fp:'E'},
+      {kind:'PRIV', tipo:'Hockey', importe:40, fp:'E'},
+      // 3 revisiones "a mano" (custom) con nombres arbitrarios — también son personas
+      {kind:'PRIV', tipo:'Rugby', importe:40, fp:'E'},
+      {kind:'PRIV', tipo:'Golf', importe:35, fp:'E'},
+      {kind:'PRIV', tipo:'Boxeo', importe:45, fp:'E'},
+      // Extras (NO cuentan como persona)
+      {kind:'PRIV', tipo:'Foto', importe:4, fp:'E'},
+      {kind:'PRIV', tipo:'Foto', importe:4, fp:'E'},
+      {kind:'PRIV', tipo:'Duplicado', importe:15, fp:'E'},
+      {kind:'PRIV', tipo:'C.Oficial', importe:20, fp:'E'},
+    ],
+  };
+  const g = aggregateAnnualReport(data);
+  // 20 personas (17 chips + 3 custom manual)
+  assertEq('CEMPLA · Entradas = 20 personas (17 chips + 3 escritos a mano)', g.cnt, 20);
+  // Foto/Duplicado/C.Oficial NO cuentan aunque tengan importe > 0
+  const fotoCnt = g.byConceptCnt['Foto'] || 0;
+  const dupCnt = g.byConceptCnt['Duplicado'] || 0;
+  const cofiCnt = g.byConceptCnt['C.Oficial'] || 0;
+  assertEq('Foto tiene 2 uds. por concepto pero NO se suman a Entradas', fotoCnt, 2);
+  assertEq('Duplicado tiene 1 uds. por concepto pero NO se suma a Entradas', dupCnt, 1);
+  assertEq('C.Oficial tiene 1 uds. por concepto pero NO se suma a Entradas', cofiCnt, 1);
+  // Facturación TOTAL incluye extras (2×4 + 15 + 20 = 43€ de extras)
+  const totalFact = Object.values(g.byConcept).reduce((s,n)=>s+n,0);
+  const expectedFact = (40*15 + 36.5 + 77 + 40+35+45) + (4+4+15+20);  // 20 personas + extras
+  assertEq('Facturación total incluye extras (personas + Foto/Dup/C.O)', totalFact, expectedFact);
+  console.log(`   CEMPLA · Entradas Totales = ${g.cnt} personas · Facturación = ${totalFact.toFixed(2)}€ (incluye 4 extras)`);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // RESULTADO FINAL
 // ═══════════════════════════════════════════════════════════════
 console.log('\n' + '═'.repeat(66));
@@ -956,7 +1106,8 @@ if(failCount === 0){
   console.log('   · KPI cards ≡ Resumen contable ≡ Resultado (3 fuentes = mismo beneficio)');
   console.log('   · HABER unificado en byConcept SIN doble conteo (bug feb 2026 · TEST 15)');
   console.log('   · Casos extremos: solo HABER · solo DEBE · retornos+traspasos+brutoIRPF');
-  console.log('   · Sync PC1↔PC2 · idempotencia · 10.000 entradas precision céntimo\n');
+  console.log('   · Sync PC1↔PC2 · idempotencia · 10.000 entradas precision céntimo');
+  console.log('   · Entradas Totales = SOLO personas (excluye Foto/Duplicado/C.Oficial · TEST 26-28)\n');
   process.exit(0);
 } else {
   console.log(`\n❌ ${failCount} FALLOS de ${failCount+passCount} pruebas · ${passCount} PASAN`);

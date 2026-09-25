@@ -1,5 +1,42 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-25 (parte 2) · Entradas Totales = SOLO personas + nombre empresa + Varios expandible + landing
+
+**A) Nombre real de la empresa en Informe Anual**
+- La sección "Facturación por categoría" mostraba "· Empresa 1" hardcodeado. Ahora usa `comps[0].name` (el nombre configurado en Ajustes → Empresa 1/2). Ej. "· AUTOESCOLA BRUGULAT".
+
+**B) Categoría "Varios" expandible con clic-a-día**
+- Todas las categorías (Tráfico, Fotos, Duplicado, C.Oficial, Varios) tienen ahora caret ▸.
+- Clic en una categoría → despliega los conceptos individuales.
+- Clic en un concepto → popup con los días exactos e importes.
+- Clic en un día → salta a esa fecha en la app (mismo UX que la sección Gastos).
+- Usa `catConceptsMap` + `grandTotals.byConceptEntries` + `.ar-clickable-item` (infraestructura ya existente en gastos).
+
+**C) "Entradas Totales" = SOLO PERSONAS (revisiones/renovaciones/expediciones/canjes)**
+- **Problema:** el KPI "ENTRADAS TOTALES" contaba TODO (retornos, gastos, traspasos, Fotos, Duplicados, C.Oficial…), inflando el número.
+- **Regla nueva (universal Empresa 1 y 2):**
+  - Cuenta: `TRAF/PRIV` con `importe > 0` que NO sean Foto, Duplicado ni C.Oficial.
+  - NO cuenta: retornos, gastos DEBE, HABER manuales, traspasos internos, brutoIRPF, refund tasas, coste 0.
+- **Lógica:** `_isExtra = /foto|duplic|c\.?ofici/` → si es extra, NO incrementa `cnt`. Aplicado también a `byMonthCnt` y `cTotal.cnt`.
+- **Facturación:** intacta — Fotos/Duplicados/C.Oficial siguen sumando en total facturado, solo NO cuentan como "personas".
+
+**D) Landing page: añadidas 2 características clave**
+- Texto ampliado en `/app/frontend/public/downloads/landing-medicarplus.html` y `landing-assets/index.html`:
+  - Antes: "gestiona caja diaria, certificados médicos, renovaciones DGT y contabilidad IRPF…"
+  - Ahora: "gestiona caja diaria, certificados médicos, renovaciones DGT, contabilidad IRPF, **estadísticas anuales/mensuales** y **recordatorios automáticos a clientes**…"
+
+**E) Auditoría contable exhaustiva ampliada (98 invariantes verificados)**
+- Añadidos 3 tests nuevos (TEST 26-28):
+  - **TEST 26:** verifica escenario mixto (4 personas + 3 Duplicados + 5 C.Oficial + 1 coste 0 + 10 fotos + 2 revisiones + HABER + DEBE) → resultado esperado: 6 personas exactas.
+  - **TEST 27:** cuadre integral 3 años (14.163 entradas) · g.cnt (producción) == manualCnt (recuento independiente) · Σ byMonthCnt == g.cnt.
+  - **TEST 28:** facturación total independiente de la regla de conteo (Beneficio = Ingresos − Gastos sigue igual).
+- Total tests: **98/98 PASS** con 3 años (2024-2026) · 14.163 entradas · precisión céntimo perfecta (10K entries · error 0,000000€).
+
+**F) Archivos modificados:**
+- `/app/frontend/public/v2.html`: líneas 6912-6915 (quitado `t.cnt` acumulado), 6963-6980 (HABER no cuenta como persona), 6989-7008 (nueva regla con `_isExtra`), 7166-7237 (nombre empresa + Varios expandible).
+- `/app/frontend/public/tests/accounting_audit.js`: +3 tests + `aggregateAnnualReport` con regla `_isExtra`.
+- `/app/frontend/public/downloads/landing-medicarplus.html`, `/app/frontend/public/downloads/landing-assets/index.html`: texto ampliado.
+
 ## 2026-02-25 · Renombrado DEBE/HABER → INGRESO/GASTO + fix doble conteo HABER
 
 **Problema reportado:** el panel "🎯 Resultado" del Informe Anual mostraba `HABER: +0,00 €` de forma persistente, generando confusión.
