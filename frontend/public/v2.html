@@ -6996,15 +6996,22 @@ function _buildAnnualReport(year, monthFilterIdx){
         grandTotals.byConceptCnt = grandTotals.byConceptCnt || {};
         // Uds. por concepto: solo si tiene importe > 0
         if(amtTotal > 0){ grandTotals.byConceptCnt[cat] = (grandTotals.byConceptCnt[cat]||0) + 1; }
-        // 👥 ENTRADAS TOTALES = SOLO PERSONAS (fuente primaria de cada empresa)
-        //  · Empresa 1 (Autoescola / trafic): kind='TRAF' con importe>0 (viene del CSV DGT)
-        //  · Empresa 2 (CEMPLA / cempla):     kind='PRIV' con importe>0 (revisiones deportivas)
-        // NO cuentan los extras: Foto, Duplicado, C.Oficial (aunque tengan importe).
-        // Un extra vendido a un cliente NO es "una persona nueva".
-        const _catLow = String(cat||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-        const _isExtra = /foto/.test(_catLow) || /duplic/.test(_catLow) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLow);
-        const _isPrimaryKind = (activeKey === 'trafic') ? (e.kind === 'TRAF') : (e.kind === 'PRIV');
-        if(amtTotal > 0 && !_isExtra && _isPrimaryKind){
+        // 👥 ENTRADAS TOTALES = personas de la fuente primaria de cada empresa
+        //  · Empresa 1 (Autoescola / trafic): TODAS las entradas del CSV DGT que salgan en
+        //    el módulo Tráfico (kind='TRAF') con importe > 0. Da igual el tipo (Renovación,
+        //    Expedición, Canje, Duplicado, Prórroga…) — todas son PERSONAS que pasaron por DGT.
+        //  · Empresa 2 (CEMPLA / cempla): revisiones (kind='PRIV') con importe > 0, EXCLUYENDO
+        //    los extras Foto/Duplicado/C.Oficial (que se venden A la persona, no son personas).
+        // Los PRIV extras añadidos a mano en Empresa 1 (C.O, Foto…) NO son entradas del CSV Tráfico.
+        let _isEntradaReal = false;
+        if(activeKey === 'trafic'){
+          _isEntradaReal = (e.kind === 'TRAF') && (amtTotal > 0);
+        } else {
+          const _catLow = String(cat||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+          const _isExtra = /foto/.test(_catLow) || /duplic/.test(_catLow) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLow);
+          _isEntradaReal = (e.kind === 'PRIV') && (amtTotal > 0) && !_isExtra;
+        }
+        if(_isEntradaReal){
           grandTotals.cnt += 1;
           grandTotals.byMonthCnt[m] += 1;
           cTotal.cnt += 1;
