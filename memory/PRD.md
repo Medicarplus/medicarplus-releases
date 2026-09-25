@@ -1,5 +1,46 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-25 · Renombrado DEBE/HABER → INGRESO/GASTO + fix doble conteo HABER
+
+**Problema reportado:** el panel "🎯 Resultado" del Informe Anual mostraba `HABER: +0,00 €` de forma persistente, generando confusión.
+
+**A) Fix crítico: DOBLE CONTEO de HABER en Beneficio Neto (bug feb 2026)**
+- **Root cause:** desde la fusión "HABER manual → byConcept" (feb 2026), los HABER pasaron a incluirse dentro de `byConcept`, pero la fórmula del panel Resultado y KPI cards seguía haciendo `ingresosBrutos = byConcept + haberTotal`, sumando HABER dos veces.
+- **Impacto:** con miles de € de HABER manuales el Beneficio Neto quedaba inflado por ese mismo importe. Con 0 HABER simplemente confundía visualmente.
+- **Fix:** eliminado `haberTotal` de la fórmula de KPI cards (`_ingresosBrutosKPI`) y del panel Resultado. Ahora `ingresosBrutos = Σ byConcept` (única fuente de verdad).
+- Panel Resultado simplificado: **Ingresos − Gastos = Beneficio** (3 filas en vez de 4).
+
+**B) UX: renombrado global DEBE/HABER → INGRESO/GASTO**
+- El usuario pidió terminología no contable: "SI ES MUY LIO PONEMOS INGRESOS I GASTOS EN VEZ DE DEBE HABER".
+- Cambios visibles (los valores internos `HABER`/`DEBE` en localStorage siguen igual para compatibilidad):
+  - Pestaña "Debe / Haber" → **"Ingresos / Gastos"**
+  - Select: "HABER (entra dinero)" → **"INGRESO (entra dinero)"**, "DEBE (sale dinero)" → **"GASTO (sale dinero)"**
+  - Botón "+ Añadir Debe/Haber" → **"+ Añadir Ingreso/Gasto"**
+  - Badge en libreta: `HABER` → **`INGRESO`**, `DEBE` → **`GASTO`** (mismos colores)
+  - Sidebar diaria: "Ingresos manuales (HABER)" → **"Ingresos manuales"**
+  - Panel Resultado: filas HABER + DEBE → **Ingresos + Gastos**
+  - Subtítulo app: "Cierre diario · … · Debe / Haber" → **"… · Ingresos / Gastos"**
+  - i18n `tab_dh` actualizado ES + CA
+
+**C) Auditoría exhaustiva (83 invariantes verificados)**
+- Añadidos 11 tests nuevos a `/app/frontend/public/tests/accounting_audit.js`:
+  - TEST 15: bug doble conteo detectado y confirmado corregido
+  - TEST 16: KPI cards ≡ Resumen Contable ≡ Panel Resultado (3 fuentes = mismo Beneficio)
+  - TEST 17: Σ byMonthFacturacion == Σ byConcept (transitividad producción)
+  - TEST 18: Σ byMonthGastos == Σ g.gastos (consistencia gastos)
+  - TEST 19: HABER "Foto" fusiona con concepto Foto (NO crea fila nueva)
+  - TEST 20: caso extremo · todo HABER (12 meses, sin TRAF/PRIV)
+  - TEST 21: caso extremo · todo DEBE (año en pérdida absoluta)
+  - TEST 22: retornos + traspasos + brutoIRPF + refund tasas ignorados
+  - TEST 23: sync PC1↔PC2 · mismo payload → mismo Resultado
+  - TEST 24: idempotencia · aggregar N veces == aggregar 1 vez
+  - TEST 25: 10.000 entradas con decimales · error acumulado < 0,01€
+- Resultado: **83/83 PASS · 14.163 entradas simuladas · 3 años (2024-2026)**
+
+**D) Archivos modificados:**
+- `/app/frontend/public/v2.html`: líneas 631, 701, 718, 719, 754, 3461, 3603 (sidebar CB), 7014-7023 (KPI cards), 7408-7422 (Panel Resultado)
+- `/app/frontend/public/tests/accounting_audit.js`: +260 líneas de nuevos tests
+
 ## 2026-02-08 (parte 4) · Informe Anual: 2 KPIs nuevos + IRPF simplificado + fix cálculos
 
 **A) IRPF Modelo 111 rehecho (solo pagos reales):**

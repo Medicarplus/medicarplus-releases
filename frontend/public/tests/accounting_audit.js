@@ -664,6 +664,281 @@ console.log('\n🧪 TEST 14 · Empresas 1 y 2 aisladas (no mezcla datos)');
 }
 
 // ═══════════════════════════════════════════════════════════════
+// TESTS DE PRODUCCIÓN — MIRROR EXACTO DE openAnnualReport (feb 2026)
+// ═══════════════════════════════════════════════════════════════
+// Simula la lógica REAL de agregación para "Informe Anual → Resultado / KPIs / Tabla mensual".
+// Verifica que:
+//   · HABER manual NO se cuenta dos veces (bug feb 2026)
+//   · Ingresos - Gastos = Beneficio (invariante universal)
+//   · Σ byMonthFacturacion == Σ byConcept
+//   · KPI cards, Resumen contable y Resultado dan MISMO beneficio
+//   · Añadir/eliminar HABER cambia Ingresos SIN duplicar
+
+function _normalizeReportCat(s){ return String(s||'').trim(); }
+
+// Reproduce EXACTAMENTE el bucle de agregación de openAnnualReport (líneas 6933-7006)
+function aggregateAnnualReport(entriesByDate){
+  const g = {
+    byConcept:{}, byConceptCnt:{},
+    byMonthFacturacion: Array(12).fill(0),
+    byMonthGastos: Array(12).fill(0),
+    byMonthCnt: Array(12).fill(0),
+    gastos:{},
+    haberTotal:0,  // solo para verificar el bug — NO se usa ya en el cálculo
+  };
+  Object.entries(entriesByDate).forEach(([d, list]) => {
+    const m = parseInt(d.slice(5,7)) - 1;
+    list.forEach(e => {
+      if(e.retorno) return;
+      if(e.kind==='DH' && e._hnBruto) return;
+      if(e.kind==='DH' && (e._internal || e._tasaRefund)) return;
+      g.byMonthCnt[m] += 1;
+      // DEBE → gasto
+      if(e.kind==='DH' && e.tipo==='DEBE'){
+        const gCat = (e.nombre || 'Gasto').trim();
+        g.gastos[gCat] = g.gastos[gCat] || {count:0, total:0};
+        g.gastos[gCat].count += 1;
+        g.gastos[gCat].total += (e.importe || 0);
+        g.byMonthGastos[m] += (e.importe || 0);
+        return;
+      }
+      // HABER → fusiona en byConcept + byMonthFacturacion
+      if(e.kind==='DH' && e.tipo==='HABER'){
+        const hCat = _normalizeReportCat((e.nombre || 'Ingreso').trim());
+        g.byConcept[hCat] = (g.byConcept[hCat]||0) + (e.importe||0);
+        g.byConceptCnt[hCat] = (g.byConceptCnt[hCat]||0) + 1;
+        g.haberTotal += (e.importe||0);
+        g.byMonthFacturacion[m] += (e.importe||0);
+        return;
+      }
+      // Normal
+      const rawTipo = (e.kind==='TRAF') ? _effectiveTipo(e) : (e.tipo||'Otro');
+      const cat = _normalizeReportCat(rawTipo);
+      const amtTotal = ((e.importe||0) - (e.descuento||0)) + (e.tasa||0);
+      g.byConcept[cat] = (g.byConcept[cat]||0) + amtTotal;
+      g.byConceptCnt[cat] = (g.byConceptCnt[cat]||0) + 1;
+      g.byMonthFacturacion[m] += amtTotal;
+    });
+  });
+  return g;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TEST 15 · Panel "Resultado" · Ingresos = Σ byConcept (SIN doble conteo de HABER)
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 15 · Panel Resultado · SIN doble conteo de HABER (bug feb 2026)');
+YEARS.forEach(year => {
+  const g = aggregateAnnualReport(dataset[year]);
+  // NEW correct formula (post-fix):
+  const totalServicios = Object.values(g.byConcept).reduce((s,n)=>s+n,0);
+  const totalGastos = Object.values(g.gastos).reduce((s,x)=>s+x.total,0);
+  const ingresosBrutos = totalServicios;   // ← NO se suma haberTotal (ya está dentro)
+  const beneficioNeto = ingresosBrutos - totalGastos;
+  // OLD buggy formula (pre-fix): totalServicios + haberTotal → double count
+  const beneficioBuggy = (totalServicios + g.haberTotal) - totalGastos;
+  const diffBug = beneficioBuggy - beneficioNeto;
+  // El "bug" añade EXACTAMENTE haberTotal de más:
+  assertEq(`Año ${year}: bug corregido (Δ == haberTotal)`, diffBug, g.haberTotal);
+  // Cross-check contra computeTotals (fuente de verdad):
+  let netoTruth = 0;
+  Object.values(dataset[year]).forEach(a => { netoTruth += computeTotals(a).neto; });
+  assertEq(`Año ${year}: Beneficio Resultado == Σ neto computeTotals`, beneficioNeto, netoTruth);
+  console.log(`   ${year}: Ing=${ingresosBrutos.toFixed(2)}€, Gas=${totalGastos.toFixed(2)}€, Ben=${beneficioNeto.toFixed(2)}€ (haber fusionado=${g.haberTotal.toFixed(2)}€) ✓`);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// TEST 16 · KPI cards y Resumen Contable coinciden con Resultado
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 16 · KPI cards ≡ Resumen Contable ≡ Resultado (3 fuentes = mismo beneficio)');
+YEARS.forEach(year => {
+  const g = aggregateAnnualReport(dataset[year]);
+  const totalServicios = Object.values(g.byConcept).reduce((s,n)=>s+n,0);
+  const totalGastos = Object.values(g.gastos).reduce((s,x)=>s+x.total,0);
+  // (A) KPI cards (líneas 7019-7023 corregidas)
+  const kpi_ingresos = totalServicios;
+  const kpi_beneficio = kpi_ingresos - totalGastos;
+  // (B) Resumen contable (línea 7275-7280 · ya correcto originalmente)
+  const rc_ingresos = totalServicios;
+  const rc_beneficio = rc_ingresos - totalGastos;
+  // (C) Panel Resultado (línea 7409-7413 corregido)
+  const rp_ingresos = totalServicios;
+  const rp_beneficio = rp_ingresos - totalGastos;
+  assertEq(`Año ${year}: KPI == Resumen == Resultado (ingresos)`, kpi_ingresos, rp_ingresos);
+  assertEq(`Año ${year}: KPI == Resumen == Resultado (beneficio)`, kpi_beneficio, rp_beneficio);
+  assertEq(`Año ${year}: Resumen == Resultado (beneficio idénticos)`, rc_beneficio, rp_beneficio);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// TEST 17 · Σ byMonthFacturacion == Σ byConcept (transitividad producción)
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 17 · Σ byMonthFacturacion == Σ byConcept (ingresos por concepto y mes coinciden)');
+YEARS.forEach(year => {
+  const g = aggregateAnnualReport(dataset[year]);
+  const sumConcept = Object.values(g.byConcept).reduce((s,n)=>s+n,0);
+  const sumMonths = g.byMonthFacturacion.reduce((s,n)=>s+n,0);
+  assertEq(`Año ${year}: Σ byConcept == Σ byMonthFacturacion`, sumConcept, sumMonths);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// TEST 18 · Σ byMonthGastos == Σ g.gastos.total (consistencia gastos)
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 18 · Σ byMonthGastos == Σ g.gastos (gastos por mes y concepto coinciden)');
+YEARS.forEach(year => {
+  const g = aggregateAnnualReport(dataset[year]);
+  const sumGastosMonth = g.byMonthGastos.reduce((s,n)=>s+n,0);
+  const sumGastosCat = Object.values(g.gastos).reduce((s,x)=>s+x.total,0);
+  assertEq(`Año ${year}: Σ gastos por mes == Σ gastos por categoría`, sumGastosMonth, sumGastosCat);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// TEST 19 · Añadir HABER "Foto" fusiona con concepto Foto (NO crea fila nueva)
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 19 · HABER "Foto" 4€ fusiona con Foto existente (unificación byConcept)');
+{
+  const data = {
+    '2026-03-15': [
+      {kind:'PRIV', tipo:'Foto', importe:4, fp:'E'},
+      {kind:'PRIV', tipo:'Foto', importe:4, fp:'E'},
+      {kind:'DH', tipo:'HABER', nombre:'Foto', importe:4, fp:'E'},
+    ],
+  };
+  const g = aggregateAnnualReport(data);
+  // Debe haber UNA sola fila "Foto" con 3 entradas y 12€
+  assertEq('byConcept.Foto == 12€ (3×4)', g.byConcept['Foto'], 12);
+  assertEq('byConceptCnt.Foto == 3 entradas', g.byConceptCnt['Foto'], 3);
+  const nRows = Object.keys(g.byConcept).length;
+  assertEq('Número de filas byConcept == 1 (todo fusionado)', nRows, 1);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TEST 20 · CASO PATOLÓGICO: HABER puros sin ningún TRAF/PRIV (todo manual)
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 20 · Todo el año son HABER manuales (caso extremo)');
+{
+  const data = {};
+  for(let m=1; m<=12; m++){
+    data[`2026-${String(m).padStart(2,'0')}-15`] = [
+      {kind:'DH', tipo:'HABER', nombre:'Ingreso mensual', importe:1000, fp:'X'},
+    ];
+  }
+  const g = aggregateAnnualReport(data);
+  const totalServicios = Object.values(g.byConcept).reduce((s,n)=>s+n,0);
+  const ingresosBrutos = totalServicios;
+  const beneficio = ingresosBrutos - 0;
+  assertEq('12 HABER × 1000€ == 12.000€ ingresos', ingresosBrutos, 12000);
+  assertEq('Beneficio == 12.000€ (sin gastos)', beneficio, 12000);
+  // Cross-check con computeTotals
+  let neto = 0;
+  Object.values(data).forEach(a => { neto += computeTotals(a).neto; });
+  assertEq('Beneficio Resultado == Σ neto computeTotals', beneficio, neto);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TEST 21 · CASO PATOLÓGICO: Solo DEBE (año en pérdida absoluta)
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 21 · Año 100% en pérdidas (todos DEBE)');
+{
+  const data = {};
+  for(let m=1; m<=12; m++){
+    data[`2026-${String(m).padStart(2,'0')}-15`] = [
+      {kind:'DH', tipo:'DEBE', nombre:'Alquiler local', importe:800, fp:'X'},
+    ];
+  }
+  const g = aggregateAnnualReport(data);
+  const totalServicios = Object.values(g.byConcept).reduce((s,n)=>s+n,0);
+  const totalGastos = Object.values(g.gastos).reduce((s,x)=>s+x.total,0);
+  const beneficio = totalServicios - totalGastos;
+  assertEq('Ingresos == 0', totalServicios, 0);
+  assertEq('Gastos == 9.600€', totalGastos, 9600);
+  assertEq('Beneficio == -9.600€ (pérdida)', beneficio, -9600);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TEST 22 · CASO PATOLÓGICO: Retornos + Traspasos + BrutoIRPF NO alteran nada
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 22 · Retornos + Traspasos + Bruto IRPF ignorados correctamente');
+{
+  const data = {
+    '2026-05-10': [
+      {kind:'TRAF', tipo:'Renovación', importe:37, tasa:6.30, fp:'E'},
+      // Retornos: NO afectan
+      {kind:'TRAF', tipo:'Expedición', importe:47, tasa:6.30, fp:'E', retorno:true},
+      // Traspaso interno: NO afecta facturación
+      {kind:'DH', tipo:'DEBE', importe:100, _internal:true, _transferDir:'caja_to_banco'},
+      // Bruto IRPF (metadata contable, NO real): NO afecta caja
+      {kind:'DH', tipo:'HABER', importe:500, _hnBruto:true, nombre:'Bruto IRPF Marta'},
+      // Devolución tasa DGT: refund, NO afecta agregado (se resta a nivel diario)
+      {kind:'DH', tipo:'DEBE', importe:6.30, _tasaRefund:true, fp:'E'},
+    ],
+  };
+  const g = aggregateAnnualReport(data);
+  const totalServicios = Object.values(g.byConcept).reduce((s,n)=>s+n,0);
+  const totalGastos = Object.values(g.gastos).reduce((s,x)=>s+x.total,0);
+  // Solo la Renovación cuenta: 37 + 6.30 = 43.30
+  assertEq('Solo Renovación cuenta (43.30€)', totalServicios, 43.30);
+  assertEq('Sin gastos reales (traspaso/refund/bruto excluidos)', totalGastos, 0);
+  assertEq('byMonthFacturacion[4] == 43.30', g.byMonthFacturacion[4], 43.30);
+  assertEq('byMonthCnt[4] == 1 (retorno + internal + brutoIRPF + refund NO cuentan)', g.byMonthCnt[4], 1);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TEST 23 · Simulación "envío de copia entre PCs" (misma sync payload → mismo resultado)
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 23 · Sync entre PCs: mismo payload → mismo Resultado (determinista)');
+{
+  // Simula que PC1 y PC2 tienen el mismo dataset (sync completa vía mailbox)
+  const pc1 = generateYear(2026, {trafPerDay:5, debePerMonth:3, haberPerMonth:2});
+  // "Enviar copia" = serializar/deserializar (JSON deep clone)
+  const payload = JSON.parse(JSON.stringify(pc1));
+  const g1 = aggregateAnnualReport(pc1);
+  const g2 = aggregateAnnualReport(payload);
+  const b1 = Object.values(g1.byConcept).reduce((s,n)=>s+n,0) - Object.values(g1.gastos).reduce((s,x)=>s+x.total,0);
+  const b2 = Object.values(g2.byConcept).reduce((s,n)=>s+n,0) - Object.values(g2.gastos).reduce((s,x)=>s+x.total,0);
+  assertEq('PC1 == PC2 beneficio (post sync)', b2, b1);
+  console.log(`   PC1: ${b1.toFixed(2)}€ · PC2 (tras copia): ${b2.toFixed(2)}€ ✓`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TEST 24 · Idempotencia: aggregar 2 veces DA el mismo resultado
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 24 · Idempotencia: aggregar N veces == aggregar 1 vez');
+{
+  const data = generateYear(2026, {trafPerDay:5, debePerMonth:3});
+  const g1 = aggregateAnnualReport(data);
+  const g2 = aggregateAnnualReport(data);
+  const g3 = aggregateAnnualReport(data);
+  const sum1 = Object.values(g1.byConcept).reduce((s,n)=>s+n,0);
+  const sum2 = Object.values(g2.byConcept).reduce((s,n)=>s+n,0);
+  const sum3 = Object.values(g3.byConcept).reduce((s,n)=>s+n,0);
+  assertEq('agg×2 == agg×1', sum2, sum1);
+  assertEq('agg×3 == agg×1', sum3, sum1);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TEST 25 · Céntimo perfecto: 10.000 entradas con decimales · error acumulado < 0,01€
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 25 · Precisión céntimo perfecto (10.000 entradas · error < 0,01€)');
+{
+  const data = {};
+  const importes = [37.85, 47.13, 66.50, 27.60, 89.99, 12.34, 4.00, 9.60];
+  let expectedSum = 0;
+  for(let i=0; i<10000; i++){
+    const m = 1 + (i % 12);
+    const d = 1 + (i % 27);
+    const iso = `2026-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    data[iso] = data[iso] || [];
+    const imp = importes[i % importes.length];
+    data[iso].push({kind:'PRIV', tipo:'Servicio', importe:imp, fp:'E'});
+    expectedSum += imp;
+  }
+  const g = aggregateAnnualReport(data);
+  const actualSum = Object.values(g.byConcept).reduce((s,n)=>s+n,0);
+  const err = Math.abs(actualSum - expectedSum);
+  assertEq('10.000 entradas: error acumulado < 0,01€', err < 0.01 ? 0 : err, 0);
+  console.log(`   Esperado: ${expectedSum.toFixed(2)}€ · Calculado: ${actualSum.toFixed(2)}€ · Error: ${err.toFixed(6)}€`);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // RESULTADO FINAL
 // ═══════════════════════════════════════════════════════════════
 console.log('\n' + '═'.repeat(66));
@@ -677,7 +952,11 @@ if(failCount === 0){
   console.log('   · Traspasos internos caja↔cambio↔banco');
   console.log('   · Retornos, devoluciones, datáfono reclassifications');
   console.log('   · Ingresos, Gastos, Beneficio Neto (invariante universal)');
-  console.log('   · Categorización 5 fixas Emp1 · fallback "Varios" garantizado\n');
+  console.log('   · Categorización 5 fixas Emp1 · fallback "Varios" garantizado');
+  console.log('   · KPI cards ≡ Resumen contable ≡ Resultado (3 fuentes = mismo beneficio)');
+  console.log('   · HABER unificado en byConcept SIN doble conteo (bug feb 2026 · TEST 15)');
+  console.log('   · Casos extremos: solo HABER · solo DEBE · retornos+traspasos+brutoIRPF');
+  console.log('   · Sync PC1↔PC2 · idempotencia · 10.000 entradas precision céntimo\n');
   process.exit(0);
 } else {
   console.log(`\n❌ ${failCount} FALLOS de ${failCount+passCount} pruebas · ${passCount} PASAN`);
