@@ -720,12 +720,21 @@ function aggregateAnnualReport(entriesByDate, activeKey){
       g.byConcept[cat] = (g.byConcept[cat]||0) + amtTotal;
       if(amtTotal > 0) g.byConceptCnt[cat] = (g.byConceptCnt[cat]||0) + 1;
       g.byMonthFacturacion[m] += amtTotal;
-      // 👥 ENTRADAS TOTALES según empresa activa:
-      //  · Empresa 1 (trafic): TODAS las TRAF del CSV DGT con importe>0 (Renov/Exped/Canje/Duplic…)
-      //  · Empresa 2 (cempla): PRIV con importe>0, EXCLUYENDO Foto/Duplicado/C.Oficial (extras)
+      // 👥 Entradas Totales:
+      //  · Empresa 1 (trafic): isTramiteDGT(e) — SOLO lo que vino del CSV DGT (_csv:true)
+      //    Manual: Duplicado/C.Oficial/Foto/Ciclista añadidos a mano NO cuentan.
+      //  · Empresa 2 (cempla): kind='PRIV' con importe>0, excluyendo Foto/Duplicado/C.Oficial
       let isEntradaReal = false;
       if(activeKey === 'trafic'){
-        isEntradaReal = (e.kind === 'TRAF') && (amtTotal > 0);
+        // Replica isTramiteDGT: _csv:true → true · _csv:false → false · sin flag → patrones típicos
+        let isDGT;
+        if(e._csv === true) isDGT = true;
+        else if(e._csv === false) isDGT = false;
+        else {
+          const s = String(e.tipo||'').toUpperCase();
+          isDGT = /RENOV|EXPED|CANJE|CANVI|RECUPER|OBTEN/.test(s);
+        }
+        isEntradaReal = isDGT && (amtTotal > 0);
       } else {
         const catLow = String(cat||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
         const isExtra = /foto/.test(catLow) || /duplic/.test(catLow) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(catLow);
@@ -956,59 +965,72 @@ console.log('\n🧪 TEST 25 · Precisión céntimo perfecto (10.000 entradas · 
 }
 
 // ═══════════════════════════════════════════════════════════════
-// TEST 26 · Empresa 1 (Autoescola): TODAS las TRAF del CSV cuentan (importe>0)
+// TEST 26 · Empresa 1 (Autoescola): Entradas = SOLO lo que vino del CSV DGT (_csv:true)
 // ═══════════════════════════════════════════════════════════════
-console.log('\n🧪 TEST 26 · Empresa 1 (trafic): Entradas = TODAS las TRAF del CSV DGT (Renov/Exped/Duplic/Canje…)');
+console.log('\n🧪 TEST 26 · Empresa 1 (trafic): Entradas = SOLO CSV DGT (_csv:true) con importe>0');
+console.log('   Todo lo añadido a MANO (Duplicado/C.O/Foto/Ciclista) NO cuenta como entrada.');
 {
   const data = {
     '2026-06-10': [
-      // Todos son personas del CSV Tráfico — cuentan (incluye TRAF Duplicado que ES una persona DGT)
-      {kind:'TRAF', tipo:'Renovación', importe:37, tasa:6.30, fp:'E'},
-      {kind:'TRAF', tipo:'Expedición', importe:47, tasa:6.30, fp:'T'},
-      {kind:'TRAF', tipo:'Canje', importe:66.5, fp:'E'},
-      {kind:'TRAF', tipo:'Recuperación', importe:87, fp:'E'},
-      {kind:'TRAF', tipo:'Duplicado', importe:25, fp:'E'},   // TRAF Duplicado ES persona DGT → SÍ cuenta
-      {kind:'TRAF', tipo:'Duplicado', importe:25, fp:'E'},
-      {kind:'TRAF', tipo:'Prórroga', importe:30, fp:'E'},
-      // 1 TRAF a coste 0 sin tasa → NO cuenta
-      {kind:'TRAF', tipo:'Renovación', importe:0, tasa:0, fp:'E'},
-      // 1 retorno → NO cuenta
-      {kind:'TRAF', tipo:'Renovación', importe:37, retorno:true, fp:'E'},
-      // Extras PRIV añadidos a mano en Empresa 1 (Foto, Ciclista, ISO, C.Oficial) → NO cuentan
-      ...Array.from({length:10}, () => ({kind:'PRIV', tipo:'Foto', importe:4, fp:'E'})),
+      // 20 personas del CSV DGT (_csv:true) — cuentan
+      ...Array.from({length:20}, (_, i) => ({
+        kind:'TRAF', _csv:true,
+        tipo: i%3===0 ? 'Renovación' : i%3===1 ? 'Expedición' : 'Canje',
+        importe: i%3===0 ? 37 : i%3===1 ? 47 : 66.5,
+        tasa: i%2===0 ? 6.30 : 0,
+        fp:'E', nombre:`Cliente ${i+1}`,
+      })),
+      // Añadidos manualmente en la pestaña Tráfico (sin _csv) — NO cuentan
+      {kind:'TRAF', tipo:'Duplicado', importe:25, fp:'E', nombre:'Manual Duplicado'},
+      {kind:'TRAF', tipo:'C.Oficial', importe:20, fp:'E', nombre:'Manual C.O'},
+      // PRIV extras añadidos a mano — NO cuentan
+      {kind:'PRIV', tipo:'Foto', importe:4, fp:'E'},
+      {kind:'PRIV', tipo:'Foto', importe:4, fp:'E'},
       {kind:'PRIV', tipo:'Ciclista', importe:40, fp:'E'},
       {kind:'PRIV', tipo:'Certificado ISO', importe:60, fp:'E'},
-      {kind:'PRIV', tipo:'C.Oficial', importe:20, fp:'E'},
-      // HABER y DEBE → NO cuentan
+      // CSV entry con importe 0 sin tasa → NO cuenta (mientras "Contar 0€" desactivado)
+      {kind:'TRAF', _csv:true, tipo:'Renovación', importe:0, tasa:0, fp:'E', nombre:'Coste 0'},
+      // Retorno → NO cuenta
+      {kind:'TRAF', _csv:true, tipo:'Renovación', importe:37, retorno:true, fp:'E'},
+      // HABER/DEBE → NO cuentan
       {kind:'DH', tipo:'HABER', nombre:'Cobro pendiente', importe:150, fp:'X'},
       {kind:'DH', tipo:'DEBE', nombre:'Nómina', importe:800, fp:'X'},
     ],
   };
   const g = aggregateAnnualReport(data, 'trafic');
-  // 7 TRAF con importe>0 (todas cuentan, incluye Duplicado y Prórroga)
-  assertEq('Empresa 1 · Entradas = 7 (todas las TRAF del CSV con importe>0)', g.cnt, 7);
-  console.log(`   Empresa 1 · Entradas Totales = ${g.cnt} (todas las TRAF del CSV DGT · PRIV extras NO cuentan)`);
+  // Exactamente 20 (las del CSV con importe>0), coincidiendo con el "Entradas Tráfico 20" del sidebar
+  assertEq('Empresa 1 · Entradas = 20 (exactas del CSV con importe>0)', g.cnt, 20);
+  console.log(`   Empresa 1 · Entradas Totales = ${g.cnt} (Duplicado/C.O manual, PRIV extras, coste 0, retorno NO cuentan)`);
 }
 
 // ═══════════════════════════════════════════════════════════════
-// TEST 27 · Cuadre integral 3 años · Empresa 1 · TODAS las TRAF con importe>0
+// TEST 27 · Cuadre 3 años · Entradas ≡ t.cntDGT del cierre diario
 // ═══════════════════════════════════════════════════════════════
-console.log('\n🧪 TEST 27 · Cuadre integral 3 años (Empresa 1) · TODAS las TRAF del CSV DGT');
+console.log('\n🧪 TEST 27 · Cuadre 3 años (Empresa 1) · Entradas Informe ≡ t.cntDGT del cierre diario');
 YEARS.forEach(year => {
   const g = aggregateAnnualReport(dataset[year], 'trafic');
-  let manualCnt = 0;
+  // Recuento manual usando la MISMA función que el módulo Tráfico
+  let manualCntDGT = 0;
   Object.values(dataset[year]).forEach(list => {
     list.forEach(e => {
       if(e.retorno) return;
-      if(e.kind !== 'TRAF') return;
+      // Replica isTramiteDGT
+      let isDGT;
+      if(e._csv === true) isDGT = true;
+      else if(e._csv === false) isDGT = false;
+      else {
+        const s = String(e.tipo||'').toUpperCase();
+        isDGT = /RENOV|EXPED|CANJE|CANVI|RECUPER|OBTEN/.test(s);
+      }
+      if(!isDGT) return;
       const amtTotal = ((e.importe||0) - (e.descuento||0)) + (e.tasa||0);
-      if(amtTotal > 0) manualCnt++;
+      if(amtTotal > 0) manualCntDGT++;
     });
   });
-  assertEq(`Año ${year}: g.cnt (producción) == manualCnt (independiente)`, g.cnt, manualCnt);
+  assertEq(`Año ${year}: g.cnt (Informe Anual) == manualCntDGT (cierre diario)`, g.cnt, manualCntDGT);
   const sumMonthly = g.byMonthCnt.reduce((s,n)=>s+n,0);
   assertEq(`Año ${year}: Σ byMonthCnt == g.cnt`, sumMonthly, g.cnt);
-  console.log(`   ${year}: Empresa 1 · Entradas = ${g.cnt} personas TRAF ✓`);
+  console.log(`   ${year}: Empresa 1 · Entradas = ${g.cnt} personas CSV DGT ✓`);
 });
 
 // ═══════════════════════════════════════════════════════════════

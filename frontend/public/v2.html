@@ -6996,16 +6996,17 @@ function _buildAnnualReport(year, monthFilterIdx){
         grandTotals.byConceptCnt = grandTotals.byConceptCnt || {};
         // Uds. por concepto: solo si tiene importe > 0
         if(amtTotal > 0){ grandTotals.byConceptCnt[cat] = (grandTotals.byConceptCnt[cat]||0) + 1; }
-        // 👥 ENTRADAS TOTALES = personas de la fuente primaria de cada empresa
-        //  · Empresa 1 (Autoescola / trafic): TODAS las entradas del CSV DGT que salgan en
-        //    el módulo Tráfico (kind='TRAF') con importe > 0. Da igual el tipo (Renovación,
-        //    Expedición, Canje, Duplicado, Prórroga…) — todas son PERSONAS que pasaron por DGT.
-        //  · Empresa 2 (CEMPLA / cempla): revisiones (kind='PRIV') con importe > 0, EXCLUYENDO
-        //    los extras Foto/Duplicado/C.Oficial (que se venden A la persona, no son personas).
-        // Los PRIV extras añadidos a mano en Empresa 1 (C.O, Foto…) NO son entradas del CSV Tráfico.
+        // 👥 ENTRADAS TOTALES · MISMA lógica que el módulo Tráfico (feb 2026)
+        //  · Empresa 1 (trafic): isTramiteDGT(e) — solo lo que vino del CSV DGT (_csv:true)
+        //    Con la casilla "Contar 0€" desactivada solo cuentan importe>0 (subt>0), igual que t.cntDGT.
+        //  · Empresa 2 (cempla): kind='PRIV' + importe>0, EXCLUYENDO Foto/Duplicado/C.Oficial.
+        // De este modo el número de "Entradas Totales" del Informe Anual coincide al 100% con
+        // el que muestra el cierre diario "Entradas Tráfico N" en el sidebar.
         let _isEntradaReal = false;
         if(activeKey === 'trafic'){
-          _isEntradaReal = (e.kind === 'TRAF') && (amtTotal > 0);
+          const _isDGT = (typeof isTramiteDGT === 'function') ? isTramiteDGT(e) : (e._csv === true);
+          const _countZero = (typeof getCountZero === 'function') ? getCountZero() : false;
+          _isEntradaReal = _isDGT && (amtTotal > 0 || _countZero);
         } else {
           const _catLow = String(cat||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
           const _isExtra = /foto/.test(_catLow) || /duplic/.test(_catLow) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLow);
