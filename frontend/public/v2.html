@@ -7565,6 +7565,10 @@ function _buildYearComparison(latestYear,count){
   const MESES=currentLang==='es'?['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']:['Gener','Febrer','Març','Abril','Maig','Juny','Juliol','Agost','Setembre','Octubre','Novembre','Desembre'];
 
   // Agrega totales por año
+  // 👥 Entradas: aplica la MISMA regla que openAnnualReport (Feb 2026):
+  //   · Empresa 1 (trafic): SOLO lo que viene del CSV DGT con importe>0 (isTramiteDGT + amt>0)
+  //   · Empresa 2 (cempla): kind='PRIV' con importe>0, excluyendo Foto/Duplicado/C.Oficial
+  // Así el "Entradas" de la Comparativa años coincide con el del Informe Anual.
   const byYear={};
   years.forEach(y=>{byYear[y]={bruto:0,tasas:0,neto:0,cnt:0,byMonth:Array(12).fill(0),byMonthCnt:Array(12).fill(0)}});
   comps.forEach(comp=>{
@@ -7572,9 +7576,35 @@ function _buildYearComparison(latestYear,count){
     Object.keys(raw.byDate||{}).forEach(d=>{
       const y=parseInt(d.split('-')[0]);if(!byYear[y])return;
       const m=parseInt(d.split('-')[1])-1;
-      const t=computeTotals(raw.byDate[d]||[]);
-      byYear[y].bruto+=t.bruto;byYear[y].tasas+=t.tasas;byYear[y].neto+=t.neto;byYear[y].cnt+=t.cnt;
-      byYear[y].byMonth[m]+=t.neto;byYear[y].byMonthCnt[m]+=t.cnt;
+      const list = raw.byDate[d]||[];
+      const t=computeTotals(list);
+      byYear[y].bruto+=t.bruto;byYear[y].tasas+=t.tasas;byYear[y].neto+=t.neto;
+      byYear[y].byMonth[m]+=t.neto;
+      // Recuento de entradas REALES aplicando la regla común
+      list.forEach(e => {
+        if(e.retorno) return;
+        if(e.kind==='DH') return;
+        const amtTotal = ((e.importe||0) - (e.descuento||0)) + (e.tasa||0);
+        if(amtTotal <= 0) return;
+        let isEntradaReal = false;
+        if(comp.key === 'trafic'){
+          // Replica isTramiteDGT
+          if(e._csv === true) isEntradaReal = true;
+          else if(e._csv === false) isEntradaReal = false;
+          else {
+            const s = String(e.tipo||'').toUpperCase();
+            isEntradaReal = /RENOV|EXPED|CANJE|CANVI|RECUPER|OBTEN/.test(s);
+          }
+        } else {
+          const tipo = String(e.tipo||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+          const isExtra = /foto/.test(tipo) || /duplic/.test(tipo) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(tipo);
+          isEntradaReal = (e.kind === 'PRIV') && !isExtra;
+        }
+        if(isEntradaReal){
+          byYear[y].cnt += 1;
+          byYear[y].byMonthCnt[m] += 1;
+        }
+      });
     });
   });
 
