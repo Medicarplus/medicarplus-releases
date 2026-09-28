@@ -6762,19 +6762,35 @@ function openAnnualReport(){
     printVisibleElement(modal, {
       title:'Facturación anual',
       landscape:true,
-      margins:'6mm',
+      margins:'8mm',
       extraCss:`
-        @page { size: A4 landscape; margin: 6mm }
-        button, select, input, [data-no], .icon-btn { display:none !important }
-        body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important }
+        /* 📄 A4 landscape · 297mm × 210mm · margen 8mm → área útil 281mm × 194mm.
+           Fallback A4 portrait: los mismos estilos funcionan · content-width fija al 100%. */
+        @page { size: A4 landscape; margin: 8mm }
+        html, body { margin:0 !important; padding:0 !important; width:100% !important; max-width:100% !important; overflow-x:hidden !important }
+        button, select, input, [data-no], .icon-btn, .no-print { display:none !important }
+        body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important; font-size:9pt !important }
+        .modal-back{ position:static !important; inset:auto !important; transform:none !important; background:transparent !important }
         .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important }
-        .modal{ padding:4mm !important; max-width:none !important; width:100% !important; border:none !important }
-        h3{ color:#000 !important; font-size:13pt !important; margin:0 0 6pt 0 !important }
-        h4{ color:#000 !important; font-size:11pt !important; margin:6pt 0 4pt 0 !important }
-        table{ border-collapse:collapse !important; width:100% !important; font-size:8pt !important; margin-bottom:6pt !important; table-layout:fixed !important; page-break-inside:auto }
-        thead{ display:table-header-group } tr{ page-break-inside:avoid }
-        th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 4pt !important; font-weight:700 !important; font-size:8pt !important; word-wrap:break-word }
-        td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 4pt !important; font-size:8pt !important; word-wrap:break-word; overflow-wrap:break-word }
+        .modal{ padding:0 !important; margin:0 !important; max-width:100% !important; width:100% !important; border:none !important; overflow:visible !important; max-height:none !important; height:auto !important }
+        h3{ color:#000 !important; font-size:13pt !important; margin:0 0 4pt 0 !important; text-align:center !important; page-break-after:avoid }
+        h4{ color:#000 !important; font-size:10pt !important; margin:6pt 0 3pt 0 !important; page-break-after:avoid }
+        /* KPI cards: 3×2 rejilla → siempre caben en portrait/landscape sin overflow */
+        [style*="grid-template-columns"]{ display:grid !important; grid-template-columns:repeat(3, minmax(0,1fr)) !important; gap:4pt !important; margin-bottom:8pt !important; page-break-inside:avoid }
+        [style*="grid-template-columns"] > div{ padding:4pt 6pt !important; page-break-inside:avoid; font-size:8pt !important; border-radius:3pt !important }
+        [style*="grid-template-columns"] > div > div:first-child{ font-size:7pt !important; letter-spacing:0.5pt !important }
+        [style*="grid-template-columns"] > div > div:last-child{ font-size:11pt !important; margin-top:1pt !important; font-weight:700 !important }
+        /* Tablas: fijas, wrap de texto para que ninguna celda quede fuera del encuadre */
+        table{ border-collapse:collapse !important; width:100% !important; max-width:100% !important; font-size:7.5pt !important; margin:0 0 6pt 0 !important; table-layout:fixed !important; page-break-inside:auto; word-wrap:break-word }
+        thead{ display:table-header-group } tfoot{ display:table-footer-group } tr{ page-break-inside:avoid }
+        th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:2pt 3pt !important; font-weight:700 !important; font-size:7.5pt !important; word-wrap:break-word; overflow-wrap:break-word; text-align:center !important }
+        td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 3pt !important; font-size:7.5pt !important; word-wrap:break-word; overflow-wrap:break-word; overflow:hidden; text-overflow:ellipsis }
+        /* Filas detalle expandibles: forzar visibles en el PDF (aunque estén ocultas en la app) */
+        .cat-detail{ display:table-row !important }
+        /* Evitar overflow horizontal en cualquier contenedor */
+        div{ max-width:100% !important; overflow:visible !important }
+        /* Nowrap solo en columnas monetarias para no romper importes */
+        td[style*="Courier"], th[style*="Courier"]{ white-space:nowrap !important; font-size:7pt !important }
       `
     });
   };
