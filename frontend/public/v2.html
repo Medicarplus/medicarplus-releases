@@ -6785,12 +6785,25 @@ function openAnnualReport(){
         thead{ display:table-header-group } tfoot{ display:table-footer-group } tr{ page-break-inside:avoid }
         th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:2pt 3pt !important; font-weight:700 !important; font-size:7.5pt !important; word-wrap:break-word; overflow-wrap:break-word; text-align:center !important }
         td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 3pt !important; font-size:7.5pt !important; word-wrap:break-word; overflow-wrap:break-word; overflow:hidden; text-overflow:ellipsis }
-        /* Filas detalle expandibles: forzar visibles en el PDF (aunque estén ocultas en la app) */
-        .cat-detail{ display:table-row !important }
+        /* Filas detalle expandibles: MANTENER CERRADAS en el PDF (solo se ve el total por categoría).
+           El usuario ya ve el total al lado de cada categoría · si quiere el detalle, lo abre en la app. */
+        .cat-detail{ display:none !important }
         /* Evitar overflow horizontal en cualquier contenedor */
         div{ max-width:100% !important; overflow:visible !important }
         /* Nowrap solo en columnas monetarias para no romper importes */
         td[style*="Courier"], th[style*="Courier"]{ white-space:nowrap !important; font-size:7pt !important }
+        /* 🔀 Evita que una sección se parta a mitad de página */
+        h4{ break-after:avoid !important; page-break-after:avoid !important; break-inside:avoid !important; page-break-inside:avoid !important }
+        table{ break-inside:avoid-page; page-break-inside:avoid }
+        /* Tablas muy largas (Facturación mensual, Gastos por categoría, etc.) permiten break entre filas */
+        table.long-table, table[data-testid="ingresos-por-categoria"]{ break-inside:auto; page-break-inside:auto }
+        /* Cabecera de tabla se repite en cada página al partir */
+        thead{ display:table-header-group; break-inside:avoid; break-after:avoid }
+        tfoot{ display:table-footer-group }
+        /* Evita líneas viudas/huérfanas */
+        p, li, tr{ orphans:3; widows:3 }
+        /* Nunca romper una fila entre páginas */
+        tr{ break-inside:avoid !important; page-break-inside:avoid !important }
       `
     });
   };
