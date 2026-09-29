@@ -1640,7 +1640,8 @@ function openStats(initialSection){
       <button class="btn btn-primary st-autos-only" id="stImport">📥 ${isCA?'Importar CSV':'Importar CSV'}</button>
       <select class="st-autos-only" id="stImportMonth" title="${isCA?'Mes al qual pertanyen les dades del CSV':'Mes al que pertenecen los datos del CSV'}" style="background:#141821;color:var(--text);border:1px solid #f5b301;border-radius:8px;padding:6px 10px;font-weight:600" data-testid="st-import-month">${MESOS.map((m,i)=>`<option value="${i+1}" ${(i+1)===(new Date().getMonth()+1)?'selected':''}>📅 ${m}</option>`).join('')}</select>
       <input type="file" id="stFile" accept=".csv,.txt" style="display:none" />
-      <button class="btn st-autos-only" id="stBackfillHist" data-testid="st-backfill-hist" title="${isCA?'Carrega el històric complet (1998-2026) del fitxer estadístic manual':'Carga el histórico completo (1998-2026) del archivo estadístico manual'}" style="background:#1e2f3e;border-color:#22d3ee;color:#22d3ee;font-weight:600;display:${localStorage.getItem('caja.stats.backfill.loaded.v1')?'none':'inline-flex'}">🗂️ ${isCA?'Carregar històric':'Cargar histórico'}</button>
+      <input type="file" id="stBackfillFile" accept=".xls,.xlsx" style="display:none" />
+      <button class="btn st-autos-only" id="stBackfillHist" data-testid="st-backfill-hist" title="${isCA?'Puja el teu Excel històric (multi-any) i el classifica automàticament':'Sube tu Excel histórico (multi-año) y lo clasifica automáticamente'}" style="background:#1e2f3e;border-color:#22d3ee;color:#22d3ee;font-weight:600;display:${localStorage.getItem('caja.stats.backfill.loaded.v1')?'none':'inline-flex'}">📥 ${isCA?'Pujar històric':'Subir histórico'}</button>
       <button class="btn st-autos-only" id="stAdd">+ ${isCA?'Autoescola':'Autoescuela'}</button>
       <button class="btn st-autos-only" id="stClearAll" style="background:#7f1d1d;color:#fecaca;border-color:#b91c1c" title="${isCA?'Elimina totes les autoescoles i les seves dades':'Elimina todas las autoescuelas y sus datos'}">🗑 ${isCA?'Buidar tot':'Vaciar todo'}</button>
       <button class="btn st-autos-only" id="stChart" data-testid="st-chart" style="background:#1e293b;border-color:#22d3ee;color:#22d3ee" title="${isCA?'Gràfic d\'evolució mensual':'Gráfico de evolución mensual'}">📈 ${isCA?'Gràfic':'Gráfico'}</button>
@@ -1813,71 +1814,139 @@ function openStats(initialSection){
   back.querySelector('#stClearAll').onclick=()=>{
     confirmModal(isCA?'⚠️ Buidar totes les autoescoles':'⚠️ Vaciar todas las autoescuelas', isCA?'Vols esborrar <b>TOTES</b> les autoescoles i les seves dades?<br><br>Aquesta acció <b>NO es pot desfer</b>. Es recomana només al primer arrencament o si vols començar de zero.':'¿Borrar <b>TODAS</b> las autoescuelas y sus datos?<br><br>Esta acción <b>NO se puede deshacer</b>. Recomendado solo en la primera puesta en marcha o si quieres empezar de cero.', ()=>{saveStats({autoescoles:[],data:{}});renderTable();toast(isCA?'🗑 Autoescoles esborrades':'🗑 Autoescuelas borradas')}, isCA?'Sí, esborrar tot':'Sí, borrar todo', true);
   };
-  // 🗂️ Cargar histórico manual pre-generado (Feb 2026 · desde /downloads/backfill-autoescoles-historico.json)
-  // Reemplaza `caja.stats.v1` con los datos históricos del archivo Excel del propietario (1998-2026 · 343 meses).
-  // Solo tocamos meses que están en el JSON — meses fuera (ej. Sep-Dic 2026 con CSV real) quedan intactos.
+  // 📥 Cargar histórico DESDE EL EXCEL DEL CLIENTE (feb 2026)
+  // Cada cliente sube su propio archivo .xls/.xlsx con varias hojas (una por año).
+  // El parser detecta automáticamente:
+  //   · Hojas cuyo nombre es un año (1998-2030)
+  //   · Fila header con GENER/ENERO/JAN/JANUARY...
+  //   · Columna del nombre = la anterior a GENER
+  //   · Columnas de meses según headers
+  //   · Filas TOTAL/CERTIFICATS se filtran
+  // Aplica canonicalización fuzzy (ROSSELL/ROSELL/A.E.ROSELL → 1 grupo).
+  // Merge con caja.stats.v1 (respeta meses que ya tienen datos).
+  const _canonicalize = (s) => String(s||'')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toUpperCase()
+    .replace(/^(A\.?\s*E\.?\s*|AUTOESCOLA\s+|AUTOESCUELA\s+|A\.E\s+)/,'')
+    .replace(/[^A-Z0-9]/g,'')
+    .replace(/([A-Z])\1+/g,'$1');
+  const MONTHS_HEAD = { // Header → mes 1-12 (soporta ES/CA/EN)
+    'ENERO':1,'ENER':1,'GENER':1,'JANUARY':1,'JAN':1,
+    'FEBRERO':2,'FEBRER':2,'FEBRUARY':2,'FEB':2,
+    'MARZO':3,'MARÇ':3,'MARC':3,'MARCH':3,'MAR':3,
+    'ABRIL':4,'APRIL':4,'ABR':4,'APR':4,'ABIL':4,
+    'MAYO':5,'MAIG':5,'MAY':5,
+    'JUNIO':6,'JUNY':6,'JUNE':6,'JUN':6,
+    'JULIO':7,'JULIOL':7,'JULY':7,'JUL':7,
+    'AGOSTO':8,'AGOST':8,'AUGUST':8,'AUG':8,'AGO':8,
+    'SEPTIEMBRE':9,'SETEMBRE':9,'SEPTEMBER':9,'SEP':9,'SEPT':9,'SET':9,
+    'OCTUBRE':10,'OCTOBER':10,'OCT':10,
+    'NOVIEMBRE':11,'NOVEMBRE':11,'NOVEMBER':11,'NOV':11,
+    'DICIEMBRE':12,'DESEMBRE':12,'DECEMBER':12,'DEC':12,'DIC':12,'DES':12,
+  };
+  const _isTotalRow = (name) => {
+    const n = _canonicalize(name);
+    return n.includes('TOTAL') || n.includes('CERTIFICAT') || n === 'SUMA';
+  };
   back.querySelector('#stBackfillHist').onclick=()=>{
-    confirmModal(
-      isCA?'📥 Carregar històric d\'autoescoles':'📥 Cargar histórico de autoescuelas',
-      isCA?'Carregarà els <b>totals mensuals</b> de 1998 fins agost 2026 (≈340 mesos) que tens al fitxer Excel manual.<br><br>Els mesos que ja tinguis a l\'app <b>NO es sobreescriuran</b> — només s\'afegeixen els que falten.<br><br>Els totals apareixeran automàticament al KPI "Entrades totals" del Informe Anual i de la Comparativa anys.':'Cargará los <b>totales mensuales</b> desde 1998 hasta agosto 2026 (≈340 meses) que tienes en tu Excel manual.<br><br>Los meses que ya tengas en la app <b>NO se sobrescribirán</b> — solo se añaden los que faltan.<br><br>Los totales aparecerán automáticamente en el KPI "Entradas totales" del Informe Anual y de la Comparativa años.',
-      async ()=>{
-        try{
-          // En Electron file:// la ruta absoluta falla → probar primero relativa, luego backend URL
-          let backfill = null;
-          const candidates = [
-            'downloads/backfill-autoescoles-historico.json',
-            './downloads/backfill-autoescoles-historico.json',
-            '/downloads/backfill-autoescoles-historico.json',
-          ];
-          // Añadir backend URL (para Electron que apunta al preview cloud)
-          try{
-            const beUrl = (typeof getApiBase==='function') ? getApiBase() : '';
-            if(beUrl) candidates.push(beUrl.replace(/\/$/,'')+'/downloads/backfill-autoescoles-historico.json');
-          }catch(_){}
-          try{
-            const beUrl2 = (window.API_BASE||'') || (window.APP_BACKEND_URL||'') || (localStorage.getItem('caja.backend.url')||'');
-            if(beUrl2) candidates.push(beUrl2.replace(/\/$/,'')+'/downloads/backfill-autoescoles-historico.json');
-          }catch(_){}
-          // También el origen actual (web preview)
-          try{ if(location && location.origin && location.protocol!=='file:') candidates.push(location.origin+'/downloads/backfill-autoescoles-historico.json'); }catch(_){}
-          console.info('[backfill] intentando URLs:', candidates);
-          let lastErr = null;
-          for(const url of candidates){
-            try{
-              const r = await fetch(url + '?t='+Date.now(), {cache:'no-store'});
-              if(r.ok){ backfill = await r.json(); break; }
-              lastErr = new Error('HTTP '+r.status);
-            }catch(e){ lastErr = e; }
-          }
-          if(!backfill){
-            toast(isCA?`❌ No es pot descarregar el fitxer històric: ${lastErr&&lastErr.message||'desconegut'}`:`❌ No se puede descargar el archivo histórico: ${lastErr&&lastErr.message||'desconocido'}`, 6000);
-            return;
-          }
-          const cur = loadStats();
-          let mergedMonths = 0, addedMonths = 0, skippedMonths = 0;
-          const curAutoSet = new Set(cur.autoescoles || []);
-          (backfill.autoescoles||[]).forEach(a => { if(!curAutoSet.has(a)){ cur.autoescoles.push(a); curAutoSet.add(a); }});
-          for(const [monthKey, autos] of Object.entries(backfill.data||{})){
-            if(cur.data[monthKey] && Object.keys(cur.data[monthKey]).length > 0){
-              skippedMonths++; continue;
-            }
-            cur.data[monthKey] = autos;
-            addedMonths++;
-            mergedMonths++;
-          }
-          saveStats(cur);
-          try{ localStorage.setItem('caja.stats.backfill.loaded.v1', String(Date.now())); }catch(_){}
-          const btn = back.querySelector('#stBackfillHist');
-          if(btn) btn.style.display = 'none';
-          renderTable();
-          toast(isCA?`✅ Històric carregat: ${addedMonths} mesos afegits · ${skippedMonths} respectats (ja tenies dades)`:`✅ Histórico cargado: ${addedMonths} meses añadidos · ${skippedMonths} respetados (ya tenías datos)`, 5000);
-        }catch(e){
-          console.error('backfill error', e);
-          toast(isCA?`❌ Error carregant l'històric: ${e.message||e}`:`❌ Error cargando el histórico: ${e.message||e}`, 5000);
+    back.querySelector('#stBackfillFile').click();
+  };
+  back.querySelector('#stBackfillFile').onchange=async (ev)=>{
+    const f = ev.target.files[0];
+    ev.target.value = '';
+    if(!f) return;
+    if(typeof XLSX === 'undefined'){
+      toast(isCA?'❌ Lector Excel no disponible':'❌ Lector Excel no disponible', 4000); return;
+    }
+    try{
+      const buf = await f.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const groups = {};  // canonical → {variants: {name:count}, data: {yyyy-mm: total}}
+      let sheetsProcessed = 0, sheetsSkipped = [];
+      wb.SheetNames.forEach(sname => {
+        const yearMatch = String(sname).match(/(19|20)\d{2}/);
+        if(!yearMatch){ sheetsSkipped.push(sname); return; }
+        const year = parseInt(yearMatch[0]);
+        if(year < 1990 || year > 2035){ sheetsSkipped.push(sname); return; }
+        const sheet = wb.Sheets[sname];
+        const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', raw:false});
+        if(rows.length < 3){ sheetsSkipped.push(sname); return; }
+        // Buscar header row (contains GENER/ENERO/JAN) en las primeras 6 filas
+        let headerRow = -1;
+        for(let r=0; r<Math.min(6, rows.length); r++){
+          const upcaseCells = rows[r].map(c => _canonicalize(c));
+          if(upcaseCells.some(c => c && MONTHS_HEAD[c] === 1)){ headerRow = r; break; }
         }
-      },
-      isCA?'Sí, carregar':'Sí, cargar',
-    );
+        if(headerRow < 0){ sheetsSkipped.push(sname); return; }
+        // Detectar col del nombre + cols de meses
+        const colMonth = {};
+        let nameCol = 0;
+        rows[headerRow].forEach((cell, c) => {
+          const up = _canonicalize(cell);
+          if(MONTHS_HEAD[up]){
+            colMonth[c] = MONTHS_HEAD[up];
+            if(colMonth[c] === 1 && nameCol === 0) nameCol = Math.max(0, c - 1);
+          }
+        });
+        if(Object.keys(colMonth).length === 0){ sheetsSkipped.push(sname); return; }
+        // Extraer datos
+        for(let r = headerRow + 1; r < rows.length; r++){
+          const row = rows[r];
+          const name = String(row[nameCol]||'').trim();
+          if(!name || _isTotalRow(name)) continue;
+          const can = _canonicalize(name);
+          if(!can) continue;
+          groups[can] = groups[can] || {variants:{}, data:{}};
+          for(const [c, m] of Object.entries(colMonth)){
+            const v = row[+c];
+            const n = parseInt(String(v||'').replace(/[^0-9-]/g,''), 10);
+            if(!isFinite(n) || n <= 0) continue;
+            const key = `${year}-${String(m).padStart(2,'0')}`;
+            groups[can].variants[name] = (groups[can].variants[name]||0) + n;
+            groups[can].data[key] = (groups[can].data[key]||0) + n;
+          }
+        }
+        sheetsProcessed++;
+      });
+      // Elegir nombre display por grupo (variante más usada)
+      const cur = loadStats();
+      const curAutoSet = new Set(cur.autoescoles || []);
+      let addedMonths = 0, skippedMonths = 0;
+      for(const [can, info] of Object.entries(groups)){
+        const variants = Object.entries(info.variants).sort((a,b) => b[1]-a[1] || b[0].length-a[0].length);
+        const display = variants[0][0];
+        // Buscar si ya existe una variante en cur con misma canónica
+        const existingDisplay = cur.autoescoles.find(x => _canonicalize(x) === can);
+        const finalName = existingDisplay || display;
+        if(!existingDisplay){
+          cur.autoescoles.push(display);
+          curAutoSet.add(display);
+        }
+        for(const [key, cnt] of Object.entries(info.data)){
+          if(cur.data[key] && Object.keys(cur.data[key]).length > 0 && (cur.data[key][finalName]||0) > 0){
+            skippedMonths++; continue;
+          }
+          cur.data[key] = cur.data[key] || {};
+          cur.data[key][finalName] = cnt;
+          addedMonths++;
+        }
+      }
+      saveStats(cur);
+      try{ localStorage.setItem('caja.stats.backfill.loaded.v1', String(Date.now())); }catch(_){}
+      const btn = back.querySelector('#stBackfillHist');
+      if(btn) btn.style.display = 'none';
+      renderTable();
+      const summary = isCA
+        ? `✅ Històric pujat · ${sheetsProcessed} fulls processats · ${Object.keys(groups).length} autoescoles úniques · ${addedMonths} mesos afegits${skippedMonths?' · '+skippedMonths+' respectats':''}`
+        : `✅ Histórico subido · ${sheetsProcessed} hojas procesadas · ${Object.keys(groups).length} autoescuelas únicas · ${addedMonths} meses añadidos${skippedMonths?' · '+skippedMonths+' respetados':''}`;
+      toast(summary, 6000);
+      if(sheetsSkipped.length){
+        console.info('[backfill] hojas ignoradas (sin datos válidos):', sheetsSkipped);
+      }
+    }catch(e){
+      console.error('backfill file error', e);
+      toast(isCA?`❌ Error llegint el fitxer: ${e.message||e}`:`❌ Error leyendo archivo: ${e.message||e}`, 5000);
+    }
   };
   // Alias mapping CSV → canonical name
   const STAT_ALIAS={
