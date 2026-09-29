@@ -7776,6 +7776,7 @@ function openYearComparison(){
       <select id="ycCount" style="background:#1e293b;color:#f5b301;border:1px solid #f5b301;border-radius:6px;padding:6px 10px;font-weight:700">
         <option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option>
       </select>
+      <button class="btn" id="ycGoChart" style="background:#22d3ee;color:#0f172a;border-color:#22d3ee;font-weight:700" data-testid="yc-go-chart">📈 ${L('Veure gràfica','Ver gráfica')}</button>
       <button class="btn" id="ycPrint" style="background:#f5b301;color:#0f172a;border-color:#f5b301;font-weight:700" data-testid="yc-print">📥 ${L('Descarregar PDF','Descargar PDF')}</button>
       <button class="btn" id="ycClose" style="background:#7f1d1d;color:#fff;border-color:#7f1d1d" data-testid="yc-close">✖</button>
     </div>
@@ -7809,6 +7810,11 @@ function openYearComparison(){
   const bodyEl=back.querySelector('#ycBody');
   const render=()=>{bodyEl.innerHTML=_buildYearComparison(yearNow,parseInt(sel.value))};
   sel.onchange=render;render();
+  // 📈 Scroll suave hasta la gráfica al pulsar "Ver gráfica"
+  back.querySelector('#ycGoChart').onclick=()=>{
+    const chartEl = bodyEl.querySelector('#ycChart');
+    if(chartEl){ chartEl.scrollIntoView({behavior:'smooth', block:'start'}); }
+  };
 }
 
 function _buildYearComparison(latestYear,count){
@@ -7910,6 +7916,9 @@ function _buildYearComparison(latestYear,count){
   });
   html+=`</div>`;
 
+  // 📈 Gráfica de líneas · comparativa de entradas mensuales por año (SVG nativo)
+  html+= _buildYearComparisonChart(years, byYear, MESES);
+
   // Tabla comparativa totales
   html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">📊 ${L('Resum comparatiu','Resumen comparativo')}</h4>
     <table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',sans-serif;font-size:13px;margin-bottom:18px">
@@ -7945,6 +7954,136 @@ function _buildYearComparison(latestYear,count){
   const anyData=years.some(y=>byYear[y].cnt>0);
   if(!anyData){html+=`<div style="text-align:center;padding:40px;color:#94a3b8;font-style:italic">${L('No hi ha dades per aquests anys','No hay datos para estos años')}.</div>`}
   return html;
+}
+
+// ============================================================================
+// 📈 Gráfica SVG de líneas suaves · Nº de entradas mensuales por año
+// ============================================================================
+// Genera una gráfica de líneas Bézier (una línea por año) usando SVG nativo.
+// Datos: byYear[y].byMonthCnt (array 12 con nº entradas por mes).
+// Soporta 2-6 años con paleta de colores distinta por año.
+function _buildYearComparisonChart(years, byYear, MESES){
+  // Paleta por índice (cíclica). Colores contrastados y accesibles.
+  const PALETTE = ['#ef4444','#f59e0b','#10b981','#06b6d4','#6366f1','#f5b301'];
+
+  // Prepara los datos de cada año
+  const series = years.map((y,i)=>({
+    year: y,
+    color: PALETTE[i % PALETTE.length],
+    data: (byYear[y] && byYear[y].byMonthCnt) ? byYear[y].byMonthCnt.slice() : Array(12).fill(0),
+    total: (byYear[y] && byYear[y].cnt) ? byYear[y].cnt : 0
+  }));
+
+  // Máximo Y (redondeado hacia arriba para un eje "bonito")
+  let maxY = 0;
+  series.forEach(s => s.data.forEach(v => { if(v>maxY) maxY = v; }));
+  if(maxY <= 0){
+    return `<div id="ycChart" style="margin:8px 0 24px 0;padding:24px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;text-align:center;color:#94a3b8;font-style:italic">
+      📈 ${L("No hi ha dades d'entrades per aquests anys","No hay datos de entradas para estos años")}.
+    </div>`;
+  }
+  // Redondeo del máximo a un múltiplo bonito (50, 100, 200, 500, 1000...)
+  const niceStep = (v)=>{
+    const pow = Math.pow(10, Math.floor(Math.log10(v)));
+    const norm = v/pow;
+    if(norm <= 1) return pow*0.2;
+    if(norm <= 2) return pow*0.5;
+    if(norm <= 5) return pow;
+    return pow*2;
+  };
+  const step = niceStep(maxY/5);
+  const yMax = Math.ceil(maxY/step)*step;
+  const ticks = [];
+  for(let v=0; v<=yMax; v+=step) ticks.push(v);
+
+  // Dimensiones del SVG (viewBox → responsive)
+  const W = 1140, H = 340;
+  const M = { top: 20, right: 20, bottom: 44, left: 60 };
+  const iw = W - M.left - M.right;
+  const ih = H - M.top - M.bottom;
+  // Escalas
+  const xAt = (i)=> M.left + (iw/11) * i;               // 12 puntos → 11 intervalos
+  const yAt = (v)=> M.top + ih - (v/yMax) * ih;
+
+  // Path suavizado (cubic bezier tipo Catmull-Rom con tensión 1/6)
+  const smoothPath = (pts)=>{
+    if(pts.length < 2) return '';
+    let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+    for(let i=0; i<pts.length-1; i++){
+      const p0 = pts[i-1] || pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i+1];
+      const p3 = pts[i+2] || p2;
+      const c1x = p1.x + (p2.x - p0.x)/6;
+      const c1y = p1.y + (p2.y - p0.y)/6;
+      const c2x = p2.x - (p3.x - p1.x)/6;
+      const c2y = p2.y - (p3.y - p1.y)/6;
+      d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+    }
+    return d;
+  };
+
+  // ── Bloque contenedor ──────────────────────────────────────────────
+  let out = `<div id="ycChart" style="margin:8px 0 24px 0;padding:16px 18px 14px 18px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 1px 3px rgba(15,23,42,0.05)">`;
+  out += `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:10px">
+    <h4 style="margin:0;color:#0f172a;font-family:Georgia,serif;font-size:15px">📈 ${L("Gràfica d'entrades mensuals","Gráfica de entradas mensuales")}</h4>
+    <div style="font-size:11px;color:#64748b">${L("Nº d'entrades per mes · comparativa anual","Nº de entradas por mes · comparativa anual")}</div>
+  </div>`;
+
+  // ── Leyenda ────────────────────────────────────────────────────────
+  out += `<div style="display:flex;flex-wrap:wrap;gap:14px;margin:4px 0 10px 0;padding:8px 10px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0">`;
+  series.forEach(s=>{
+    out += `<div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#334155;font-weight:600">
+      <span style="display:inline-block;width:14px;height:3px;background:${s.color};border-radius:2px"></span>
+      <span>${s.year}</span>
+      <span style="color:#94a3b8;font-weight:500">· ${s.total.toLocaleString(currentLang==='es'?'es-ES':'ca-ES')} ${L('entrades','entradas')}</span>
+    </div>`;
+  });
+  out += `</div>`;
+
+  // ── SVG ────────────────────────────────────────────────────────────
+  out += `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;max-height:340px" preserveAspectRatio="xMidYMid meet">`;
+
+  // Rejilla horizontal + etiquetas del eje Y
+  ticks.forEach(v=>{
+    const y = yAt(v);
+    out += `<line x1="${M.left}" y1="${y.toFixed(1)}" x2="${(W-M.right).toFixed(1)}" y2="${y.toFixed(1)}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="${v===0?'0':'3 3'}"/>`;
+    out += `<text x="${(M.left-8).toFixed(1)}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="11" fill="#64748b" font-family="Segoe UI,sans-serif">${v.toLocaleString(currentLang==='es'?'es-ES':'ca-ES')}</text>`;
+  });
+
+  // Etiquetas eje X (meses abreviados)
+  const MESES_ABBR = MESES.map(m => m.slice(0,3));
+  for(let i=0; i<12; i++){
+    const x = xAt(i);
+    out += `<text x="${x.toFixed(1)}" y="${(H-M.bottom+18).toFixed(1)}" text-anchor="middle" font-size="11" fill="#64748b" font-family="Segoe UI,sans-serif">${MESES_ABBR[i]}</text>`;
+  }
+
+  // Título ejes
+  out += `<text x="${(M.left/2-4).toFixed(1)}" y="${(M.top-6).toFixed(1)}" font-size="10" fill="#94a3b8" font-family="Segoe UI,sans-serif" font-weight="600">Nº</text>`;
+
+  // Líneas de cada año
+  series.forEach(s=>{
+    const pts = s.data.map((v,i)=>({x:xAt(i), y:yAt(v), v:v, m:i}));
+    const d = smoothPath(pts);
+    // Área tenue bajo la línea (opcional, muy sutil)
+    const areaD = d + ` L${xAt(11).toFixed(1)},${yAt(0).toFixed(1)} L${xAt(0).toFixed(1)},${yAt(0).toFixed(1)} Z`;
+    out += `<path d="${areaD}" fill="${s.color}" fill-opacity="0.06" stroke="none"/>`;
+    out += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 1px 1px rgba(15,23,42,0.08))"/>`;
+    // Puntos con tooltip nativo (SVG <title>)
+    pts.forEach(p=>{
+      out += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.2" fill="#fff" stroke="${s.color}" stroke-width="2">
+        <title>${s.year} · ${MESES[p.m]}: ${p.v.toLocaleString(currentLang==='es'?'es-ES':'ca-ES')} ${L('entrades','entradas')}</title>
+      </circle>`;
+    });
+  });
+
+  // Ejes izquierdo e inferior
+  out += `<line x1="${M.left}" y1="${M.top}" x2="${M.left}" y2="${(H-M.bottom).toFixed(1)}" stroke="#cbd5e1" stroke-width="1"/>`;
+  out += `<line x1="${M.left}" y1="${(H-M.bottom).toFixed(1)}" x2="${(W-M.right).toFixed(1)}" y2="${(H-M.bottom).toFixed(1)}" stroke="#cbd5e1" stroke-width="1"/>`;
+
+  out += `</svg>`;
+  out += `</div>`;
+  return out;
 }
 
 

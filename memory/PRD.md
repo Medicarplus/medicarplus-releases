@@ -1844,3 +1844,22 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 - **Admin panel** (`/admin.html` → detalle cliente): nueva sección `<details data-testid="details-cloud-backups">` "☁️ COPIAS EN LA NUBE · soporte al cliente · envía cualquiera de las 30". Tabla ordenada por fecha con columnas [Fecha·hora · Etiqueta · Tamaño · Claves · Acción]. Fila más reciente destacada con badge "MÁS RECIENTE". Cada fila con botón "📤 Enviar" individual → confirma → push a pending buzón del cliente.
 - **UX**: la función `window._loadCloudBackupsForAdmin(iid, lkey)` lee el data-testid del `<details>` en `ontoggle`, hace fetch lazy (solo cuando el admin lo abre), renderiza tabla con 30 filas. `data-loaded='1'` evita recarga si se cierra/reabre.
 - **Verificado E2E**: admin auth 403 sin token · listar devuelve 30 items · push envía copia histórica concreta (backup_id=X) → pending mailbox del cliente muestra "📩 Copia enviada por soporte (del DD/MM/YYYY HH:MM)".
+
+### 📈 Gráfica multi-año de entradas mensuales · Feb 2026 (v2.html)
+- **Objetivo (usuario msg 522)**: en "Comparativa años" añadir una gráfica visual de nº de entradas (tráfico) por mes, comparando los 2-6 años seleccionados.
+- **Implementado**:
+  - Nuevo botón `#ycGoChart` en la cabecera del modal · data-testid=`yc-go-chart` · `📈 Ver gráfica` (cian) → scroll suave hasta la gráfica.
+  - Nueva función `_buildYearComparisonChart(years, byYear, MESES)` que devuelve SVG nativo (viewBox 1140×340, responsive).
+  - Líneas suaves Bézier tipo Catmull-Rom (tensión 1/6) · 1 línea por año · paleta 6 colores contrastados (rojo, ámbar, verde, cian, índigo, dorado).
+  - Área tenue bajo cada línea (opacity 6%), círculos en cada mes con `<title>` (tooltip nativo: `YYYY · Mes: N entradas`).
+  - Eje Y auto-escalado a múltiplos "bonitos" (niceStep: 20/50/100/200/500/1000...) con 5 ticks y rejilla horizontal dashed.
+  - Eje X: 12 meses abreviados (Ene, Feb, Mar...) según currentLang.
+  - Leyenda superior con dot color + año + total entradas anuales (localizado es/ca).
+  - Bloque contenedor `#ycChart` insertado entre las tarjetas KPI y el "Resumen comparativo".
+  - Se alimenta de `byYear[y].byMonthCnt` que ya integra CSV DGT real + backfill histórico (`caja.stats.v1`).
+- **Verificación**:
+  - `node tests/accounting_audit.js` · 102/102 invariantes PASS (sin regresión contable).
+  - Los 10 bloques `<script>` de `v2.html` parsean sin errores (`node -c`).
+  - Screenshot Playwright → `#ycChart` presente en DOM al abrir el modal.
+- **Notas**: gráfica renderiza en SVG puro → visible tanto en modal como en el PDF exportado. En Electron: recordar `Ctrl + Shift + R` tras actualizar.
+
