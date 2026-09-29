@@ -12331,7 +12331,13 @@ function isLicenseActive(){
           const LAST_CB = 'caja.cloudbackup.last.v1';
           const lastCb = parseInt(localStorage.getItem(LAST_CB)||'0');
           const hoursSinceCb = (Date.now()-lastCb)/(1000*60*60);
-          const isPremium = (lic.plan||'').toString().toUpperCase().includes('PREMIUM') || lic.type==='MASTER';
+          // Feb 2026 · Fix bug: el backend acepta PRM/PREMIUM/TRIAL/MASTER pero antes el cliente
+          // solo detectaba .includes('PREMIUM'), dejando fuera clientes con TRIAL (60 días)
+          // y con código PRM · resultado: no se enviaba ninguna copia diaria.
+          const _plan = (lic.plan||'').toString().toUpperCase();
+          const _type = (lic.type||'').toString().toUpperCase();
+          const PREMIUM_PLANS = ['PRM','PREMIUM','TRIAL','MASTER'];
+          const isPremium = PREMIUM_PLANS.includes(_plan) || _type === 'MASTER' || _type === 'TRIAL';
           if(isPremium && hoursSinceCb >= 20 && window.mcSync && window.mcSync.sendCloudBackup){
             window.mcSync.sendCloudBackup('auto-daily').then(r=>{
               if(r && r.ok){
