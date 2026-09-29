@@ -3871,6 +3871,11 @@ function computeTotals(list){const t={bruto:0,dto:0,tasas:0,neto:0,byFp:{E:0,T:0
     } else if(e._transferDir === 'banco_to_reserva'){
       // El dinero sale del banco y va a la reserva de cambio (dentro de caja física).
       t.internalBanco -= amt;
+    } else if(e._transferDir === 'reserva_to_caja'){
+      // Feb 2026 (simplificación): sacar cambio de la reserva a la caja física real.
+      // La reserva ya baja (denominaciones bajan en loadCambio) → resCambio menor.
+      // Este asiento es HABER fp:E: SUMA a caja física. Total físico no cambia.
+      t.internalCaja += amt;
     }
     return; // NO toca facturación (neto), NO altera datáfono ni byFp
   }
@@ -3948,10 +3953,12 @@ function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(
   const debeTotalCB=totalMovCB;
   // CAIXA FÍSICA = Efectiu auto − delta (el que va anar a targeta segons datàfon) + reserva de cambio (diner físic guardat).
   // COMPTE BANC = Efectiu auto de targeta + delta = df (si df>0) + Bizum + Transferència.
-  // resCambio = cajón de cambio + lo traspasado a caja (traspaso interno: no altera el total)
+  // resCambio = SOLO el cajón de cambio (denominaciones + bulk pendiente).
+  // Feb 2026 · simplificación: eliminado el concepto "traspasado a caja" (_toCaja).
+  // Sacar cambio ahora crea un asiento HABER _internal (fp:E) real que sube la caja
+  // física a través de t.internalCaja. Añadir cambio crea un DEBE _internal que la baja.
   const cajonCambio=reservaCambio();
-  const traspCaja=traspasoCambio();
-  const resCambio=cajonCambio+traspCaja;
+  const resCambio=cajonCambio;
   const cajaC=(efShown-delta_C)+saCC.caja+resCambio+(t.internalCaja||0);
   // 🔵 CUENTA BANCO = tarjeta declarada (trShown) + Bizum + Transf + saldo ant. + transferencias internas
   // Nota: trShown ya es df cuando el usuario lo ha declarado, y autoT_C si no.
@@ -3960,7 +3967,7 @@ function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(
   const cajaCB=(efShownCB-delta_CB)+saCC.caja+resCambio+(t.internalCaja||0);
   const bbvaCB=(autoT_CB+delta_CB+dfExcess_CB)+((t.byFp.B||0)+(t.tasasByFp.B||0))+((t.byFp.X||0)+(t.tasasByFp.X||0))+saCC.banc+(t.internalBanco||0);
   const datafonoHTML='';
-  $('#sumBox').innerHTML=isC?`${datafonoHTML}<div class="row"><span>Revisiones</span><b>${t.cnt-t.retornos}${t.retornos?` (${t.retornos} anulada)`:''}</b></div><div class="row"><span>Total revisiones</span><b class="num">${fmt(t.bruto)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row"><span>💵 Efectivo</span><b class="num" data-testid="efectivo-neto-c">${fmt(efIn_C-deltaDisp_C)}</b></div><div class="row"><span>💳 Tarjeta <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><div style="display:flex;gap:4px;align-items:center;justify-content:flex-end"><span data-datafono-info="1" title="Info datáfono manual" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#2a3040;color:#86b6ff;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #86b6ff;user-select:none">?</span><input type="number" step="0.01" id="datafono-inp" value="${df||''}" placeholder="manual" title="Introduce manualmente el total del datáfono (anula el automático)" style="width:70px;background:#0e1117;color:#86b6ff;border:1px solid #2a3040;border-radius:4px;padding:2px 4px;font-size:11px;text-align:right" /><button id="datafono-save" title="Guardar" style="background:#3ddc97;color:#0f1115;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px">✓</button><b class="num" ${df?'style="color:#86b6ff"':''}>${fmt(trTarShown_C)}</b></div></div><div class="row"><span>📱 Bizum <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(bizIn_C)}</b></div><div class="row"><span>🏦 Transferencia <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(trIn_C)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(126,227,170,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97;display:none"><span style="color:#7ee3aa;font-weight:700">↗ TOTAL HABER</span><b class="num big" style="color:#7ee3aa">+${fmt(haberTotalC)}</b></div><div class="row wide" style="background:rgba(255,150,160,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #ff5d6c;display:none"><span style="color:#ff96a0;font-weight:700">↘ TOTAL DEBE</span><b class="num big" style="color:#ff96a0">-${fmt(debeTotalC)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(61,220,151,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97"><span style="color:#7ee3aa;font-weight:600">🟢 ${L('CAIXA FÍSICA','CAJA FÍSICA')}</span><b class="num big" style="color:#7ee3aa">${fmt(cajaC)}</b></div><div class="row wide" style="background:rgba(134,182,255,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #5aa9ff"><span style="color:#86b6ff;font-weight:600">🔵 CUENTA BANCO</span><b class="num big" style="color:#86b6ff">${fmt(bbvaC)}</b></div><div class="row total"><span>TOTAL DÍA (facturación)</span><span class="num">${fmt(t.neto)}</span></div>`:`${datafonoHTML}<div class="row"><span>Entradas Tráfico</span><b>${t.cntDGT} ${t.retornos?`(${t.retornos} retorno)`:''}</b></div><div class="row"><span>Total Certificados Tráfico</span><b class="num">${fmt(t.brutoDGT)}</b></div><div class="row"><span>Descuentos</span><b class="num">-${fmt(t.dto)}</b></div><div class="row"><span>Tasas DGT ${(()=>{const bk=t.tasasBreakdown||{};const keys=Object.keys(bk).sort((a,b)=>+b-+a);if(keys.length===0)return '';const parts=keys.map(k=>{const cnt=bk[k];const price=+k;const sub=cnt*price;return `<span style="white-space:nowrap">${cnt}×${price.toFixed(2).replace('.',',')} = <b style="color:#7ee3aa">${sub.toFixed(2).replace('.',',')}</b></span>`});return `<div style="color:#94a3b8;font-size:10px;font-weight:400;margin-top:4px;line-height:1.6;font-family:'Consolas',monospace">${parts.join(' · ')}</div>`;})()}</span><b class="num">${fmt(t.tasasDGT)}</b></div><div style="grid-column:span 2;margin:10px -16px 4px -16px;padding:12px 16px;background:linear-gradient(90deg,rgba(var(--tint),.14) 0%,rgba(var(--tint),.04) 100%);border-left:3px solid rgb(var(--tint));border-radius:6px;display:flex;justify-content:space-between;align-items:center"><span style="color:rgb(var(--tint));font-weight:700;font-size:13px">💰 TOTAL TRÁFICO</span><span class="num" style="color:var(--accent-2);font-weight:700;font-size:17px">${fmt(t.brutoDGT+t.tasasDGT)}</span></div>${t.cntOtros>0||t.haber>0||t.refundsCount>0?`<div class="row" data-otros-detail="1" style="cursor:pointer" title="${L('Clica per veure el detall dels serveis','Clic para ver el detalle de los servicios')}"><span style="text-decoration:underline dotted;text-decoration-color:#7a8394">Otros servicios (${t.cntOtros}) <span style="color:#7a8394;font-size:10px">▸ detall</span></span><b class="num">${fmt(t.brutoOtros)}</b></div>${t.haber>0?`<div class="row"><span>Ingresos manuales</span><b class="num">${fmt(t.haber)}</b></div>`:''}${t.refundsCount>0?`<div class="row" style="background:rgba(217,119,6,.1);padding:6px 10px;border-radius:6px;border-left:3px solid #d97706"><span style="color:#fbbf24;font-weight:700">↩ Devoluciones tasas (${t.refundsCount})</span><b class="num" style="color:#fbbf24">-${fmt(t.refundsTotal)}</b></div>`:''}`:''}<div style="grid-column:span 2;margin:2px -16px 8px -16px;padding:12px 16px;background:linear-gradient(90deg,rgba(126,227,170,.14) 0%,rgba(126,227,170,.04) 100%);border-left:4px solid #3ddc97;border-radius:6px;display:flex;justify-content:space-between;align-items:center"><span style="color:#7ee3aa;font-weight:700;font-size:13px">🧾 TOTAL COBRADO</span><span class="num" style="color:#7ee3aa;font-weight:700;font-size:17px">${fmt(t.bruto+t.tasas+t.haber)}</span></div><div class="row"><span>💵 Efectivo</span><b class="num" data-testid="efectivo-neto-cb">${fmt(efIn_CB-deltaDisp_CB)}</b></div><div class="row"><span>💳 Tarjeta <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><div style="display:flex;gap:4px;align-items:center;justify-content:flex-end"><span data-datafono-info="1" title="Info datáfono manual" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#2a3040;color:#7ee3aa;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #7ee3aa;user-select:none">?</span><input type="number" step="0.01" id="datafono-inp" value="${df||''}" placeholder="manual" title="Introduce manualmente el total del datáfono (anula el automático)" style="width:70px;background:#0e1117;color:#7ee3aa;border:1px solid #2a3040;border-radius:4px;padding:2px 4px;font-size:11px;text-align:right" /><button id="datafono-save" title="Guardar" style="background:#3ddc97;color:#0f1115;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px">✓</button><b class="num" ${df?'style="color:#7ee3aa"':''}>${fmt(trTarShown_CB)}</b></div></div><div class="row"><span>📱 Bizum <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(bizIn_CB)}</b></div><div class="row"><span>🏦 Transferencia <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(trIn_CB)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(126,227,170,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97;display:none"><span style="color:#7ee3aa;font-weight:700">↗ TOTAL HABER</span><b class="num big" style="color:#7ee3aa">+${fmt(haberTotalCB)}</b></div><div class="row wide" style="background:rgba(255,150,160,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #ff5d6c;display:none"><span style="color:#ff96a0;font-weight:700">↘ TOTAL DEBE</span><b class="num big" style="color:#ff96a0">-${fmt(debeTotalCB)}</b></div><div class="row"><span>Saldo anterior caja + cambio <span style="color:#7a8394;font-size:10px">(todo el efectivo)</span> <span class="tt" data-tt="Todo el dinero metálico al empezar el día: saldo de caja física del día anterior + traspasos de cambio a caja + cajón de reserva de cambio.">?</span></span><b class="num" data-testid="saldo-ant-caja-cambio">${fmt(saCC.caja+resCambio)}</b></div><div class="row"><span>Saldo solo caja <span style="color:#7a8394;font-size:10px">(sin cajón de cambio)</span> <span class="tt" data-tt="Efectivo en la caja: saldo del día anterior + cambio traspasado a caja. NO incluye lo guardado en el cajón de reserva de cambio.">?</span></span><b class="num" data-testid="saldo-ant-solo-caja">${fmt(saCC.caja+traspCaja)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(61,220,151,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97"><span style="color:#7ee3aa;font-weight:600">🟢 ${L('CAIXA FÍSICA','CAJA FÍSICA')}</span><b class="num big" style="color:#7ee3aa">${fmt(cajaCB)}</b></div><div class="row wide" style="background:rgba(134,182,255,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #5aa9ff"><span style="color:#86b6ff;font-weight:600">🔵 CUENTA BANCO</span><b class="num big" style="color:#86b6ff">${fmt(bbvaCB)}</b></div><div class="row total"><span>TOTAL <span style="color:#7a8394;font-size:10px;font-weight:400">(caja física con reserva + banco)</span></span><span class="num" data-testid="total-caja-banco">${fmt(cajaCB+bbvaCB)}</span></div>`;
+  $('#sumBox').innerHTML=isC?`${datafonoHTML}<div class="row"><span>Revisiones</span><b>${t.cnt-t.retornos}${t.retornos?` (${t.retornos} anulada)`:''}</b></div><div class="row"><span>Total revisiones</span><b class="num">${fmt(t.bruto)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row"><span>💵 Efectivo</span><b class="num" data-testid="efectivo-neto-c">${fmt(efIn_C-deltaDisp_C)}</b></div><div class="row"><span>💳 Tarjeta <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><div style="display:flex;gap:4px;align-items:center;justify-content:flex-end"><span data-datafono-info="1" title="Info datáfono manual" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#2a3040;color:#86b6ff;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #86b6ff;user-select:none">?</span><input type="number" step="0.01" id="datafono-inp" value="${df||''}" placeholder="manual" title="Introduce manualmente el total del datáfono (anula el automático)" style="width:70px;background:#0e1117;color:#86b6ff;border:1px solid #2a3040;border-radius:4px;padding:2px 4px;font-size:11px;text-align:right" /><button id="datafono-save" title="Guardar" style="background:#3ddc97;color:#0f1115;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px">✓</button><b class="num" ${df?'style="color:#86b6ff"':''}>${fmt(trTarShown_C)}</b></div></div><div class="row"><span>📱 Bizum <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(bizIn_C)}</b></div><div class="row"><span>🏦 Transferencia <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(trIn_C)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(126,227,170,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97;display:none"><span style="color:#7ee3aa;font-weight:700">↗ TOTAL HABER</span><b class="num big" style="color:#7ee3aa">+${fmt(haberTotalC)}</b></div><div class="row wide" style="background:rgba(255,150,160,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #ff5d6c;display:none"><span style="color:#ff96a0;font-weight:700">↘ TOTAL DEBE</span><b class="num big" style="color:#ff96a0">-${fmt(debeTotalC)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(61,220,151,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97"><span style="color:#7ee3aa;font-weight:600">🟢 ${L('CAIXA FÍSICA','CAJA FÍSICA')}</span><b class="num big" style="color:#7ee3aa">${fmt(cajaC)}</b></div><div class="row wide" style="background:rgba(134,182,255,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #5aa9ff"><span style="color:#86b6ff;font-weight:600">🔵 CUENTA BANCO</span><b class="num big" style="color:#86b6ff">${fmt(bbvaC)}</b></div><div class="row total"><span>TOTAL DÍA (facturación)</span><span class="num">${fmt(t.neto)}</span></div>`:`${datafonoHTML}<div class="row"><span>Entradas Tráfico</span><b>${t.cntDGT} ${t.retornos?`(${t.retornos} retorno)`:''}</b></div><div class="row"><span>Total Certificados Tráfico</span><b class="num">${fmt(t.brutoDGT)}</b></div><div class="row"><span>Descuentos</span><b class="num">-${fmt(t.dto)}</b></div><div class="row"><span>Tasas DGT ${(()=>{const bk=t.tasasBreakdown||{};const keys=Object.keys(bk).sort((a,b)=>+b-+a);if(keys.length===0)return '';const parts=keys.map(k=>{const cnt=bk[k];const price=+k;const sub=cnt*price;return `<span style="white-space:nowrap">${cnt}×${price.toFixed(2).replace('.',',')} = <b style="color:#7ee3aa">${sub.toFixed(2).replace('.',',')}</b></span>`});return `<div style="color:#94a3b8;font-size:10px;font-weight:400;margin-top:4px;line-height:1.6;font-family:'Consolas',monospace">${parts.join(' · ')}</div>`;})()}</span><b class="num">${fmt(t.tasasDGT)}</b></div><div style="grid-column:span 2;margin:10px -16px 4px -16px;padding:12px 16px;background:linear-gradient(90deg,rgba(var(--tint),.14) 0%,rgba(var(--tint),.04) 100%);border-left:3px solid rgb(var(--tint));border-radius:6px;display:flex;justify-content:space-between;align-items:center"><span style="color:rgb(var(--tint));font-weight:700;font-size:13px">💰 TOTAL TRÁFICO</span><span class="num" style="color:var(--accent-2);font-weight:700;font-size:17px">${fmt(t.brutoDGT+t.tasasDGT)}</span></div>${t.cntOtros>0||t.haber>0||t.refundsCount>0?`<div class="row" data-otros-detail="1" style="cursor:pointer" title="${L('Clica per veure el detall dels serveis','Clic para ver el detalle de los servicios')}"><span style="text-decoration:underline dotted;text-decoration-color:#7a8394">Otros servicios (${t.cntOtros}) <span style="color:#7a8394;font-size:10px">▸ detall</span></span><b class="num">${fmt(t.brutoOtros)}</b></div>${t.haber>0?`<div class="row"><span>Ingresos manuales</span><b class="num">${fmt(t.haber)}</b></div>`:''}${t.refundsCount>0?`<div class="row" style="background:rgba(217,119,6,.1);padding:6px 10px;border-radius:6px;border-left:3px solid #d97706"><span style="color:#fbbf24;font-weight:700">↩ Devoluciones tasas (${t.refundsCount})</span><b class="num" style="color:#fbbf24">-${fmt(t.refundsTotal)}</b></div>`:''}`:''}<div style="grid-column:span 2;margin:2px -16px 8px -16px;padding:12px 16px;background:linear-gradient(90deg,rgba(126,227,170,.14) 0%,rgba(126,227,170,.04) 100%);border-left:4px solid #3ddc97;border-radius:6px;display:flex;justify-content:space-between;align-items:center"><span style="color:#7ee3aa;font-weight:700;font-size:13px">🧾 TOTAL COBRADO</span><span class="num" style="color:#7ee3aa;font-weight:700;font-size:17px">${fmt(t.bruto+t.tasas+t.haber)}</span></div><div class="row"><span>💵 Efectivo</span><b class="num" data-testid="efectivo-neto-cb">${fmt(efIn_CB-deltaDisp_CB)}</b></div><div class="row"><span>💳 Tarjeta <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><div style="display:flex;gap:4px;align-items:center;justify-content:flex-end"><span data-datafono-info="1" title="Info datáfono manual" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#2a3040;color:#7ee3aa;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #7ee3aa;user-select:none">?</span><input type="number" step="0.01" id="datafono-inp" value="${df||''}" placeholder="manual" title="Introduce manualmente el total del datáfono (anula el automático)" style="width:70px;background:#0e1117;color:#7ee3aa;border:1px solid #2a3040;border-radius:4px;padding:2px 4px;font-size:11px;text-align:right" /><button id="datafono-save" title="Guardar" style="background:#3ddc97;color:#0f1115;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px">✓</button><b class="num" ${df?'style="color:#7ee3aa"':''}>${fmt(trTarShown_CB)}</b></div></div><div class="row"><span>📱 Bizum <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(bizIn_CB)}</b></div><div class="row"><span>🏦 Transferencia <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(trIn_CB)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(126,227,170,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97;display:none"><span style="color:#7ee3aa;font-weight:700">↗ TOTAL HABER</span><b class="num big" style="color:#7ee3aa">+${fmt(haberTotalCB)}</b></div><div class="row wide" style="background:rgba(255,150,160,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #ff5d6c;display:none"><span style="color:#ff96a0;font-weight:700">↘ TOTAL DEBE</span><b class="num big" style="color:#ff96a0">-${fmt(debeTotalCB)}</b></div><div class="row"><span>Saldo anterior caja + cambio <span style="color:#7a8394;font-size:10px">(todo el efectivo)</span> <span class="tt" data-tt="Todo el dinero metálico al empezar el día: saldo de caja física del día anterior + traspasos de cambio a caja + cajón de reserva de cambio.">?</span></span><b class="num" data-testid="saldo-ant-caja-cambio">${fmt(saCC.caja+resCambio)}</b></div><div class="row"><span>Saldo solo caja <span style="color:#7a8394;font-size:10px">(sin cajón de cambio)</span> <span class="tt" data-tt="Efectivo en la caja: saldo del día anterior sin incluir el cajón de reserva de cambio.">?</span></span><b class="num" data-testid="saldo-ant-solo-caja">${fmt(saCC.caja)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(61,220,151,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97"><span style="color:#7ee3aa;font-weight:600">🟢 ${L('CAIXA FÍSICA','CAJA FÍSICA')}</span><b class="num big" style="color:#7ee3aa">${fmt(cajaCB)}</b></div><div class="row wide" style="background:rgba(134,182,255,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #5aa9ff"><span style="color:#86b6ff;font-weight:600">🔵 CUENTA BANCO</span><b class="num big" style="color:#86b6ff">${fmt(bbvaCB)}</b></div><div class="row total"><span>TOTAL <span style="color:#7a8394;font-size:10px;font-weight:400">(caja física con reserva + banco)</span></span><span class="num" data-testid="total-caja-banco">${fmt(cajaCB+bbvaCB)}</span></div>`;
   const sv=$('#datafono-save'),inp=$('#datafono-inp'),cl=$('#datafono-clear');if(sv)sv.onclick=()=>{setDatafono(currentDate,num(inp.value));toast(isC?'✓ Datàfon desat':'✓ Datáfono guardado');render()};if(inp)inp.onkeydown=e=>{if(e.key==='Enter'&&sv)sv.click()};if(cl)cl.onclick=()=>{setDatafono(currentDate,0);toast('🗑️ Datáfono borrado');render()}
   // Popup informatiu del datàfon manual
   const infoBtn=document.querySelector('[data-datafono-info]');
@@ -4328,7 +4335,7 @@ function cajaFisicaAcumulada(date){
 function renderSaldoAnterior(){
   // Saldo anterior = caja física + banc acumulats fins avui (exclusiu) + reserva de cambio (metàl·lic guardat)
   const saCC=saldoAnteriorPorCuenta(currentDate);
-  $('#saldoAntNum').textContent=fmt(saCC.caja+saCC.banc+reservaCambio()+traspasoCambio());
+  $('#saldoAntNum').textContent=fmt(saCC.caja+saCC.banc+reservaCambio());
 }
 function renderHistory(){const dates=Object.keys(state.byDate).filter(d=>entriesOf(d).length).sort().reverse();$('#histCount').textContent=`${dates.length} día(s)`;$('#histList').innerHTML=dates.length?dates.map(d=>{const t=computeTotals(entriesOf(d));const cls=d===currentDate?'style="background:#1a1e27"':'';return `<div class="history-item" ${cls} data-d="${d}"><div><div class="date">${d.split('-').reverse().join('/')}</div><div class="totals">${t.cnt} entrada(s) · ${fmt(t.neto)}</div></div><button class="icon-btn" data-delday="${d}" title="Borrar día">🗑️</button></div>`}).join(''):'<div class="empty">Sin histórico todavía</div>';$$('#histList .history-item').forEach(el=>el.onclick=e=>{if(e.target.dataset.delday){const day=e.target.dataset.delday;confirmModal('Borrar día',`¿Borrar TODOS los datos del día <b>${day.split('-').reverse().join('/')}</b>?`,()=>{delete state.byDate[day];saveState();render()},'Borrar día');e.stopPropagation();return}setDate(el.dataset.d)})}
 function actEntry(act,id){
@@ -6105,14 +6112,14 @@ function _cuadreCajaCompute(comp, fromIso, cutoffIso){
   const storeKey = comp === 'cempla' ? 'caja.cempla.v1' : 'caja.v1';
   const dfStoreKey = comp === 'cempla' ? 'caja.cempla.datafono' : 'caja.datafono';
   const siKey = 'caja.saldoInicial.' + (comp==='cempla'?'cempla':'trafic') + '.v1';
-  // 💰 Reserva de cambio: dinero físico (cajón) — cuenta como CAJA FÍSICA
-  // Incluye también _toCaja (traspaso a caja) porque, aunque haya salido del cajón,
-  // sigue siendo efectivo del negocio (mismo mental model que la vista diaria).
+  // 💰 Reserva de cambio: dinero físico (cajón) — cuenta como CAJA FÍSICA.
+  // Feb 2026 · simplificación: eliminado _toCaja (traspaso lógico). Sacar cambio ya crea
+  // un asiento HABER _internal real, así que la caja física del día ya lo refleja.
   const reservaKey = comp === 'cempla' ? 'caja.cempla.reserva.v1' : 'caja.reserva.v1';
   let reserva = 0;
   try{
     const rObj = JSON.parse(localStorage.getItem(reservaKey) || '{}');
-    if(typeof cambioTotal === 'function') reserva = cambioTotal(rObj) + (+(rObj && rObj._toCaja)||0);
+    if(typeof cambioTotal === 'function') reserva = cambioTotal(rObj);
   }catch(_){}
   let bd = {}, dfMap = {}, si = {caja:0, banc:0, from:null};
   try{ bd = (JSON.parse(localStorage.getItem(storeKey)||'{"byDate":{}}').byDate)||{}; }catch(_){}
@@ -7438,8 +7445,24 @@ function _buildAnnualReport(year, monthFilterIdx){
         if(e.retorno)return;
         // 💼 BRUTO IRPF: NUNCA aparece en gastos ni informe (informativo solo para IRPF)
         if(e.kind==='DH' && e._hnBruto) return;
-        // 🔁 Traspaso interno · ↩ Devolución: tampoco cuentan como ingresos/gastos aquí
-        if(e.kind==='DH' && (e._internal||e._tasaRefund)) return;
+        // 🔁 Traspaso interno · ↩ Devolución: tampoco cuentan como ingresos/gastos aquí,
+        //    PERO sí acumulamos su neto en internalCajaNet/internalBancoNet para poder
+        //    reflejar la Caja Física real en la tarjeta "Efectivo" del informe.
+        if(e.kind==='DH' && (e._internal||e._tasaRefund)){
+          if(e._internal){
+            const _amtI = +e.importe || 0;
+            const _fpI = e.fp || 'E';
+            // HABER = entra dinero a esa cuenta · DEBE = sale dinero
+            const _signI = (e.tipo === 'HABER') ? +1 : -1;
+            if(_fpI === 'E'){
+              grandTotals.internalCajaNet = (grandTotals.internalCajaNet||0) + _signI * _amtI;
+            } else {
+              // T, B, X → banco
+              grandTotals.internalBancoNet = (grandTotals.internalBancoNet||0) + _signI * _amtI;
+            }
+          }
+          return;
+        }
         // 📚 REGLES COMPTABLES (autoescola/gestoria autònom · Espanya)
         // ─────────────────────────────────────────────────────────
         //  • Servei propi (importe - descuento) = base imponible IRPF = FACTURACIÓN
@@ -8143,17 +8166,32 @@ function _buildAnnualReport(year, monthFilterIdx){
     </table>`;
 
   // Formes de pagament
-  //   💡 IMPORTANTE (Feb 2026):
-  //   Las tarjetas de abajo muestran los importes COBRADOS en el año por método de pago.
-  //   NO reflejan la Caja Física ni la Reserva de cambio actual (esos son conceptos aparte
-  //   que se ven en el cierre diario). Aquí solo se suma lo facturado sin movimientos
-  //   internos (traspasos caja↔reserva) para no inflar cifras.
-  html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">💳 ${L('Per forma de pagament','Por forma de pago')} <span style="font-size:11px;color:#64748b;font-weight:400">· ${L('només cobraments del període','solo cobros del período')}</span></h4>
+  //   🔧 Feb 2026 · aclarado por el usuario:
+  //     La tarjeta "Efectivo" debe reflejar TODO el efectivo real del negocio
+  //     (caja + reserva de cambio), no solo los cobros del período. Es "lo que tienes
+  //     físicamente ahora mismo". Fórmula (equivalente a la Caja Física del cierre diario):
+  //       Efectivo = byFp.E + saldoApertura.caja + reservaActual + internalCajaNet
+  //     Donde internalCajaNet = HABER _internal fp:E (reserva→caja) − DEBE _internal fp:E (caja→reserva).
+  //     Los asientos internos ya se filtran de byFp.E · aquí se recuperan como neto.
+  //   La "Transferencia" incluye el banco de apertura por simetría (banco físico total).
+  const _sa2 = grandTotals.saldoApertura || {caja:0, banco:0, cambio:0};
+  const _reservaActualEf = (typeof reservaCambio === 'function') ? reservaCambio() : 0;
+  const _internalCajaNet = grandTotals.internalCajaNet || 0;  // calculado abajo en forEach
+  const _internalBancoNet = grandTotals.internalBancoNet || 0;
+  const _kpiEfectivo = (grandTotals.byFp.E||0) + (_sa2.caja||0) + _reservaActualEf + _internalCajaNet;
+  const _kpiTarjeta = (grandTotals.byFp.T||0);
+  const _kpiBizum   = (grandTotals.byFp.B||0);
+  const _kpiTransf  = (grandTotals.byFp.X||0) + (_sa2.banco||0) + _internalBancoNet;
+  const _saNoteEf = (_reservaActualEf > 0 || (_sa2.caja||0) > 0)
+    ? `<div style="font-size:9px;color:#64748b;margin-top:3px;font-style:italic">${L('inclou caixa + reserva','incluye caja + reserva')}</div>` : '';
+  const _saNoteBc = (_sa2.banco||0) > 0
+    ? `<div style="font-size:9px;color:#64748b;margin-top:3px;font-style:italic">${L("inclou banc d'apertura","incluye banco de apertura")}</div>` : '';
+  html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">💳 ${L('Per forma de pagament','Por forma de pago')} <span style="font-size:11px;color:#64748b;font-weight:400">· ${L('diner físic total','dinero físico total')}</span></h4>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px">
-      ${_arCard(L('Efectiu','Efectivo'),fmt(grandTotals.byFp.E),'#22c55e','#f0fdf4')}
-      ${_arCard(L('Targeta','Tarjeta'),fmt(grandTotals.byFp.T),'#3b82f6','#eff6ff')}
-      ${_arCard('Bizum',fmt(grandTotals.byFp.B),'#8b5cf6','#f5f3ff')}
-      ${_arCard(L('Transferència','Transferencia'),fmt(grandTotals.byFp.X),'#f59e0b','#fefce8')}
+      ${_arCard(L('Efectiu','Efectivo'),fmt(_kpiEfectivo),'#22c55e','#f0fdf4', _saNoteEf)}
+      ${_arCard(L('Targeta','Tarjeta'),fmt(_kpiTarjeta),'#3b82f6','#eff6ff')}
+      ${_arCard('Bizum',fmt(_kpiBizum),'#8b5cf6','#f5f3ff')}
+      ${_arCard(L('Transferència','Transferencia'),fmt(_kpiTransf),'#f59e0b','#fefce8', _saNoteBc)}
     </div>`;
 
   // Socis (si n'hi ha)
@@ -8636,12 +8674,10 @@ function openCambio(){
     <div id="cambioTotal" style="text-align:center;padding:16px;background:linear-gradient(135deg,#065f46,#0f172a);border:2px solid #22c55e;border-radius:12px;margin-bottom:14px">
       <div style="font-size:11px;color:#a7f3d0;letter-spacing:2px;text-transform:uppercase">Total guardat</div>
       <div id="cambioTotalNum" style="font-size:36px;color:#7ee3aa;font-weight:700;font-family:'Courier New',monospace;margin-top:4px">0,00 €</div>
-      <div id="cambioTraspaso" data-testid="cambio-traspaso-line" style="display:none;margin-top:8px;font-size:12px;color:#fdba74">🔁 Traspasado a caja: <b id="cambioTraspasoNum" style="font-family:'Courier New',monospace">0,00 €</b> <span style="color:#94a3b8">(sigue en tu CAJA FÍSICA, no se resta del saldo)</span> <button id="cambioDevolver" data-testid="cambio-devolver-btn" style="margin-left:8px;padding:4px 12px;background:#1d4ed8;color:#fff;border:1px solid #3b82f6;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">↩ Devolver a la reserva</button></div>
     </div>
     <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn" id="cambioAdd" style="background:#166534;color:#fff;border-color:#166534;flex:1;font-weight:700">➕ Añadir cambio (del banco)</button>
-      <button class="btn" id="cambioRemove" style="background:#7c2d12;color:#fff;border-color:#7c2d12;flex:1;font-weight:700">➖ Retirar (para caja)</button>
-      <button class="btn" id="cambioReturn" data-testid="cambio-return-btn" style="background:#1d4ed8;color:#fff;border-color:#1d4ed8;flex:1;font-weight:700">↩ Devolver a cambio (desde caja)</button>
+      <button class="btn" id="cambioAdd" style="background:#166534;color:#fff;border-color:#166534;flex:1;font-weight:700">➕ Añadir cambio</button>
+      <button class="btn" id="cambioRemove" style="background:#7c2d12;color:#fff;border-color:#7c2d12;flex:1;font-weight:700">💵 Sacar cambio (a caja)</button>
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:12px">
       <thead><tr style="background:#0f172a;color:#f5b301">
@@ -8691,13 +8727,6 @@ function openCambio(){
       </tr>`;
     }).join('');
     totalEl.textContent=fmt(cambioTotal(data));
-    // Línea de traspasos a caja (dinero que salió del cajón hacia la caja)
-    const trBox=back.querySelector('#cambioTraspaso');
-    const trNum=back.querySelector('#cambioTraspasoNum');
-    const tr=+(data&&data._toCaja)||0;
-    if(tr>0){trBox.style.display='block';trNum.textContent=fmt(tr);}else{trBox.style.display='none';}
-    const devBtn=back.querySelector('#cambioDevolver');
-    if(devBtn)devBtn.onclick=()=>_cambioBulkOp(data,render,'return');
     // Banner "Pendiente de repartir" del Saldo inicial
     const pendBox = back.querySelector('#cambioPendiente');
     const pendNum = back.querySelector('#cambioPendienteNum');
@@ -8718,10 +8747,9 @@ function openCambio(){
   render();
 
   back.querySelector('#cambioReset').onclick=()=>{
-    if(!confirm('¿Vaciar la reserva de cambio? Se pondrán todas las cantidades a 0.\n\n(El histórico de "traspasado a caja" se mantiene, ese dinero sigue en tu caja física.)'))return;
-    // Conserva el histórico de traspasos a caja (ese dinero sigue en la caja física)
-    // pero borra COMPLETAMENTE denominaciones, _bulk y _bulk_seed → total real 0€.
-    data={_toCaja:+(data&&data._toCaja)||0};
+    if(!confirm('¿Vaciar la reserva de cambio? Se pondrán todas las cantidades a 0.'))return;
+    // Borra COMPLETAMENTE denominaciones, _bulk, _bulk_seed y _toCaja → reserva a 0€.
+    data={};
     saveCambio(data);
     // 💡 Si el "cambio" del Saldo inicial es el que sembró _bulk_seed, también lo
     // ponemos a 0 para que no vuelva a re-sembrar al abrir/cerrar el modal.
@@ -8736,18 +8764,15 @@ function openCambio(){
   };
   back.querySelector('#cambioAdd').onclick=()=>_cambioBulkOp(data,render,'add');
   back.querySelector('#cambioRemove').onclick=()=>_cambioBulkOp(data,render,'remove');
-  back.querySelector('#cambioReturn').onclick=()=>{
-    const tr=+(data&&data._toCaja)||0;
-    if(tr<=0){toast('No hay nada traspasado a caja que devolver');return}
-    _cambioBulkOp(data,render,'return');
-  };
+  // Nota Feb 2026: eliminado el modo 'return' (devolver a reserva desde caja).
+  //   Ahora la lógica es simple: para mover dinero DE CAJA A RESERVA se usa "➕ Añadir cambio".
   // ↶ Deshacer último: revierte el snapshot guardado + borra el asiento DH (solo modo 'add')
   back.querySelector('#cambioUndo').onclick=()=>{
     const HK='caja.cambio.history.v1';
     let hist=[]; try{ hist=JSON.parse(localStorage.getItem(HK)||'[]'); }catch(_){ hist=[]; }
     if(!hist.length){ toast('No hay ninguna operación reciente que deshacer'); return; }
     const last=hist[hist.length-1];
-    const modeLbl=last.mode==='add'?'Añadir cambio':(last.mode==='remove'?'Retirar cambio':'Devolver a la reserva');
+    const modeLbl=last.mode==='add'?'Añadir cambio':(last.mode==='remove'?'Sacar cambio a caja':'Operación');
     const srcLbl=last.entryId?(last.entryDate?(' · asiento del '+last.entryDate.split('-').reverse().join('/')):' · asiento en Data History'):'';
     if(!confirm(`¿Deshacer la última operación?\n\n· Tipo: ${modeLbl}\n· Importe: ${fmt(last.amount||0)}${srcLbl}\n\nSe revertirá la Reserva al estado anterior${last.entryId?' Y se borrará el asiento correspondiente':''}.`)) return;
     // 1) Restaurar la Reserva al snapshot previo
@@ -8780,12 +8805,11 @@ function openCambio(){
 
 function _cambioBulkOp(data,rerender,mode){
   const back=document.createElement('div');back.className='modal-back';
-  const title=mode==='add'?'➕ Añadir cambio (del banco)':(mode==='return'?'↩ Devolver a la reserva (desde caja)':'➖ Retirar cambio (para caja)');
-  const color=mode==='add'?'#166534':(mode==='return'?'#1d4ed8':'#7c2d12');
-  const maxRet=+(data&&data._toCaja)||0;
-  const desc=mode==='add'?'Indica cuántas piezas de cada tipo añades en esta operación. Se sumarán a la reserva actual.'
-    :(mode==='return'?`Devuelves dinero de la caja al cajón de cambio (deshacer traspaso). Indica en qué piezas lo devuelves. <b style="color:#93c5fd">Máximo a devolver: ${fmt(maxRet)}</b> (lo traspasado a caja).`
-    :'Indica cuántas piezas de cada tipo retiras en esta operación. Se restarán a la reserva actual.');
+  const title=mode==='add'?'➕ Añadir cambio':'💵 Sacar cambio (a caja)';
+  const color=mode==='add'?'#166534':'#7c2d12';
+  const desc=mode==='add'
+    ? 'Indica cuántas piezas de cada tipo añades. Se descontarán de Caja o Banco (a tu elección) y se sumarán a la reserva.'
+    : 'Indica cuántas piezas retiras. Se restarán de la reserva y sumarán en la caja física.';
   back.innerHTML=`<div class="modal" style="max-width:520px;width:97%">
     <div style="display:flex;align-items:center;gap:14px;margin:-16px -16px 16px -16px;padding:12px 18px;background:${color};color:#fff;border-radius:12px 12px 0 0">
       <h3 style="margin:0;flex:1;font-family:Georgia,serif">${title}</h3>
@@ -8811,7 +8835,7 @@ function _cambioBulkOp(data,rerender,mode){
     </div>
     <div style="text-align:right;margin-top:12px">
       <button class="btn" id="bkCancel">Cancelar</button>
-      <button class="btn" id="bkOk" style="background:${color};color:#fff;border-color:${color};font-weight:700">${mode==='add'?'✓ Añadir':(mode==='return'?'✓ Devolver':'✓ Retirar')}</button>
+      <button class="btn" id="bkOk" style="background:${color};color:#fff;border-color:${color};font-weight:700">${mode==='add'?'✓ Añadir':'✓ Sacar a caja'}</button>
     </div>
   </div>`;
   document.body.appendChild(back);
@@ -8864,21 +8888,6 @@ function _cambioBulkOp(data,rerender,mode){
     // 📸 Snapshot ANTES de modificar (para "Deshacer último")
     const _cambioSnapshotBefore = JSON.stringify(data);
     recalc();
-    if(mode==='return'){
-      // ↩ DEVOLVER: deshace traspasos caja→cajón. Tope: lo traspasado a caja.
-      let retEur=0;
-      CAMBIO_DENOMS.forEach(d=>{const q=ops[d.k]||0;if(q>0)retEur+=q*(d.pack||d.val);});
-      if(retEur<=0){toast('No has indicado ninguna cantidad');return}
-      if(retEur>maxRet+0.001){toast(`⚠️ Solo puedes devolver hasta ${fmt(maxRet)} (lo traspasado a caja)`,4000);return}
-      CAMBIO_DENOMS.forEach(d=>{const q=ops[d.k]||0;if(q>0)data[d.k]=(Number(data[d.k])||0)+q;});
-      if(data._bulk_seed!==undefined)data._bulk_seed=(+data._bulk_seed||0)+retEur;
-      data._toCaja=Math.max(0,maxRet-retEur);
-      saveCambio(data);
-      back.remove();
-      rerender();
-      toast(`↩ ${fmt(retEur)} devueltos de la caja a la reserva de cambio`,4000);
-      return;
-    }
     let changed=0;
     let movedEur=0;   // € realmente movidos (retirar) o añadidos
     let capped=false; // true si se pidió más de lo disponible en alguna denominación
@@ -8917,11 +8926,15 @@ function _cambioBulkOp(data,rerender,mode){
     });
     if(!changed||(mode==='remove'&&movedEur<=0)){toast(mode==='remove'?'No hay ese cambio disponible en la reserva':'No has indicado ninguna cantidad');return}
     if(mode==='remove'){
-      // 🔁 TRASPASO, no resta: el dinero pasa del cajón de cambio a la CAJA FÍSICA.
-      data._toCaja=(+data._toCaja||0)+movedEur;
-      // El total objetivo del Saldo inicial baja por lo retirado (saveCambio recalcula _bulk)
-      if(data._bulk_seed!==undefined)data._bulk_seed=Math.max(0,(+data._bulk_seed||0)-movedEur);
-      data._bulk=bulkPool;
+      // 💵 SACAR CAMBIO A CAJA (feb 2026 · simplificado a petición del usuario):
+      //   Traspaso REAL: reserva BAJA en €, caja SUBE en €. Sin conceptos raros de "sigue
+      //   en caja pero cuenta en reserva". Se materializa como asiento HABER _internal fp:E
+      //   en el día actual (aumenta caja física · no cuenta como facturación).
+      //   El _bulk (bulk pendiente del saldo inicial) también baja.
+      data._bulk = bulkPool;
+      if(data._bulk_seed !== undefined) data._bulk_seed = Math.max(0, (+data._bulk_seed||0) - movedEur);
+      // Ya no usamos _toCaja (lógica antigua de traspaso simulado). Se elimina si existe.
+      if(data._toCaja !== undefined) delete data._toCaja;
     }
     if(mode==='add'){
       // 🐛 FIX: si hay _bulk_seed activo (dinero pendiente de repartir del Saldo Inicial),
@@ -8930,36 +8943,51 @@ function _cambioBulkOp(data,rerender,mode){
       if(data._bulk_seed!==undefined)data._bulk_seed=(+data._bulk_seed||0)+movedEur;
     }
     saveCambio(data);
-    // 💰 Modo 'add': registrar movimiento interno desde la fuente elegida (Caja o Banco).
-    // Esto asegura que el efectivo diario o el saldo del banco se descuenta correctamente
-    // — no cuenta como gasto (_internal:true), es solo una reclasificación de dinero.
+    // 💰 REGISTRO DEL MOVIMIENTO REAL COMO ASIENTO _INTERNAL
+    //   · mode='add'    → DEBE fp:src (caja/banco baja, reserva sube)
+    //   · mode='remove' → HABER fp:E  (reserva baja, caja sube)
+    //   Ambos con _internal:true → NO cuentan como facturación ni como gasto.
+    //   El widget diario los suma en `t.internalCaja` para reflejar la Caja Física real.
     let _createdEntryId = null;
     let _createdEntryDate = null;
-    if(mode==='add' && movedEur > 0){
+    if(movedEur > 0){
       try{
-        const src = (back.querySelector('input[name="cambioSource"]:checked')||{}).value || 'caja';
-        const fp = src === 'banco' ? 'X' : 'E';
-        const srcLbl = src === 'banco' ? 'Banco' : 'Caja';
-        const iso = currentDate;
-        const arr = entriesOf(iso);
-        const newId = uid();
-        arr.push({
-          id: newId,
-          kind: 'DH',
-          tipo: 'DEBE',
-          grupo: '-',
-          nombre: `Traspaso ${srcLbl} → Reserva de cambio`,
-          importe: movedEur,
-          descuento: 0,
-          tasa: 0,
-          fp: fp,
-          retorno: false,
-          _internal: true,
-          _transferDir: `${src}_to_reserva`
-        });
-        _createdEntryId = newId;
-        _createdEntryDate = iso;
-        saveState();
+        let fp, tipo, nombre, dir;
+        if(mode==='add'){
+          const src = (back.querySelector('input[name="cambioSource"]:checked')||{}).value || 'caja';
+          const srcLbl = src === 'banco' ? 'Banco' : 'Caja';
+          fp = src === 'banco' ? 'X' : 'E';
+          tipo = 'DEBE';
+          nombre = `Traspaso ${srcLbl} → Reserva de cambio`;
+          dir = `${src}_to_reserva`;
+        } else if(mode==='remove'){
+          fp = 'E';
+          tipo = 'HABER';
+          nombre = 'Traspaso Reserva de cambio → Caja';
+          dir = 'reserva_to_caja';
+        }
+        if(fp){
+          const iso = currentDate;
+          const arr = entriesOf(iso);
+          const newId = uid();
+          arr.push({
+            id: newId,
+            kind: 'DH',
+            tipo: tipo,
+            grupo: '-',
+            nombre: nombre,
+            importe: movedEur,
+            descuento: 0,
+            tasa: 0,
+            fp: fp,
+            retorno: false,
+            _internal: true,
+            _transferDir: dir
+          });
+          _createdEntryId = newId;
+          _createdEntryDate = iso;
+          saveState();
+        }
       }catch(err){ console.warn('Traspaso reserva cambio', err); }
     }
     // 📝 Guardar en historial para "Deshacer último"
@@ -8977,7 +9005,7 @@ function _cambioBulkOp(data,rerender,mode){
       const srcLbl = src === 'banco' ? '🏦 del BANCO' : '💵 de la CAJA';
       toast(`✓ ${fmt(movedEur)} añadidos a reserva ${srcLbl}`, 4500);
     }
-    else toast(`🔁 ${fmt(movedEur)} traspasados a caja${capped?' (ajustado al disponible)':''} · el saldo total NO cambia`,4500);
+    else toast(`💵 ${fmt(movedEur)} sacados de la reserva a la CAJA${capped?' (ajustado al disponible)':''}`,4500);
   };
 }
 $('#btnClearDay').onclick=()=>{if(!entriesOf(currentDate).length){toast('No hay entradas que vaciar');return}const cnt=entriesOf(currentDate).length;confirmModal('🗑️ Vaciar día',`Se borrarán las <b>${cnt} entrada(s)</b> del día <b>${currentDate.split('-').reverse().join('/')}</b>.<br><br>✅ Se guardará una copia de seguridad automática antes de borrar.`,()=>{pushSnapshot('preClear');delete state.byDate[currentDate];saveState();render();toast('Día vaciado ✅ (copia de seguridad guardada en 🛡️ Historial)',3500)},'Sí, vaciar día')};
