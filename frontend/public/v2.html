@@ -7567,6 +7567,12 @@ function _buildAnnualReport(year, monthFilterIdx){
       grandTotals.byFp.E += efDay;
       grandTotals.byFp.B += bizumDay;
       grandTotals.byFp.X += transDay;
+      // 💡 Feb 2026 · Snapshot antes del inner forEach para poder aplicar el override
+      //   del datáfono a `cobrosByFp` a nivel de día (igual que hace `byFp` arriba).
+      //   Sin esto, cobrosByFp usaba el `e.fp` crudo y NO reflejaba el total manual del
+      //   datáfono que el usuario mete cada día ("Tarjeta: 25€" en lugar de miles de €).
+      grandTotals.cobrosByFp = grandTotals.cobrosByFp || {E:0,T:0,B:0,X:0};
+      const _cbT_before = grandTotals.cobrosByFp.T;
       list.forEach(e=>{
         if(e.retorno)return;
         // 💼 BRUTO IRPF: NUNCA aparece en gastos ni informe (informativo solo para IRPF)
@@ -7773,6 +7779,18 @@ function _buildAnnualReport(year, monthFilterIdx){
         if(amtTotal > 0){ gc.count += 1; }  // 🔧 FIX: solo cuenta uds con importe>0
         gc.total += amtTotal;
       });
+      // 🐛 FIX Feb 2026 · Override datáfono aplicado a `cobrosByFp` a nivel de día.
+      //   Si el usuario mete el total del datáfono manual (dfManual), reclasifica
+      //   `delta = dfManual - cobros_T_auto_dia` entre E y T (misma lógica que ya
+      //   aplica `byFp` arriba). Así las tarjetas "Por forma de pago" del informe
+      //   reflejan lo que realmente cobró por tarjeta ese día (no solo lo marcado
+      //   como T en la entrada). Fix del bug donde TARJETA salía 25€ en lugar de miles.
+      if(dfManual > 0){
+        const _cbTday = grandTotals.cobrosByFp.T - _cbT_before;
+        const _deltaCobros = dfManual - _cbTday;
+        grandTotals.cobrosByFp.T += _deltaCobros;
+        grandTotals.cobrosByFp.E -= _deltaCobros;
+      }
     });
     grandTotals.byCompany[comp.name]=cTotal;
   });

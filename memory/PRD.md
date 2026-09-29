@@ -1,4 +1,36 @@
 # MediCar Plus · PRD (Product Requirements Document)
+## 2026-02-28 · Fix crítico: "Por forma de pago" ignoraba el datáfono manual
+
+**Problema reportado (msg 499):** en el Informe Anual, la tarjeta "TARJETA" de "Por forma de pago" mostraba solo 25€ mientras que EFECTIVO mostraba 38.544,55€ (99.9%). El usuario cada día mete manualmente el total del datáfono (dfManual), y ese valor debería dominar los cálculos de cobros por tarjeta.
+
+**Root cause:** en `_buildAnnualReport` había dos trackers:
+1. `grandTotals.byFp` (líneas 7566-7569): SÍ aplicaba `dfManual` per día → correcto.
+2. `grandTotals.cobrosByFp` (líneas 7649-7659): construido dentro del inner `list.forEach` usando `e.fp` crudo, sin consultar el datáfono. Este tracker es el que alimenta la sección "💳 Por forma de pago" (líneas 8312+). Por eso solo contaba las entradas explícitamente marcadas con `fp='T'` (25€ en total).
+
+**Fix aplicado:** `v2.html` líneas 7566-7574 + 7788-7799.
+
+1. Snapshot antes del inner forEach:
+   ```js
+   grandTotals.cobrosByFp = grandTotals.cobrosByFp || {E:0,T:0,B:0,X:0};
+   const _cbT_before = grandTotals.cobrosByFp.T;
+   ```
+2. Después del inner forEach, mismo criterio que `byFp`:
+   ```js
+   if(dfManual > 0){
+     const _cbTday = grandTotals.cobrosByFp.T - _cbT_before;
+     const _deltaCobros = dfManual - _cbTday;
+     grandTotals.cobrosByFp.T += _deltaCobros;
+     grandTotals.cobrosByFp.E -= _deltaCobros;
+   }
+   ```
+
+Prioridad: si hay `dfManual` para ese día → domina (reclasifica `delta` entre E↔T). Si no → usa el auto (`e.fp` de cada entrada). Exactamente como el usuario pidió.
+
+**Verificación:** 208/208 tests contables pasan (accounting_audit + informe_anual_saldo_apertura). El total del período (Ingresos = 38.569,55€) queda IGUAL — solo cambia el reparto interno entre EFECTIVO y TARJETA.
+
+**Recordatorio:** `Ctrl + Shift + R` en Electron para refrescar cache y ver el nuevo cálculo.
+
+
 ## 2026-02-28 · Fix crítico: gráficas cortadas en PDF (Comparativa años + Autoescuelas)
 
 **Problema reportado:** el PDF de "Comparativa años" mostraba la gráfica con el top recortado (las etiquetas numéricas que se añadieron en cada punto salían FUERA del viewBox del SVG y quedaban clipped en la exportación PDF). En pantalla se veía bien porque el navegador aplica overflow:visible al SVG cuando el contenedor no lo restringe.
