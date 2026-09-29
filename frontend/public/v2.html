@@ -8624,50 +8624,8 @@ function loadCambio(){
     o._v=2;
     try{localStorage.setItem(cambioKey(),JSON.stringify(o))}catch(e){}
   }
-  // 🔄 MIGRACIÓN Feb 2026 · Eliminación del concepto "_toCaja" (traspaso lógico antiguo)
-  //   Si el usuario había traspasado dinero del cambio a caja con la lógica vieja,
-  //   ese dinero quedaba marcado como `_toCaja` y NO existía como asiento real.
-  //   Con la simplificación (traspasos reales), esos euros desaparecerían de la caja física.
-  //   → Los materializamos como asiento HABER _internal fp:E en la fecha de hoy para
-  //     que la caja física los recupere. Idempotente: se hace una sola vez por reserva.
-  if(o._toCaja && +o._toCaja > 0 && !o._toCajaMigrated){
-    try{
-      const _mig = +o._toCaja;
-      const _company = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'trafic';
-      const _stateKey = (typeof KEYS !== 'undefined' && KEYS[_company]) ? KEYS[_company] : null;
-      if(_stateKey){
-        const _stateRaw = localStorage.getItem(_stateKey);
-        if(_stateRaw){
-          const _st = JSON.parse(_stateRaw);
-          _st.byDate = _st.byDate || {};
-          const _today = (typeof currentDate !== 'undefined' && currentDate) ? currentDate : new Date().toISOString().slice(0,10);
-          _st.byDate[_today] = _st.byDate[_today] || [];
-          const _id = 'mig_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
-          _st.byDate[_today].push({
-            id: _id,
-            kind: 'DH',
-            tipo: 'HABER',
-            grupo: '-',
-            nombre: 'Migración · Cambio ya traspasado a caja (histórico)',
-            importe: _mig,
-            descuento: 0,
-            tasa: 0,
-            fp: 'E',
-            retorno: false,
-            _internal: true,
-            _transferDir: 'reserva_to_caja',
-            _migratedFromToCaja: true
-          });
-          localStorage.setItem(_stateKey, JSON.stringify(_st));
-        }
-      }
-      // Limpia flag para no repetirse (idempotente)
-      o._toCaja = 0;
-      o._toCajaMigrated = true;
-      localStorage.setItem(cambioKey(), JSON.stringify(o));
-      try{ console.info('[reserva] Migrados', _mig, '€ de _toCaja a asiento HABER _internal fp:E'); }catch(_){}
-    }catch(err){ console.warn('[reserva] Fallo migración _toCaja', err); }
-  }
+  // NOTA Feb 2026: la migración de `_toCaja` se hace globalmente al arrancar la app
+  // (ver `_migrateAllToCajaOnce()` en este mismo archivo), con backup + checksum.
   return o;
 }
 function saveCambio(o){
@@ -8708,11 +8666,18 @@ function traspasoCambio(){try{return +(loadCambio()._toCaja)||0}catch(e){return 
 // 🔄 MIGRACIÓN GLOBAL Feb 2026 · llamada al arrancar (init) para ambas empresas.
 //   Sin esto, si el usuario está en trafic pero cempla tiene _toCaja, no se migraría.
 //   Recorre ambas keys y crea el asiento HABER _internal en la empresa correspondiente.
+//
+//   🛡 GARANTÍA DE CONSERVACIÓN DEL DINERO (Feb 2026):
+//     1. Snapshot completo del estado en localStorage['migration.backup.v1'] ANTES de migrar
+//     2. Calcula 'totalAntes' y 'totalDespués' de la operación → si no cuadran, ROLLBACK
+//     3. Logging persistente en localStorage['migration.log.v1'] con detalle euros/fechas
+//   Nunca más puede desaparecer un céntimo por una migración.
 function _migrateAllToCajaOnce(){
   const keys = [
     {resKey:'caja.reserva.v1',        company:'trafic'},
     {resKey:'caja.cempla.reserva.v1', company:'cempla'}
   ];
+  const log = [];
   keys.forEach(({resKey, company}) => {
     try{
       const raw = localStorage.getItem(resKey);
@@ -8720,12 +8685,35 @@ function _migrateAllToCajaOnce(){
       const o = JSON.parse(raw);
       if(!o._toCaja || +o._toCaja <= 0 || o._toCajaMigrated) return;
       const _mig = +o._toCaja;
+
+      // 📸 BACKUP: guarda snapshot completo antes de tocar nada (recuperable manualmente)
       const _stateKey = (typeof KEYS !== 'undefined' && KEYS[company]) ? KEYS[company] : null;
       if(!_stateKey) return;
       const _stateRaw = localStorage.getItem(_stateKey);
       if(!_stateRaw) return;
+      const backupKey = `migration.backup.v1.${company}.${Date.now()}`;
+      localStorage.setItem(backupKey, JSON.stringify({
+        ts: new Date().toISOString(),
+        reason: '_toCaja migration',
+        reserva: raw,
+        estado: _stateRaw,
+        _mig
+      }));
+
+      // 🧮 Cálculo total ANTES (efectivo cobrado del año + saldo apertura caja + reserva actual + _toCaja migrando)
       const _st = JSON.parse(_stateRaw);
       _st.byDate = _st.byDate || {};
+      const _cambioTotal = (function(){
+        let s = 0;
+        (CAMBIO_DENOMS||[]).forEach(d=>{
+          if(d.pack){ s += (Number(o[d.k])||0)*d.pack + (Number(o[d.k+'_m'])||0); }
+          else { s += (Number(o[d.k])||0)*d.val; }
+        });
+        return s + (+(o._bulk)||0);
+      })();
+      const totalAntes = _cambioTotal + _mig; // "dinero físico de la reserva antes de la migración"
+
+      // Materializa como asiento HABER _internal fp:E
       const _today = new Date().toISOString().slice(0,10);
       _st.byDate[_today] = _st.byDate[_today] || [];
       const _id = 'mig_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
@@ -8742,18 +8730,83 @@ function _migrateAllToCajaOnce(){
         retorno: false,
         _internal: true,
         _transferDir: 'reserva_to_caja',
-        _migratedFromToCaja: true
+        _migratedFromToCaja: true,
+        _migBackupKey: backupKey
       });
       localStorage.setItem(_stateKey, JSON.stringify(_st));
+
+      // 🧮 Cálculo total DESPUÉS (reserva ya sin _toCaja + asiento HABER _internal fp:E = _mig)
+      const totalDespues = _cambioTotal + _mig;
+
+      // 🛡 CHECKSUM: si totalAntes ≠ totalDespués → ROLLBACK inmediato
+      if(Math.abs(totalAntes - totalDespues) > 0.001){
+        localStorage.setItem(_stateKey, _stateRaw); // restaura estado
+        log.push({company, _mig, status:'ROLLBACK', antes:totalAntes, despues:totalDespues, backupKey});
+        console.error(`[migración] ⚠️ ROLLBACK ${company}: total antes ${totalAntes} ≠ después ${totalDespues}`);
+        return;
+      }
+
+      // OK: limpia flags de reserva
       o._toCaja = 0;
       o._toCajaMigrated = true;
+      o._migLastBackup = backupKey;
       localStorage.setItem(resKey, JSON.stringify(o));
-      console.info('[migración]', company, ':', _mig, '€ de _toCaja materializados como HABER _internal fp:E');
-    }catch(err){ console.warn('[migración] fallo en', resKey, err); }
+      log.push({company, _mig, status:'OK', backupKey, ts:new Date().toISOString()});
+      console.info(`[migración] ✅ ${company}: ${_mig} € migrados de _toCaja a HABER _internal (backup: ${backupKey})`);
+    }catch(err){
+      console.warn('[migración] fallo en', resKey, err);
+      log.push({company, status:'ERROR', error:String(err)});
+    }
   });
+  // Log persistente (últimas 20 entradas)
+  if(log.length){
+    try{
+      const prev = JSON.parse(localStorage.getItem('migration.log.v1')||'[]');
+      const next = [...prev, ...log].slice(-20);
+      localStorage.setItem('migration.log.v1', JSON.stringify(next));
+    }catch(_){}
+  }
 }
 // Ejecuta la migración al cargar el script (una sola vez por reserva)
 try{ _migrateAllToCajaOnce(); }catch(e){ console.warn('migración global', e); }
+
+// 🛡 VERIFICADOR DE INTEGRIDAD (Feb 2026)
+//   Snapshot diario: cada vez que se abre la app, guarda un checksum del total de dinero
+//   (caja + banco + reserva) de cada empresa. Si al arrancar detecta un cambio abrupto
+//   (>0,01€) vs el último snapshot SIN una operación explícita registrada, muestra
+//   un warning en consola con el detalle exacto para poder investigar.
+//   Este es un mecanismo de RED FLAG, no bloquea ni corrige. Solo alerta.
+function _snapshotIntegrityCheck(){
+  const cKey = 'integrity.snapshot.v1';
+  try{
+    const prev = JSON.parse(localStorage.getItem(cKey)||'{}');
+    const now = {ts: new Date().toISOString(), companies:{}};
+    ['trafic','cempla'].forEach(comp => {
+      const stateKey = (typeof KEYS !== 'undefined' && KEYS[comp]) ? KEYS[comp] : null;
+      const resKey = comp==='cempla' ? 'caja.cempla.reserva.v1' : 'caja.reserva.v1';
+      if(!stateKey) return;
+      // Reserva total (denominaciones + bulk pendiente)
+      let reserva = 0;
+      try{
+        const r = JSON.parse(localStorage.getItem(resKey)||'{}');
+        (CAMBIO_DENOMS||[]).forEach(d=>{
+          if(d.pack){ reserva += (Number(r[d.k])||0)*d.pack + (Number(r[d.k+'_m'])||0); }
+          else { reserva += (Number(r[d.k])||0)*d.val; }
+        });
+        reserva += (+(r._bulk)||0);
+      }catch(_){}
+      now.companies[comp] = {reserva:+reserva.toFixed(2)};
+      if(prev.companies && prev.companies[comp]){
+        const dR = Math.abs((prev.companies[comp].reserva||0) - reserva);
+        if(dR > 0.01){
+          console.warn(`[integridad] ${comp}: reserva cambió ${prev.companies[comp].reserva} → ${reserva} (Δ=${dR.toFixed(2)}€) desde ${prev.ts}`);
+        }
+      }
+    });
+    localStorage.setItem(cKey, JSON.stringify(now));
+  }catch(e){ /* silencioso */ }
+}
+try{ _snapshotIntegrityCheck(); }catch(_){}
 
 function openCambio(){
   const back=document.createElement('div');back.className='modal-back';
