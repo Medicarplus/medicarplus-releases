@@ -1657,7 +1657,6 @@ function openStats(initialSection){
       <button class="btn" id="stNext">${isCA?'Any seg.':'Año sig.'} →</button>
       <div style="flex:1"></div>
       <button class="btn btn-primary st-autos-only" id="stImport">📥 ${isCA?'Importar CSV':'Importar CSV'}</button>
-      <select class="st-autos-only" id="stImportMonth" title="${isCA?'Mes al qual pertanyen les dades del CSV':'Mes al que pertenecen los datos del CSV'}" style="background:#141821;color:var(--text);border:1px solid #f5b301;border-radius:8px;padding:6px 10px;font-weight:600" data-testid="st-import-month">${MESOS.map((m,i)=>`<option value="${i+1}" ${(i+1)===(new Date().getMonth()+1)?'selected':''}>📅 ${m}</option>`).join('')}</select>
       <input type="file" id="stFile" accept=".csv,.txt" style="display:none" />
       <input type="file" id="stBackfillFile" accept=".xls,.xlsx" style="display:none" />
       <button class="btn st-autos-only" id="stBackfillHist" data-testid="st-backfill-hist" title="${isCA?'Puja el teu Excel històric (multi-any) i el classifica automàticament':'Sube tu Excel histórico (multi-año) y lo clasifica automáticamente'}" style="background:#1e2f3e;border-color:#22d3ee;color:#22d3ee;font-weight:600;display:${localStorage.getItem('caja.stats.backfill.loaded.v1')?'none':'inline-flex'}">📥 ${isCA?'Pujar històric':'Subir histórico'}</button>
@@ -2007,7 +2006,11 @@ function openStats(initialSection){
   $('#stFile').onchange=async ev=>{
     const f=ev.target.files[0];if(!f)return;ev.target.value='';
     // Modal explícito para confirmar/seleccionar el mes ANTES de procesar (así el usuario no depende de la toolbar)
-    const toolbarMonth=parseInt(back.querySelector('#stImportMonth')?.value || (new Date().getMonth()+1));
+    // 🔧 Feb 2026: el selector toolbar #stImportMonth ha sido eliminado (era duplicado del #stMonth
+    //    de "Vista mensual"). Como default usamos #stMonth si está en modo mensual, si no el mes actual.
+    const _stMode = back.querySelector('#stMode')?.value;
+    const _stMonthVal = parseInt(back.querySelector('#stMonth')?.value);
+    const toolbarMonth = (_stMode === 'month' && _stMonthVal >= 1 && _stMonthVal <= 12) ? _stMonthVal : (new Date().getMonth()+1);
     const yearVal=$('#stYear').value;
     const pickedMonth = await new Promise(resolve => {
       const mm=document.createElement('div');mm.className='modal-back';mm.style.zIndex='999999';
@@ -2029,7 +2032,9 @@ function openStats(initialSection){
         if(!y||!m||m<1||m>12){toast(isCA?'Any/mes invàlid':'Año/mes inválido');return}
         // Sincroniza toolbar con la selección
         $('#stYear').value=y;
-        const tm=back.querySelector('#stImportMonth');if(tm)tm.value=String(m);
+        // Si estamos en vista mensual, sincroniza también el selector de mes de arriba
+        const _stMonthEl = back.querySelector('#stMonth');
+        if(_stMonthEl && back.querySelector('#stMode')?.value === 'month') _stMonthEl.value = String(m);
         cleanup({year:y,month:m});
       };
       mm.querySelector('[data-no]').onclick=()=>cleanup(null);
@@ -2606,7 +2611,7 @@ function openStats(initialSection){
       margins:'6mm',
       extraCss:`
         @page { size: A4 landscape; margin: 6mm }
-        button, select, input, [data-no], #stSectionSwitch, .icon-btn, [data-del], #stFooterHint, #stImportMonth, #stImport, #stAdd, #stClearAll, #stChart { display:none !important }
+        button, select, input, [data-no], #stSectionSwitch, .icon-btn, [data-del], #stFooterHint, #stImport, #stAdd, #stClearAll, #stChart { display:none !important }
         body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important }
         .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important }
         .modal{ padding:4mm !important; max-width:none !important; width:100% !important }

@@ -1,4 +1,19 @@
 # MediCar Plus · PRD (Product Requirements Document)
+## 2026-02-28 · Fix duplicado: eliminado selector "Enero" redundante en Estadísticas Autoescuelas
+
+**Problema reportado:** en Estadísticas → Autoescuelas había DOS selectores de mes:
+1. El principal `#stMonth` arriba (junto a "Vista mensual"): elige el mes visible.
+2. El duplicado `#stImportMonth` en la barra de acciones (mostrando "Enero"): elegía a qué mes se aplicaba el CSV importado.
+
+**Fix:**
+- `v2.html` línea 1660: eliminado `<select id="stImportMonth">` de la toolbar.
+- El modal "¿A qué mes pertenece este CSV?" (que ya aparece al importar) ahora usa como default el mes del selector principal `#stMonth` si el usuario está en "Vista mensual", o el mes actual en caso contrario.
+- Sincronización tras importar: si el usuario está en modo mensual y elige un mes distinto en el modal, se actualiza también `#stMonth` arriba.
+- Limpiada la referencia CSS de impresión (línea 2614).
+
+**Verificación:** tests contables 102 checks ✅. Sin efectos colaterales — el selector eliminado solo daba un default; el modal explícito de importación sigue exigiendo confirmación por parte del usuario.
+
+
 ## 2026-02-28 · Fix "Total entradas" en Tráfico para años sin CSV DGT
 
 **Problema reportado (msg 480):** en Estadísticas → Tráfico, al seleccionar un año que NO es el actual (2026), las barras del gráfico mostraban los conteos correctos (backfill desde `caja.stats.v1`) pero las tarjetas KPI mostraban `Total entradas: 0` y las columnas de la tabla (CANJE, EXPEDICIÓN, INICIAL, PERIÓDICA, PRÓRROGA, RECUPERACIÓN, RENOVACIÓN) aparecían vacías.
