@@ -7496,13 +7496,16 @@ function _buildAnnualReport(year, monthFilterIdx){
           grandTotals.byMonthCnt[m] += 1;
           cTotal.cnt += 1;
         }
-        // 🎯 EXTRAS con importe>0 · Fotos, Duplicado, C.Oficial (feb 2026)
+        // 🎯 EXTRAS · Fotos, Duplicado, C.Oficial (feb 2026)
         //    Los extras NO se cuentan en "Entradas GIC" pero SÍ como "trámites extras hechos".
-        //    Se tracks aparte para mostrar en la tarjeta: "449 GIC + 12 extras = 461 total"
+        //    Se tracks aparte para mostrar en la tarjeta: "449 GIC · +12 extras = 461 total"
+        //    🔧 Feb 2026 · MISMA regla de conteo que GIC:
+        //      cuentan si importe > 0, o si la casilla "Contar 0€" está activa (traf).
         {
           const _catLowExtra = String(cat||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
           const _isExtraE = /foto/.test(_catLowExtra) || /duplic/.test(_catLowExtra) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLowExtra);
-          if(_isExtraE && amtTotal > 0){
+          const _countZeroExtra = (activeKey === 'trafic' && typeof getCountZero === 'function') ? getCountZero() : false;
+          if(_isExtraE && (amtTotal > 0 || _countZeroExtra)){
             grandTotals.extrasCnt = (grandTotals.extrasCnt||0) + 1;
             grandTotals.extrasByMonth = grandTotals.extrasByMonth || Array(12).fill(0);
             grandTotals.extrasByMonth[m] += 1;
@@ -7577,17 +7580,20 @@ function _buildAnnualReport(year, monthFilterIdx){
   const _ingresosBrutosKPI = _totalServiciosKPI;
   const _beneficioKPI = _ingresosBrutosKPI - _totalGastosKPI;
   const _kpiCols = isC2 ? 5 : 6;
-  // 🎯 Tarjeta especial "Entradas Totales" con desglose GIC (CSV DGT real) + Extras (>0€)
+  // 🎯 Tarjeta especial "Entradas Totales" · GIC (CSV DGT real) como cifra principal
+  //     y Total (GIC + Extras >0€ o con "Contar 0€") como cifra secundaria abajo.
+  //     Los extras (Foto/Dup/C.Oficial) suelen entrarse manualmente pero también
+  //     cuentan si vienen del CSV — la clave es el tipo/concepto, no el origen.
   const _entrGIC = grandTotals.cnt;
   const _entrExtras = grandTotals.extrasCnt || 0;
   const _entrTotal = _entrGIC + _entrExtras;
   const _kpiEntradas = `<div data-testid="kpi-entradas-total" style="background:#0f172a;border:1px solid #22c55e55;border-left:4px solid #22c55e;padding:12px 14px;border-radius:6px">
-    <div style="font-size:10px;color:#64748b;letter-spacing:1px;text-transform:uppercase">${L('Entrades totals','Entradas totales')}</div>
-    <div style="font-size:20px;color:#22c55e;font-weight:700;margin-top:4px;font-family:'Courier New',monospace" data-testid="kpi-entradas-total-num">${_entrTotal}</div>
-    ${_entrExtras > 0 ? `<div style="font-size:10px;color:#94a3b8;margin-top:4px;line-height:1.35">
-      <span style="color:#22c55e;font-weight:700" data-testid="kpi-entradas-gic">${_entrGIC}</span> ${L('GIC (CSV DGT)','GIC (CSV DGT)')}<br>
-      <span style="color:#f59e0b;font-weight:700" data-testid="kpi-entradas-extras">+${_entrExtras}</span> ${L('extres (Foto/Dup/C.O.)','extras (Foto/Dup/C.O.)')}
-    </div>` : `<div style="font-size:10px;color:#94a3b8;margin-top:4px" data-testid="kpi-entradas-gic-only">${L('només GIC (CSV DGT)','solo GIC (CSV DGT)')}</div>`}
+    <div style="font-size:10px;color:#64748b;letter-spacing:1px;text-transform:uppercase">${L('Entrades GIC (CSV DGT)','Entradas GIC (CSV DGT)')}</div>
+    <div style="font-size:20px;color:#22c55e;font-weight:700;margin-top:4px;font-family:'Courier New',monospace" data-testid="kpi-entradas-gic">${_entrGIC}</div>
+    ${_entrExtras > 0 ? `<div style="font-size:10px;color:#94a3b8;margin-top:6px;line-height:1.4;border-top:1px dashed #334155;padding-top:6px">
+      <span style="color:#f59e0b;font-weight:700" data-testid="kpi-entradas-extras">+${_entrExtras}</span> ${L('extres (Foto/Dup/C.O.)','extras (Foto/Dup/C.O.)')}<br>
+      <span style="color:#e2e8f0;font-weight:700" data-testid="kpi-entradas-total-num">= ${_entrTotal} ${L('total','total')}</span>
+    </div>` : `<div style="font-size:10px;color:#94a3b8;margin-top:6px" data-testid="kpi-entradas-gic-only">${L('sense extres · total = GIC','sin extras · total = GIC')}</div>`}
   </div>`;
   html+=`<div style="display:grid;grid-template-columns:repeat(${_kpiCols},minmax(0,1fr));gap:10px;margin-bottom:20px">
     ${_arCard(L('Facturació total','Facturación total'),fmt(_ingresosBrutosKPI),'#f5b301','#0f172a')}

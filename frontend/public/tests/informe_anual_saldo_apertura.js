@@ -34,7 +34,7 @@ function assertTrue(name, cond){
 // Idéntica a la de v2.html · Se replica aquí para tests aislados.
 // ═══════════════════════════════════════════════════════════════
 
-function simulateBuildAnnualReport({byDate, year, monthFilterIdx = -1, saldoInicialConfig = null, activeKey = 'trafic'}){
+function simulateBuildAnnualReport({byDate, year, monthFilterIdx = -1, saldoInicialConfig = null, activeKey = 'trafic', countZero = false}){
   const _monthSuffix = monthFilterIdx >= 0 ? '-' + String(monthFilterIdx+1).padStart(2,'0') : null;
   const grandTotals = {
     bruto:0, tasas:0, neto:0, cnt:0,
@@ -161,7 +161,7 @@ function simulateBuildAnnualReport({byDate, year, monthFilterIdx = -1, saldoInic
       let _isEntradaReal = false;
       if(activeKey==='trafic'){
         const _isDGT = e._csv === true;
-        _isEntradaReal = _isDGT && amtTotal > 0 && !_isExtra;
+        _isEntradaReal = _isDGT && (amtTotal > 0 || countZero) && !_isExtra;
       } else {
         _isEntradaReal = e.kind==='PRIV' && amtTotal>0 && !_isExtra;
       }
@@ -169,8 +169,9 @@ function simulateBuildAnnualReport({byDate, year, monthFilterIdx = -1, saldoInic
         grandTotals.cnt += 1;
         grandTotals.byMonthCnt[m] += 1;
       }
-      // Extras >0€
-      if(_isExtra && amtTotal>0){
+      // Extras (>0€ o countZero para trafic)
+      const _countZeroExtra = (activeKey==='trafic') ? countZero : false;
+      if(_isExtra && (amtTotal>0 || _countZeroExtra)){
         grandTotals.extrasCnt += 1;
         grandTotals.extrasByMonth[m] += 1;
       }
@@ -344,6 +345,47 @@ console.log('\n🧪 CASO 6 · KPI "Entradas Totales" = GIC (CSV real) + Extras (
   assertEq('GIC entradas reales = 2 (Renov 20 + Exped 15, excluye 0€ y extras)', g.cnt, 2);
   assertEq('Extras >0€ = 3 (Foto 5 + Dup 15 + C.O. 20)', g.extrasCnt, 3);
   assertEq('Total mostrado en tarjeta (GIC + Extras) = 5', g.cnt + g.extrasCnt, 5);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CASO 6b · Casilla "Contar 0€" ACTIVA · GIC y Extras cuentan también los de 0€
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 CASO 6b · Contar 0€ activa · 0€ también cuentan tanto en GIC como en Extras');
+{
+  const byDate = {
+    '2026-03-15': [
+      {id:'a1', kind:'TRAF', tipo:'Renovación', importe:20, _csv:true},
+      {id:'a2', kind:'TRAF', tipo:'Renovación', importe:0, _csv:true},  // 0€ ahora SÍ cuenta
+      {id:'a3', kind:'TRAF', tipo:'Foto', importe:5, _csv:true},        // extra >0
+      {id:'a4', kind:'TRAF', tipo:'Foto', importe:0, _csv:true},        // extra 0€ · ahora SÍ cuenta
+      {id:'a5', kind:'TRAF', tipo:'Duplicado', importe:0, _csv:true}    // extra 0€ · ahora SÍ cuenta
+    ]
+  };
+  const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic', countZero:true});
+
+  assertEq('GIC con countZero = 2 (Renov 20 + Renov 0)', g.cnt, 2);
+  assertEq('Extras con countZero = 3 (Foto 5 + Foto 0 + Dup 0)', g.extrasCnt, 3);
+  assertEq('Total = 5 (GIC + Extras)', g.cnt + g.extrasCnt, 5);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CASO 6c · Extras entrados MANUALMENTE (no CSV) también cuentan
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 CASO 6c · Extras manuales (sin _csv) también cuentan en la tarjeta');
+{
+  const byDate = {
+    '2026-03-15': [
+      {id:'a1', kind:'TRAF', tipo:'Renovación', importe:20, _csv:true},         // GIC
+      {id:'a2', kind:'TRAF', tipo:'Foto',       importe:5},                     // extra MANUAL
+      {id:'a3', kind:'TRAF', tipo:'C.Oficial',  importe:15},                    // extra MANUAL
+      {id:'a4', kind:'TRAF', tipo:'Duplicado',  importe:12, _csv:true}          // extra CSV
+    ]
+  };
+  const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic'});
+
+  assertEq('GIC = 1 (solo Renov CSV)', g.cnt, 1);
+  assertEq('Extras = 3 (Foto manual + C.O. manual + Dup CSV, todos >0)', g.extrasCnt, 3);
+  assertEq('Total = 4', g.cnt + g.extrasCnt, 4);
 }
 
 // ═══════════════════════════════════════════════════════════════
