@@ -2482,44 +2482,112 @@ function openStats(initialSection){
       drawChart();drawLegend();
     };
     chartBack.querySelector('#_ch_print').onclick=()=>{
-      const modal=chartBack.querySelector('.modal');
-      const label = state.mode==='single' ? state.yearSingle : state.years.join(' · ');
-      printVisibleElement(modal, {
-        title:`Estadísticas Autoescuelas · ${label}`,
-        landscape:true, margins:'6mm',
-        // 🖨️ FIX Feb 2026 · Layout del PDF del chart de autoescuelas
-        //   Problema anterior: SVG con max-height:60vh + layout flex causaban
-        //   que el chart ocupara MUY alto, el panel autoescuelas quedaba cortado
-        //   y hubiera páginas semi-vacías. Ahora forzamos alturas razonables A4.
-        extraCss:`@page { size: A4 landscape; margin: 6mm }
-          button, select, input, [data-no], ._ch_mode, .no-print { display:none !important }
-          html, body { background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important; margin:0 !important; padding:0 !important }
-          .modal-back, .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important; border-color:#999 !important }
-          .modal { padding:0 !important; margin:0 !important; max-width:none !important; width:100% !important; max-height:none !important; height:auto !important; display:block !important; overflow:visible !important }
-          .modal * { max-height:none !important; overflow:visible !important }
-          /* Cabecera compacta */
-          h3 { color:#000 !important; font-size:14pt !important; margin:0 0 4pt 0 !important; font-family:Georgia,serif !important; page-break-after:avoid }
-          /* Panel de años/leyenda: en línea, compacto */
-          #_ch_yearpick { padding:4pt 8pt !important; margin-bottom:6pt !important; border:1px solid #ccc !important; background:#f7f7f7 !important; font-size:9pt !important }
-          #_ch_yearpick * { font-size:9pt !important; color:#000 !important }
-          /* Layout chart + leyenda lado a lado en horizontal, alturas fijas para A4 landscape */
-          .modal > div[style*="display:flex"][style*="gap:14px"] { display:flex !important; gap:8pt !important; align-items:flex-start !important; overflow:visible !important; height:auto !important; page-break-inside:avoid }
-          #_ch_svg { flex:1 !important; padding:6pt !important; border:1px solid #ccc !important; background:#fff !important; min-width:0 !important; overflow:visible !important; max-height:none !important }
-          /* Panel lateral autoescuelas · ancho fijo, sin scroll */
-          #_ch_svg + div { width:200pt !important; padding:6pt !important; border:1px solid #ccc !important; background:#fafafa !important; overflow:visible !important; max-height:none !important }
-          #_ch_legend { color:#000 !important }
-          #_ch_legend * { color:#000 !important; background:transparent !important; opacity:1 !important; border-color:#ccc !important }
-          /* Leyenda de años compacta */
-          #_ch_svg > div:first-child { padding:4pt 8pt !important; margin-bottom:6pt !important; border:1px solid #ccc !important; background:#f7f7f7 !important }
-          /* SVG del chart · altura pensada para A4 landscape (una sola página) */
-          svg[data-testid="chart-svg"] { width:100% !important; height:auto !important; max-height:130mm !important; display:block }
-          svg text { fill:#000 !important; font-family:Arial,sans-serif !important }
-          svg line { stroke:#999 !important }
-          /* Ocultar tip inferior */
-          #_ch_tip { display:none !important }
-          /* Evitar saltos de página en la zona clave */
-          h3, #_ch_yearpick, #_ch_svg { page-break-inside:avoid }`
-      });
+      // 🖨️ FIX Feb 2026 (v3) · HTML dedicado + leyenda con estilos claros para PDF
+      const label = state.mode==='single' ? `Año ${state.yearSingle}` : `Comparación · ${state.years.join(' · ')}`;
+      const svgHtml = chartBack.querySelector('#_ch_svg svg')?.outerHTML || '';
+      const modeStr = state.mode==='compare'
+        ? `Comparativa entre ${state.years.length} años`
+        : `Datos del año ${state.yearSingle}`;
+
+      // 🎯 Reconstruyo la leyenda desde los datos originales (colores oscuros sobre blanco)
+      const chosen = state.topN==='all' ? fallbackActive : fallbackActive.slice(0, +state.topN);
+      const drawNames = chosen.filter(n => state.enabled.has(n));
+      let legendRows = '';
+      if(state.mode==='single'){
+        const tots = totalsFor(state.yearSingle);
+        legendRows = drawNames.map(name => {
+          const idx = sortedNames.indexOf(name);
+          const color = PALETTE[idx % PALETTE.length];
+          return `<tr>
+            <td class="col-color"><span class="dot" style="background:${color}"></span></td>
+            <td class="col-name">${name.replace(/</g,'&lt;')}</td>
+            <td class="col-val">${tots[name]||0}</td>
+          </tr>`;
+        }).join('');
+      } else {
+        // Comparativa: 1 fila por autoescuela con TODOS los años + variación
+        const totsBy = {};
+        state.years.forEach(y => totsBy[y] = totalsFor(y));
+        legendRows = drawNames.map(name => {
+          const idx = sortedNames.indexOf(name);
+          const color = PALETTE[idx % PALETTE.length];
+          const cols = state.years.map((y, yi) => {
+            const v = totsBy[y][name] || 0;
+            const prevY = yi>0 ? state.years[yi-1] : null;
+            const prev = prevY ? (totsBy[prevY][name] || 0) : null;
+            let arrow = '';
+            if(prev !== null && prev > 0){
+              const pct = ((v - prev) / prev) * 100;
+              const col = pct > 0.5 ? '#059669' : (pct < -0.5 ? '#dc2626' : '#64748b');
+              const ar = pct > 0.5 ? '▲' : (pct < -0.5 ? '▼' : '—');
+              arrow = ` <span style="color:${col};font-size:7pt">${ar}${Math.abs(pct).toFixed(0)}%</span>`;
+            } else if(prev === 0 && v > 0){
+              arrow = ` <span style="color:#0891b2;font-size:7pt">NUEVO</span>`;
+            }
+            return `${y}:<b>${v}</b>${arrow}`;
+          }).join(' &nbsp; ');
+          return `<tr>
+            <td class="col-color"><span class="dot" style="background:${color}"></span></td>
+            <td class="col-name">${name.replace(/</g,'&lt;')}</td>
+            <td class="col-val-multi">${cols}</td>
+          </tr>`;
+        }).join('');
+      }
+
+      const isCompare = state.mode==='compare';
+      const printableHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Estadísticas Autoescuelas · ${label}</title>
+<style>
+  @page { size: A4 landscape; margin: 8mm }
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}
+  html,body{margin:0;padding:0;color:#0f172a;font-family:Arial,sans-serif;background:#fff}
+  .header{border-bottom:2px solid #22d3ee;padding-bottom:5mm;margin-bottom:5mm}
+  h1{margin:0;font-family:Georgia,serif;font-size:15pt;color:#0f172a}
+  .sub{color:#64748b;font-size:9.5pt;margin-top:1.5mm}
+  ${isCompare
+    ? '.grid{display:block}'
+    : '.grid{display:grid;grid-template-columns:1fr 60mm;gap:6mm;align-items:flex-start;page-break-inside:avoid}'
+  }
+  .chart-box{border:1px solid #cbd5e1;border-radius:4pt;padding:4mm;background:#fff;page-break-inside:avoid;${isCompare?'margin-bottom:5mm':''}}
+  .chart-box svg{width:100% !important;height:auto !important;${isCompare?'max-height:100mm':'max-height:135mm'} !important;display:block}
+  .chart-box svg text{fill:#0f172a !important;font-family:Arial,sans-serif !important;font-size:9pt !important}
+  .chart-box svg line{stroke:#cbd5e1 !important}
+  .leyenda{border:1px solid #cbd5e1;border-radius:4pt;padding:0;background:#fafafa;page-break-inside:auto}
+  .leyenda h3{margin:0;padding:3mm 4mm;font-size:10pt;color:#fff;background:#0f172a;border-radius:4pt 4pt 0 0;font-family:Georgia,serif}
+  table.leg{width:100%;border-collapse:collapse;font-size:8.5pt}
+  table.leg thead{display:table-header-group}
+  table.leg tr{page-break-inside:avoid}
+  table.leg td{padding:2mm 3mm;border-bottom:1px dotted #cbd5e1;vertical-align:middle}
+  table.leg tr:last-child td{border-bottom:none}
+  .col-color{width:6mm;text-align:center}
+  .dot{display:inline-block;width:3mm;height:3mm;border-radius:1mm}
+  .col-name{color:#0f172a;font-weight:700}
+  .col-val{color:#0f172a;font-family:'Courier New',monospace;font-weight:700;text-align:right;white-space:nowrap}
+  .col-val-multi{color:#0f172a;font-family:'Courier New',monospace;font-size:8pt;text-align:right}
+  .col-val-multi b{color:#0f172a;font-weight:700}
+  .footer{margin-top:5mm;padding-top:3mm;border-top:1px dashed #cbd5e1;color:#64748b;font-size:8pt;text-align:center}
+  select, button, input, ._ch_mode, .no-print { display:none !important }
+</style></head><body>
+  <div class="header">
+    <h1>📊 Estadísticas Autoescuelas · ${label}</h1>
+    <div class="sub">${modeStr} · Total autoescuelas: ${drawNames.length} · Generado ${new Date().toLocaleDateString('es-ES')}</div>
+  </div>
+  <div class="grid">
+    <div class="chart-box">${svgHtml}</div>
+    <div class="leyenda">
+      <h3>🏆 Autoescuelas${isCompare?' · comparativa':''}</h3>
+      <table class="leg"><tbody>${legendRows}</tbody></table>
+    </div>
+  </div>
+  <div class="footer">MediCar Plus · ${new Date().toLocaleString('es-ES')}</div>
+</body></html>`;
+      if(typeof printHtml === 'function'){
+        printHtml(printableHtml, {title:`Estadísticas Autoescuelas · ${label}`});
+      } else {
+        const w = window.open('', '_blank');
+        w.document.write(printableHtml);
+        w.document.close();
+        setTimeout(()=>{ w.print(); w.close(); }, 400);
+      }
     };
     drawChart();drawLegend();
   }
