@@ -8143,12 +8143,30 @@ function _buildAnnualReport(year, monthFilterIdx){
     </table>`;
 
   // Formes de pagament
+  //   🔧 Feb 2026 · aclarado por el usuario:
+  //     La tarjeta "Efectivo" debe englobar CAJA + RESERVA DE CAMBIO (todo el metálico
+  //     que hay físicamente en la oficina), igual que la "Caja Física" del cierre diario.
+  //     · byFp.E     = efectivo cobrado en el año
+  //     · saldoApertura.caja  = efectivo con el que se arrancó (Config → Saldo inicial)
+  //     · saldoApertura.cambio = reserva de cambio inicial (Config)
+  //   La tarjeta "Tarjeta/Bizum/Transferencia" ya se mapean al banco → se suma banco de apertura
+  //   a "Transferencia" (que es la vía habitual para transferir el saldo inicial al banco).
+  const _sa2 = grandTotals.saldoApertura || {caja:0, banco:0, cambio:0};
+  const _kpiEfectivo = (grandTotals.byFp.E||0) + (_sa2.caja||0) + (_sa2.cambio||0);
+  const _kpiTarjeta = (grandTotals.byFp.T||0);
+  const _kpiBizum   = (grandTotals.byFp.B||0);
+  const _kpiTransf  = (grandTotals.byFp.X||0) + (_sa2.banco||0);
+  const _hasSA = (_sa2.caja||0)+(_sa2.cambio||0)+(_sa2.banco||0) > 0;
+  const _saNoteEf = _hasSA && ((_sa2.caja||0)+(_sa2.cambio||0)>0)
+    ? `<div style="font-size:9px;color:#64748b;margin-top:3px;font-style:italic">${L('inclou reserva/apertura','incluye reserva/apertura')}</div>` : '';
+  const _saNoteBc = _hasSA && (_sa2.banco||0)>0
+    ? `<div style="font-size:9px;color:#64748b;margin-top:3px;font-style:italic">${L("inclou banc d'apertura","incluye banco de apertura")}</div>` : '';
   html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">💳 ${L('Per forma de pagament','Por forma de pago')}</h4>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px">
-      ${_arCard(L('Efectiu','Efectivo'),fmt(grandTotals.byFp.E),'#22c55e','#f0fdf4')}
-      ${_arCard(L('Targeta','Tarjeta'),fmt(grandTotals.byFp.T),'#3b82f6','#eff6ff')}
-      ${_arCard('Bizum',fmt(grandTotals.byFp.B),'#8b5cf6','#f5f3ff')}
-      ${_arCard(L('Transferència','Transferencia'),fmt(grandTotals.byFp.X),'#f59e0b','#fefce8')}
+      ${_arCard(L('Efectiu','Efectivo'),fmt(_kpiEfectivo),'#22c55e','#f0fdf4', _saNoteEf)}
+      ${_arCard(L('Targeta','Tarjeta'),fmt(_kpiTarjeta),'#3b82f6','#eff6ff')}
+      ${_arCard('Bizum',fmt(_kpiBizum),'#8b5cf6','#f5f3ff')}
+      ${_arCard(L('Transferència','Transferencia'),fmt(_kpiTransf),'#f59e0b','#fefce8', _saNoteBc)}
     </div>`;
 
   // Socis (si n'hi ha)
@@ -8164,7 +8182,7 @@ function _buildAnnualReport(year, monthFilterIdx){
 
   return html;
 }
-function _arCard(label,value,color,bg){return `<div style="background:${bg};border:1px solid ${color}55;border-left:4px solid ${color};padding:12px 14px;border-radius:6px"><div style="font-size:10px;color:#64748b;letter-spacing:1px;text-transform:uppercase">${label}</div><div style="font-size:20px;color:${color};font-weight:700;margin-top:4px;font-family:'Courier New',monospace">${value}</div></div>`}
+function _arCard(label,value,color,bg,note){return `<div style="background:${bg};border:1px solid ${color}55;border-left:4px solid ${color};padding:12px 14px;border-radius:6px"><div style="font-size:10px;color:#64748b;letter-spacing:1px;text-transform:uppercase">${label}</div><div style="font-size:20px;color:${color};font-weight:700;margin-top:4px;font-family:'Courier New',monospace">${value}</div>${note||''}</div>`}
 
 // ============================================================================
 // COMPARATIVA AÑOS · vista comparativa año a año (facturación, entradas, tasas)
