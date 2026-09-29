@@ -7063,6 +7063,34 @@ function _buildAnnualReport(year, monthFilterIdx){
     grandTotals.byCompany[comp.name]=cTotal;
   });
 
+  // 📊 BACKFILL desde "Estadísticas Autoescuelas" (feb 2026) · SOLO Empresa 1 (trafic)
+  //    Si un mes NO tiene entradas del CSV DGT (byMonthCnt[m]===0) pero SÍ tiene datos
+  //    en caja.stats.v1 (recuento manual histórico por autoescola), usamos el total de
+  //    todas las autoescolas de ese mes como conteo del mes. Así el usuario puede tener
+  //    stats completas del año aunque haya empezado a usar el programa a mitad de año.
+  //    Regla anti-doble-conteo: si ya hay CSV, se ignora el backfill (CSV = real).
+  if(comps.length === 1 && comps[0].key === 'trafic'){
+    try{
+      const _stats = JSON.parse(localStorage.getItem('caja.stats.v1')||'null');
+      if(_stats && _stats.data){
+        for(let mi=0; mi<12; mi++){
+          const monthKey = `${year}-${String(mi+1).padStart(2,'0')}`;
+          const monthObj = _stats.data[monthKey];
+          if(!monthObj) continue;
+          // Solo aplicamos backfill si ese mes NO tiene entradas CSV (no queremos duplicar)
+          if((grandTotals.byMonthCnt[mi]||0) > 0) continue;
+          const monthTotal = Object.values(monthObj).reduce((s,n)=>s+(Number(n)||0), 0);
+          if(monthTotal > 0){
+            grandTotals.byMonthCnt[mi] = monthTotal;
+            grandTotals.cnt += monthTotal;
+            grandTotals._backfillCnt = (grandTotals._backfillCnt||0) + monthTotal;
+            grandTotals._backfillMonths = (grandTotals._backfillMonths||[]).concat([mi]);
+          }
+        }
+      }
+    }catch(e){ /* silencioso: si stats está corrupto no rompe el informe */ }
+  }
+
   // Panell "resum principal" · en Empresa 2 (cempla) no hay tasas DGT
   const isC2 = comps[0].key === 'cempla';
   // 💸 Cálculos correctos para las KPI cards:
@@ -7636,6 +7664,30 @@ function _buildYearComparison(latestYear,count){
       });
     });
   });
+
+  // 📊 BACKFILL desde "Estadísticas Autoescuelas" (feb 2026) · SOLO Empresa 1 (trafic)
+  //    Igual lógica que openAnnualReport: si un mes de un año NO tiene entradas CSV pero
+  //    SÍ tiene datos en caja.stats.v1, usamos ese total. No duplica si ya hay CSV.
+  if(comps.length === 1 && comps[0].key === 'trafic'){
+    try{
+      const _stats = JSON.parse(localStorage.getItem('caja.stats.v1')||'null');
+      if(_stats && _stats.data){
+        years.forEach(y => {
+          for(let mi=0; mi<12; mi++){
+            const monthKey = `${y}-${String(mi+1).padStart(2,'0')}`;
+            const monthObj = _stats.data[monthKey];
+            if(!monthObj) continue;
+            if((byYear[y].byMonthCnt[mi]||0) > 0) continue;
+            const monthTotal = Object.values(monthObj).reduce((s,n)=>s+(Number(n)||0), 0);
+            if(monthTotal > 0){
+              byYear[y].byMonthCnt[mi] = monthTotal;
+              byYear[y].cnt += monthTotal;
+            }
+          }
+        });
+      }
+    }catch(e){ /* silencioso */ }
+  }
 
   let html='';
   html+=`<div class="print-header" style="text-align:center;padding:14px 0;border-bottom:2px solid #0f172a;margin-bottom:20px">
