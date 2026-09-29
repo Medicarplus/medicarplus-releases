@@ -4141,9 +4141,40 @@ function openSaldoInicial(){
     </div>
 
     <div id="siWarn" style="display:none;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.35);border-radius:6px;padding:8px 12px;margin-top:12px;color:#fed7aa;font-size:12px;line-height:1.5"></div>
+    <div id="siMigrateBox" style="display:none;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.4);border-radius:6px;padding:10px 12px;margin-top:12px;color:#bfdbfe;font-size:12px;line-height:1.5"></div>
   </div>`;
   document.body.appendChild(back);
   back.addEventListener('click',(ev)=>{ if(ev.target===back || ev.target.hasAttribute('data-close')) back.remove(); });
+
+  // 🔄 Detecta HABER manual "Saldo anterior/Apertura/Saldo inicial" pendiente de migrar
+  //    Feb 2026 · antes esto se veía como banner grande en el Informe Anual (redundante).
+  //    Ahora aparece solo aquí (donde tiene sentido) como aviso discreto con botón.
+  try{
+    const _stateRaw = localStorage.getItem(KEYS[currentCompany||'trafic']);
+    if(_stateRaw){
+      const _parsed = JSON.parse(_stateRaw);
+      const _explicit = /^\s*(saldo\s*(anterior|apertura|inicial)|apertura|opening|obertura|saldo\s*previ)\s*$/i;
+      let _found = null;
+      const _dates = Object.keys(_parsed.byDate||{}).sort();
+      for(const dt of _dates){
+        if(_found) break;
+        const list = _parsed.byDate[dt]; if(!Array.isArray(list)) continue;
+        for(const e of list){
+          if(e.kind==='DH' && e.tipo==='HABER'){
+            const _nm = String(e.nombre||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+            if(_explicit.test(_nm)){ _found = {date:dt, importe:e.importe||0}; break; }
+          }
+        }
+      }
+      if(_found){
+        const box = back.querySelector('#siMigrateBox');
+        box.style.display = 'block';
+        box.innerHTML = `🔄 <b>Detectado un ingreso manual de apertura</b> (${fmt(_found.importe)} · ${_found.date}). ¿Prefieres moverlo aquí para tenerlo bien clasificado?
+          <button data-testid="migrate-saldo-apertura" style="display:block;margin-top:6px;background:#3b82f6;color:white;border:none;padding:6px 10px;font-size:11px;font-weight:700;border-radius:4px;cursor:pointer">🔄 Migrar a Saldo Inicial</button>`;
+        box.querySelector('button').onclick = ()=>{ back.remove(); migrateSaldoAperturaToConfig(); };
+      }
+    }
+  }catch(err){ /* silencioso */ }
 
   const fields = ['siEfectivo','siBanco','siCambio'];
   const recalc = ()=>{
@@ -7647,30 +7678,13 @@ function _buildAnnualReport(year, monthFilterIdx){
     }
   }
 
-  if(grandTotals.saldoApertura && grandTotals.saldoApertura.total > 0){
-    const _sa = grandTotals.saldoApertura;
-    const _MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-    const _MESOS_CA = ['Gener','Febrer','Març','Abril','Maig','Juny','Juliol','Agost','Setembre','Octubre','Novembre','Desembre'];
-    const _mesArr = currentLang==='es' ? _MESES : _MESOS_CA;
-    // Detecta el mes (o meses) donde se introdujo el saldo apertura
-    const _mesLbls = _sa.byMonth.map((v,i)=>v>0?_mesArr[i]:null).filter(Boolean).join(', ');
-    const _hasCambio = (_sa.cambio||0) > 0;
-    const _origen = _sa.fromConfig
-      ? L('des de Configuració · 🏦 Saldo inicial','desde Configuración · 🏦 Saldo inicial')
-      : L("des d'un ingrés manual amb concepte \"Saldo anterior\"","desde un ingreso manual con concepto \"Saldo anterior\"");
-    html += `<div data-testid="saldo-apertura-note" style="background:linear-gradient(90deg,#eff6ff 0%,#dbeafe 100%);border-left:4px solid #3b82f6;padding:12px 18px;margin-bottom:20px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
-      <div style="flex:1;min-width:260px">
-        <div style="font-size:13px;color:#1e40af;font-weight:700;letter-spacing:.3px">💰 ${L("Saldo d'obertura","Saldo de apertura")} · ${_mesLbls}</div>
-        <div style="font-size:11px;color:#475569;margin-top:2px">${L("Efectiu que ja tenies quan vas començar a usar el programa · NO computa com a facturació ni benefici · només aquí per quadrar la caixa/banc/reserva.","Efectivo que ya tenías cuando empezaste a usar el programa · NO computa como facturación ni beneficio · solo aquí para cuadrar caja/banco/reserva.")}</div>
-        <div style="font-size:10px;color:#64748b;margin-top:4px;font-style:italic">${_origen}</div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-size:20px;color:#1e40af;font-weight:800;font-family:'Courier New',monospace">${fmt(_sa.total)}</div>
-        <div style="font-size:10px;color:#64748b;margin-top:2px">${L('Caixa','Caja')}: <b>${fmt(_sa.caja)}</b> · ${L('Banc','Banco')}: <b>${fmt(_sa.banco)}</b>${_hasCambio?` · ${L('Reserva','Reserva')}: <b>${fmt(_sa.cambio||0)}</b>`:''}</div>
-        ${!_sa.fromConfig && _sa.entries && _sa.entries.length ? `<button class="btn no-print" data-testid="migrate-saldo-apertura" onclick="migrateSaldoAperturaToConfig()" style="margin-top:8px;background:#3b82f6;color:white;border:none;padding:6px 12px;font-size:11px;font-weight:700;border-radius:4px;cursor:pointer">🔄 ${L('Migrar a Configuració → Saldo Inicial','Migrar a Configuración → Saldo Inicial')}</button>` : ''}
-      </div>
-    </div>`;
-  }
+  // ℹ️ Nota Feb 2026: antes aquí había un banner grande "💰 Saldo de apertura · Mes"
+  //    con el importe y desglose Caja/Banco/Reserva. Se ha ELIMINADO a petición del usuario
+  //    porque es redundante: el saldo apertura ya se ve en la pill "Saldo anterior"
+  //    del sidebar, en el Cuadre de Caja, y en Ajustes → 🏦 Saldo inicial.
+  //    No añade info al informe de facturación (por definición no computa como facturación).
+  //    Si hay un HABER manual pendiente de migrar, aparece un aviso dentro del modal
+  //    Ajustes → 🏦 Saldo inicial (ver openSaldoInicialModal).
 
   // Empreses (si n'hi ha 2)
   if(comps.length===2){
