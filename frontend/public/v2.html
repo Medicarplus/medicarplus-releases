@@ -7474,42 +7474,41 @@ function _buildAnnualReport(year, monthFilterIdx){
         //  · Empresa 2 (cempla): kind='PRIV' + importe>0, EXCLUYENDO Foto/Duplicado/C.Oficial.
         // De este modo el número de "Entradas Totales" del Informe Anual coincide al 100% con
         // el que muestra el cierre diario "Entradas Tráfico N" en el sidebar.
+        // 👥 ENTRADAS · Regla feb 2026 (aclarada por el usuario):
+        //   Tráfico (empresa 1):
+        //     · GIC   = SOLO entradas del CSV DGT (`_csv:true`) y que NO sean Foto/Dup/C.O.
+        //     · Extra = TODO lo demás en TRAF · cualquier entrada MANUAL (aunque el concepto
+        //               sea "Renovación", "Canje", "Café" o lo que sea) + Foto/Dup/C.O.
+        //               aunque vengan del CSV. Simple: si no es GIC, es Extra.
+        //   Empresa 2 (cempla · revisiones médicas): sin CSV, todo manual → mantenemos
+        //     kind='PRIV' + importe>0 como "entrada normal", Foto/Dup/C.O. como extras.
+        //   Ambos respetan la casilla "Contar 0€" (solo aplica en Tráfico).
+        const _catLowFlag = String(cat||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        const _isKnownExtra = /foto/.test(_catLowFlag) || /duplic/.test(_catLowFlag) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLowFlag);
         let _isEntradaReal = false;
+        let _isExtraFinal = false;
         if(activeKey === 'trafic'){
           const _isDGT = (typeof isTramiteDGT === 'function') ? isTramiteDGT(e) : (e._csv === true);
           const _countZero = (typeof getCountZero === 'function') ? getCountZero() : false;
-          // 🔧 FIX feb 2026: EXCLUYE extras (Foto/Duplicado/C.Oficial) del GIC.
-          //    Antes: cualquier CSV DGT contaba como Tráfico incluidos los extras
-          //    → doble conteo en la nueva tarjeta KPI (GIC + Extras).
-          //    Ahora: GIC = solo tramites reales (Renov/Exped/Canj/Recup/Periodic/Inicial/Obten)
-          //          extras.cnt = Foto/Dup/C.Oficial >0€ (aparte)
-          const _catLowER = String(cat||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-          const _isExtraER = /foto/.test(_catLowER) || /duplic/.test(_catLowER) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLowER);
-          _isEntradaReal = _isDGT && (amtTotal > 0 || _countZero) && !_isExtraER;
+          const _passesCount = (amtTotal > 0 || _countZero);
+          _isEntradaReal = _isDGT && !_isKnownExtra && _passesCount;
+          // Extra = todo lo que no es GIC y pasa el filtro de conteo
+          _isExtraFinal = !_isEntradaReal && _passesCount;
         } else {
-          const _catLow = String(cat||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-          const _isExtra = /foto/.test(_catLow) || /duplic/.test(_catLow) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLow);
-          _isEntradaReal = (e.kind === 'PRIV') && (amtTotal > 0) && !_isExtra;
+          _isEntradaReal = (e.kind === 'PRIV') && (amtTotal > 0) && !_isKnownExtra;
+          _isExtraFinal = _isKnownExtra && (amtTotal > 0);
         }
         if(_isEntradaReal){
           grandTotals.cnt += 1;
           grandTotals.byMonthCnt[m] += 1;
           cTotal.cnt += 1;
         }
-        // 🎯 EXTRAS · Fotos, Duplicado, C.Oficial (feb 2026)
-        //    Los extras NO se cuentan en "Entradas GIC" pero SÍ como "trámites extras hechos".
-        //    Se tracks aparte para mostrar en la tarjeta: "449 GIC · +12 extras = 461 total"
-        //    🔧 Feb 2026 · MISMA regla de conteo que GIC:
-        //      cuentan si importe > 0, o si la casilla "Contar 0€" está activa (traf).
-        {
-          const _catLowExtra = String(cat||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-          const _isExtraE = /foto/.test(_catLowExtra) || /duplic/.test(_catLowExtra) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLowExtra);
-          const _countZeroExtra = (activeKey === 'trafic' && typeof getCountZero === 'function') ? getCountZero() : false;
-          if(_isExtraE && (amtTotal > 0 || _countZeroExtra)){
-            grandTotals.extrasCnt = (grandTotals.extrasCnt||0) + 1;
-            grandTotals.extrasByMonth = grandTotals.extrasByMonth || Array(12).fill(0);
-            grandTotals.extrasByMonth[m] += 1;
-          }
+        // 🎯 EXTRAS · cualquier entrada NO-GIC en Tráfico (o Foto/Dup/C.O. en cempla)
+        //    Se cuenta aparte para mostrar en la tarjeta: "449 GIC · +12 extras = 461 total"
+        if(_isExtraFinal){
+          grandTotals.extrasCnt = (grandTotals.extrasCnt||0) + 1;
+          grandTotals.extrasByMonth = grandTotals.extrasByMonth || Array(12).fill(0);
+          grandTotals.extrasByMonth[m] += 1;
         }
         // 📅 Guarda las fechas por concepto para el clic → salta al día (feb 2026)
         grandTotals.byConceptEntries = grandTotals.byConceptEntries || {};
@@ -7517,15 +7516,12 @@ function _buildAnnualReport(year, monthFilterIdx){
         grandTotals.byConceptEntries[cat].push({date:d, importe:amtTotal, company:comp.key});
         // Tasas cobradas (separades per referència: quant se n'ha venut de stock)
         grandTotals.tasasVendidas = (grandTotals.tasasVendidas || 0) + amtTasa;
-        // Desglossament per grup × concepte (total facturat = servei + tasa)
-        // 🔧 FIX Feb 2026 · dos cambios importantes:
-        //   1. Los EXTRAS (Foto/Duplicado/C.Oficial) van SIEMPRE a un grupo virtual "Otros"
-        //      (antes iban a "General" mezclados con CANJE sin grupo).
-        //   2. Solo cuentan las unidades con importe>0 (alinea con "Tráfico" de arriba).
-        //   Así el total del Desglose (excluyendo "Otros") = Tráfico de arriba.
-        const _catLowGC = String(cat||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-        const _isExtraGC = /foto/.test(_catLowGC) || /duplic/.test(_catLowGC) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLowGC);
-        const grupoLabelFinal = _isExtraGC ? (currentLang==='es'?'Otros':'Altres') : grupoLabel;
+        // 🗂 Desglose por grupo × concepto (total facturado = servicio + tasa)
+        //   Feb 2026 · aclarado por el usuario:
+        //   TODA entrada Extra (manual en TRAF o Foto/Dup/C.O.) va al grupo virtual "Otros",
+        //   con su propio nombre de concepto (ej. "Café" bajo "Otros"). Así el desglose
+        //   sin "Otros" siempre = Entradas GIC del CSV. Ante la duda → "Otros".
+        const grupoLabelFinal = _isExtraFinal ? (currentLang==='es'?'Otros':'Altres') : grupoLabel;
         grandTotals.byGroupConcept = grandTotals.byGroupConcept || {};
         grandTotals.byGroupConcept[grupoLabelFinal] = grandTotals.byGroupConcept[grupoLabelFinal] || {};
         const gc = grandTotals.byGroupConcept[grupoLabelFinal][cat] = grandTotals.byGroupConcept[grupoLabelFinal][cat] || {count:0, total:0};
