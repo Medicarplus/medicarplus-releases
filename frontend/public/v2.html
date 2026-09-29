@@ -7612,6 +7612,22 @@ function _buildAnnualReport(year, monthFilterIdx){
             return; // ⚠️ CRÍTICO: no continuar al bloque HABER normal
           }
         }
+        // 💡 Feb 2026 · Tracking dedicado de COBROS por forma de pago
+        //   (solo HABER manuales + servicios TRAF/PRIV, ya filtrados _internal/hnBruto/refund/apertura arriba)
+        //   Se usa en las tarjetas "Por forma de pago" del informe para mostrar SOLO ingresos
+        //   reales, NUNCA gastos ni movimientos internos.
+        grandTotals.cobrosByFp = grandTotals.cobrosByFp || {E:0,T:0,B:0,X:0};
+        if(e.kind==='DH' && e.tipo==='HABER'){
+          const _fpC = e.fpago || e.fp || 'E';
+          if(grandTotals.cobrosByFp[_fpC] !== undefined) grandTotals.cobrosByFp[_fpC] += (e.importe||0);
+        } else if(e.kind==='TRAF' || e.kind==='PRIV'){
+          const _fpC = e.fp || 'E';
+          const _neto = (e.importe||0) - (e.descuento||0);
+          if(grandTotals.cobrosByFp[_fpC] !== undefined && _neto > 0) grandTotals.cobrosByFp[_fpC] += _neto;
+          // Tasa DGT: cobrada con su propia forma de pago (o la misma si no se especifica)
+          const _fpT = e.fpTasa || _fpC;
+          if(grandTotals.cobrosByFp[_fpT] !== undefined && (e.tasa||0) > 0) grandTotals.cobrosByFp[_fpT] += (e.tasa||0);
+        }
         // HABER (ingrés manual) → SE FUSIONA con "Facturación por concepto" (feb 2026)
         // El usuario pidió un único bloque de ingresos: da igual si viene de TRAF, PRIV o
         // apuntado a mano — es ingreso de la empresa igualmente. La reagrupación usa el
@@ -8263,8 +8279,10 @@ function _buildAnnualReport(year, monthFilterIdx){
 
   // 💳 POR FORMA DE PAGO · cobros del período con % sobre el total (Feb 2026)
   //   Muestra CÓMO me pagan los clientes (no cuánto dinero tengo ahora).
-  //   Cada tarjeta lleva su importe (byFp) y el % que representa sobre el total cobrado.
-  const _byE = grandTotals.byFp.E||0, _byT = grandTotals.byFp.T||0, _byB = grandTotals.byFp.B||0, _byX = grandTotals.byFp.X||0;
+  //   Usa `cobrosByFp` (dedicado, filtrado): NUNCA incluye gastos, internal, apertura ni refunds.
+  //   Cada tarjeta lleva su importe y el % que representa sobre el total cobrado.
+  const _cobros = grandTotals.cobrosByFp || {E:0,T:0,B:0,X:0};
+  const _byE = _cobros.E||0, _byT = _cobros.T||0, _byB = _cobros.B||0, _byX = _cobros.X||0;
   const _fpTotal = _byE + _byT + _byB + _byX;
   const _pct = v => _fpTotal > 0 ? ((v/_fpTotal)*100).toFixed(1)+'%' : '0%';
   const _pctNote = v => `<div style="font-size:11px;color:#64748b;margin-top:3px;font-weight:600">${_pct(v)} ${L('del total','del total')}</div>`;
