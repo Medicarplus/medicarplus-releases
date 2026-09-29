@@ -1631,7 +1631,16 @@ function openStats(initialSection){
     </div>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <label class="small" style="margin:0">${isCA?'ANY':'AÑO'}:</label>
-      <input type="number" id="stYear" value="${new Date().getFullYear()}" min="2020" max="2099" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;width:100px" />
+      <select id="stYear" data-testid="st-year-select" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-weight:600;min-width:110px">${(function(){
+        // 📅 Feb 2026 · Selector calendario en vez de input · años detectados en stats + año actual ±3
+        const cur = new Date().getFullYear();
+        const _st = (function(){try{return JSON.parse(localStorage.getItem('caja.stats.v1')||'null');}catch(_){return null;}})();
+        const yearsWithData = new Set();
+        if(_st && _st.data){ Object.keys(_st.data).forEach(k => { const y = parseInt(k.slice(0,4)); if(y) yearsWithData.add(y); }); }
+        for(let y = cur-3; y <= cur+1; y++) yearsWithData.add(y);
+        const sortedYears = [...yearsWithData].sort((a,b) => b-a);
+        return sortedYears.map(y => `<option value="${y}" ${y===cur?'selected':''}>📅 ${y}</option>`).join('');
+      })()}</select>
       <select id="stMode" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px"><option value="year">📅 ${isCA?'Vista anual (12 mesos)':'Vista anual (12 meses)'}</option><option value="month">📆 ${isCA?'Vista mensual':'Vista mensual'}</option></select>
       <select id="stMonth" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:none">${MESOS.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('')}</select>
       <button class="btn" id="stPrev">← ${isCA?'Any ant.':'Año ant.'}</button>
@@ -2728,10 +2737,28 @@ function openStats(initialSection){
     const COLORS = CATS.reduce((o,c) => { o[c] = _trafColorFor(c, CATS); return o; }, {});
     if(mode === 'year'){
       const agg = _trafAggregate(year);
-      // Chart: monthly counts
+      // 📊 Feb 2026 · Backfill desde caja.stats.v1 (Estadísticas Autoescoles)
+      //    Si un mes NO tiene entradas CSV pero SÍ tiene datos en stats → usa stats como fallback.
+      //    Esto hace que las "Entradas de Tráfico por mes" incluyan tu histórico manual.
+      let _statsBackfill = {};
+      try{
+        const _statsRaw = JSON.parse(localStorage.getItem('caja.stats.v1')||'null');
+        if(_statsRaw && _statsRaw.data){
+          for(let mi=0; mi<12; mi++){
+            const k = `${year}-${String(mi+1).padStart(2,'0')}`;
+            const monthObj = _statsRaw.data[k];
+            if(!monthObj) continue;
+            const csvCount = agg.monthly[k]?.count || 0;
+            if(csvCount > 0) continue;  // Ya hay CSV → no aplicar backfill
+            const total = Object.values(monthObj).reduce((s,n)=>s+(+n||0), 0);
+            if(total > 0) _statsBackfill[k] = total;
+          }
+        }
+      }catch(_){}
+      // Chart: monthly counts (CSV + fallback backfill)
       const monthCounts = MESOS.map((_, mi) => {
         const k = `${year}-${String(mi+1).padStart(2,'0')}`;
-        return agg.monthly[k]?.count || 0;
+        return (agg.monthly[k]?.count || 0) + (_statsBackfill[k] || 0);
       });
       const monthLabels = MESOS.map(m => m.slice(0,3));
       const chart = _barChartHtml(monthLabels, monthCounts, monthLabels.map(()=>'#7ec8ff'), 180);
@@ -2758,6 +2785,11 @@ function openStats(initialSection){
           rowTotal += val;
           displayByCat[c] += val;
         });
+        // 📊 Backfill: si el mes no tiene CSV pero tiene stats históricas → añade al TOTAL como "histórico"
+        const bf = _statsBackfill[k] || 0;
+        if(bf > 0 && rowTotal === 0){
+          rowTotal = bf;
+        }
         displayCount += rowTotal;
         const catCells = CATS.map(c => {
           const d = dispCat[c];
@@ -2767,7 +2799,8 @@ function openStats(initialSection){
           const borderExtra = isOv ? 'border:2px solid #fbbf24;' : 'border:1px solid #2a3040;';
           return `<td class="traf-cell" data-mk="${k}" data-cat="${c}" data-csv="${d.csv}" title="${tip.replace(/"/g,'&quot;')}${isOv?'\\n(Editado a mano · doble clic para volver al CSV)':''}" style="padding:6px 8px;${borderExtra}text-align:center;font-family:'Consolas',monospace;color:${COLORS[c]};cursor:cell;position:relative;user-select:none">${d.val || ''}${pencil}</td>`;
         }).join('');
-        return `<tr><td style="padding:6px 10px;border:1px solid #2a3040;font-weight:600;background:#141821;text-transform:capitalize">${mName}</td><td style="padding:6px 10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff">${rowTotal || ''}</td>${catCells}<td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;font-family:'Consolas',monospace;color:#3ddc97">${md.importe ? _fmtEur(md.importe) : ''}</td><td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;font-family:'Consolas',monospace;color:#f5b301">${md.tasas ? _fmtEur(md.tasas) : ''}</td></tr>`;
+        const totalBadge = bf > 0 && !md.count ? `<span title="Histórico (Estadísticas Autoescoles)" style="font-size:10px;color:#22d3ee;margin-left:4px">📋</span>` : '';
+        return `<tr><td style="padding:6px 10px;border:1px solid #2a3040;font-weight:600;background:#141821;text-transform:capitalize">${mName}</td><td style="padding:6px 10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff">${rowTotal || ''}${totalBadge}</td>${catCells}<td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;font-family:'Consolas',monospace;color:#3ddc97">${md.importe ? _fmtEur(md.importe) : ''}</td><td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;font-family:'Consolas',monospace;color:#f5b301">${md.tasas ? _fmtEur(md.tasas) : ''}</td></tr>`;
       }).join('');
       const catTotCells = CATS.map(c => `<td style="padding:8px;border:1px solid #2a3040;background:#1f2530;text-align:center;font-weight:700;color:${COLORS[c]}">${displayByCat[c] || ''}</td>`).join('');
       // Sobreescribe agg con los valores mostrados (para las KPIs de arriba)
