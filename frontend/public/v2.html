@@ -3986,6 +3986,87 @@ function setSaldoInicial(obj){
   };
   localStorage.setItem(_saldoInicialKey(), JSON.stringify(clean));
 }
+
+// 🔄 Migración one-click: si el cliente introdujo el saldo apertura como HABER manual
+//    (concepto "Saldo anterior" o auto-detectado), este helper lo mueve al mecanismo
+//    correcto (Config Saldo Inicial) y borra el HABER original. Resultado: el saldo
+//    queda en Configuración → 🏦 Saldo inicial · exactamente como si el cliente lo
+//    hubiese introducido bien desde el principio.
+//    Feb 2026 · Idempotente: si no hay HABER migrable, muestra toast informativo.
+function migrateSaldoAperturaToConfig(){
+  try{
+    const key = KEYS[currentCompany||'trafic'];
+    const raw = localStorage.getItem(key);
+    if(!raw){ alert(L('No hi ha dades per migrar','No hay datos para migrar')); return; }
+    const parsed = JSON.parse(raw);
+    if(!parsed || !parsed.byDate){ alert(L('No hi ha dades per migrar','No hay datos para migrar')); return; }
+
+    // Detectar el HABER apertura (mismo criterio que el informe)
+    const _generic = /^(otro|otros|altre|altres|ingreso|ingres|-|)$/i;
+    const _explicit = /^\s*(saldo\s*(anterior|apertura|inicial)|apertura|opening|obertura|saldo\s*previ)\s*$/i;
+    const _allDatesSorted = Object.keys(parsed.byDate||{}).sort();
+    let _target = null; // {date, entry}
+    for(const dt of _allDatesSorted){
+      if(_target) break;
+      const list = parsed.byDate[dt];
+      if(!Array.isArray(list)) continue;
+      for(const e of list){
+        if(_target) break;
+        if(e.kind==='DH' && e.tipo==='HABER' && (e.importe||0) >= 500){
+          const _nm = String(e.nombre||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+          if(_explicit.test(_nm) || _generic.test(_nm)){
+            _target = {date: dt, entry: e};
+          }
+        }
+      }
+    }
+    if(!_target){
+      alert(L("No s'ha trobat cap ingrés d'obertura per migrar. Configura'l directament des d'Ajustes → 🏦 Saldo inicial.",
+              "No se encontró ningún ingreso de apertura para migrar. Configúralo directamente desde Ajustes → 🏦 Saldo inicial."));
+      return;
+    }
+
+    const _amt = _target.entry.importe || 0;
+    const _fp = _target.entry.fp || 'E';
+    const _fecha = _target.date;
+    const _esCaja = (_fp === 'E');
+    const _nombreEmpresa = (currentCompany==='trafic' ? (CFG?.company1?.name||'Empresa 1') : (CFG?.company2?.name||'Empresa 2'));
+
+    if(!confirm(L(
+      `Migrar ${fmt(_amt)} del ${_fecha} a Configuració → 🏦 Saldo Inicial de ${_nombreEmpresa}?\n\nS'esborrarà l'ingrés manual actual (irreversible).\n\nDesprés Caixa/Banc quadraran igual però el saldo anirà a Configuració.`,
+      `¿Migrar ${fmt(_amt)} del ${_fecha} a Configuración → 🏦 Saldo Inicial de ${_nombreEmpresa}?\n\nSe eliminará el ingreso manual actual (irreversible).\n\nDespués Caja/Banco cuadrarán igual pero el saldo estará en Configuración.`
+    ))) return;
+
+    // 1) Guardar en Config
+    const _prevSI = getSaldoInicial() || {};
+    setSaldoInicial({
+      fecha: _prevSI.fecha || _fecha,
+      efectivo: (_prevSI.efectivo||0) + (_esCaja ? _amt : 0),
+      banco:    (_prevSI.banco||0)    + (_esCaja ? 0 : _amt),
+      cambio:   _prevSI.cambio || 0,
+      nota:     _prevSI.nota ? (_prevSI.nota + ' · ') : (L("Migrat des d'ingrés manual","Migrado desde ingreso manual"))
+    });
+
+    // 2) Borrar el HABER de byDate
+    const list = parsed.byDate[_fecha];
+    parsed.byDate[_fecha] = list.filter(e => e.id !== _target.entry.id);
+    if(parsed.byDate[_fecha].length === 0) delete parsed.byDate[_fecha];
+    localStorage.setItem(key, JSON.stringify(parsed));
+
+    // 3) Recargar informe si está abierto
+    alert(L('✅ Migració completada. Recarrega el informe per veure els canvis.',
+            '✅ Migración completada. Recarga el informe para ver los cambios.'));
+    // Si estamos en un modal de informe anual, cierra y reabre
+    const anyModal = document.querySelector('[data-testid="saldo-apertura-note"]')?.closest('.modal-back');
+    if(anyModal && typeof openAnnualReport === 'function'){
+      anyModal.remove();
+      setTimeout(()=>openAnnualReport(), 100);
+    }
+  }catch(err){
+    console.error('[migrateSaldoApertura]', err);
+    alert(L('Error a la migració. Revisa la consola.','Error en la migración. Revisa la consola.'));
+  }
+}
 // Devuelve {caja, banc} del saldo inicial si aplica a la fecha (fecha >= arranque)
 // Nota: el campo `cambio` NO se suma aquí — se guarda como _bulk en la Reserva
 // de cambio y se refleja vía reservaCambio() para evitar doble contabilidad.
@@ -7260,30 +7341,37 @@ function _buildAnnualReport(year, monthFilterIdx){
     let compRaw;try{compRaw=JSON.parse(localStorage.getItem(KEYS[comp.key]))||{byDate:{}}}catch(e){compRaw={byDate:{}}}
 
     // 🧠 AUTO-DETECCIÓN de saldo apertura (feb 2026) · SIN acción manual del cliente.
-    //   Heurística SEGURA (solo se activa si se cumple TODO):
-    //   1. Es el primer día CON ENTRADAS del histórico de esa empresa.
-    //   2. Ese día contiene UN HABER manual (kind=DH tipo=HABER) con importe >= 300€.
-    //   3. Ese HABER tiene concepto genérico ("Otro", "Ingreso", "-", "" o similar)
-    //      que sugiere que el cliente puso "el dinero que ya tenía" al instalar.
-    //   4. NO existe ya un flag `_isAutoSaldoApertura` en la entrada.
-    //   Resultado: al detectar, se AÑADE al Set `_autoSaldoAperturaIds` que luego
-    //   se consulta en el forEach de entries para tratarlo como Saldo anterior.
-    //   NO se modifica la entrada real en localStorage (no-destructivo). El usuario
-    //   puede editar el concepto si NO era saldo apertura (basta con cambiar nombre).
+    //   Heurística ROBUSTA (independiente de si hay DEBE anteriores):
+    //   1. Recorre TODOS los HABER manuales del histórico ordenados por fecha ASC.
+    //   2. Detecta el PRIMER HABER que cumpla:
+    //      - Concepto genérico ("Otro", "Ingreso", "-", "" o similares)
+    //      - Importe >= 500€
+    //      - Es cronológicamente ANTES o el mismo día que la primera entrada TRAF/PRIV/DEBE
+    //        importante (o simplemente el primer HABER si no hay entradas anteriores).
+    //   3. Solo se detecta UNO (el primero). Cualquier otro "Otro" grande será facturación normal.
+    //   Resultado: al detectar, se añade al Set `_autoSaldoAperturaIds` para tratarlo
+    //   como Saldo anterior en el forEach principal. NO se modifica localStorage (no-destructivo).
+    //   Si NO era saldo apertura, el cliente edita el concepto poniendo algo específico
+    //   (ej. "Foto grupo") y deja de auto-detectarse automáticamente.
     const _autoSaldoAperturaIds = new Set();
     try{
-      const _allDates = Object.keys(compRaw.byDate||{}).sort();
-      // Solo el PRIMER día con entradas es candidato
-      const _firstDateWithEntries = _allDates.find(d => Array.isArray(compRaw.byDate[d]) && compRaw.byDate[d].length > 0);
-      if(_firstDateWithEntries){
-        const _firstDay = compRaw.byDate[_firstDateWithEntries];
-        const _generic = /^(otro|otros|altre|altres|ingreso|ingres|-|)$/i;
-        _firstDay.forEach(e => {
-          if(e.kind==='DH' && e.tipo==='HABER' && (e.importe||0) >= 300){
+      const _generic = /^(otro|otros|altre|altres|ingreso|ingres|-|)$/i;
+      const _allDatesSorted = Object.keys(compRaw.byDate||{}).sort();
+      let _found = false;
+      for(const dt of _allDatesSorted){
+        if(_found) break;
+        const _dayList = compRaw.byDate[dt];
+        if(!Array.isArray(_dayList)) continue;
+        for(const e of _dayList){
+          if(_found) break;
+          if(e.kind==='DH' && e.tipo==='HABER' && (e.importe||0) >= 500){
             const _nm = String(e.nombre||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-            if(_generic.test(_nm)) _autoSaldoAperturaIds.add(e.id);
+            if(_generic.test(_nm)){
+              _autoSaldoAperturaIds.add(e.id);
+              _found = true; // solo el primero
+            }
           }
-        });
+        }
       }
     }catch(err){ /* silencioso: no romper si falla la auto-detección */ }
     const dfMap = dfMapByComp[comp.key] || {};
@@ -7599,6 +7687,7 @@ function _buildAnnualReport(year, monthFilterIdx){
       <div style="text-align:right">
         <div style="font-size:20px;color:#1e40af;font-weight:800;font-family:'Courier New',monospace">${fmt(_sa.total)}</div>
         <div style="font-size:10px;color:#64748b;margin-top:2px">${L('Caixa','Caja')}: <b>${fmt(_sa.caja)}</b> · ${L('Banc','Banco')}: <b>${fmt(_sa.banco)}</b>${_hasCambio?` · ${L('Reserva','Reserva')}: <b>${fmt(_sa.cambio||0)}</b>`:''}</div>
+        ${!_sa.fromConfig && _sa.entries && _sa.entries.length ? `<button class="btn no-print" data-testid="migrate-saldo-apertura" onclick="migrateSaldoAperturaToConfig()" style="margin-top:8px;background:#3b82f6;color:white;border:none;padding:6px 12px;font-size:11px;font-weight:700;border-radius:4px;cursor:pointer">🔄 ${L('Migrar a Configuració → Saldo Inicial','Migrar a Configuración → Saldo Inicial')}</button>` : ''}
       </div>
     </div>`;
   }

@@ -54,19 +54,27 @@ function simulateBuildAnnualReport({byDate, year, monthFilterIdx = -1, saldoInic
     saldoApertura:null
   };
 
-  // 🧠 AUTO-DETECCIÓN de saldo apertura (mismo criterio que v2.html)
+  // 🧠 AUTO-DETECCIÓN de saldo apertura (mismo criterio ROBUSTO que v2.html)
+  //   Primer HABER genérico >= 500€ del histórico completo (evita falsos negativos si hay
+  //   DEBEs anteriores). Solo detecta UNO.
   const _autoSaldoAperturaIds = new Set();
-  const _allDates = Object.keys(byDate||{}).sort();
-  const _firstDateWithEntries = _allDates.find(d => Array.isArray(byDate[d]) && byDate[d].length > 0);
-  if(_firstDateWithEntries){
-    const _firstDay = byDate[_firstDateWithEntries];
-    const _generic = /^(otro|otros|altre|altres|ingreso|ingres|-|)$/i;
-    _firstDay.forEach(e => {
-      if(e.kind==='DH' && e.tipo==='HABER' && (e.importe||0) >= 300){
+  const _generic = /^(otro|otros|altre|altres|ingreso|ingres|-|)$/i;
+  const _allDatesSorted = Object.keys(byDate||{}).sort();
+  let _found = false;
+  for(const dt of _allDatesSorted){
+    if(_found) break;
+    const _dayList = byDate[dt];
+    if(!Array.isArray(_dayList)) continue;
+    for(const e of _dayList){
+      if(_found) break;
+      if(e.kind==='DH' && e.tipo==='HABER' && (e.importe||0) >= 500){
         const _nm = String(e.nombre||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-        if(_generic.test(_nm)) _autoSaldoAperturaIds.add(e.id);
+        if(_generic.test(_nm)){
+          _autoSaldoAperturaIds.add(e.id);
+          _found = true;
+        }
       }
-    });
+    }
   }
 
   // computeTotals simulado (subset relevante: HABER suma a neto y byFp)
@@ -438,6 +446,31 @@ console.log('\n🧪 CASO 10 · Auto-detección solo con conceptos genéricos (Ot
   const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic'});
   assertTrue('NO se detecta saldo apertura ("Foto grupo" es específico)', !g.saldoApertura);
   assertEq('El HABER 500€ cuenta como facturación', g.byConcept['Foto grupo']||0, 500);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CASO 11 · CASO REAL · HABER 2500,71 en junio + DEBEs previos
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 CASO 11 · CASO REAL · Aunque haya DEBEs anteriores, se detecta el HABER de junio');
+{
+  const byDate = {
+    '2026-03-05': [{id:'d1', kind:'DH', tipo:'DEBE', nombre:'Alquiler', importe:800, fp:'X'}],
+    '2026-04-10': [{id:'d2', kind:'DH', tipo:'DEBE', nombre:'Luz', importe:150, fp:'X'}],
+    '2026-06-15': [{id:'sa', kind:'DH', tipo:'HABER', nombre:'Otro', importe:2500.71, fp:'E'}],
+    '2026-07-01': [
+      {id:'t1', kind:'TRAF', tipo:'Renovación', importe:20, tasa:22, fp:'E', _csv:true},
+      {id:'t2', kind:'TRAF', tipo:'Renovación', importe:20, tasa:22, fp:'T', _csv:true}
+    ]
+  };
+  const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic'});
+
+  assertTrue('Saldo apertura DETECTADO pese a DEBEs anteriores', !!g.saldoApertura);
+  assertEq('Saldo apertura = 2500,71 (auto-detectado)', g.saldoApertura.total, 2500.71);
+  assertTrue('Es auto-detectado (no explícito)', g.saldoApertura.hasAutoDetected === true);
+  assertEq('Facturación año LIMPIA = 84 (2×20 + 2×22, sin 2500,71)', Object.values(g.byConcept).reduce((s,n)=>s+n,0), 84);
+  assertEq('Junio facturación = 0 (solo tenía el saldo apertura)', g.byMonthFacturacion[5], 0);
+  assertEq('Julio facturación = 84', g.byMonthFacturacion[6], 84);
+  assertEq('Gastos año = 950 (800 + 150)', Object.values(g.gastos).reduce((s,g)=>s+g.total,0), 950);
 }
 
 // ═══════════════════════════════════════════════════════════════
