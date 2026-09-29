@@ -1917,3 +1917,18 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 
 **Validación**: 102/102 invariantes contables pasan, sintaxis JS limpia en los 10 bloques.
 
+
+### 💰 Saldo de Apertura NO computa como Facturación · Feb 2026
+
+**Petición del usuario**: máxima lógica contable como cualquier programa fiscal. Si al instalar el programa el cliente ya tenía dinero en caja/banco de ejercicios anteriores, ese saldo NO debe inflar la Facturación del año actual (ya se declaró en el IRPF previo).
+
+**Implementación** (`_buildAnnualReport`):
+- **Detector de concepto reservado**: cualquier HABER manual cuyo nombre coincida (case/acento-insensible) con `saldo anterior`, `saldo apertura`, `saldo inicial`, `apertura`, `opening`, `obertura`, `saldo previ` se INTERCEPTA antes del bloque HABER normal.
+- **Exclusión total**: no suma en `byConcept`, `byMonthFacturacion`, `byConceptCnt`, `haberTotal`, `cnt`, ni en ningún KPI/tabla del informe. `return` inmediato para no contaminar.
+- **Tracking aparte**: se acumula en `grandTotals.saldoApertura = {caja, banco, total, byMonth[12], entries[]}`. Divide entre caja y banco según `fpago` (E vs otros).
+- **Renderizado**: nota informativa azul entre los KPIs y la tabla mensual con mensaje "💰 Saldo de apertura · [mes] · Efectivo que ya tenías cuando empezaste a usar el programa · NO computa como facturación ni beneficio · solo aquí para cuadrar caja/banco.", más el total con desglose Caja/Banco.
+
+**Cómo lo activa el cliente**: renombrar el HABER manual de `"Otro"` (o el nombre que fuera) a `"Saldo anterior"` (o `"Apertura"` o `"Saldo apertura"`). Al reabrir el informe, deja de contar como Varios y aparece la nota informativa.
+
+**Validación**: 102/102 invariantes contables pasan · sintaxis JS OK en los 10 bloques.
+

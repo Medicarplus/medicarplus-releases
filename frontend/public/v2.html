@@ -7317,6 +7317,30 @@ function _buildAnnualReport(year, monthFilterIdx){
           grandTotals.byMonthGastos[m] = (grandTotals.byMonthGastos[m]||0) + (e.importe || 0);
           return;
         }
+        // 💰 SALDO ANTERIOR / APERTURA (feb 2026) · Máxima lógica contable:
+        //    Si el usuario introduce un HABER manual con concepto reservado
+        //    "Saldo anterior", "Saldo apertura", "Saldo inicial" o "Apertura",
+        //    lo tratamos como el dinero que YA tenía cuando instaló el programa.
+        //    → NO computa como facturación, NO computa como ingresos manuales,
+        //       NO computa como entradas ni beneficio. Solo se muestra como
+        //       línea informativa aparte para que la caja/banco cuadre desde
+        //       el día 1 sin distorsionar los informes fiscales.
+        if(e.kind==='DH' && e.tipo==='HABER'){
+          const _hnRaw = String(e.nombre||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+          const _isSaldoAnt = /^\s*(saldo\s*(anterior|apertura|inicial)|apertura|opening|obertura|saldo\s*previ)\s*$/.test(_hnRaw);
+          if(_isSaldoAnt){
+            grandTotals.saldoApertura = grandTotals.saldoApertura || {caja:0, banco:0, total:0, byMonth:Array(12).fill(0), entries:[]};
+            const _amt = e.importe||0;
+            grandTotals.saldoApertura.total += _amt;
+            grandTotals.saldoApertura.byMonth[m] += _amt;
+            // Divide por forma de pago para caja vs banco (informativo)
+            const _fp = e.fpago || 'E';
+            if(_fp === 'E'){ grandTotals.saldoApertura.caja += _amt; }
+            else { grandTotals.saldoApertura.banco += _amt; }
+            grandTotals.saldoApertura.entries.push({date:d, importe:_amt, fp:_fp, company:comp.key});
+            return; // ⚠️ CRÍTICO: no continuar al bloque HABER normal
+          }
+        }
         // HABER (ingrés manual) → SE FUSIONA con "Facturación por concepto" (feb 2026)
         // El usuario pidió un único bloque de ingresos: da igual si viene de TRAF, PRIV o
         // apuntado a mano — es ingreso de la empresa igualmente. La reagrupación usa el
@@ -7452,6 +7476,28 @@ function _buildAnnualReport(year, monthFilterIdx){
     ${_arCard(L('Despeses totals','Gastos totales'),fmt(_totalGastosKPI),'#ef4444','#0f172a')}
     ${_arCard(L('Benefici net','Beneficio neto'),fmt(_beneficioKPI),_beneficioKPI>=0?'#16a34a':'#dc2626','#0f172a')}
   </div>`;
+
+  // 💰 SALDO ANTERIOR / APERTURA · nota informativa aparte (feb 2026)
+  //    No computa como facturación, solo se muestra para que caja/banco cuadren desde
+  //    el día que el cliente empezó a usar el programa. Máxima lógica contable.
+  if(grandTotals.saldoApertura && grandTotals.saldoApertura.total > 0){
+    const _sa = grandTotals.saldoApertura;
+    const _MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const _MESOS_CA = ['Gener','Febrer','Març','Abril','Maig','Juny','Juliol','Agost','Setembre','Octubre','Novembre','Desembre'];
+    const _mesArr = currentLang==='es' ? _MESES : _MESOS_CA;
+    // Detecta el mes (o meses) donde se introdujo el saldo apertura
+    const _mesLbls = _sa.byMonth.map((v,i)=>v>0?_mesArr[i]:null).filter(Boolean).join(', ');
+    html += `<div data-testid="saldo-apertura-note" style="background:linear-gradient(90deg,#eff6ff 0%,#dbeafe 100%);border-left:4px solid #3b82f6;padding:12px 18px;margin-bottom:20px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <div style="flex:1;min-width:260px">
+        <div style="font-size:13px;color:#1e40af;font-weight:700;letter-spacing:.3px">💰 ${L("Saldo d'obertura","Saldo de apertura")} · ${_mesLbls}</div>
+        <div style="font-size:11px;color:#475569;margin-top:2px">${L("Efectiu que ja tenies quan vas començar a usar el programa · NO computa com a facturació ni benefici · només aquí per quadrar la caixa/banc.","Efectivo que ya tenías cuando empezaste a usar el programa · NO computa como facturación ni beneficio · solo aquí para cuadrar caja/banco.")}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:20px;color:#1e40af;font-weight:800;font-family:'Courier New',monospace">${fmt(_sa.total)}</div>
+        <div style="font-size:10px;color:#64748b;margin-top:2px">${L('Caixa','Caja')}: <b>${fmt(_sa.caja)}</b> · ${L('Banc','Banco')}: <b>${fmt(_sa.banco)}</b></div>
+      </div>
+    </div>`;
+  }
 
   // Empreses (si n'hi ha 2)
   if(comps.length===2){
