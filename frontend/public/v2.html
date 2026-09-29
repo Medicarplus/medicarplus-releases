@@ -7304,54 +7304,70 @@ function openAnnualReport(){
   back.addEventListener('click',e=>{if(e.target===back)back.remove()});
   back.querySelector('#arClose').onclick=()=>back.remove();
   back.querySelector('#arPrint').onclick=()=>{
-    const modal=back.querySelector('.modal')||back.firstElementChild||back;
-    printVisibleElement(modal, {
-      title:'Facturación anual',
-      landscape:true,
-      margins:'8mm',
-      extraCss:`
-        /* 📄 A4 landscape · 297mm × 210mm · margen 8mm → área útil 281mm × 194mm.
-           Fallback A4 portrait: los mismos estilos funcionan · content-width fija al 100%. */
-        @page { size: A4 landscape; margin: 8mm }
-        html, body { margin:0 !important; padding:0 !important; width:100% !important; max-width:100% !important; overflow-x:hidden !important }
-        button, select, input, [data-no], .icon-btn, .no-print { display:none !important }
-        body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important; font-size:9pt !important }
-        .modal-back{ position:static !important; inset:auto !important; transform:none !important; background:transparent !important }
-        .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important }
-        .modal{ padding:0 !important; margin:0 !important; max-width:100% !important; width:100% !important; border:none !important; overflow:visible !important; max-height:none !important; height:auto !important }
-        h3{ color:#000 !important; font-size:13pt !important; margin:0 0 4pt 0 !important; text-align:center !important; page-break-after:avoid }
-        h4{ color:#000 !important; font-size:10pt !important; margin:6pt 0 3pt 0 !important; page-break-after:avoid }
-        /* KPI cards: 3×2 rejilla → siempre caben en portrait/landscape sin overflow */
-        [style*="grid-template-columns"]{ display:grid !important; grid-template-columns:repeat(3, minmax(0,1fr)) !important; gap:4pt !important; margin-bottom:8pt !important; page-break-inside:avoid }
-        [style*="grid-template-columns"] > div{ padding:4pt 6pt !important; page-break-inside:avoid; font-size:8pt !important; border-radius:3pt !important }
-        [style*="grid-template-columns"] > div > div:first-child{ font-size:7pt !important; letter-spacing:0.5pt !important }
-        [style*="grid-template-columns"] > div > div:last-child{ font-size:11pt !important; margin-top:1pt !important; font-weight:700 !important }
-        /* Tablas: fijas, wrap de texto para que ninguna celda quede fuera del encuadre */
-        table{ border-collapse:collapse !important; width:100% !important; max-width:100% !important; font-size:7.5pt !important; margin:0 0 6pt 0 !important; table-layout:fixed !important; page-break-inside:auto; word-wrap:break-word }
-        thead{ display:table-header-group } tfoot{ display:table-footer-group } tr{ page-break-inside:avoid }
-        th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:2pt 3pt !important; font-weight:700 !important; font-size:7.5pt !important; word-wrap:break-word; overflow-wrap:break-word; text-align:center !important }
-        td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 3pt !important; font-size:7.5pt !important; word-wrap:break-word; overflow-wrap:break-word; overflow:hidden; text-overflow:ellipsis }
-        /* Filas detalle expandibles: MANTENER CERRADAS en el PDF (solo se ve el total por categoría).
-           El usuario ya ve el total al lado de cada categoría · si quiere el detalle, lo abre en la app. */
-        .cat-detail{ display:none !important }
-        /* Evitar overflow horizontal en cualquier contenedor */
-        div{ max-width:100% !important; overflow:visible !important }
-        /* Nowrap solo en columnas monetarias para no romper importes */
-        td[style*="Courier"], th[style*="Courier"]{ white-space:nowrap !important; font-size:7pt !important }
-        /* 🔀 Evita que una sección se parta a mitad de página */
-        h4{ break-after:avoid !important; page-break-after:avoid !important; break-inside:avoid !important; page-break-inside:avoid !important }
-        table{ break-inside:avoid-page; page-break-inside:avoid }
-        /* Tablas muy largas (Facturación mensual, Gastos por categoría, etc.) permiten break entre filas */
-        table.long-table, table[data-testid="ingresos-por-categoria"]{ break-inside:auto; page-break-inside:auto }
-        /* Cabecera de tabla se repite en cada página al partir */
-        thead{ display:table-header-group; break-inside:avoid; break-after:avoid }
-        tfoot{ display:table-footer-group }
-        /* Evita líneas viudas/huérfanas */
-        p, li, tr{ orphans:3; widows:3 }
-        /* Nunca romper una fila entre páginas */
-        tr{ break-inside:avoid !important; page-break-inside:avoid !important }
-      `
-    });
+    // 🖨️ FIX Feb 2026 (v3) · HTML dedicado para PDF de Facturación Anual/Mensual.
+    //   Antes: imprimía el modal completo (con selects, controles, colores oscuros)
+    //   Ahora: clona solo #arBody + envuelve en HTML limpio con CSS claro y page-breaks.
+    const bodyClone = back.querySelector('#arBody')?.innerHTML || '';
+    const yTitle = back.querySelector('#arYear')?.value || new Date().getFullYear();
+    const mSel = back.querySelector('#arMonth');
+    const mVal = mSel && mSel.style.display !== 'none' ? +mSel.value : 0;
+    const mLbl = mVal>0 ? ` · ${['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][mVal-1]}` : '';
+    const title = `Facturación${mLbl} · ${yTitle}`;
+    const printableHtml = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
+<style>
+  @page { size: A4 landscape; margin: 8mm }
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}
+  html,body{margin:0;padding:0;color:#0f172a;font-family:Arial,sans-serif;background:#fff;width:100%;overflow-x:hidden;font-size:9pt}
+  .header{border-bottom:2px solid #f5b301;padding-bottom:4mm;margin-bottom:5mm;text-align:center}
+  h1{margin:0;font-family:Georgia,serif;font-size:15pt;color:#0f172a}
+  .sub{color:#64748b;font-size:9pt;margin-top:1mm}
+  h3, h4{color:#0f172a !important;font-family:Georgia,serif;margin:5mm 0 2mm 0;page-break-after:avoid;page-break-inside:avoid;border-bottom:1px solid #cbd5e1;padding-bottom:1mm}
+  h3{font-size:12pt}
+  h4{font-size:10.5pt}
+  /* KPI cards: colores claros, cabe en 1 fila */
+  div[style*="grid-template-columns"]{display:grid !important;gap:3mm !important;margin-bottom:4mm !important;page-break-inside:avoid}
+  div[style*="grid-template-columns"] > div{padding:3mm !important;border:1px solid #cbd5e1 !important;border-radius:2mm;background:#fafafa !important;page-break-inside:avoid}
+  div[style*="grid-template-columns"] > div *{color:#0f172a !important}
+  div[style*="grid-template-columns"] > div > div:first-child{font-size:7.5pt !important;letter-spacing:0.3pt !important;color:#64748b !important}
+  div[style*="grid-template-columns"] > div > div:nth-child(2){font-size:11pt !important;font-weight:700 !important}
+  /* Notas pequeñas en las cards (inclou reserva/apertura) */
+  div[style*="grid-template-columns"] > div > div:nth-child(3){font-size:7pt !important;color:#64748b !important;font-style:italic}
+  /* Tablas: bordes visibles, cabecera oscura, cuerpo blanco */
+  table{border-collapse:collapse !important;width:100% !important;font-size:8pt !important;margin-bottom:5mm !important;table-layout:auto;page-break-inside:auto}
+  thead{display:table-header-group}
+  tr{page-break-inside:avoid !important}
+  th{background:#0f172a !important;color:#fff !important;border:1px solid #64748b !important;padding:2pt 4pt !important;font-weight:700 !important;font-size:8pt !important;text-align:center !important;word-wrap:break-word}
+  td{border:1px solid #cbd5e1 !important;color:#0f172a !important;padding:2pt 4pt !important;font-size:8pt !important;word-wrap:break-word;background:#fff !important;vertical-align:top}
+  td[style*="Courier"]{font-family:'Courier New',monospace !important;white-space:nowrap;text-align:right}
+  tfoot td{background:#f5b301 !important;color:#0f172a !important;font-weight:700 !important;border:1px solid #64748b !important}
+  /* Filas detalle expandibles: mantener CERRADAS (el usuario ya ve el total) */
+  .cat-detail{display:none !important}
+  /* Ocultar elementos interactivos */
+  button, select, input, .no-print, [data-no], .icon-btn{display:none !important}
+  /* Bordes de secciones (facturación, gastos, cuadre) */
+  [style*="border:1px solid"]{border:1px solid #cbd5e1 !important;background:#fff !important}
+  [style*="background:linear-gradient"]{background:#fafafa !important;color:#0f172a !important}
+  /* Textos con estilos inline oscuros (heredado del modo dark del modal) */
+  [style*="color:#94a3b8"], [style*="color:#cbd5e1"], [style*="color:#e2e8f0"], [style*="color:#7ee3aa"], [style*="color:#f5b301"]{color:#0f172a !important}
+  [style*="color:#22c55e"], [style*="color:#16a34a"], [style*="color:#16a34a"]{color:#059669 !important}
+  [style*="color:#ef4444"], [style*="color:#dc2626"]{color:#dc2626 !important}
+  .footer{margin-top:6mm;padding-top:3mm;border-top:1px dashed #cbd5e1;color:#64748b;font-size:8pt;text-align:center}
+</style></head><body>
+  <div class="header">
+    <h1>📊 ${title}</h1>
+    <div class="sub">Generado ${new Date().toLocaleString('es-ES')}</div>
+  </div>
+  ${bodyClone}
+  <div class="footer">MediCar Plus · ${new Date().toLocaleString('es-ES')}</div>
+</body></html>`;
+    if(typeof printHtml === 'function'){
+      printHtml(printableHtml, {title});
+    } else {
+      const w = window.open('', '_blank');
+      w.document.write(printableHtml);
+      w.document.close();
+      setTimeout(()=>{ w.print(); w.close(); }, 400);
+    }
   };
   const yearSel=back.querySelector('#arYear');
   const monthSel=back.querySelector('#arMonth');
@@ -8303,39 +8319,56 @@ function openYearComparison(){
   back.addEventListener('click',e=>{if(e.target===back)back.remove()});
   back.querySelector('#ycClose').onclick=()=>back.remove();
   back.querySelector('#ycPrint').onclick=()=>{
-    const modal=back.querySelector('.modal')||back.firstElementChild||back;
-    printVisibleElement(modal, {
-      title:'Comparativa anual',
-      landscape:true,
-      margins:'6mm',
-      // 🖨️ FIX Feb 2026 · Layout PDF Comparativa Años
-      //   - Chart en 1 página · Resumen + Facturación mensual en la siguiente
-      //   - Alturas fijas para evitar cortes y espacios vacíos
-      extraCss:`@page { size: A4 landscape; margin: 6mm }
-        button, select, input, [data-no], .icon-btn, .no-print { display:none !important }
-        html, body { background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important; margin:0 !important; padding:0 !important }
-        .modal-back, .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important; border-color:#999 !important }
-        .modal { padding:0 !important; margin:0 !important; max-width:none !important; width:100% !important; max-height:none !important; height:auto !important; display:block !important; overflow:visible !important; border:none !important }
-        .modal * { max-height:none !important; overflow:visible !important }
-        h3 { color:#000 !important; font-size:14pt !important; margin:0 0 6pt 0 !important; font-family:Georgia,serif !important; page-break-after:avoid }
-        h4 { color:#000 !important; font-size:11pt !important; margin:6pt 0 3pt 0 !important; font-family:Georgia,serif !important; page-break-after:avoid; page-break-inside:avoid }
-        /* KPI cards en 1 fila */
-        div[style*="grid-template-columns:repeat"] { display:grid !important; page-break-inside:avoid; margin-bottom:8pt !important }
-        .yc-kpi-card { padding:6pt !important; border:1px solid #ccc !important; background:#fafafa !important }
-        .yc-kpi-card * { color:#000 !important }
-        /* Chart: altura fija para caber holgadamente en A4 landscape */
-        #ycChart { padding:6pt 8pt !important; border:1px solid #ccc !important; margin:6pt 0 !important; page-break-inside:avoid; page-break-after:always }
-        #ycChart svg { width:100% !important; height:auto !important; max-height:120mm !important; display:block }
-        #ycChart svg text { fill:#000 !important }
-        #ycChart svg line { stroke:#999 !important }
-        /* Tablas compactas */
-        table { border-collapse:collapse !important; width:100% !important; font-size:9pt !important; page-break-inside:auto; margin-bottom:6pt !important }
-        thead { display:table-header-group } tr { page-break-inside:avoid; page-break-after:auto }
-        th { background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:9pt !important }
-        td { border:1px solid #999 !important; color:#000 !important; padding:2pt 5pt !important; font-size:9pt !important; word-wrap:break-word }
-        /* Elementos que no aportan al PDF */
-        [data-testid="yc-goto-chart"], #ycGoChart { display:none !important }`
-    });
+    // 🖨️ FIX Feb 2026 (v3) · Clona el #ycBody y lo envuelve en HTML dedicado para PDF.
+    //   Antes: imprimía el modal completo (cabecera + selects + botones) causando cortes.
+    //   Ahora: HTML dedicado con solo el contenido útil, colores claros y page-breaks correctos.
+    const bodyClone = back.querySelector('#ycBody')?.innerHTML || '';
+    const title = `Comparativa Años · ${new Date().getFullYear()}`;
+    const printableHtml = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
+<style>
+  @page { size: A4 landscape; margin: 8mm }
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}
+  html,body{margin:0;padding:0;color:#0f172a;font-family:Arial,sans-serif;background:#fff;width:100%;overflow-x:hidden}
+  .header{border-bottom:2px solid #f5b301;padding-bottom:4mm;margin-bottom:4mm;text-align:center}
+  h1{margin:0;font-family:Georgia,serif;font-size:15pt;color:#0f172a}
+  h2, h3{color:#0f172a !important;font-family:Georgia,serif;font-size:12pt;margin:6mm 0 2mm 0;page-break-after:avoid;page-break-inside:avoid}
+  h4{color:#0f172a !important;font-family:Georgia,serif;font-size:11pt;margin:4mm 0 2mm 0;page-break-after:avoid;page-break-inside:avoid;border-bottom:1px solid #cbd5e1;padding-bottom:1mm}
+  /* KPI cards: 1 fila, colores forzados a claro */
+  div[style*="grid-template-columns"]{display:grid !important;gap:3mm !important;margin-bottom:4mm !important;page-break-inside:avoid}
+  .yc-kpi-card{padding:2mm 3mm !important;border:1px solid #cbd5e1 !important;background:#fafafa !important;border-radius:2mm;page-break-inside:avoid}
+  .yc-kpi-card *{color:#0f172a !important}
+  .yc-kpi-card > div:first-child{font-size:8pt !important;letter-spacing:0.3pt !important}
+  .yc-kpi-card > div:nth-child(2){font-size:11pt !important;font-weight:700 !important}
+  /* Chart: cabe entero en la página */
+  #ycChart{padding:3mm !important;border:1px solid #cbd5e1 !important;background:#fff !important;margin:4mm 0 !important;page-break-inside:avoid}
+  #ycChart svg{width:100% !important;height:auto !important;max-height:100mm !important;display:block}
+  #ycChart svg text{fill:#0f172a !important;font-size:8pt !important;font-family:Arial,sans-serif !important}
+  #ycChart svg line{stroke:#cbd5e1 !important}
+  /* Tablas: bordes visibles, texto oscuro, cabecera repetida por página */
+  table{border-collapse:collapse !important;width:100% !important;font-size:8pt !important;margin-bottom:4mm !important;table-layout:auto}
+  thead{display:table-header-group}
+  tr{page-break-inside:avoid !important}
+  th{background:#0f172a !important;color:#fff !important;border:1px solid #64748b !important;padding:2pt 4pt !important;font-weight:700 !important;font-size:8pt !important;text-align:center !important}
+  td{border:1px solid #cbd5e1 !important;color:#0f172a !important;padding:2pt 4pt !important;font-size:8pt !important;word-wrap:break-word;background:#fff !important}
+  td[style*="Courier"]{font-family:'Courier New',monospace !important;white-space:nowrap;text-align:right}
+  /* Ocultar elementos residuales de la UI */
+  button, select, input, .no-print, [data-testid="yc-goto-chart"], #ycGoChart{display:none !important}
+  .footer{margin-top:6mm;padding-top:3mm;border-top:1px dashed #cbd5e1;color:#64748b;font-size:8pt;text-align:center}
+</style></head><body>
+  <div class="header">
+    <h1>📈 ${title}</h1>
+  </div>
+  ${bodyClone}
+  <div class="footer">MediCar Plus · ${new Date().toLocaleString('es-ES')}</div>
+</body></html>`;
+    if(typeof printHtml === 'function'){
+      printHtml(printableHtml, {title});
+    } else {
+      const w = window.open('', '_blank');
+      w.document.write(printableHtml);
+      w.document.close();
+      setTimeout(()=>{ w.print(); w.close(); }, 400);
+    }
   };
   const sel=back.querySelector('#ycCount');
   const bodyEl=back.querySelector('#ycBody');
