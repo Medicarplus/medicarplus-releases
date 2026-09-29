@@ -1956,3 +1956,40 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 
 **Validación**: 102/102 invariantes contables OK · sintaxis JS OK.
 
+
+### 💰 Saldo Apertura · Cuadre TOTAL feb 2026
+
+**Petición explícita del cliente**: máxima lógica contable — el saldo anterior debe SUMAR en caja/banco/reserva (para cuadrar con realidad) pero NO computar como facturación en ningún lado (ni informes, ni socios, ni fp).
+
+**Detectores activos** (ambos van al mismo `grandTotals.saldoApertura`):
+1. HABER manual con concepto reservado: `saldo anterior`, `saldo apertura`, `saldo inicial`, `apertura`, `opening`, `obertura`, `saldo previ` (case/acento-insensible)
+2. Config-based `caja.saldoInicial.<company>.v1` (Ajustes → 🏦 Saldo inicial) si su fecha cae dentro del año/mes filtrado
+
+**Doble descuento aplicado** (importante):
+- `computeTotals(list)` procesa HABER "Saldo anterior" ANTES del forEach y suma a `t.neto` y `t.byFp[fp]`. Estas quedan en `grandTotals.neto`, `grandTotals.byMonth[m]`, `grandTotals.byFp[fp]`, `cTotal.neto`.
+- **Fix crítico**: al detectar el HABER en el forEach del `_buildAnnualReport`, no solo se agrega a `grandTotals.saldoApertura` sino que se DESCUENTA la cantidad de:
+  - `grandTotals.neto` (para reparto entre socios)
+  - `grandTotals.byMonth[m]` (dead code pero por coherencia)
+  - `grandTotals.byFp[fp]` (para KPIs Efectivo/Tarjeta/Bizum/Transferencia)
+  - `cTotal.neto` (para Facturación por empresa)
+
+**Coherencia total garantizada** en TODO el Informe Anual:
+- Facturación total (KPI): NO incluye saldo apertura
+- Beneficio neto (KPI): NO incluye
+- Entradas totales: NO cuenta (HABER kind=DH no era entrada de todos modos)
+- Tabla "Facturación y gastos mensuales": NO incluye (usa byMonthFacturacion)
+- Tabla "Facturación por categoría": NO incluye (usa byConcept)
+- Tabla "Desglose por grupo y tipo": NO incluye (usa byGroupConcept)
+- Tabla "Facturación por empresa": NO incluye (cTotal.neto descontado)
+- Tabla "Reparto entre socios": NO incluye (grandTotals.neto descontado)
+- KPIs por forma de pago (Efectivo/Tarjeta/Bizum/Transferencia): NO incluye (byFp descontado)
+
+**Caja/Banco/Reserva sí lo suman** (para cuadrar realidad):
+- `saldoAnterior(date)` acumula neto de entries + saldoInicial config
+- `saldoAnteriorPorCuenta(date)` desglosa {caja, banc}
+- `reservaCambio()` maneja el cajón de cambio independiente
+
+**Banner del informe** enriquecido: muestra origen ("desde Configuración · 🏦 Saldo inicial" vs "desde un ingreso manual con concepto 'Saldo anterior'") y desglose Caja/Banco/Reserva.
+
+**Validación**: 102/102 invariantes contables PASS · sintaxis JS OK.
+
