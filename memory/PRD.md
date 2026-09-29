@@ -1,4 +1,41 @@
 # MediCar Plus · PRD (Product Requirements Document)
+## 2026-02-28 · Fix crítico: gráficas cortadas en PDF (Comparativa años + Autoescuelas)
+
+**Problema reportado:** el PDF de "Comparativa años" mostraba la gráfica con el top recortado (las etiquetas numéricas que se añadieron en cada punto salían FUERA del viewBox del SVG y quedaban clipped en la exportación PDF). En pantalla se veía bien porque el navegador aplica overflow:visible al SVG cuando el contenedor no lo restringe.
+
+**Root cause:** al añadir las etiquetas numéricas arriba de cada punto, la Y de la etiqueta era `punto.y + labelOffset` donde `labelOffset = -8 - (si * 11)`. Para el año superior (si=2) en un punto cerca del top (y=M.top=20), la etiqueta caía en y=-10 → fuera del viewBox → recortada en el PDF.
+
+**Fix aplicado:**
+
+1. **`_buildYearComparisonChart` (Comparativa años):**
+   - `M.top`: 20 → 46 (deja espacio para labels apilados de hasta 3 series).
+   - `H`: 340 → 380 (mantiene la altura del área de dibujo).
+   - `M.right`: 20 → 24 (para que la última etiqueta de Diciembre no roce el borde).
+   - `svg style`: añadido `overflow:visible`.
+   - `max-height`: 340px (antes 340px) — sin cambios en pantalla.
+
+2. **PDF ycPrint (Comparativa años):**
+   - `#ycChart` y `#ycChart svg`: añadido `overflow:visible !important`.
+   - `max-height` del SVG: 100mm → 120mm (proporcional al nuevo H).
+
+3. **`drawChart` (Autoescuelas):**
+   - `padT`: 20 → 70 (para soportar hasta 6 años en modo compare · offset máx = 8+5×11=63).
+   - `H`: 440 → 490 (compensación).
+   - `svg style`: añadido `overflow:visible`.
+
+4. **PDF `_ch_print` (Autoescuelas):**
+   - `max-height`: single 135mm→145mm · compare 100mm→110mm.
+   - `overflow:visible !important` añadido.
+
+**Otros prints revisados:**
+- **Facturación (`arPrint`):** ya usa HTML dedicado con landscape A4 8mm y `overflow-x:hidden` en body. Sin cambios necesarios.
+- **Tráfico (`printTrafficReport`):** solo tablas (sin SVG). Ya tenía `page-break-inside:auto` en tabla y `avoid` por fila. Sin cambios necesarios.
+
+**Verificación:** 102 tests contables ✅. Cambios puramente visuales SVG/CSS; sin tocar lógica.
+
+**Recordatorio:** `Ctrl + Shift + R` en Electron para refrescar cache.
+
+
 ## 2026-02-28 · Etiquetas numéricas en gráfica "Comparativa años"
 
 **Petición:** en la gráfica de líneas de Comparativa años, mostrar el número de entradas de cada mes justo encima de los puntos, igual que hace la gráfica de barras de Autoescuelas.

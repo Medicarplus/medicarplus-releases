@@ -2332,12 +2332,16 @@ function openStats(initialSection){
       let maxY=0;
       for(const s of series){for(const v of s.values){if(v>maxY)maxY=v}}
       if(maxY<10)maxY=10; maxY=Math.ceil(maxY/10)*10;
-      const W=900,H=440,padL=50,padR=20,padT=20,padB=40;
+      // 🔧 Feb 2026 · padT aumentado a 70 (antes 20) para dejar sitio a las etiquetas numéricas
+      //   que se apilan encima de cada punto (yOff = 8 + yearIdx*11 · hasta 6 años en compare).
+      //   H compensado (+50) para mantener área de dibujo similar. Sin esto, las etiquetas del
+      //   año superior salían del viewBox y se cortaban en el PDF.
+      const W=900,H=490,padL=50,padR=20,padT=70,padB=40;
       const cw=W-padL-padR, ch=H-padT-padB;
       const stepX=cw/11;
       const yTicks=5;
       const yTickVals=[];for(let i=0;i<=yTicks;i++)yTickVals.push(Math.round(maxY*i/yTicks));
-      let svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-height:60vh" data-testid="chart-svg">`;
+      let svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-height:60vh;overflow:visible" data-testid="chart-svg">`;
       svg+=`<g stroke="#1e293b" stroke-width="1">`;
       for(let i=0;i<=yTicks;i++){const y=padT+ch-(ch*i/yTicks);svg+=`<line x1="${padL}" y1="${y}" x2="${padL+cw}" y2="${y}" />`;}
       svg+=`</g>`;
@@ -2553,7 +2557,7 @@ function openStats(initialSection){
     : '.grid{display:grid;grid-template-columns:1fr 60mm;gap:6mm;align-items:flex-start;page-break-inside:avoid}'
   }
   .chart-box{border:1px solid #cbd5e1;border-radius:4pt;padding:4mm;background:#fff;page-break-inside:avoid;${isCompare?'margin-bottom:5mm':''}}
-  .chart-box svg{width:100% !important;height:auto !important;${isCompare?'max-height:100mm':'max-height:135mm'} !important;display:block}
+  .chart-box svg{width:100% !important;height:auto !important;${isCompare?'max-height:110mm':'max-height:145mm'} !important;display:block;overflow:visible !important}
   .chart-box svg text{fill:#0f172a !important;font-family:Arial,sans-serif !important;font-size:9pt !important}
   .chart-box svg line{stroke:#cbd5e1 !important}
   .leyenda{border:1px solid #cbd5e1;border-radius:4pt;padding:0;background:#fafafa;page-break-inside:auto}
@@ -8382,8 +8386,8 @@ function openYearComparison(){
   .yc-kpi-card > div:first-child{font-size:8pt !important;letter-spacing:0.3pt !important}
   .yc-kpi-card > div:nth-child(2){font-size:11pt !important;font-weight:700 !important}
   /* Chart: cabe entero en la página */
-  #ycChart{padding:3mm !important;border:1px solid #cbd5e1 !important;background:#fff !important;margin:4mm 0 !important;page-break-inside:avoid}
-  #ycChart svg{width:100% !important;height:auto !important;max-height:100mm !important;display:block}
+  #ycChart{padding:3mm !important;border:1px solid #cbd5e1 !important;background:#fff !important;margin:4mm 0 !important;page-break-inside:avoid;overflow:visible !important}
+  #ycChart svg{width:100% !important;height:auto !important;max-height:120mm !important;display:block;overflow:visible !important}
   #ycChart svg text{fill:#0f172a !important;font-size:8pt !important;font-family:Arial,sans-serif !important}
   #ycChart svg line{stroke:#cbd5e1 !important}
   /* Tablas: bordes visibles, texto oscuro, cabecera repetida por página */
@@ -8639,8 +8643,11 @@ function _buildYearComparisonChart(years, byYear, MESES){
   for(let v=0; v<=yMax; v+=step) ticks.push(v);
 
   // Dimensiones del SVG (viewBox → responsive)
-  const W = 1140, H = 340;
-  const M = { top: 20, right: 20, bottom: 44, left: 60 };
+  // 🔧 Feb 2026: M.top aumentado a 46 (antes 20) para dejar sitio a las etiquetas numéricas
+  //   que van encima de cada punto (offset -8, -19, -30 según serie). Sin esto, las etiquetas
+  //   del año superior salían fuera del viewBox y se recortaban en el PDF.
+  const W = 1140, H = 380;
+  const M = { top: 46, right: 24, bottom: 44, left: 60 };
   const iw = W - M.left - M.right;
   const ih = H - M.top - M.bottom;
   // Escalas
@@ -8684,7 +8691,7 @@ function _buildYearComparisonChart(years, byYear, MESES){
   out += `</div>`;
 
   // ── SVG ────────────────────────────────────────────────────────────
-  out += `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;max-height:340px" preserveAspectRatio="xMidYMid meet">`;
+  out += `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;max-height:400px;overflow:visible" preserveAspectRatio="xMidYMid meet">`;
 
   // Rejilla horizontal + etiquetas del eje Y
   ticks.forEach(v=>{
