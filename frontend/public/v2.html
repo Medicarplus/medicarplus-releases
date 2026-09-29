@@ -5822,9 +5822,17 @@ function generateLedgerEntries(dateFrom,dateTo,company){
           // 🔁 Movimiento interno Caja↔Banco: NO es ingreso (no toca 705). Es un traspaso
           // entre cuentas propias. Español contable: DEBE = cuenta destino / HABER = origen.
           if(e._internal){
+            // 🔁 Movimientos entre CAJA y RESERVA de cambio: son la MISMA cuenta contable
+            //    (570 Caja incluye la reserva de cambio como efectivo físico).
+            //    NO se registran en la libreta (evita confusión "retirada del banco" falsa).
+            if(e._transferDir === 'caja_to_reserva' || e._transferDir === 'reserva_to_caja') return;
             if(e._transferDir === 'caja2banco'){
               expenseRows.push({date,concepto:`🔁 Ingreso en metálico: ${e.nombre||'—'}`,debeAcct:'572 Banco',debeAmt:e.importe,haberAcct:'570 Caja',haberAmt:e.importe});
+            } else if(e._transferDir === 'banco_to_reserva'){
+              // Retirada REAL del banco (para meterla en la reserva/caja física)
+              expenseRows.push({date,concepto:`🏦 Retirada del banco → Reserva: ${e.nombre||'—'}`,debeAcct:'570 Caja',debeAmt:e.importe,haberAcct:'572 Banco',haberAmt:e.importe});
             } else {
+              // banco2caja u otros: retirada genérica del banco
               expenseRows.push({date,concepto:`🏦 Retirada del banco: ${e.nombre||'—'}`,debeAcct:'570 Caja',debeAmt:e.importe,haberAcct:'572 Banco',haberAmt:e.importe});
             }
             return;
@@ -5894,8 +5902,12 @@ function generateLedgerEntries(dateFrom,dateTo,company){
           if(!e.importe || Math.abs(e.importe) < 0.005) return;
           // 🔁 Movimiento interno Caja↔Banco: NO es ingreso. DEBE=destino / HABER=origen.
           if(e._internal){
+            // 🔁 Reserva ↔ Caja: misma cuenta contable (570 Caja incluye reserva). NO asiento.
+            if(e._transferDir === 'caja_to_reserva' || e._transferDir === 'reserva_to_caja') return;
             if(e._transferDir === 'caja2banco'){
               rows.push({date,concepto:`🔁 Ingreso en metálico: ${e.nombre||'—'}`,debeAcct:'572 Banco',debeAmt:e.importe,haberAcct:'570 Caja',haberAmt:e.importe});
+            } else if(e._transferDir === 'banco_to_reserva'){
+              rows.push({date,concepto:`🏦 Retirada del banco → Reserva: ${e.nombre||'—'}`,debeAcct:'570 Caja',debeAmt:e.importe,haberAcct:'572 Banco',haberAmt:e.importe});
             } else {
               rows.push({date,concepto:`🏦 Retirada del banco: ${e.nombre||'—'}`,debeAcct:'570 Caja',debeAmt:e.importe,haberAcct:'572 Banco',haberAmt:e.importe});
             }
@@ -8249,33 +8261,29 @@ function _buildAnnualReport(year, monthFilterIdx){
       </tbody>
     </table>`;
 
-  // Formes de pagament
-  //   🔧 Feb 2026 · aclarado por el usuario:
-  //     La tarjeta "Efectivo" debe reflejar TODO el efectivo real del negocio
-  //     (caja + reserva de cambio), no solo los cobros del período. Es "lo que tienes
-  //     físicamente ahora mismo". Fórmula (equivalente a la Caja Física del cierre diario):
-  //       Efectivo = byFp.E + saldoApertura.caja + reservaActual + internalCajaNet
-  //     Donde internalCajaNet = HABER _internal fp:E (reserva→caja) − DEBE _internal fp:E (caja→reserva).
-  //     Los asientos internos ya se filtran de byFp.E · aquí se recuperan como neto.
-  //   La "Transferencia" incluye el banco de apertura por simetría (banco físico total).
+  // 💰 DINERO DISPONIBLE AHORA · Simple y claro (Feb 2026)
+  //   Reemplaza la vieja "Por forma de pago" (era liosa · mezclaba efectivo + tarjeta + bizum + transf).
+  //   Ahora muestra 2 tarjetas grandes: CAJA + RESERVA (efectivo físico) y BANCO (todo lo digital).
+  //   Fórmulas equivalentes a la Caja Física / Banco del cierre diario:
+  //     · CAJA + RESERVA = byFp.E + saldoApertura.caja + reservaActual + internalCajaNet
+  //     · BANCO          = byFp.T + byFp.B + byFp.X + saldoApertura.banco + internalBancoNet
+  //   Suma total = todo el dinero real del negocio (físico + banco) sin duplicidades.
   const _sa2 = grandTotals.saldoApertura || {caja:0, banco:0, cambio:0};
   const _reservaActualEf = (typeof reservaCambio === 'function') ? reservaCambio() : 0;
-  const _internalCajaNet = grandTotals.internalCajaNet || 0;  // calculado abajo en forEach
+  const _internalCajaNet = grandTotals.internalCajaNet || 0;
   const _internalBancoNet = grandTotals.internalBancoNet || 0;
-  const _kpiEfectivo = (grandTotals.byFp.E||0) + (_sa2.caja||0) + _reservaActualEf + _internalCajaNet;
-  const _kpiTarjeta = (grandTotals.byFp.T||0);
-  const _kpiBizum   = (grandTotals.byFp.B||0);
-  const _kpiTransf  = (grandTotals.byFp.X||0) + (_sa2.banco||0) + _internalBancoNet;
-  const _saNoteEf = (_reservaActualEf > 0 || (_sa2.caja||0) > 0)
-    ? `<div style="font-size:9px;color:#64748b;margin-top:3px;font-style:italic">${L('inclou caixa + reserva','incluye caja + reserva')}</div>` : '';
-  const _saNoteBc = (_sa2.banco||0) > 0
-    ? `<div style="font-size:9px;color:#64748b;margin-top:3px;font-style:italic">${L("inclou banc d'apertura","incluye banco de apertura")}</div>` : '';
-  html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">💳 ${L('Per forma de pagament','Por forma de pago')} <span style="font-size:11px;color:#64748b;font-weight:400">· ${L('diner físic total','dinero físico total')}</span></h4>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px">
-      ${_arCard(L('Efectiu','Efectivo'),fmt(_kpiEfectivo),'#22c55e','#f0fdf4', _saNoteEf)}
-      ${_arCard(L('Targeta','Tarjeta'),fmt(_kpiTarjeta),'#3b82f6','#eff6ff')}
-      ${_arCard('Bizum',fmt(_kpiBizum),'#8b5cf6','#f5f3ff')}
-      ${_arCard(L('Transferència','Transferencia'),fmt(_kpiTransf),'#f59e0b','#fefce8', _saNoteBc)}
+  const _kpiCajaTotal = (grandTotals.byFp.E||0) + (_sa2.caja||0) + _reservaActualEf + _internalCajaNet;
+  const _kpiBancoTotal = (grandTotals.byFp.T||0) + (grandTotals.byFp.B||0) + (grandTotals.byFp.X||0) + (_sa2.banco||0) + _internalBancoNet;
+  const _kpiDineroTotal = _kpiCajaTotal + _kpiBancoTotal;
+
+  html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">💰 ${L('Diners disponibles ara','Dinero disponible ahora')} <span style="font-size:11px;color:#64748b;font-weight:400">· ${L('inclou obertura, reserva i moviments interns','incluye apertura, reserva y movimientos internos')}</span></h4>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+      ${_arCard('💵 '+L('CAIXA + RESERVA','CAJA + RESERVA'),fmt(_kpiCajaTotal),'#22c55e','#f0fdf4','<div style="font-size:9px;color:#64748b;margin-top:3px;font-style:italic">'+L('efectiu físic total','efectivo físico total')+'</div>')}
+      ${_arCard('🏦 '+L('EN BANC','EN BANCO'),fmt(_kpiBancoTotal),'#3b82f6','#eff6ff','<div style="font-size:9px;color:#64748b;margin-top:3px;font-style:italic">'+L('targeta + bizum + transferències','tarjeta + bizum + transferencias')+'</div>')}
+      ${_arCard('💰 '+L('TOTAL DISPONIBLE','TOTAL DISPONIBLE'),fmt(_kpiDineroTotal),'#0f172a','#fef3c7','<div style="font-size:9px;color:#64748b;margin-top:3px;font-style:italic">'+L('caixa + reserva + banc','caja + reserva + banco')+'</div>')}
+    </div>
+    <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:6px;padding:8px 12px;margin-bottom:20px;font-size:12px;color:#475569;line-height:1.5">
+      <b>💡 ${L('Com llegir això','Cómo leer esto')}:</b> ${L("Aquests són els diners que tens ARA MATEIX (no els cobraments del període). Els Gastos i el Benefici es mostren a dalt (\"Resultat\") · aquí veus el diner líquid.","Estos son los euros que tienes AHORA MISMO (no los cobros del período). Los Gastos y el Beneficio se muestran arriba (\"Resultado\") · aquí ves el dinero líquido.")}
     </div>`;
 
   // Socis (si n'hi ha)
