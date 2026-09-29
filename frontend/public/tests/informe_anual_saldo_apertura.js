@@ -163,16 +163,18 @@ function simulateBuildAnnualReport({byDate, year, monthFilterIdx = -1, saldoInic
         _isExtraFinal = _isKnownExtra && amtTotal>0;
       }
 
-      // byGroupConcept · Extras conocidos → grupo dedicado. Extras arbitrarios → "Otros"
+      // byGroupConcept · Feb 2026:
+      //   Foto/Dup/C.O. → grupo dedicado
+      //   Concepto DGT reconocible (Renov/Exped/Canje/Recup/Peri/Ini/Obten) → grupo real del entry
+      //   Extra manual arbitrario (Café/Coche/XYZ) → "Otros"
+      const _isKnownDGT = /renov|exped|canje|canj\b|recup|period|inicial|obten/.test(_catLow);
       let grupoLabelFinal;
-      if(_isExtraFinal){
-        if(/foto/.test(_catLow)) grupoLabelFinal = 'Foto';
-        else if(/duplic/.test(_catLow)) grupoLabelFinal = 'Duplicado';
-        else if(/c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLow)) grupoLabelFinal = 'C.Oficial';
-        else grupoLabelFinal = 'Otros';
-      } else {
-        grupoLabelFinal = grupoLabel;
-      }
+      if(/foto/.test(_catLow)) grupoLabelFinal = 'Foto';
+      else if(/duplic/.test(_catLow)) grupoLabelFinal = 'Duplicado';
+      else if(/c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLow)) grupoLabelFinal = 'C.Oficial';
+      else if(_isEntradaReal || _isKnownDGT) grupoLabelFinal = grupoLabel;
+      else if(_isExtraFinal) grupoLabelFinal = 'Otros';
+      else grupoLabelFinal = grupoLabel;
       grandTotals.byGroupConcept[grupoLabelFinal] = grandTotals.byGroupConcept[grupoLabelFinal] || {};
       const gc = grandTotals.byGroupConcept[grupoLabelFinal][cat] = grandTotals.byGroupConcept[grupoLabelFinal][cat] || {count:0,total:0};
       if(amtTotal>0) gc.count += 1;
@@ -404,51 +406,55 @@ console.log('\n🧪 CASO 6c · Extras manuales (sin _csv) también cuentan en la
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CASO 6d · Extras: Foto/Dup/C.O. → grupo dedicado · Café/Coche → "Otros"
+// CASO 6d · Desglose fino: Canje/Renov manual → grupo real · Café/Coche → "Otros"
 // ═══════════════════════════════════════════════════════════════
-console.log('\n🧪 CASO 6d · Foto→"Foto", C.Oficial→"C.Oficial", Duplicado→"Duplicado", Café/Coche/Canje-manual→"Otros"');
+console.log('\n🧪 CASO 6d · Canje/Renov manual → Conducción (grupo real) · Café/Coche → "Otros"');
 {
   const byDate = {
     '2026-03-15': [
       {id:'a1', kind:'TRAF', tipo:'Renovación', grupo:'Conducción', importe:20, _csv:true}, // GIC
-      {id:'a2', kind:'TRAF', tipo:'Foto',       grupo:'General',    importe:5},              // extra manual conocido → grupo "Foto"
-      {id:'a3', kind:'TRAF', tipo:'C.Oficial',  grupo:'General',    importe:15},             // extra manual conocido → grupo "C.Oficial"
-      {id:'a4', kind:'TRAF', tipo:'Duplicado',  grupo:'Conducción', importe:10, _csv:true},  // extra CSV conocido → grupo "Duplicado"
-      {id:'a5', kind:'TRAF', tipo:'Café',       grupo:'General',    importe:2},              // manual arbitrario → "Otros"
-      {id:'a6', kind:'TRAF', tipo:'Coche',      grupo:'Conducción', importe:150},            // manual arbitrario → "Otros"
-      {id:'a7', kind:'TRAF', tipo:'Canje',      grupo:'Conducción', importe:20}              // MANUAL concepto DGT → "Otros"
+      {id:'a2', kind:'TRAF', tipo:'Foto',       grupo:'General',    importe:5},              // extra conocido → "Foto"
+      {id:'a3', kind:'TRAF', tipo:'C.Oficial',  grupo:'General',    importe:15},             // extra conocido → "C.Oficial"
+      {id:'a4', kind:'TRAF', tipo:'Duplicado',  grupo:'Conducción', importe:10, _csv:true},  // extra conocido → "Duplicado"
+      {id:'a5', kind:'TRAF', tipo:'Canje',      grupo:'Conducción', importe:20},             // MANUAL concepto DGT → CONDUCCIÓN (no Otros)
+      {id:'a6', kind:'TRAF', tipo:'Renovación', grupo:'Armas',      importe:18},             // MANUAL concepto DGT → ARMAS (no Otros)
+      {id:'a7', kind:'TRAF', tipo:'Café',       grupo:'General',    importe:2},              // manual arbitrario → "Otros"
+      {id:'a8', kind:'TRAF', tipo:'Coche',      grupo:'Conducción', importe:150}             // manual arbitrario → "Otros"
     ]
   };
   const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic'});
 
-  assertEq('GIC = 1 (solo Renov CSV, aunque haya un Canje manual)', g.cnt, 1);
-  assertEq('Extras = 6 (Foto+C.O.+Dup CSV+Café+Coche+Canje manual)', g.extrasCnt, 6);
-  assertEq('Total tarjeta = 7', g.cnt + g.extrasCnt, 7);
+  // TARJETA: GIC=1, Extras=7 (Foto, C.O., Dup CSV, Canje manual, Renov manual, Café, Coche)
+  assertEq('GIC = 1 (solo Renov CSV Conducción)', g.cnt, 1);
+  assertEq('Extras = 7', g.extrasCnt, 7);
+  assertEq('Total tarjeta = 8', g.cnt + g.extrasCnt, 8);
 
-  // Desglose: GIC en su grupo real
-  assertTrue('Grupo "Conducción" con Renovación GIC', !!g.byGroupConcept['Conducción']?.['Renovación']);
-  assertEq('Conducción · Renovación count = 1', g.byGroupConcept['Conducción']['Renovación'].count, 1);
+  // DESGLOSE: Canje manual + Renov manual → grupos reales
+  assertTrue('Grupo "Conducción" existe', !!g.byGroupConcept['Conducción']);
+  assertTrue('Conducción · Renovación (CSV) presente', !!g.byGroupConcept['Conducción']?.['Renovación']);
+  assertTrue('Conducción · Canje (manual) presente ← CLAVE', !!g.byGroupConcept['Conducción']?.['Canje']);
+  assertEq('Conducción · Canje count = 1', g.byGroupConcept['Conducción']['Canje'].count, 1);
+  assertEq('Conducción · Canje total = 20 €', g.byGroupConcept['Conducción']['Canje'].total, 20);
 
-  // Extras conocidos → grupo dedicado (NO "Otros")
-  assertTrue('Grupo "Foto" dedicado existe', !!g.byGroupConcept['Foto']);
-  assertTrue('Grupo "Duplicado" dedicado existe', !!g.byGroupConcept['Duplicado']);
-  assertTrue('Grupo "C.Oficial" dedicado existe', !!g.byGroupConcept['C.Oficial']);
-  assertEq('Foto count = 1', g.byGroupConcept['Foto']['Foto'].count, 1);
-  assertEq('Duplicado count = 1', g.byGroupConcept['Duplicado']['Duplicado'].count, 1);
-  assertEq('C.Oficial count = 1', g.byGroupConcept['C.Oficial']['C.Oficial'].count, 1);
+  // Renov manual con grupo Armas → va a Armas (concepto DGT reconocible)
+  assertTrue('Grupo "Armas" existe con Renovación manual', !!g.byGroupConcept['Armas']?.['Renovación']);
+  assertEq('Armas · Renovación total = 18', g.byGroupConcept['Armas']['Renovación'].total, 18);
 
-  // Solo "Otros" para lo desconocido
-  assertTrue('Grupo "Otros" existe con extras arbitrarios', !!g.byGroupConcept['Otros']);
+  // Extras conocidos → grupo dedicado
+  assertTrue('Grupo "Foto" dedicado', !!g.byGroupConcept['Foto']?.['Foto']);
+  assertTrue('Grupo "Duplicado" dedicado', !!g.byGroupConcept['Duplicado']?.['Duplicado']);
+  assertTrue('Grupo "C.Oficial" dedicado', !!g.byGroupConcept['C.Oficial']?.['C.Oficial']);
+
+  // "Otros" SOLO para desconocidos (Café, Coche)
+  assertTrue('Grupo "Otros" existe con arbitrarios', !!g.byGroupConcept['Otros']);
   assertTrue('Otros · Café presente', !!g.byGroupConcept['Otros']?.['Café']);
   assertTrue('Otros · Coche presente', !!g.byGroupConcept['Otros']?.['Coche']);
-  assertTrue('Otros · Canje (manual) presente', !!g.byGroupConcept['Otros']?.['Canje']);
+  assertTrue('Canje NO está en "Otros" ← CLAVE', !g.byGroupConcept['Otros']?.['Canje']);
   assertTrue('Foto NO está en "Otros"', !g.byGroupConcept['Otros']?.['Foto']);
-  assertTrue('C.Oficial NO está en "Otros"', !g.byGroupConcept['Otros']?.['C.Oficial']);
-  assertTrue('Duplicado NO está en "Otros"', !g.byGroupConcept['Otros']?.['Duplicado']);
-  assertTrue('Canje manual NO aparece en grupo real "Conducción"', !g.byGroupConcept['Conducción']?.['Canje']);
+  assertTrue('Renovación (manual) NO está en "Otros"', !g.byGroupConcept['Otros']?.['Renovación']);
 
-  // Facturación total = 20 + 5 + 15 + 10 + 2 + 150 + 20 = 222
-  assertEq('Facturación total = 222', Object.values(g.byConcept).reduce((s,n)=>s+n,0), 222);
+  // Facturación total = 20 + 5 + 15 + 10 + 20 + 18 + 2 + 150 = 240
+  assertEq('Facturación total = 240', Object.values(g.byConcept).reduce((s,n)=>s+n,0), 240);
 }
 
 // ═══════════════════════════════════════════════════════════════
