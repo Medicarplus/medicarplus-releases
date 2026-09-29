@@ -3988,10 +3988,10 @@ function setSaldoInicial(obj){
 }
 
 // 🔄 Migración one-click: si el cliente introdujo el saldo apertura como HABER manual
-//    (concepto "Saldo anterior" o auto-detectado), este helper lo mueve al mecanismo
-//    correcto (Config Saldo Inicial) y borra el HABER original. Resultado: el saldo
-//    queda en Configuración → 🏦 Saldo inicial · exactamente como si el cliente lo
-//    hubiese introducido bien desde el principio.
+//    con concepto explícito ("Saldo anterior" / "Apertura" / "Saldo inicial"), este helper
+//    lo mueve al mecanismo correcto (Config Saldo Inicial) y borra el HABER original.
+//    Resultado: el saldo queda en Configuración → 🏦 Saldo inicial · exactamente como si
+//    el cliente lo hubiese introducido bien desde el principio.
 //    Feb 2026 · Idempotente: si no hay HABER migrable, muestra toast informativo.
 function migrateSaldoAperturaToConfig(){
   try{
@@ -4001,8 +4001,7 @@ function migrateSaldoAperturaToConfig(){
     const parsed = JSON.parse(raw);
     if(!parsed || !parsed.byDate){ alert(L('No hi ha dades per migrar','No hay datos para migrar')); return; }
 
-    // Detectar el HABER apertura (mismo criterio que el informe)
-    const _generic = /^(otro|otros|altre|altres|ingreso|ingres|-|)$/i;
+    // Detectar el HABER apertura (mismo criterio que el informe: concepto explícito)
     const _explicit = /^\s*(saldo\s*(anterior|apertura|inicial)|apertura|opening|obertura|saldo\s*previ)\s*$/i;
     const _allDatesSorted = Object.keys(parsed.byDate||{}).sort();
     let _target = null; // {date, entry}
@@ -4012,9 +4011,9 @@ function migrateSaldoAperturaToConfig(){
       if(!Array.isArray(list)) continue;
       for(const e of list){
         if(_target) break;
-        if(e.kind==='DH' && e.tipo==='HABER' && (e.importe||0) >= 500){
+        if(e.kind==='DH' && e.tipo==='HABER'){
           const _nm = String(e.nombre||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-          if(_explicit.test(_nm) || _generic.test(_nm)){
+          if(_explicit.test(_nm)){
             _target = {date: dt, entry: e};
           }
         }
@@ -7340,40 +7339,6 @@ function _buildAnnualReport(year, monthFilterIdx){
   comps.forEach(comp=>{
     let compRaw;try{compRaw=JSON.parse(localStorage.getItem(KEYS[comp.key]))||{byDate:{}}}catch(e){compRaw={byDate:{}}}
 
-    // 🧠 AUTO-DETECCIÓN de saldo apertura (feb 2026) · SIN acción manual del cliente.
-    //   Heurística ROBUSTA (independiente de si hay DEBE anteriores):
-    //   1. Recorre TODOS los HABER manuales del histórico ordenados por fecha ASC.
-    //   2. Detecta el PRIMER HABER que cumpla:
-    //      - Concepto genérico ("Otro", "Ingreso", "-", "" o similares)
-    //      - Importe >= 500€
-    //      - Es cronológicamente ANTES o el mismo día que la primera entrada TRAF/PRIV/DEBE
-    //        importante (o simplemente el primer HABER si no hay entradas anteriores).
-    //   3. Solo se detecta UNO (el primero). Cualquier otro "Otro" grande será facturación normal.
-    //   Resultado: al detectar, se añade al Set `_autoSaldoAperturaIds` para tratarlo
-    //   como Saldo anterior en el forEach principal. NO se modifica localStorage (no-destructivo).
-    //   Si NO era saldo apertura, el cliente edita el concepto poniendo algo específico
-    //   (ej. "Foto grupo") y deja de auto-detectarse automáticamente.
-    const _autoSaldoAperturaIds = new Set();
-    try{
-      const _generic = /^(otro|otros|altre|altres|ingreso|ingres|-|)$/i;
-      const _allDatesSorted = Object.keys(compRaw.byDate||{}).sort();
-      let _found = false;
-      for(const dt of _allDatesSorted){
-        if(_found) break;
-        const _dayList = compRaw.byDate[dt];
-        if(!Array.isArray(_dayList)) continue;
-        for(const e of _dayList){
-          if(_found) break;
-          if(e.kind==='DH' && e.tipo==='HABER' && (e.importe||0) >= 500){
-            const _nm = String(e.nombre||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-            if(_generic.test(_nm)){
-              _autoSaldoAperturaIds.add(e.id);
-              _found = true; // solo el primero
-            }
-          }
-        }
-      }
-    }catch(err){ /* silencioso: no romper si falla la auto-detección */ }
     const dfMap = dfMapByComp[comp.key] || {};
     let cTotal={bruto:0,tasas:0,neto:0,cnt:0,byMonth:Array(12).fill(0)};
     Object.keys(compRaw.byDate||{}).forEach(d=>{
@@ -7444,9 +7409,7 @@ function _buildAnnualReport(year, monthFilterIdx){
         if(e.kind==='DH' && e.tipo==='HABER'){
           const _hnRaw = String(e.nombre||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
           const _isSaldoAnt = /^\s*(saldo\s*(anterior|apertura|inicial)|apertura|opening|obertura|saldo\s*previ)\s*$/.test(_hnRaw);
-          // 🧠 Auto-detección: HABER en el primer día del histórico con concepto genérico e importe alto
-          const _isAutoDetected = _autoSaldoAperturaIds.has(e.id);
-          if(_isSaldoAnt || _isAutoDetected){
+          if(_isSaldoAnt){
             grandTotals.saldoApertura = grandTotals.saldoApertura || {caja:0, banco:0, total:0, byMonth:Array(12).fill(0), entries:[]};
             const _amt = e.importe||0;
             grandTotals.saldoApertura.total += _amt;
@@ -7455,8 +7418,7 @@ function _buildAnnualReport(year, monthFilterIdx){
             const _fp = e.fpago || e.fp || 'E';
             if(_fp === 'E'){ grandTotals.saldoApertura.caja += _amt; }
             else { grandTotals.saldoApertura.banco += _amt; }
-            grandTotals.saldoApertura.entries.push({date:d, importe:_amt, fp:_fp, company:comp.key, autoDetected: _isAutoDetected && !_isSaldoAnt});
-            if(_isAutoDetected && !_isSaldoAnt){ grandTotals.saldoApertura.hasAutoDetected = true; }
+            grandTotals.saldoApertura.entries.push({date:d, importe:_amt, fp:_fp, company:comp.key});
             // ⚠️ CRÍTICO: computeTotals YA sumó este HABER a t.neto y t.byFp[fp] antes de este forEach.
             //    Por eso ya se acumuló en grandTotals.neto, grandTotals.byMonth, grandTotals.byFp[fp]
             //    y cTotal.neto. Los DESCONTAMOS aquí para que el reparto entre socios, los KPIs
@@ -7675,9 +7637,7 @@ function _buildAnnualReport(year, monthFilterIdx){
     const _hasCambio = (_sa.cambio||0) > 0;
     const _origen = _sa.fromConfig
       ? L('des de Configuració · 🏦 Saldo inicial','desde Configuración · 🏦 Saldo inicial')
-      : (_sa.hasAutoDetected
-          ? L("auto-detectat · primer ingrés manual d'obertura","auto-detectado · primer ingreso manual de apertura")
-          : L("des d'un ingrés manual amb concepte \"Saldo anterior\"","desde un ingreso manual con concepto \"Saldo anterior\""));
+      : L("des d'un ingrés manual amb concepte \"Saldo anterior\"","desde un ingreso manual con concepto \"Saldo anterior\"");
     html += `<div data-testid="saldo-apertura-note" style="background:linear-gradient(90deg,#eff6ff 0%,#dbeafe 100%);border-left:4px solid #3b82f6;padding:12px 18px;margin-bottom:20px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
       <div style="flex:1;min-width:260px">
         <div style="font-size:13px;color:#1e40af;font-weight:700;letter-spacing:.3px">💰 ${L("Saldo d'obertura","Saldo de apertura")} · ${_mesLbls}</div>

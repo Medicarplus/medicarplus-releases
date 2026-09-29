@@ -3,15 +3,14 @@
  * ─────────────────────────────────────────────────────────────────────
  * Cubre TODOS los cambios recientes:
  *   1. Saldo Apertura HABER concepto reservado → NO facturación, SÍ caja/banco
- *   2. Saldo Apertura AUTO-DETECCIÓN (primer día + HABER genérico + ≥300€)
- *   3. Saldo Apertura Config saldoInicial → banner en informe
- *   4. Descuento coherente: grandTotals.neto/byMonth/byFp/cTotal.neto
- *   5. byGroupConcept solo cuenta si importe > 0
- *   6. Extras (Foto/Dup/C.O.) van a grupo "Otros"
- *   7. Extras >0€ contabilizan aparte para KPI "Entradas Totales GIC + Extras"
- *   8. Backfill monthFilterIdx respetado
- *   9. Filtro mensual respeta año y mes
- *  10. Cuadre GLOBAL: Caja Real = ingresos nuevos + saldo apertura
+ *   2. Saldo Apertura Config saldoInicial → banner en informe
+ *   3. Descuento coherente: grandTotals.neto/byMonth/byFp/cTotal.neto
+ *   4. byGroupConcept solo cuenta si importe > 0
+ *   5. Extras (Foto/Dup/C.O.) van a grupo "Otros"
+ *   6. Extras >0€ contabilizan aparte para KPI "Entradas Totales GIC + Extras"
+ *   7. Backfill monthFilterIdx respetado
+ *   8. Filtro mensual respeta año y mes
+ *   9. Cuadre GLOBAL: Caja Real = ingresos nuevos + saldo apertura
  *
  * Ejecutar: node /app/frontend/public/tests/informe_anual_saldo_apertura.js
  */
@@ -54,28 +53,11 @@ function simulateBuildAnnualReport({byDate, year, monthFilterIdx = -1, saldoInic
     saldoApertura:null
   };
 
-  // 🧠 AUTO-DETECCIÓN de saldo apertura (mismo criterio ROBUSTO que v2.html)
-  //   Primer HABER genérico >= 500€ del histórico completo (evita falsos negativos si hay
-  //   DEBEs anteriores). Solo detecta UNO.
-  const _autoSaldoAperturaIds = new Set();
-  const _generic = /^(otro|otros|altre|altres|ingreso|ingres|-|)$/i;
-  const _allDatesSorted = Object.keys(byDate||{}).sort();
-  let _found = false;
-  for(const dt of _allDatesSorted){
-    if(_found) break;
-    const _dayList = byDate[dt];
-    if(!Array.isArray(_dayList)) continue;
-    for(const e of _dayList){
-      if(_found) break;
-      if(e.kind==='DH' && e.tipo==='HABER' && (e.importe||0) >= 500){
-        const _nm = String(e.nombre||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-        if(_generic.test(_nm)){
-          _autoSaldoAperturaIds.add(e.id);
-          _found = true;
-        }
-      }
-    }
-  }
+  // 🚫 AUTO-DETECCIÓN DESACTIVADA (feb 2026 · a petición del usuario).
+  //   Solo se trata como saldo apertura si:
+  //     (a) Config Saldo Inicial (saldoAnteriorPorCuenta)
+  //     (b) HABER con concepto explícito ("Saldo anterior" / "Apertura" / "Saldo inicial")
+  //   Cualquier otro HABER manual (aunque sea genérico "Otro" con importe alto) cuenta como facturación normal.
 
   // computeTotals simulado (subset relevante: HABER suma a neto y byFp)
   function computeTotals(list){
@@ -125,12 +107,11 @@ function simulateBuildAnnualReport({byDate, year, monthFilterIdx = -1, saldoInic
         return;
       }
 
-      // SALDO ANTERIOR / APERTURA
+      // SALDO ANTERIOR / APERTURA (solo concepto explícito)
       if(e.kind==='DH' && e.tipo==='HABER'){
         const _hnRaw = String(e.nombre||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
         const _isSaldoAnt = /^\s*(saldo\s*(anterior|apertura|inicial)|apertura|opening|obertura|saldo\s*previ)\s*$/.test(_hnRaw);
-        const _isAutoDetected = _autoSaldoAperturaIds.has(e.id);
-        if(_isSaldoAnt || _isAutoDetected){
+        if(_isSaldoAnt){
           grandTotals.saldoApertura = grandTotals.saldoApertura || {caja:0,banco:0,total:0,byMonth:Array(12).fill(0),entries:[]};
           const _amt = e.importe||0;
           grandTotals.saldoApertura.total += _amt;
@@ -138,8 +119,7 @@ function simulateBuildAnnualReport({byDate, year, monthFilterIdx = -1, saldoInic
           const _fp = e.fp||'E';
           if(_fp==='E') grandTotals.saldoApertura.caja += _amt;
           else grandTotals.saldoApertura.banco += _amt;
-          grandTotals.saldoApertura.entries.push({date:d,importe:_amt,fp:_fp,autoDetected: _isAutoDetected && !_isSaldoAnt});
-          if(_isAutoDetected && !_isSaldoAnt) grandTotals.saldoApertura.hasAutoDetected = true;
+          grandTotals.saldoApertura.entries.push({date:d,importe:_amt,fp:_fp});
           // DESCUENTO coherente
           grandTotals.neto -= _amt;
           grandTotals.byMonth[m] -= _amt;
@@ -219,9 +199,9 @@ function simulateBuildAnnualReport({byDate, year, monthFilterIdx = -1, saldoInic
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CASO 1 · Cliente con HABER "Otro" 2500,71 € · Auto-detección
+// CASO 1 · HABER "Otro" 2500,71 € · SIN auto-detección → facturación
 // ═══════════════════════════════════════════════════════════════
-console.log('\n🧪 CASO 1 · Cliente instala en junio con 2.500,71 € previos (HABER "Otro" · fp:E)');
+console.log('\n🧪 CASO 1 · HABER "Otro" 2500,71 € (sin concepto reservado) → SÍ es facturación');
 {
   const byDate = {
     '2026-06-01': [
@@ -233,18 +213,11 @@ console.log('\n🧪 CASO 1 · Cliente instala en junio con 2.500,71 € previos 
   };
   const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic'});
 
-  assertTrue('Saldo apertura detectado', !!g.saldoApertura);
-  assertEq('Saldo apertura total = 2500,71 €', g.saldoApertura.total, 2500.71);
-  assertEq('Saldo apertura caja = 2500,71 €', g.saldoApertura.caja, 2500.71);
-  assertEq('Saldo apertura banco = 0', g.saldoApertura.banco, 0);
-  assertTrue('Marcado como auto-detectado', g.saldoApertura.hasAutoDetected === true);
-  assertEq('Facturación (byMonthFacturacion junio) SIN saldo = 0', g.byMonthFacturacion[5], 0);
-  assertEq('Facturación (byMonthFacturacion julio) = 42', g.byMonthFacturacion[6], 42);
-  assertEq('byConcept["Otro"] no existe (excluido)', g.byConcept['Otro']||0, 0);
-  assertEq('grandTotals.neto NO incluye saldo apertura', g.neto, 42);
-  assertEq('grandTotals.byFp.E NO incluye saldo apertura (solo servicio 20€)', g.byFp.E, 20);
-  assertEq('grandTotals.byMonth[5] junio NO incluye saldo apertura', g.byMonth[5], 0);
-  assertEq('Entradas Tráfico = 1 (solo el CSV)', g.cnt, 1);
+  assertTrue('NO se detecta saldo apertura (concepto genérico ya no auto-detecta)', !g.saldoApertura);
+  assertEq('El HABER 2500,71 cuenta como facturación (byConcept["Otro"])', g.byConcept['Otro']||0, 2500.71);
+  assertEq('Facturación junio incluye el HABER = 2500,71', g.byMonthFacturacion[5], 2500.71);
+  assertEq('Facturación julio = 42', g.byMonthFacturacion[6], 42);
+  assertEq('grandTotals.neto = 2500,71 + 42 = 2542,71', g.neto, 2542.71);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -262,7 +235,6 @@ console.log('\n🧪 CASO 2 · HABER con nombre explícito "Saldo anterior" (fp:T
   assertEq('Saldo apertura = 5000 (nombre explícito)', g.saldoApertura.total, 5000);
   assertEq('Va al BANCO (fp:T)', g.saldoApertura.banco, 5000);
   assertEq('Caja saldo apertura = 0', g.saldoApertura.caja, 0);
-  assertTrue('NO auto-detectado (concepto explícito)', !g.saldoApertura.hasAutoDetected);
   assertEq('Facturación total = 20 + 15 (Foto legítimo) = 35', Object.values(g.byConcept).reduce((s,n)=>s+n,0), 35);
   assertEq('grandTotals.byFp.T NO incluye saldo (0)', g.byFp.T, 0);
   assertEq('grandTotals.byFp.E = 15 (Foto exceso legítimo)', g.byFp.E, 20+15); // 20 servicio + 15 haber
@@ -421,42 +393,42 @@ console.log('\n🧪 CASO 8 · CUADRE TOTAL · Caja/Banco real ≠ Facturación I
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CASO 9 · No saldo apertura en HABER < 300€
+// CASO 9 · HABER pequeño con concepto genérico → cuenta como facturación
 // ═══════════════════════════════════════════════════════════════
-console.log('\n🧪 CASO 9 · Auto-detección NO se activa si HABER < 300€');
+console.log('\n🧪 CASO 9 · HABER 150€ concepto "Otro" → facturación normal');
 {
   const byDate = {
-    '2026-01-01': [{id:'h1', kind:'DH', tipo:'HABER', nombre:'Otro', importe:150, fp:'E'}], // <300, no cuenta
+    '2026-01-01': [{id:'h1', kind:'DH', tipo:'HABER', nombre:'Otro', importe:150, fp:'E'}],
     '2026-01-02': [{id:'t1', kind:'TRAF', tipo:'Renovación', importe:20, _csv:true}]
   };
   const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic'});
-  assertTrue('NO se detecta saldo apertura (150 < 300)', !g.saldoApertura);
+  assertTrue('NO se detecta saldo apertura (sin concepto reservado)', !g.saldoApertura);
   assertEq('El HABER 150€ cuenta como facturación normal', g.byConcept['Otro']||0, 150);
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CASO 10 · Concepto específico (Foto) NO se auto-detecta
+// CASO 10 · Concepto específico (Foto) → facturación
 // ═══════════════════════════════════════════════════════════════
-console.log('\n🧪 CASO 10 · Auto-detección solo con conceptos genéricos (Otro/Ingreso/-)');
+console.log('\n🧪 CASO 10 · HABER con concepto específico → facturación normal');
 {
   const byDate = {
-    '2026-01-01': [{id:'h1', kind:'DH', tipo:'HABER', nombre:'Foto grupo', importe:500, fp:'E'}], // concepto específico, no cuenta
+    '2026-01-01': [{id:'h1', kind:'DH', tipo:'HABER', nombre:'Foto grupo', importe:500, fp:'E'}],
     '2026-01-02': [{id:'t1', kind:'TRAF', tipo:'Renovación', importe:20, _csv:true}]
   };
   const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic'});
-  assertTrue('NO se detecta saldo apertura ("Foto grupo" es específico)', !g.saldoApertura);
+  assertTrue('NO se detecta saldo apertura ("Foto grupo" no es concepto reservado)', !g.saldoApertura);
   assertEq('El HABER 500€ cuenta como facturación', g.byConcept['Foto grupo']||0, 500);
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CASO 11 · CASO REAL · HABER 2500,71 en junio + DEBEs previos
+// CASO 11 · HABER con concepto explícito "Saldo anterior" · con DEBEs previos
 // ═══════════════════════════════════════════════════════════════
-console.log('\n🧪 CASO 11 · CASO REAL · Aunque haya DEBEs anteriores, se detecta el HABER de junio');
+console.log('\n🧪 CASO 11 · HABER "Saldo anterior" explícito (con DEBEs anteriores)');
 {
   const byDate = {
     '2026-03-05': [{id:'d1', kind:'DH', tipo:'DEBE', nombre:'Alquiler', importe:800, fp:'X'}],
     '2026-04-10': [{id:'d2', kind:'DH', tipo:'DEBE', nombre:'Luz', importe:150, fp:'X'}],
-    '2026-06-15': [{id:'sa', kind:'DH', tipo:'HABER', nombre:'Otro', importe:2500.71, fp:'E'}],
+    '2026-06-15': [{id:'sa', kind:'DH', tipo:'HABER', nombre:'Saldo anterior', importe:2500.71, fp:'E'}],
     '2026-07-01': [
       {id:'t1', kind:'TRAF', tipo:'Renovación', importe:20, tasa:22, fp:'E', _csv:true},
       {id:'t2', kind:'TRAF', tipo:'Renovación', importe:20, tasa:22, fp:'T', _csv:true}
@@ -464,9 +436,8 @@ console.log('\n🧪 CASO 11 · CASO REAL · Aunque haya DEBEs anteriores, se det
   };
   const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic'});
 
-  assertTrue('Saldo apertura DETECTADO pese a DEBEs anteriores', !!g.saldoApertura);
-  assertEq('Saldo apertura = 2500,71 (auto-detectado)', g.saldoApertura.total, 2500.71);
-  assertTrue('Es auto-detectado (no explícito)', g.saldoApertura.hasAutoDetected === true);
+  assertTrue('Saldo apertura DETECTADO por concepto explícito', !!g.saldoApertura);
+  assertEq('Saldo apertura = 2500,71', g.saldoApertura.total, 2500.71);
   assertEq('Facturación año LIMPIA = 84 (2×20 + 2×22, sin 2500,71)', Object.values(g.byConcept).reduce((s,n)=>s+n,0), 84);
   assertEq('Junio facturación = 0 (solo tenía el saldo apertura)', g.byMonthFacturacion[5], 0);
   assertEq('Julio facturación = 84', g.byMonthFacturacion[6], 84);
@@ -479,7 +450,7 @@ console.log('\n🧪 CASO 11 · CASO REAL · Aunque haya DEBEs anteriores, se det
 console.log('\n' + '═'.repeat(66));
 if(failCount === 0){
   console.log(`\n✅ TODOS LOS TESTS DE SALDO APERTURA PASAN · ${passCount} verificaciones`);
-  console.log('   Cubre: auto-detección, concepto explícito, config saldoInicial,');
+  console.log('   Cubre: concepto explícito, config saldoInicial,');
   console.log('   filtro mensual, descuento coherente (neto/byMonth/byFp), byGroupConcept,');
   console.log('   extras GIC vs Otros, reparto socios, cuadre total caja/banco vs IRPF.\n');
   process.exit(0);
