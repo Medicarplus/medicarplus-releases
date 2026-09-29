@@ -1684,7 +1684,15 @@ function openStats(initialSection){
       }
     });
     // Show/hide autos-only controls (import CSV / add autoescola / clear all)
-    back.querySelectorAll('.st-autos-only').forEach(el => { el.style.display = sec === 'autos' ? '' : 'none' });
+    // ⚠️ EXCEPCIÓN: el botón "Subir histórico" se oculta permanentemente
+    //    una vez que el flag caja.stats.backfill.loaded.v1 está puesto.
+    //    Antes: se restauraba a '' al cambiar de sección → botón reaparecía. FIX Feb 2026.
+    const _backfillDone = !!localStorage.getItem('caja.stats.backfill.loaded.v1');
+    back.querySelectorAll('.st-autos-only').forEach(el => {
+      if(sec !== 'autos'){ el.style.display = 'none'; return; }
+      if(el.id === 'stBackfillHist' && _backfillDone){ el.style.display = 'none'; return; }
+      el.style.display = '';
+    });
     // Hide year/mode/month/prev/next/print/label for SMS and Cites sections
     ['#stYear','#stMode','#stMonth','#stPrev','#stNext','#stPrint'].forEach(sel => { const el = back.querySelector(sel); if(el) el.style.display = (sec === 'sms' || sec === 'cites') ? 'none' : (sel==='#stMonth' && back.querySelector('#stMode')?.value!=='month' ? 'none' : '') });
     // Hide the "ANY:" label when in sms or cites section
