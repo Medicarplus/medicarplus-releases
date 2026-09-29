@@ -8624,6 +8624,50 @@ function loadCambio(){
     o._v=2;
     try{localStorage.setItem(cambioKey(),JSON.stringify(o))}catch(e){}
   }
+  // 🔄 MIGRACIÓN Feb 2026 · Eliminación del concepto "_toCaja" (traspaso lógico antiguo)
+  //   Si el usuario había traspasado dinero del cambio a caja con la lógica vieja,
+  //   ese dinero quedaba marcado como `_toCaja` y NO existía como asiento real.
+  //   Con la simplificación (traspasos reales), esos euros desaparecerían de la caja física.
+  //   → Los materializamos como asiento HABER _internal fp:E en la fecha de hoy para
+  //     que la caja física los recupere. Idempotente: se hace una sola vez por reserva.
+  if(o._toCaja && +o._toCaja > 0 && !o._toCajaMigrated){
+    try{
+      const _mig = +o._toCaja;
+      const _company = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'trafic';
+      const _stateKey = (typeof KEYS !== 'undefined' && KEYS[_company]) ? KEYS[_company] : null;
+      if(_stateKey){
+        const _stateRaw = localStorage.getItem(_stateKey);
+        if(_stateRaw){
+          const _st = JSON.parse(_stateRaw);
+          _st.byDate = _st.byDate || {};
+          const _today = (typeof currentDate !== 'undefined' && currentDate) ? currentDate : new Date().toISOString().slice(0,10);
+          _st.byDate[_today] = _st.byDate[_today] || [];
+          const _id = 'mig_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+          _st.byDate[_today].push({
+            id: _id,
+            kind: 'DH',
+            tipo: 'HABER',
+            grupo: '-',
+            nombre: 'Migración · Cambio ya traspasado a caja (histórico)',
+            importe: _mig,
+            descuento: 0,
+            tasa: 0,
+            fp: 'E',
+            retorno: false,
+            _internal: true,
+            _transferDir: 'reserva_to_caja',
+            _migratedFromToCaja: true
+          });
+          localStorage.setItem(_stateKey, JSON.stringify(_st));
+        }
+      }
+      // Limpia flag para no repetirse (idempotente)
+      o._toCaja = 0;
+      o._toCajaMigrated = true;
+      localStorage.setItem(cambioKey(), JSON.stringify(o));
+      try{ console.info('[reserva] Migrados', _mig, '€ de _toCaja a asiento HABER _internal fp:E'); }catch(_){}
+    }catch(err){ console.warn('[reserva] Fallo migración _toCaja', err); }
+  }
   return o;
 }
 function saveCambio(o){
@@ -8660,6 +8704,56 @@ function reservaCambio(){try{return cambioTotal(loadCambio())}catch(e){return 0}
 // 🔁 Cambio traspasado a caja: dinero que salió del cajón de cambio HACIA la caja.
 // NO desaparece del saldo: sigue siendo efectivo físico, solo cambió de sitio.
 function traspasoCambio(){try{return +(loadCambio()._toCaja)||0}catch(e){return 0}}
+
+// 🔄 MIGRACIÓN GLOBAL Feb 2026 · llamada al arrancar (init) para ambas empresas.
+//   Sin esto, si el usuario está en trafic pero cempla tiene _toCaja, no se migraría.
+//   Recorre ambas keys y crea el asiento HABER _internal en la empresa correspondiente.
+function _migrateAllToCajaOnce(){
+  const keys = [
+    {resKey:'caja.reserva.v1',        company:'trafic'},
+    {resKey:'caja.cempla.reserva.v1', company:'cempla'}
+  ];
+  keys.forEach(({resKey, company}) => {
+    try{
+      const raw = localStorage.getItem(resKey);
+      if(!raw) return;
+      const o = JSON.parse(raw);
+      if(!o._toCaja || +o._toCaja <= 0 || o._toCajaMigrated) return;
+      const _mig = +o._toCaja;
+      const _stateKey = (typeof KEYS !== 'undefined' && KEYS[company]) ? KEYS[company] : null;
+      if(!_stateKey) return;
+      const _stateRaw = localStorage.getItem(_stateKey);
+      if(!_stateRaw) return;
+      const _st = JSON.parse(_stateRaw);
+      _st.byDate = _st.byDate || {};
+      const _today = new Date().toISOString().slice(0,10);
+      _st.byDate[_today] = _st.byDate[_today] || [];
+      const _id = 'mig_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+      _st.byDate[_today].push({
+        id: _id,
+        kind: 'DH',
+        tipo: 'HABER',
+        grupo: '-',
+        nombre: 'Migración · Cambio ya traspasado a caja (histórico)',
+        importe: _mig,
+        descuento: 0,
+        tasa: 0,
+        fp: 'E',
+        retorno: false,
+        _internal: true,
+        _transferDir: 'reserva_to_caja',
+        _migratedFromToCaja: true
+      });
+      localStorage.setItem(_stateKey, JSON.stringify(_st));
+      o._toCaja = 0;
+      o._toCajaMigrated = true;
+      localStorage.setItem(resKey, JSON.stringify(o));
+      console.info('[migración]', company, ':', _mig, '€ de _toCaja materializados como HABER _internal fp:E');
+    }catch(err){ console.warn('[migración] fallo en', resKey, err); }
+  });
+}
+// Ejecuta la migración al cargar el script (una sola vez por reserva)
+try{ _migrateAllToCajaOnce(); }catch(e){ console.warn('migración global', e); }
 
 function openCambio(){
   const back=document.createElement('div');back.className='modal-back';
