@@ -95,7 +95,20 @@ function simulateBuildAnnualReport({byDate, year, monthFilterIdx = -1, saldoInic
     list.forEach(e => {
       if(e.retorno) return;
       if(e.kind==='DH' && e._hnBruto) return;
-      if(e.kind==='DH' && (e._internal||e._tasaRefund)) return;
+      // 🔁 Traspaso interno (reserva↔caja, caja↔banco): NO factura, PERO acumula neto
+      if(e.kind==='DH' && (e._internal||e._tasaRefund)){
+        if(e._internal){
+          const _amtI = +e.importe || 0;
+          const _fpI = e.fp || 'E';
+          const _signI = (e.tipo === 'HABER') ? +1 : -1;
+          if(_fpI === 'E'){
+            grandTotals.internalCajaNet = (grandTotals.internalCajaNet||0) + _signI * _amtI;
+          } else {
+            grandTotals.internalBancoNet = (grandTotals.internalBancoNet||0) + _signI * _amtI;
+          }
+        }
+        return;
+      }
 
       // DEBE
       if(e.kind==='DH' && e.tipo==='DEBE'){
@@ -553,6 +566,139 @@ console.log('\n🧪 CASO 11 · HABER "Saldo anterior" explícito (con DEBEs ante
   assertEq('Junio facturación = 0 (solo tenía el saldo apertura)', g.byMonthFacturacion[5], 0);
   assertEq('Julio facturación = 84', g.byMonthFacturacion[6], 84);
   assertEq('Gastos año = 950 (800 + 150)', Object.values(g.gastos).reduce((s,g)=>s+g.total,0), 950);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CASO 12 · RESERVA DE CAMBIO · Efectivo del Informe = Caja Física real
+//    Fórmula: Efectivo = byFp.E + saldoApertura.caja + reservaActual + internalCajaNet
+//    Valida el CUADRE en 6 escenarios: setup, sacar, añadir desde caja, añadir desde
+//    banco, escenarios mixtos, y un caso stress con múltiples movimientos.
+// ═══════════════════════════════════════════════════════════════
+console.log('\n🧪 CASO 12 · Reserva de cambio · Efectivo Informe = Caja Física REAL');
+
+function _cajaFisicaReal({saldoAperCaja, reservaActual, cobrosEfectivo, internalCajaNet}){
+  // Modelo mental del user: Caja Física = todo el efectivo del negocio
+  return saldoAperCaja + reservaActual + cobrosEfectivo + internalCajaNet;
+}
+
+// 12.1 · Setup inicial: Config saldoInicial caja=200, cambio=100. Sin operaciones aún.
+{
+  const g = simulateBuildAnnualReport({byDate:{}, year:2026, activeKey:'trafic'});
+  const saldoAperCaja = 200; const reservaActual = 100;
+  const efectivoInforme = (g.byFp.E||0) + saldoAperCaja + reservaActual + (g.internalCajaNet||0);
+  const cajaFisica = _cajaFisicaReal({saldoAperCaja, reservaActual, cobrosEfectivo:0, internalCajaNet:0});
+  assertEq('12.1 · Setup · Efectivo Informe = 300', efectivoInforme, 300);
+  assertEq('12.1 · Cuadra con Caja Física real (300)', efectivoInforme, cajaFisica);
+}
+
+// 12.2 · Cobras 50 en efectivo · reserva sin tocar
+{
+  const byDate = {'2026-03-10':[{id:'c1', kind:'TRAF', tipo:'Renovación', importe:50, fp:'E', _csv:true}]};
+  const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic'});
+  const saldoAperCaja = 200; const reservaActual = 100;
+  const efectivoInforme = (g.byFp.E||0) + saldoAperCaja + reservaActual + (g.internalCajaNet||0);
+  const cajaFisica = _cajaFisicaReal({saldoAperCaja, reservaActual, cobrosEfectivo:50, internalCajaNet:0});
+  assertEq('12.2 · Efectivo Informe = 350 (200 + 100 + 50)', efectivoInforme, 350);
+  assertEq('12.2 · Cuadra con Caja Física real', efectivoInforme, cajaFisica);
+}
+
+// 12.3 · SACAR 30 de reserva a caja · reserva actual queda 70 · asiento HABER _internal fp:E
+{
+  const byDate = {
+    '2026-03-10': [{id:'c1', kind:'TRAF', tipo:'Renovación', importe:50, fp:'E', _csv:true}],
+    '2026-04-05': [{id:'r1', kind:'DH', tipo:'HABER', nombre:'Traspaso Reserva → Caja', importe:30, fp:'E', _internal:true, _transferDir:'reserva_to_caja'}]
+  };
+  const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic'});
+  const saldoAperCaja = 200; const reservaActual = 70; // 100 - 30 sacados
+  const efectivoInforme = (g.byFp.E||0) + saldoAperCaja + reservaActual + (g.internalCajaNet||0);
+  const cajaFisica = _cajaFisicaReal({saldoAperCaja, reservaActual, cobrosEfectivo:50, internalCajaNet:30});
+  assertEq('12.3 · internalCajaNet = +30 (HABER reserva→caja)', g.internalCajaNet||0, 30);
+  assertEq('12.3 · Efectivo Informe = 350 (sin cambio total, movimiento interno)', efectivoInforme, 350);
+  assertEq('12.3 · Cuadra con Caja Física real (350)', efectivoInforme, cajaFisica);
+}
+
+// 12.4 · AÑADIR 40 desde CAJA a reserva · reserva actual sube a 110 · asiento DEBE _internal fp:E
+{
+  const byDate = {
+    '2026-03-10': [{id:'c1', kind:'TRAF', tipo:'Renovación', importe:50, fp:'E', _csv:true}],
+    '2026-05-01': [{id:'r2', kind:'DH', tipo:'DEBE',  nombre:'Traspaso Caja → Reserva',  importe:40, fp:'E', _internal:true, _transferDir:'caja_to_reserva'}]
+  };
+  const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic'});
+  const saldoAperCaja = 200; const reservaActual = 140; // 100 + 40
+  const efectivoInforme = (g.byFp.E||0) + saldoAperCaja + reservaActual + (g.internalCajaNet||0);
+  const cajaFisica = _cajaFisicaReal({saldoAperCaja, reservaActual, cobrosEfectivo:50, internalCajaNet:-40});
+  assertEq('12.4 · internalCajaNet = -40 (DEBE caja→reserva)', g.internalCajaNet||0, -40);
+  assertEq('12.4 · Efectivo Informe = 350 (mismo total físico)', efectivoInforme, 350);
+  assertEq('12.4 · Cuadra con Caja Física real', efectivoInforme, cajaFisica);
+}
+
+// 12.5 · AÑADIR 60 desde BANCO a reserva · reserva sube 60 pero baja el banco
+{
+  const byDate = {
+    '2026-03-10': [{id:'c1', kind:'TRAF', tipo:'Renovación', importe:50, fp:'E', _csv:true}],
+    '2026-05-15': [{id:'r3', kind:'DH', tipo:'DEBE',  nombre:'Traspaso Banco → Reserva', importe:60, fp:'X', _internal:true, _transferDir:'banco_to_reserva'}]
+  };
+  const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic'});
+  const saldoAperCaja = 200; const reservaActual = 160; // 100 + 60
+  const efectivoInforme = (g.byFp.E||0) + saldoAperCaja + reservaActual + (g.internalCajaNet||0);
+  const cajaFisica = _cajaFisicaReal({saldoAperCaja, reservaActual, cobrosEfectivo:50, internalCajaNet:0});
+  assertEq('12.5 · internalCajaNet = 0 (banco no toca caja)', g.internalCajaNet||0, 0);
+  assertEq('12.5 · internalBancoNet = -60 (DEBE fp:X)', g.internalBancoNet||0, -60);
+  assertEq('12.5 · Efectivo Informe = 410 (subió 60 porque salió de banco)', efectivoInforme, 410);
+  assertEq('12.5 · Cuadra con Caja Física real (410)', efectivoInforme, cajaFisica);
+}
+
+// 12.6 · STRESS: escenario real del user · múltiples movimientos + cobros + gastos + apertura
+{
+  const byDate = {
+    '2026-01-05': [{id:'e1', kind:'TRAF', tipo:'Renovación', importe:120.50, fp:'E', _csv:true}],
+    '2026-01-08': [{id:'e2', kind:'TRAF', tipo:'Expedición', importe:80,     fp:'E', _csv:true}],
+    '2026-02-10': [
+      {id:'e3', kind:'TRAF', tipo:'Renovación', importe:200,    fp:'E', _csv:true},
+      {id:'r1', kind:'DH',   tipo:'DEBE', nombre:'Traspaso Caja → Reserva', importe:100, fp:'E', _internal:true, _transferDir:'caja_to_reserva'}
+    ],
+    '2026-03-15': [
+      {id:'e4', kind:'TRAF', tipo:'Renovación', importe:50,     fp:'T', _csv:true},
+      {id:'r2', kind:'DH',   tipo:'HABER', nombre:'Traspaso Reserva → Caja', importe:75, fp:'E', _internal:true, _transferDir:'reserva_to_caja'}
+    ],
+    '2026-04-01': [
+      {id:'g1', kind:'DH', tipo:'DEBE', nombre:'Alquiler', importe:800, fp:'X'}, // gasto real
+      {id:'r3', kind:'DH', tipo:'DEBE', nombre:'Traspaso Banco → Reserva', importe:50, fp:'X', _internal:true, _transferDir:'banco_to_reserva'}
+    ]
+  };
+  const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic'});
+
+  const saldoAperCaja = 500;   // Config
+  const reservaActual = 100 + 100 - 75 + 50; // 175
+  // Cobros efectivo = 120.5 + 80 + 200 = 400.5 (T de 50 NO cuenta)
+  const cobrosEfectivo = 400.5;
+  // internalCajaNet = -100 (DEBE) + 75 (HABER) = -25
+  const efectivoInforme = (g.byFp.E||0) + saldoAperCaja + reservaActual + (g.internalCajaNet||0);
+  const cajaFisica = _cajaFisicaReal({saldoAperCaja, reservaActual, cobrosEfectivo, internalCajaNet:-25});
+
+  assertEq('12.6 · byFp.E = 400.5 (cobros efectivo puros)', +(g.byFp.E||0).toFixed(2), 400.5);
+  assertEq('12.6 · internalCajaNet = -25 (100 salió, 75 entró)', g.internalCajaNet||0, -25);
+  assertEq('12.6 · internalBancoNet = -50 (banco salió a reserva)', g.internalBancoNet||0, -50);
+  assertEq('12.6 · Gastos = 800 (SOLO alquiler, no incluye internal)', Object.values(g.gastos).reduce((s,gg)=>s+gg.total,0), 800);
+  // Efectivo = 400.5 + 500 + 175 + (-25) = 1050.5
+  assertEq('12.6 · Efectivo Informe = 1050.5', +efectivoInforme.toFixed(2), 1050.5);
+  assertEq('12.6 · Cuadra con Caja Física real', +efectivoInforme.toFixed(2), +cajaFisica.toFixed(2));
+}
+
+// 12.7 · TRANSFERENCIA CAJA↔BANCO no debe ensuciar el efectivo
+{
+  const byDate = {
+    '2026-06-01': [
+      {id:'x1', kind:'DH', tipo:'DEBE',  nombre:'Ingreso caja→banco', importe:200, fp:'E', _internal:true, _transferDir:'caja_to_banco'},
+      {id:'x2', kind:'DH', tipo:'HABER', nombre:'Ingreso caja→banco', importe:200, fp:'X', _internal:true, _transferDir:'caja_to_banco'}
+    ]
+  };
+  const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic'});
+  const saldoAperCaja = 500; const reservaActual = 0;
+  const efectivoInforme = (g.byFp.E||0) + saldoAperCaja + reservaActual + (g.internalCajaNet||0);
+  assertEq('12.7 · internalCajaNet = -200 (DEBE fp:E)', g.internalCajaNet||0, -200);
+  assertEq('12.7 · internalBancoNet = +200 (HABER fp:X)', g.internalBancoNet||0, 200);
+  assertEq('12.7 · Efectivo Informe = 300 (500 - 200 transferido a banco)', efectivoInforme, 300);
 }
 
 // ═══════════════════════════════════════════════════════════════
