@@ -1,4 +1,24 @@
 # MediCar Plus · PRD (Product Requirements Document)
+## 2026-02-28 · Fix "Total entradas" en Tráfico para años sin CSV DGT
+
+**Problema reportado (msg 480):** en Estadísticas → Tráfico, al seleccionar un año que NO es el actual (2026), las barras del gráfico mostraban los conteos correctos (backfill desde `caja.stats.v1`) pero las tarjetas KPI mostraban `Total entradas: 0` y las columnas de la tabla (CANJE, EXPEDICIÓN, INICIAL, PERIÓDICA, PRÓRROGA, RECUPERACIÓN, RENOVACIÓN) aparecían vacías.
+
+**Root cause:** en `renderTrafficTable()` (v2.html línea 3055), la KPI "Total entradas" usaba `agg.count` (solo entradas CSV DGT del `KEYS['trafic']`) en lugar de `displayCount` (que ya incluye el backfill histórico de `caja.stats.v1`). El tfoot y las barras ya usaban `displayCount`, así que solo estaba desincronizado el card.
+
+**Fix:**
+- `v2.html` línea 3055: `${agg.count || 0}` → `${displayCount || agg.count || 0}`.
+- `printTrafficReport()` (línea 3166): aplicado el mismo backfill al PDF para que el TOTAL del pie de tabla coincida con lo mostrado en pantalla. Los meses con backfill llevan badge 📋 en el PDF.
+
+**Verificación:** los 3 test suites siguen pasando (222 checks total):
+- `accounting_audit.js` — 102 invariantes ✅
+- `informe_anual_saldo_apertura.js` — 106 verificaciones ✅
+- `migration_conservation.js` — 14 tests de conservación ✅
+
+Los importes (`Total importes`, `Total tasas DGT`, `Facturado + Tasas`) siguen a 0 para años sin CSV porque `caja.stats.v1` solo guarda conteos por autoescuela, no importes ni tasas — comportamiento esperado.
+
+**Recordatorio Electron:** el usuario debe pulsar `Ctrl + Shift + R` para refrescar el cache tras el fix.
+
+
 
 ## 2026-02-25 (parte 2) · Entradas Totales = SOLO personas + nombre empresa + Varios expandible + landing
 

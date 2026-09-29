@@ -3052,7 +3052,7 @@ function openStats(initialSection){
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
             <div style="padding:10px 12px;background:#0e1117;border:1px solid #2a3040;border-left:3px solid #7ec8ff;border-radius:6px">
               <div class="small" style="color:#94a3b8;letter-spacing:.4px">Total entradas</div>
-              <div id="_traf_kpi_count" style="font-size:20px;font-weight:700;color:#7ec8ff;font-family:'Consolas',monospace">${agg.count || 0}</div>
+              <div id="_traf_kpi_count" style="font-size:20px;font-weight:700;color:#7ec8ff;font-family:'Consolas',monospace">${displayCount || agg.count || 0}</div>
             </div>
             <div style="padding:10px 12px;background:#0e1117;border:1px solid #2a3040;border-left:3px solid #3ddc97;border-radius:6px">
               <div class="small" style="color:#94a3b8;letter-spacing:.4px">Total importes</div>
@@ -3170,17 +3170,38 @@ function openStats(initialSection){
     let html='';
     if(mode === 'year'){
       const agg = _trafAggregate(year);
+      // 📊 Backfill desde caja.stats.v1 (histórico manual) para años sin CSV DGT
+      let _statsBackfill = {};
+      try{
+        const _statsRaw = JSON.parse(localStorage.getItem('caja.stats.v1')||'null');
+        if(_statsRaw && _statsRaw.data){
+          for(let mi=0; mi<12; mi++){
+            const k = `${year}-${String(mi+1).padStart(2,'0')}`;
+            const monthObj = _statsRaw.data[k];
+            if(!monthObj) continue;
+            const csvCount = agg.monthly[k]?.count || 0;
+            if(csvCount > 0) continue;
+            const total = Object.values(monthObj).reduce((s,n)=>s+(+n||0), 0);
+            if(total > 0) _statsBackfill[k] = total;
+          }
+        }
+      }catch(_){}
+      let _pdfDisplayCount = 0;
       const rows = MESOS.map((mName, mi) => {
         const k = `${year}-${String(mi+1).padStart(2,'0')}`;
         const md = agg.monthly[k] || { count:0, byCat:{}, importe:0, tasas:0 };
         const cells = TRAF_CATS.map(c => `<td>${md.byCat[c] || ''}</td>`).join('');
-        return `<tr><td style="text-align:left;font-weight:600">${mName}</td><td>${md.count || ''}</td>${cells}<td style="text-align:right">${md.importe ? _fmtEur(md.importe) : ''}</td><td style="text-align:right">${md.tasas ? _fmtEur(md.tasas) : ''}</td></tr>`;
+        const bf = _statsBackfill[k] || 0;
+        const rowTotal = md.count || bf;
+        _pdfDisplayCount += rowTotal;
+        const totBadge = (bf > 0 && !md.count) ? ' 📋' : '';
+        return `<tr><td style="text-align:left;font-weight:600">${mName}</td><td>${rowTotal ? rowTotal + totBadge : ''}</td>${cells}<td style="text-align:right">${md.importe ? _fmtEur(md.importe) : ''}</td><td style="text-align:right">${md.tasas ? _fmtEur(md.tasas) : ''}</td></tr>`;
       }).join('');
       const totCells = TRAF_CATS.map(c => `<td>${agg.byCat[c] || ''}</td>`).join('');
       // Desglose profesional (Tipo·Grupo·Precio) para incluir en el PDF anual
       const detailRowsData = _trafBuildDetail(year);
       const detailPdf = _trafDetailBlockPdfHtml(detailRowsData, year, null);
-      html=`<html><head><title>Estadísticas Tráfico ${year}</title><style>@page{size:A4 landscape;margin:8mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}html,body{margin:0;padding:0;width:100%;overflow-x:hidden}body{font-family:Arial,sans-serif;color:#000;font-size:11px}h1{text-align:center;margin:0 0 12pt 0;font-size:15pt}h2{margin-top:14pt;font-size:12pt;text-align:left;color:#1e3a5f;page-break-before:auto;page-break-after:avoid}table{width:100%;border-collapse:collapse;font-size:9pt;page-break-inside:auto;table-layout:auto;margin-bottom:6pt}thead{display:table-header-group}tr{page-break-inside:avoid}th,td{border:1px solid #333;padding:3pt 4pt;text-align:center;word-wrap:break-word;overflow-wrap:break-word}th{background:#1e3a5f !important;color:#fff !important;font-size:9pt}td:first-child,th:first-child{text-align:left;padding-left:6pt;white-space:nowrap}tfoot td{background:#333 !important;color:#fff !important;font-weight:700}</style></head><body><h1>ESTADÍSTICAS TRÁFICO · ${year}</h1><table><thead><tr><th>MES</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS DGT</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL ${year}</td><td>${agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table>${detailPdf}</body></html>`;
+      html=`<html><head><title>Estadísticas Tráfico ${year}</title><style>@page{size:A4 landscape;margin:8mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}html,body{margin:0;padding:0;width:100%;overflow-x:hidden}body{font-family:Arial,sans-serif;color:#000;font-size:11px}h1{text-align:center;margin:0 0 12pt 0;font-size:15pt}h2{margin-top:14pt;font-size:12pt;text-align:left;color:#1e3a5f;page-break-before:auto;page-break-after:avoid}table{width:100%;border-collapse:collapse;font-size:9pt;page-break-inside:auto;table-layout:auto;margin-bottom:6pt}thead{display:table-header-group}tr{page-break-inside:avoid}th,td{border:1px solid #333;padding:3pt 4pt;text-align:center;word-wrap:break-word;overflow-wrap:break-word}th{background:#1e3a5f !important;color:#fff !important;font-size:9pt}td:first-child,th:first-child{text-align:left;padding-left:6pt;white-space:nowrap}tfoot td{background:#333 !important;color:#fff !important;font-weight:700}</style></head><body><h1>ESTADÍSTICAS TRÁFICO · ${year}</h1><table><thead><tr><th>MES</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS DGT</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL ${year}</td><td>${_pdfDisplayCount || agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table>${detailPdf}</body></html>`;
     }else{
       const agg = _trafAggregate(year, monthSel);
       const daysInMonth = new Date(year, monthSel, 0).getDate();
