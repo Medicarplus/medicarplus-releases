@@ -1,4 +1,18 @@
 # MediCar Plus · PRD (Product Requirements Document)
+## 2026-02-28 · Etiquetas numéricas en gráfica "Comparativa años"
+
+**Petición:** en la gráfica de líneas de Comparativa años, mostrar el número de entradas de cada mes justo encima de los puntos, igual que hace la gráfica de barras de Autoescuelas.
+
+**Fix:** `v2.html` `_buildYearComparisonChart` (línea ~8707). Junto a cada `<circle>` de punto se añade ahora un `<text>` con el valor:
+- Solo se muestran valores > 0 (evita clutter en meses sin datos).
+- Color = color de la serie del año (rojo 2024, naranja 2025, verde 2026, etc.).
+- Contorno blanco (`paint-order:stroke; stroke:#fff; stroke-width:3`) para que la etiqueta sea legible cuando cae encima de otra línea.
+- Offset vertical alterno por serie (-8, -19, -30, ...) para que labels de años distintos no se pisen cuando los valores coinciden.
+- Tamaño 10.5px, `font-weight:700`.
+
+**Verificación:** los 102 tests contables siguen pasando. Cambio puramente visual en SVG.
+
+
 ## 2026-02-28 · Eliminado bloque duplicado "TOTALES DEL PERÍODO" del Informe Anual
 
 **Problema:** al final del Informe Anual había un bloque grande "🎯 TOTALES DEL PERÍODO" con tarjetas Ingresado/Gastado/Beneficio, que repetía exactamente los KPIs del **INGRESOS TOTALES · GASTOS TOTALES · BENEFICIO NETO** del inicio del informe y del panel "🎯 Resultado" (Ingresos/Gastos/BENEFICIO). Redundante.

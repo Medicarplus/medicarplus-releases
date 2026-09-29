@@ -8704,18 +8704,26 @@ function _buildYearComparisonChart(years, byYear, MESES){
   out += `<text x="${(M.left/2-4).toFixed(1)}" y="${(M.top-6).toFixed(1)}" font-size="10" fill="#94a3b8" font-family="Segoe UI,sans-serif" font-weight="600">Nº</text>`;
 
   // Líneas de cada año
-  series.forEach(s=>{
+  series.forEach((s, si)=>{
     const pts = s.data.map((v,i)=>({x:xAt(i), y:yAt(v), v:v, m:i}));
     const d = smoothPath(pts);
     // Área tenue bajo la línea (opcional, muy sutil)
     const areaD = d + ` L${xAt(11).toFixed(1)},${yAt(0).toFixed(1)} L${xAt(0).toFixed(1)},${yAt(0).toFixed(1)} Z`;
     out += `<path d="${areaD}" fill="${s.color}" fill-opacity="0.06" stroke="none"/>`;
     out += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 1px 1px rgba(15,23,42,0.08))"/>`;
-    // Puntos con tooltip nativo (SVG <title>)
+    // Puntos con tooltip nativo (SVG <title>) + etiqueta numérica
+    // 🔧 Feb 2026: el usuario pidió ver el nº de entradas encima de cada punto (como en Autoescuelas).
+    //   Offset vertical alterno por serie (si+1)*11 para evitar que labels de años distintos se pisen.
+    const labelOffset = -8 - (si * 11);
     pts.forEach(p=>{
       out += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.2" fill="#fff" stroke="${s.color}" stroke-width="2">
         <title>${s.year} · ${MESES[p.m]}: ${p.v.toLocaleString(currentLang==='es'?'es-ES':'ca-ES')} ${L('entrades','entradas')}</title>
       </circle>`;
+      if(p.v > 0){
+        // Fondo blanco semi-transparente para legibilidad cuando la etiqueta cae sobre otra línea
+        const ly = p.y + labelOffset;
+        out += `<text x="${p.x.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="10.5" font-weight="700" fill="${s.color}" font-family="Segoe UI,sans-serif" paint-order="stroke" stroke="#fff" stroke-width="3" stroke-linejoin="round">${p.v.toLocaleString(currentLang==='es'?'es-ES':'ca-ES')}</text>`;
+      }
     });
   });
 
