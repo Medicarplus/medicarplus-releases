@@ -2486,8 +2486,39 @@ function openStats(initialSection){
       const label = state.mode==='single' ? state.yearSingle : state.years.join(' · ');
       printVisibleElement(modal, {
         title:`Estadísticas Autoescuelas · ${label}`,
-        landscape:true, margins:'8mm',
-        extraCss:'button, select, [data-no], ._ch_mode { display:none !important } body{background:#fff;color:#000} .modal, .modal *{background:#fff !important;color:#000 !important} svg text{fill:#000 !important}'
+        landscape:true, margins:'6mm',
+        // 🖨️ FIX Feb 2026 · Layout del PDF del chart de autoescuelas
+        //   Problema anterior: SVG con max-height:60vh + layout flex causaban
+        //   que el chart ocupara MUY alto, el panel autoescuelas quedaba cortado
+        //   y hubiera páginas semi-vacías. Ahora forzamos alturas razonables A4.
+        extraCss:`@page { size: A4 landscape; margin: 6mm }
+          button, select, input, [data-no], ._ch_mode, .no-print { display:none !important }
+          html, body { background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important; margin:0 !important; padding:0 !important }
+          .modal-back, .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important; border-color:#999 !important }
+          .modal { padding:0 !important; margin:0 !important; max-width:none !important; width:100% !important; max-height:none !important; height:auto !important; display:block !important; overflow:visible !important }
+          .modal * { max-height:none !important; overflow:visible !important }
+          /* Cabecera compacta */
+          h3 { color:#000 !important; font-size:14pt !important; margin:0 0 4pt 0 !important; font-family:Georgia,serif !important; page-break-after:avoid }
+          /* Panel de años/leyenda: en línea, compacto */
+          #_ch_yearpick { padding:4pt 8pt !important; margin-bottom:6pt !important; border:1px solid #ccc !important; background:#f7f7f7 !important; font-size:9pt !important }
+          #_ch_yearpick * { font-size:9pt !important; color:#000 !important }
+          /* Layout chart + leyenda lado a lado en horizontal, alturas fijas para A4 landscape */
+          .modal > div[style*="display:flex"][style*="gap:14px"] { display:flex !important; gap:8pt !important; align-items:flex-start !important; overflow:visible !important; height:auto !important; page-break-inside:avoid }
+          #_ch_svg { flex:1 !important; padding:6pt !important; border:1px solid #ccc !important; background:#fff !important; min-width:0 !important; overflow:visible !important; max-height:none !important }
+          /* Panel lateral autoescuelas · ancho fijo, sin scroll */
+          #_ch_svg + div { width:200pt !important; padding:6pt !important; border:1px solid #ccc !important; background:#fafafa !important; overflow:visible !important; max-height:none !important }
+          #_ch_legend { color:#000 !important }
+          #_ch_legend * { color:#000 !important; background:transparent !important; opacity:1 !important; border-color:#ccc !important }
+          /* Leyenda de años compacta */
+          #_ch_svg > div:first-child { padding:4pt 8pt !important; margin-bottom:6pt !important; border:1px solid #ccc !important; background:#f7f7f7 !important }
+          /* SVG del chart · altura pensada para A4 landscape (una sola página) */
+          svg[data-testid="chart-svg"] { width:100% !important; height:auto !important; max-height:130mm !important; display:block }
+          svg text { fill:#000 !important; font-family:Arial,sans-serif !important }
+          svg line { stroke:#999 !important }
+          /* Ocultar tip inferior */
+          #_ch_tip { display:none !important }
+          /* Evitar saltos de página en la zona clave */
+          h3, #_ch_yearpick, #_ch_svg { page-break-inside:avoid }`
       });
     };
     drawChart();drawLegend();
@@ -3081,7 +3112,7 @@ function openStats(initialSection){
       // Desglose profesional (Tipo·Grupo·Precio) para incluir en el PDF anual
       const detailRowsData = _trafBuildDetail(year);
       const detailPdf = _trafDetailBlockPdfHtml(detailRowsData, year, null);
-      html=`<html><head><title>Estadísticas Tráfico ${year}</title><style>@page{size:A4 landscape;margin:10mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Arial,sans-serif;padding:0;color:#000;font-size:12px}h1{text-align:center;margin-bottom:20px}h2{margin-top:22px;font-size:14px;text-align:left;color:#1e3a5f;page-break-before:auto}table{width:100%;border-collapse:collapse;font-size:11px;page-break-inside:avoid}th,td{border:1px solid #333;padding:6px;text-align:center}th{background:#1e3a5f !important;color:#fff !important}td:first-child,th:first-child{text-align:left;padding-left:12px}tfoot td{background:#333 !important;color:#fff !important;font-weight:700}</style></head><body><h1>ESTADÍSTICAS TRÁFICO · ${year}</h1><table><thead><tr><th>MES</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS DGT</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL ${year}</td><td>${agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table>${detailPdf}</body></html>`;
+      html=`<html><head><title>Estadísticas Tráfico ${year}</title><style>@page{size:A4 landscape;margin:8mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}html,body{margin:0;padding:0;width:100%;overflow-x:hidden}body{font-family:Arial,sans-serif;color:#000;font-size:11px}h1{text-align:center;margin:0 0 12pt 0;font-size:15pt}h2{margin-top:14pt;font-size:12pt;text-align:left;color:#1e3a5f;page-break-before:auto;page-break-after:avoid}table{width:100%;border-collapse:collapse;font-size:9pt;page-break-inside:auto;table-layout:auto;margin-bottom:6pt}thead{display:table-header-group}tr{page-break-inside:avoid}th,td{border:1px solid #333;padding:3pt 4pt;text-align:center;word-wrap:break-word;overflow-wrap:break-word}th{background:#1e3a5f !important;color:#fff !important;font-size:9pt}td:first-child,th:first-child{text-align:left;padding-left:6pt;white-space:nowrap}tfoot td{background:#333 !important;color:#fff !important;font-weight:700}</style></head><body><h1>ESTADÍSTICAS TRÁFICO · ${year}</h1><table><thead><tr><th>MES</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS DGT</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL ${year}</td><td>${agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table>${detailPdf}</body></html>`;
     }else{
       const agg = _trafAggregate(year, monthSel);
       const daysInMonth = new Date(year, monthSel, 0).getDate();
@@ -3097,7 +3128,7 @@ function openStats(initialSection){
       // Desglose profesional del mes en el PDF
       const detailRowsMonth = _trafBuildDetail(year, monthSel);
       const detailPdfMonth = _trafDetailBlockPdfHtml(detailRowsMonth, year, MESOS[monthSel-1]);
-      html=`<html><head><title>Tráfico ${MESOS[monthSel-1]} ${year}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h1{text-align:center;margin-bottom:20px}h2{margin-top:22px;font-size:14px;text-align:left;color:#1e3a5f;page-break-before:auto}table{width:100%;border-collapse:collapse;font-size:12px;page-break-inside:avoid}th,td{border:1px solid #333;padding:6px;text-align:center}th{background:#1e3a5f;color:#fff}td:first-child,th:first-child{text-align:left;padding-left:12px}tfoot td{background:#333;color:#fff;font-weight:700}@media print{body{padding:5mm}}</style></head><body><h1>TRÁFICO · ${MESOS[monthSel-1].toUpperCase()} ${year}</h1><table><thead><tr><th>DÍA</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS</th></tr></thead><tbody>${rows.length ? rows.join('') : `<tr><td colspan="${3 + TRAF_CATS.length}" style="text-align:center;font-style:italic;color:#666">Sin entradas en este mes</td></tr>`}</tbody><tfoot><tr><td>TOTAL</td><td>${agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table>${detailPdfMonth}</body></html>`;
+      html=`<html><head><title>Tráfico ${MESOS[monthSel-1]} ${year}</title><style>@page{size:A4 landscape;margin:10mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:0;color:#000;font-size:12px;margin:0}h1{text-align:center;margin:0 0 14px 0;font-size:16pt}h2{margin-top:16px;font-size:13pt;text-align:left;color:#1e3a5f;page-break-before:auto;page-break-after:avoid}table{width:100%;border-collapse:collapse;font-size:10.5pt;page-break-inside:auto;table-layout:auto;margin-bottom:8pt}thead{display:table-header-group}tr{page-break-inside:avoid}th,td{border:1px solid #333;padding:4pt 5pt;text-align:center;word-wrap:break-word;overflow-wrap:break-word}th{background:#1e3a5f !important;color:#fff !important}td:first-child,th:first-child{text-align:left;padding-left:8pt}tfoot td{background:#333 !important;color:#fff !important;font-weight:700}</style></head><body><h1>TRÁFICO · ${MESOS[monthSel-1].toUpperCase()} ${year}</h1><table><thead><tr><th>DÍA</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS</th></tr></thead><tbody>${rows.length ? rows.join('') : `<tr><td colspan="${3 + TRAF_CATS.length}" style="text-align:center;font-style:italic;color:#666">Sin entradas en este mes</td></tr>`}</tbody><tfoot><tr><td>TOTAL</td><td>${agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table>${detailPdfMonth}</body></html>`;
     }
     printHtml(html);
   }
@@ -8166,25 +8197,33 @@ function openYearComparison(){
       title:'Comparativa anual',
       landscape:true,
       margins:'6mm',
+      // 🖨️ FIX Feb 2026 · Layout PDF Comparativa Años
+      //   - Chart en 1 página · Resumen + Facturación mensual en la siguiente
+      //   - Alturas fijas para evitar cortes y espacios vacíos
       extraCss:`@page { size: A4 landscape; margin: 6mm }
         button, select, input, [data-no], .icon-btn, .no-print { display:none !important }
-        body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important }
-        .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important }
-        .modal{ padding:4mm !important; max-width:none !important; width:100% !important; border:none !important }
-        h3{ color:#000 !important; font-size:13pt !important; margin:0 0 6pt 0 !important }
-        h4{ color:#000 !important; font-size:11pt !important; margin:10pt 0 4pt 0 !important; page-break-after:avoid; page-break-inside:avoid }
-        /* Cada sección grande empieza en su propia página si no cabe */
-        #ycChart, h4 { page-break-inside:avoid }
-        /* Tarjetas KPI en fila (evita que se apilen en portrait accidental) */
-        [style*="grid-template-columns"] { page-break-inside:avoid }
-        table{ border-collapse:collapse !important; width:100% !important; font-size:8pt !important; page-break-inside:auto }
-        thead{ display:table-header-group } tr{ page-break-inside:avoid; page-break-after:auto }
-        th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:8pt !important }
-        td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 4pt !important; font-size:8pt !important; word-wrap:break-word }
-        /* SVG de gráfica: máximo alto para caber en una página */
-        svg{ max-width:100% !important; max-height:74mm !important; height:auto !important }
-        /* Fuerza salto limpio antes de "Resumen comparativo" (primer h4 después del chart) */
-        #ycChart + h4 { page-break-before: always !important; margin-top:0 !important }`
+        html, body { background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important; margin:0 !important; padding:0 !important }
+        .modal-back, .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important; border-color:#999 !important }
+        .modal { padding:0 !important; margin:0 !important; max-width:none !important; width:100% !important; max-height:none !important; height:auto !important; display:block !important; overflow:visible !important; border:none !important }
+        .modal * { max-height:none !important; overflow:visible !important }
+        h3 { color:#000 !important; font-size:14pt !important; margin:0 0 6pt 0 !important; font-family:Georgia,serif !important; page-break-after:avoid }
+        h4 { color:#000 !important; font-size:11pt !important; margin:6pt 0 3pt 0 !important; font-family:Georgia,serif !important; page-break-after:avoid; page-break-inside:avoid }
+        /* KPI cards en 1 fila */
+        div[style*="grid-template-columns:repeat"] { display:grid !important; page-break-inside:avoid; margin-bottom:8pt !important }
+        .yc-kpi-card { padding:6pt !important; border:1px solid #ccc !important; background:#fafafa !important }
+        .yc-kpi-card * { color:#000 !important }
+        /* Chart: altura fija para caber holgadamente en A4 landscape */
+        #ycChart { padding:6pt 8pt !important; border:1px solid #ccc !important; margin:6pt 0 !important; page-break-inside:avoid; page-break-after:always }
+        #ycChart svg { width:100% !important; height:auto !important; max-height:120mm !important; display:block }
+        #ycChart svg text { fill:#000 !important }
+        #ycChart svg line { stroke:#999 !important }
+        /* Tablas compactas */
+        table { border-collapse:collapse !important; width:100% !important; font-size:9pt !important; page-break-inside:auto; margin-bottom:6pt !important }
+        thead { display:table-header-group } tr { page-break-inside:avoid; page-break-after:auto }
+        th { background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:9pt !important }
+        td { border:1px solid #999 !important; color:#000 !important; padding:2pt 5pt !important; font-size:9pt !important; word-wrap:break-word }
+        /* Elementos que no aportan al PDF */
+        [data-testid="yc-goto-chart"], #ycGoChart { display:none !important }`
     });
   };
   const sel=back.querySelector('#ycCount');
