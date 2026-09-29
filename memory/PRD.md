@@ -1,4 +1,13 @@
 # MediCar Plus · PRD (Product Requirements Document)
+## 2026-02-28 · Eliminado bloque duplicado "TOTALES DEL PERÍODO" del Informe Anual
+
+**Problema:** al final del Informe Anual había un bloque grande "🎯 TOTALES DEL PERÍODO" con tarjetas Ingresado/Gastado/Beneficio, que repetía exactamente los KPIs del **INGRESOS TOTALES · GASTOS TOTALES · BENEFICIO NETO** del inicio del informe y del panel "🎯 Resultado" (Ingresos/Gastos/BENEFICIO). Redundante.
+
+**Fix:** `v2.html` líneas 8334-8358 eliminadas (bloque completo `TOTALS DEL PERÍODE`). Sin lógica contable tocada — solo era HTML de presentación derivado de `grandTotals.byConcept` y `grandTotals.gastos`.
+
+**Verificación:** 208/208 tests contables pasan (accounting_audit + informe_anual). El informe sigue mostrando el mismo resultado 3 veces (arriba KPI cards, medio panel Resultado). Ahora es más limpio.
+
+
 ## 2026-02-28 · Fix duplicado: eliminado selector "Enero" redundante en Estadísticas Autoescuelas
 
 **Problema reportado:** en Estadísticas → Autoescuelas había DOS selectores de mes:

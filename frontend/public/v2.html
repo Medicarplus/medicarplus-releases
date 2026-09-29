@@ -8331,32 +8331,6 @@ function _buildAnnualReport(year, monthFilterIdx){
 
   if(grandTotals.cnt===0){html+=`<div style="text-align:center;padding:40px;color:#94a3b8;font-style:italic">${L('No hi ha dades per l\'any','No hay datos para el año')} ${year}.</div>`}
 
-  // 🎯 FILA FINAL DESTACADA · Totales del período (Ingresos + Gastos + Beneficio)
-  //   Repetido al final del informe para que quede la conclusión clara y visible sin
-  //   tener que volver arriba. Colores fuertes para destacar el beneficio/pérdida.
-  const _totalIngPer  = Object.values(grandTotals.byConcept||{}).reduce((s,n)=>s+n,0);
-  const _totalGasPer  = Object.values(grandTotals.gastos||{}).reduce((s,g)=>s+g.total,0);
-  const _beneficioPer = _totalIngPer - _totalGasPer;
-  const _benColor = _beneficioPer >= 0 ? '#166534' : '#dc2626';
-  const _benBg    = _beneficioPer >= 0 ? '#dcfce7' : '#fee2e2';
-  html += `<div style="margin-top:24px;padding-top:16px;border-top:3px double #0f172a">
-    <h3 style="color:#0f172a;font-family:Georgia,serif;text-align:center;margin:0 0 12px 0;font-size:16px;letter-spacing:1px">🎯 ${L('TOTALS DEL PERÍODE','TOTALES DEL PERÍODO')}</h3>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-      <div style="background:#166534;color:#fff;padding:16px 20px;border-radius:8px;text-align:center;box-shadow:0 2px 6px rgba(22,101,52,0.3)">
-        <div style="font-size:11px;letter-spacing:1.5px;opacity:0.9;font-weight:600">✚ ${L('INGRESSAT','INGRESADO')}</div>
-        <div style="font-size:22px;font-weight:800;font-family:'Courier New',monospace;margin-top:4px">${fmt(_totalIngPer)}</div>
-      </div>
-      <div style="background:#dc2626;color:#fff;padding:16px 20px;border-radius:8px;text-align:center;box-shadow:0 2px 6px rgba(220,38,38,0.3)">
-        <div style="font-size:11px;letter-spacing:1.5px;opacity:0.9;font-weight:600">− ${L('GASTAT','GASTADO')}</div>
-        <div style="font-size:22px;font-weight:800;font-family:'Courier New',monospace;margin-top:4px">${fmt(_totalGasPer)}</div>
-      </div>
-      <div style="background:${_benBg};color:${_benColor};padding:16px 20px;border-radius:8px;text-align:center;box-shadow:0 3px 8px rgba(0,0,0,0.15);border:2px solid ${_benColor}">
-        <div style="font-size:11px;letter-spacing:1.5px;font-weight:700">${_beneficioPer>=0?'🎉':'⚠️'} ${L('BENEFICI','BENEFICIO')}</div>
-        <div style="font-size:24px;font-weight:800;font-family:'Courier New',monospace;margin-top:4px">${_beneficioPer>=0?'+':''}${fmt(_beneficioPer)}</div>
-      </div>
-    </div>
-  </div>`;
-
   return html;
 }
 function _arCard(label,value,color,bg,note){return `<div style="background:${bg};border:1px solid ${color}55;border-left:4px solid ${color};padding:12px 14px;border-radius:6px"><div style="font-size:10px;color:#64748b;letter-spacing:1px;text-transform:uppercase">${label}</div><div style="font-size:20px;color:${color};font-weight:700;margin-top:4px;font-family:'Courier New',monospace">${value}</div>${note||''}</div>`}
