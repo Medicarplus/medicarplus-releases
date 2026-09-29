@@ -1790,15 +1790,41 @@ function openStats(initialSection){
       isCA?'Carregarà els <b>totals mensuals</b> de 1998 fins agost 2026 (≈340 mesos) que tens al fitxer Excel manual.<br><br>Els mesos que ja tinguis a l\'app <b>NO es sobreescriuran</b> — només s\'afegeixen els que falten.<br><br>Els totals apareixeran automàticament al KPI "Entrades totals" del Informe Anual i de la Comparativa anys.':'Cargará los <b>totales mensuales</b> desde 1998 hasta agosto 2026 (≈340 meses) que tienes en tu Excel manual.<br><br>Los meses que ya tengas en la app <b>NO se sobrescribirán</b> — solo se añaden los que faltan.<br><br>Los totales aparecerán automáticamente en el KPI "Entradas totales" del Informe Anual y de la Comparativa años.',
       async ()=>{
         try{
-          const r = await fetch('/downloads/backfill-autoescoles-historico.json?t='+Date.now(), {cache:'no-store'});
-          if(!r.ok){ toast(isCA?'❌ No es pot descarregar el JSON':'❌ No se puede descargar el JSON', 4000); return; }
-          const backfill = await r.json();
+          // En Electron file:// la ruta absoluta falla → probar primero relativa, luego backend URL
+          let backfill = null;
+          const candidates = [
+            'downloads/backfill-autoescoles-historico.json',
+            './downloads/backfill-autoescoles-historico.json',
+            '/downloads/backfill-autoescoles-historico.json',
+          ];
+          // Añadir backend URL (para Electron que apunta al preview cloud)
+          try{
+            const beUrl = (typeof getApiBase==='function') ? getApiBase() : '';
+            if(beUrl) candidates.push(beUrl.replace(/\/$/,'')+'/downloads/backfill-autoescoles-historico.json');
+          }catch(_){}
+          try{
+            const beUrl2 = (window.API_BASE||'') || (window.APP_BACKEND_URL||'') || (localStorage.getItem('caja.backend.url')||'');
+            if(beUrl2) candidates.push(beUrl2.replace(/\/$/,'')+'/downloads/backfill-autoescoles-historico.json');
+          }catch(_){}
+          // También el origen actual (web preview)
+          try{ if(location && location.origin && location.protocol!=='file:') candidates.push(location.origin+'/downloads/backfill-autoescoles-historico.json'); }catch(_){}
+          console.info('[backfill] intentando URLs:', candidates);
+          let lastErr = null;
+          for(const url of candidates){
+            try{
+              const r = await fetch(url + '?t='+Date.now(), {cache:'no-store'});
+              if(r.ok){ backfill = await r.json(); break; }
+              lastErr = new Error('HTTP '+r.status);
+            }catch(e){ lastErr = e; }
+          }
+          if(!backfill){
+            toast(isCA?`❌ No es pot descarregar el fitxer històric: ${lastErr&&lastErr.message||'desconegut'}`:`❌ No se puede descargar el archivo histórico: ${lastErr&&lastErr.message||'desconocido'}`, 6000);
+            return;
+          }
           const cur = loadStats();
           let mergedMonths = 0, addedMonths = 0, skippedMonths = 0;
-          // Merge autoescolas (unión sin duplicar)
           const curAutoSet = new Set(cur.autoescoles || []);
           (backfill.autoescoles||[]).forEach(a => { if(!curAutoSet.has(a)){ cur.autoescoles.push(a); curAutoSet.add(a); }});
-          // Merge data solo si el mes no existe ya (evita sobrescribir CSV real)
           for(const [monthKey, autos] of Object.entries(backfill.data||{})){
             if(cur.data[monthKey] && Object.keys(cur.data[monthKey]).length > 0){
               skippedMonths++; continue;
@@ -1808,7 +1834,6 @@ function openStats(initialSection){
             mergedMonths++;
           }
           saveStats(cur);
-          // Marca el flag para que el botón desaparezca (no se debe usar dos veces)
           try{ localStorage.setItem('caja.stats.backfill.loaded.v1', String(Date.now())); }catch(_){}
           const btn = back.querySelector('#stBackfillHist');
           if(btn) btn.style.display = 'none';
