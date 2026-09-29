@@ -1640,6 +1640,7 @@ function openStats(initialSection){
       <button class="btn btn-primary st-autos-only" id="stImport">📥 ${isCA?'Importar CSV':'Importar CSV'}</button>
       <select class="st-autos-only" id="stImportMonth" title="${isCA?'Mes al qual pertanyen les dades del CSV':'Mes al que pertenecen los datos del CSV'}" style="background:#141821;color:var(--text);border:1px solid #f5b301;border-radius:8px;padding:6px 10px;font-weight:600" data-testid="st-import-month">${MESOS.map((m,i)=>`<option value="${i+1}" ${(i+1)===(new Date().getMonth()+1)?'selected':''}>📅 ${m}</option>`).join('')}</select>
       <input type="file" id="stFile" accept=".csv,.txt" style="display:none" />
+      <button class="btn st-autos-only" id="stBackfillHist" data-testid="st-backfill-hist" title="${isCA?'Carrega el històric complet (1998-2026) del fitxer estadístic manual':'Carga el histórico completo (1998-2026) del archivo estadístico manual'}" style="background:#1e2f3e;border-color:#22d3ee;color:#22d3ee;font-weight:600;display:${localStorage.getItem('caja.stats.backfill.loaded.v1')?'none':'inline-flex'}">🗂️ ${isCA?'Carregar històric':'Cargar histórico'}</button>
       <button class="btn st-autos-only" id="stAdd">+ ${isCA?'Autoescola':'Autoescuela'}</button>
       <button class="btn st-autos-only" id="stClearAll" style="background:#7f1d1d;color:#fecaca;border-color:#b91c1c" title="${isCA?'Elimina totes les autoescoles i les seves dades':'Elimina todas las autoescuelas y sus datos'}">🗑 ${isCA?'Buidar tot':'Vaciar todo'}</button>
       <button class="btn st-autos-only" id="stChart" data-testid="st-chart" style="background:#1e293b;border-color:#22d3ee;color:#22d3ee" title="${isCA?'Gràfic d\'evolució mensual':'Gráfico de evolución mensual'}">📈 ${isCA?'Gràfic':'Gráfico'}</button>
@@ -1779,6 +1780,47 @@ function openStats(initialSection){
   };
   back.querySelector('#stClearAll').onclick=()=>{
     confirmModal(isCA?'⚠️ Buidar totes les autoescoles':'⚠️ Vaciar todas las autoescuelas', isCA?'Vols esborrar <b>TOTES</b> les autoescoles i les seves dades?<br><br>Aquesta acció <b>NO es pot desfer</b>. Es recomana només al primer arrencament o si vols començar de zero.':'¿Borrar <b>TODAS</b> las autoescuelas y sus datos?<br><br>Esta acción <b>NO se puede deshacer</b>. Recomendado solo en la primera puesta en marcha o si quieres empezar de cero.', ()=>{saveStats({autoescoles:[],data:{}});renderTable();toast(isCA?'🗑 Autoescoles esborrades':'🗑 Autoescuelas borradas')}, isCA?'Sí, esborrar tot':'Sí, borrar todo', true);
+  };
+  // 🗂️ Cargar histórico manual pre-generado (Feb 2026 · desde /downloads/backfill-autoescoles-historico.json)
+  // Reemplaza `caja.stats.v1` con los datos históricos del archivo Excel del propietario (1998-2026 · 343 meses).
+  // Solo tocamos meses que están en el JSON — meses fuera (ej. Sep-Dic 2026 con CSV real) quedan intactos.
+  back.querySelector('#stBackfillHist').onclick=()=>{
+    confirmModal(
+      isCA?'📥 Carregar històric d\'autoescoles':'📥 Cargar histórico de autoescuelas',
+      isCA?'Carregarà els <b>totals mensuals</b> de 1998 fins agost 2026 (≈340 mesos) que tens al fitxer Excel manual.<br><br>Els mesos que ja tinguis a l\'app <b>NO es sobreescriuran</b> — només s\'afegeixen els que falten.<br><br>Els totals apareixeran automàticament al KPI "Entrades totals" del Informe Anual i de la Comparativa anys.':'Cargará los <b>totales mensuales</b> desde 1998 hasta agosto 2026 (≈340 meses) que tienes en tu Excel manual.<br><br>Los meses que ya tengas en la app <b>NO se sobrescribirán</b> — solo se añaden los que faltan.<br><br>Los totales aparecerán automáticamente en el KPI "Entradas totales" del Informe Anual y de la Comparativa años.',
+      async ()=>{
+        try{
+          const r = await fetch('/downloads/backfill-autoescoles-historico.json?t='+Date.now(), {cache:'no-store'});
+          if(!r.ok){ toast(isCA?'❌ No es pot descarregar el JSON':'❌ No se puede descargar el JSON', 4000); return; }
+          const backfill = await r.json();
+          const cur = loadStats();
+          let mergedMonths = 0, addedMonths = 0, skippedMonths = 0;
+          // Merge autoescolas (unión sin duplicar)
+          const curAutoSet = new Set(cur.autoescoles || []);
+          (backfill.autoescoles||[]).forEach(a => { if(!curAutoSet.has(a)){ cur.autoescoles.push(a); curAutoSet.add(a); }});
+          // Merge data solo si el mes no existe ya (evita sobrescribir CSV real)
+          for(const [monthKey, autos] of Object.entries(backfill.data||{})){
+            if(cur.data[monthKey] && Object.keys(cur.data[monthKey]).length > 0){
+              skippedMonths++; continue;
+            }
+            cur.data[monthKey] = autos;
+            addedMonths++;
+            mergedMonths++;
+          }
+          saveStats(cur);
+          // Marca el flag para que el botón desaparezca (no se debe usar dos veces)
+          try{ localStorage.setItem('caja.stats.backfill.loaded.v1', String(Date.now())); }catch(_){}
+          const btn = back.querySelector('#stBackfillHist');
+          if(btn) btn.style.display = 'none';
+          renderTable();
+          toast(isCA?`✅ Històric carregat: ${addedMonths} mesos afegits · ${skippedMonths} respectats (ja tenies dades)`:`✅ Histórico cargado: ${addedMonths} meses añadidos · ${skippedMonths} respetados (ya tenías datos)`, 5000);
+        }catch(e){
+          console.error('backfill error', e);
+          toast(isCA?`❌ Error carregant l'històric: ${e.message||e}`:`❌ Error cargando el histórico: ${e.message||e}`, 5000);
+        }
+      },
+      isCA?'Sí, carregar':'Sí, cargar',
+    );
   };
   // Alias mapping CSV → canonical name
   const STAT_ALIAS={
