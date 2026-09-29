@@ -163,8 +163,16 @@ function simulateBuildAnnualReport({byDate, year, monthFilterIdx = -1, saldoInic
         _isExtraFinal = _isKnownExtra && amtTotal>0;
       }
 
-      // byGroupConcept · extras → "Otros" (con su concepto real dentro)
-      const grupoLabelFinal = _isExtraFinal ? 'Otros' : grupoLabel;
+      // byGroupConcept · Extras conocidos → grupo dedicado. Extras arbitrarios → "Otros"
+      let grupoLabelFinal;
+      if(_isExtraFinal){
+        if(/foto/.test(_catLow)) grupoLabelFinal = 'Foto';
+        else if(/duplic/.test(_catLow)) grupoLabelFinal = 'Duplicado';
+        else if(/c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLow)) grupoLabelFinal = 'C.Oficial';
+        else grupoLabelFinal = 'Otros';
+      } else {
+        grupoLabelFinal = grupoLabel;
+      }
       grandTotals.byGroupConcept[grupoLabelFinal] = grandTotals.byGroupConcept[grupoLabelFinal] || {};
       const gc = grandTotals.byGroupConcept[grupoLabelFinal][cat] = grandTotals.byGroupConcept[grupoLabelFinal][cat] || {count:0,total:0};
       if(amtTotal>0) gc.count += 1;
@@ -292,40 +300,43 @@ console.log('\n🧪 CASO 4 · Filtro mensual · Config saldoInicial junio, filtr
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CASO 5 · byGroupConcept · Extras van a "Otros" · solo cuenta si >0
+// CASO 5 · byGroupConcept · Foto/Duplicado/C.O. cada uno a SU grupo dedicado
 // ═══════════════════════════════════════════════════════════════
-console.log('\n🧪 CASO 5 · byGroupConcept: extras van a "Otros" · 0€ no cuentan uds');
+console.log('\n🧪 CASO 5 · byGroupConcept: Foto→"Foto", Duplicado→"Duplicado", C.O.→"C.Oficial", solo cuenta uds si >0');
 {
   const byDate = {
     '2026-03-15': [
       {id:'t1', kind:'TRAF', tipo:'Renovación', grupo:'Conducción', importe:20, tasa:0, _csv:true},
       {id:'t2', kind:'TRAF', tipo:'Renovación', grupo:'Conducción', importe:0, tasa:0, _csv:true}, // 0€ no cuenta uds
-      {id:'t3', kind:'TRAF', tipo:'Foto', grupo:'Conducción', importe:5, tasa:0, _csv:true}, // extra → "Otros"
-      {id:'t4', kind:'TRAF', tipo:'Duplicado', grupo:'Armas', importe:15, tasa:0, _csv:true}, // extra → "Otros"
-      {id:'t5', kind:'TRAF', tipo:'Expedición', grupo:'Marina', importe:30, tasa:0, _csv:true}
+      {id:'t3', kind:'TRAF', tipo:'Foto', grupo:'Conducción', importe:5, tasa:0, _csv:true}, // extra → grupo "Foto"
+      {id:'t4', kind:'TRAF', tipo:'Duplicado', grupo:'Armas', importe:15, tasa:0, _csv:true}, // extra → grupo "Duplicado"
+      {id:'t5', kind:'TRAF', tipo:'C.Oficial', grupo:'Marina', importe:20, tasa:0, _csv:true}, // extra → grupo "C.Oficial"
+      {id:'t6', kind:'TRAF', tipo:'Expedición', grupo:'Marina', importe:30, tasa:0, _csv:true}
     ]
   };
   const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic'});
 
-  // Verificar que extras van a "Otros"
-  assertTrue('Grupo "Otros" existe', !!g.byGroupConcept['Otros']);
-  assertTrue('Foto está en "Otros"', !!g.byGroupConcept['Otros']?.['Foto']);
-  assertTrue('Duplicado está en "Otros"', !!g.byGroupConcept['Otros']?.['Duplicado']);
-  assertEq('Otros · Foto count = 1', g.byGroupConcept['Otros']['Foto'].count, 1);
-  assertEq('Otros · Duplicado count = 1', g.byGroupConcept['Otros']['Duplicado'].count, 1);
+  // Cada extra conocido en su propio grupo (NO en "Otros")
+  assertTrue('Grupo "Foto" existe (dedicado)', !!g.byGroupConcept['Foto']);
+  assertTrue('Grupo "Duplicado" existe (dedicado)', !!g.byGroupConcept['Duplicado']);
+  assertTrue('Grupo "C.Oficial" existe (dedicado)', !!g.byGroupConcept['C.Oficial']);
+  assertTrue('NO existe grupo "Otros" (todos los extras se pudieron clasificar)', !g.byGroupConcept['Otros']);
+  assertEq('Foto · Foto count = 1', g.byGroupConcept['Foto']['Foto'].count, 1);
+  assertEq('Duplicado · Duplicado count = 1', g.byGroupConcept['Duplicado']['Duplicado'].count, 1);
+  assertEq('C.Oficial · C.Oficial count = 1', g.byGroupConcept['C.Oficial']['C.Oficial'].count, 1);
 
   // Verificar 0€ no cuenta
   assertEq('Conducción · Renovación count = 1 (0€ no cuenta)', g.byGroupConcept['Conducción']['Renovación'].count, 1);
   assertEq('Conducción · Renovación total = 20 (importe suma aunque count no)', g.byGroupConcept['Conducción']['Renovación'].total, 20);
 
-  // Verificar suma Desglose SIN Otros = suma Tráfico real
-  let sumSinOtros = 0;
+  // Verificar suma Desglose SIN extras = Entradas GIC
+  const _extraGroups = new Set(['Foto','Duplicado','C.Oficial','Otros','Altres']);
+  let sumSinExtras = 0;
   Object.keys(g.byGroupConcept).forEach(grp => {
-    if(grp === 'Otros') return;
-    Object.values(g.byGroupConcept[grp]).forEach(d => { sumSinOtros += d.count; });
+    if(_extraGroups.has(grp)) return;
+    Object.values(g.byGroupConcept[grp]).forEach(d => { sumSinExtras += d.count; });
   });
-  const entradasReales = g.cnt;
-  assertEq('Desglose sin "Otros" = Entradas reales', sumSinOtros, entradasReales);
+  assertEq('Desglose sin grupos extra = Entradas GIC', sumSinExtras, g.cnt);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -393,39 +404,51 @@ console.log('\n🧪 CASO 6c · Extras manuales (sin _csv) también cuentan en la
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CASO 6d · Entrada manual con concepto ARBITRARIO (Café, Coche…) → Extra + grupo "Otros"
+// CASO 6d · Extras: Foto/Dup/C.O. → grupo dedicado · Café/Coche → "Otros"
 // ═══════════════════════════════════════════════════════════════
-console.log('\n🧪 CASO 6d · Entrada manual concepto libre ("Café", "Coche"...) → Extra + grupo "Otros"');
+console.log('\n🧪 CASO 6d · Foto→"Foto", C.Oficial→"C.Oficial", Duplicado→"Duplicado", Café/Coche/Canje-manual→"Otros"');
 {
   const byDate = {
     '2026-03-15': [
       {id:'a1', kind:'TRAF', tipo:'Renovación', grupo:'Conducción', importe:20, _csv:true}, // GIC
-      {id:'a2', kind:'TRAF', tipo:'Café',       grupo:'General',    importe:2},              // manual arbitrario
-      {id:'a3', kind:'TRAF', tipo:'Coche',      grupo:'Conducción', importe:150},            // manual arbitrario
-      {id:'a4', kind:'TRAF', tipo:'Canje',      grupo:'Conducción', importe:20}              // MANUAL (aunque concepto CSV)
+      {id:'a2', kind:'TRAF', tipo:'Foto',       grupo:'General',    importe:5},              // extra manual conocido → grupo "Foto"
+      {id:'a3', kind:'TRAF', tipo:'C.Oficial',  grupo:'General',    importe:15},             // extra manual conocido → grupo "C.Oficial"
+      {id:'a4', kind:'TRAF', tipo:'Duplicado',  grupo:'Conducción', importe:10, _csv:true},  // extra CSV conocido → grupo "Duplicado"
+      {id:'a5', kind:'TRAF', tipo:'Café',       grupo:'General',    importe:2},              // manual arbitrario → "Otros"
+      {id:'a6', kind:'TRAF', tipo:'Coche',      grupo:'Conducción', importe:150},            // manual arbitrario → "Otros"
+      {id:'a7', kind:'TRAF', tipo:'Canje',      grupo:'Conducción', importe:20}              // MANUAL concepto DGT → "Otros"
     ]
   };
   const g = simulateBuildAnnualReport({byDate, year:2026, activeKey:'trafic'});
 
   assertEq('GIC = 1 (solo Renov CSV, aunque haya un Canje manual)', g.cnt, 1);
-  assertEq('Extras = 3 (Café + Coche + Canje manual)', g.extrasCnt, 3);
-  assertEq('Total tarjeta = 4', g.cnt + g.extrasCnt, 4);
+  assertEq('Extras = 6 (Foto+C.O.+Dup CSV+Café+Coche+Canje manual)', g.extrasCnt, 6);
+  assertEq('Total tarjeta = 7', g.cnt + g.extrasCnt, 7);
 
-  // Desglose: Renovación en "Conducción" (grupo real), TODO lo manual en "Otros"
-  assertTrue('Grupo "Conducción" existe con Renovación GIC', !!g.byGroupConcept['Conducción']?.['Renovación']);
+  // Desglose: GIC en su grupo real
+  assertTrue('Grupo "Conducción" con Renovación GIC', !!g.byGroupConcept['Conducción']?.['Renovación']);
   assertEq('Conducción · Renovación count = 1', g.byGroupConcept['Conducción']['Renovación'].count, 1);
-  assertTrue('Grupo "Otros" existe', !!g.byGroupConcept['Otros']);
+
+  // Extras conocidos → grupo dedicado (NO "Otros")
+  assertTrue('Grupo "Foto" dedicado existe', !!g.byGroupConcept['Foto']);
+  assertTrue('Grupo "Duplicado" dedicado existe', !!g.byGroupConcept['Duplicado']);
+  assertTrue('Grupo "C.Oficial" dedicado existe', !!g.byGroupConcept['C.Oficial']);
+  assertEq('Foto count = 1', g.byGroupConcept['Foto']['Foto'].count, 1);
+  assertEq('Duplicado count = 1', g.byGroupConcept['Duplicado']['Duplicado'].count, 1);
+  assertEq('C.Oficial count = 1', g.byGroupConcept['C.Oficial']['C.Oficial'].count, 1);
+
+  // Solo "Otros" para lo desconocido
+  assertTrue('Grupo "Otros" existe con extras arbitrarios', !!g.byGroupConcept['Otros']);
   assertTrue('Otros · Café presente', !!g.byGroupConcept['Otros']?.['Café']);
   assertTrue('Otros · Coche presente', !!g.byGroupConcept['Otros']?.['Coche']);
-  assertTrue('Otros · Canje (manual) presente en "Otros"', !!g.byGroupConcept['Otros']?.['Canje']);
-  assertEq('Otros · Café count = 1', g.byGroupConcept['Otros']['Café'].count, 1);
-  assertEq('Otros · Coche count = 1', g.byGroupConcept['Otros']['Coche'].count, 1);
-  assertEq('Otros · Canje manual count = 1', g.byGroupConcept['Otros']['Canje'].count, 1);
-  assertEq('Otros · Café total = 2 €', g.byGroupConcept['Otros']['Café'].total, 2);
-  assertTrue('Canje manual NUNCA aparece en grupo "Conducción"', !g.byGroupConcept['Conducción']?.['Canje']);
+  assertTrue('Otros · Canje (manual) presente', !!g.byGroupConcept['Otros']?.['Canje']);
+  assertTrue('Foto NO está en "Otros"', !g.byGroupConcept['Otros']?.['Foto']);
+  assertTrue('C.Oficial NO está en "Otros"', !g.byGroupConcept['Otros']?.['C.Oficial']);
+  assertTrue('Duplicado NO está en "Otros"', !g.byGroupConcept['Otros']?.['Duplicado']);
+  assertTrue('Canje manual NO aparece en grupo real "Conducción"', !g.byGroupConcept['Conducción']?.['Canje']);
 
-  // Facturación total = 20 + 2 + 150 + 20 = 192 (todo cuenta en facturación)
-  assertEq('Facturación total = 192', Object.values(g.byConcept).reduce((s,n)=>s+n,0), 192);
+  // Facturación total = 20 + 5 + 15 + 10 + 2 + 150 + 20 = 222
+  assertEq('Facturación total = 222', Object.values(g.byConcept).reduce((s,n)=>s+n,0), 222);
 }
 
 // ═══════════════════════════════════════════════════════════════

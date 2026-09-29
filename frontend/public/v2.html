@@ -7518,10 +7518,25 @@ function _buildAnnualReport(year, monthFilterIdx){
         grandTotals.tasasVendidas = (grandTotals.tasasVendidas || 0) + amtTasa;
         // 🗂 Desglose por grupo × concepto (total facturado = servicio + tasa)
         //   Feb 2026 · aclarado por el usuario:
-        //   TODA entrada Extra (manual en TRAF o Foto/Dup/C.O.) va al grupo virtual "Otros",
-        //   con su propio nombre de concepto (ej. "Café" bajo "Otros"). Así el desglose
-        //   sin "Otros" siempre = Entradas GIC del CSV. Ante la duda → "Otros".
-        const grupoLabelFinal = _isExtraFinal ? (currentLang==='es'?'Otros':'Altres') : grupoLabel;
+        //     · GIC (CSV DGT normal) → grupo real (Conducción/Armas/Marina...)
+        //     · Extra conocido (Foto/Duplicado/C.Oficial) → SU PROPIO grupo dedicado
+        //       (Foto → "Foto", Duplicado → "Duplicado", C.O. → "C.Oficial")
+        //     · Extra manual con concepto desconocido → grupo "Otros"
+        //   Regla mental: solo "Otros" cuando no se puede clasificar en ningún sitio.
+        let grupoLabelFinal;
+        if(_isExtraFinal){
+          if(/foto/.test(_catLowFlag)){
+            grupoLabelFinal = 'Foto';
+          } else if(/duplic/.test(_catLowFlag)){
+            grupoLabelFinal = 'Duplicado';
+          } else if(/c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLowFlag)){
+            grupoLabelFinal = 'C.Oficial';
+          } else {
+            grupoLabelFinal = (currentLang==='es'?'Otros':'Altres');
+          }
+        } else {
+          grupoLabelFinal = grupoLabel;
+        }
         grandTotals.byGroupConcept = grandTotals.byGroupConcept || {};
         grandTotals.byGroupConcept[grupoLabelFinal] = grandTotals.byGroupConcept[grupoLabelFinal] || {};
         const gc = grandTotals.byGroupConcept[grupoLabelFinal][cat] = grandTotals.byGroupConcept[grupoLabelFinal][cat] || {count:0, total:0};
