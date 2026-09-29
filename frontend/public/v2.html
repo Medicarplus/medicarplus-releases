@@ -1316,16 +1316,26 @@ function printVisibleElement(el, opts={}){
 *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;box-sizing:border-box}
 html,body{margin:0;padding:0;background:#fff;color:#000;font-family:'Segoe UI',Arial,sans-serif;font-size:12px;line-height:1.4}
 body{padding:8px}
-table{border-collapse:collapse;width:100%}
+table{border-collapse:collapse;width:100%;page-break-inside:auto}
+thead{display:table-header-group}
+tr{page-break-inside:avoid;page-break-after:auto}
 th,td{padding:6px 8px;border:1px solid #999;vertical-align:middle}
-h1,h2,h3{margin:6px 0 10px 0}
+h1,h2,h3,h4{margin:6px 0 10px 0;page-break-after:avoid;page-break-inside:avoid}
+h1+*,h2+*,h3+*,h4+*{page-break-before:avoid}
+img,svg{max-width:100% !important;page-break-inside:avoid;break-inside:avoid}
 button{display:none !important}
-.modal, [class*="modal"]{background:#fff !important;color:#000 !important;box-shadow:none !important;border:none !important;max-width:none !important;width:auto !important;padding:0 !important;margin:0 !important}
+.no-print{display:none !important}
+[data-no]{display:none !important}
+.modal, [class*="modal"]{background:#fff !important;color:#000 !important;box-shadow:none !important;border:none !important;max-width:none !important;width:auto !important;padding:0 !important;margin:0 !important;max-height:none !important;height:auto !important;overflow:visible !important}
+/* Todos los contenedores del clon deben desbloquear scroll para que html2canvas capture el contenido completo */
+.modal *, [class*="modal"] *{max-height:none !important;overflow:visible !important}
 /* Forçar text negre a printing */
 * {color: inherit}
 ${opts.extraCss||''}
 </style></head><body>${clone.outerHTML}</body></html>`;
-    return printHtml(html);
+    // 🔧 FIX Feb 2026: cal passar opts a printHtml, si no sempre imprimeix en PORTRAIT
+    //    (independentment de landscape:true) i el content es talla per baix.
+    return printHtml(html, {landscape, margins});
   }catch(err){
     console.error('[printVisibleElement] Fatal:',err);
     toast(currentLang==='ca'?'❌ Error preparant impressió':'❌ Error preparando impresión');
@@ -2197,7 +2207,7 @@ function openStats(initialSection){
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <div style="display:flex;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:2px;gap:2px">
             <button data-mode="single" class="_ch_mode" data-testid="chart-mode-single" style="background:#22d3ee;color:#0b1121;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px">📅 1 ${isCA?'Any':'Año'}</button>
-            <button data-mode="compare" class="_ch_mode" data-testid="chart-mode-compare" style="background:transparent;color:#94a3b8;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px">⚖️ ${isCA?'Comparar 2 anys':'Comparar 2 años'}</button>
+            <button data-mode="compare" class="_ch_mode" data-testid="chart-mode-compare" style="background:transparent;color:#94a3b8;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px">⚖️ ${isCA?'Comparar anys':'Comparar años'}</button>
           </div>
           <select id="_ch_top" data-testid="chart-top" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12px">
             <option value="3">Top 3</option>
@@ -2215,15 +2225,14 @@ function openStats(initialSection){
           <select id="_ch_year_single" data-testid="chart-year-single" style="background:#141821;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:5px 10px;font-size:13px;font-weight:700">${yearOptions}</select>
         </div>
         <div id="_ch_compare_wrap" style="display:none;gap:12px;align-items:center;flex-wrap:wrap">
-          <div style="display:flex;gap:6px;align-items:center"><span style="font-size:11px;color:#94a3b8;font-weight:700">${isCA?'ANY BASE':'AÑO BASE'}:</span>
-            <select id="_ch_year_a" data-testid="chart-year-a" style="background:#141821;color:#94a3b8;border:1px solid #94a3b8;border-radius:6px;padding:5px 10px;font-size:13px;font-weight:700">${yearOptions}</select>
-            <span style="font-size:9px;color:#64748b">(${isCA?'línia contínua':'línea continua'})</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span style="font-size:11px;color:#22d3ee;font-weight:700">${isCA?'ANYS A COMPARAR':'AÑOS A COMPARAR'}:</span>
+            <select id="_ch_year_count" data-testid="chart-year-count" style="background:#141821;color:#22d3ee;border:1px solid #22d3ee;border-radius:6px;padding:5px 10px;font-size:13px;font-weight:700">
+              <option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option>
+            </select>
           </div>
-          <div style="color:#64748b">vs</div>
-          <div style="display:flex;gap:6px;align-items:center"><span style="font-size:11px;color:#22d3ee;font-weight:700">${isCA?'ANY COMPARAR':'AÑO COMPARAR'}:</span>
-            <select id="_ch_year_b" data-testid="chart-year-b" style="background:#141821;color:#22d3ee;border:1px solid #22d3ee;border-radius:6px;padding:5px 10px;font-size:13px;font-weight:700">${yearOptions}</select>
-            <span style="font-size:9px;color:#64748b">(${isCA?'línia discontínua':'línea discontinua'})</span>
-          </div>
+          <div id="_ch_years_row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"></div>
+          <span style="font-size:9px;color:#64748b" id="_ch_years_hint">${isCA?'(cada any té un patró de línia diferent)':'(cada año usa un patrón de línea diferente)'}</span>
         </div>
       </div>
       <div style="display:flex;gap:14px;flex:1;overflow:hidden">
@@ -2238,20 +2247,61 @@ function openStats(initialSection){
     document.body.appendChild(chartBack);
     // Set defaults
     chartBack.querySelector('#_ch_year_single').value=currentYear;
-    chartBack.querySelector('#_ch_year_a').value=defaultBaseYear;
-    chartBack.querySelector('#_ch_year_b').value=defaultCompareYear;
     chartBack.querySelector('[data-no]').onclick=()=>chartBack.remove();
     chartBack.addEventListener('click',ev=>{if(ev.target===chartBack)chartBack.remove()});
     document.addEventListener('keydown',function esc(ev){if(ev.key==='Escape'){chartBack.remove();document.removeEventListener('keydown',esc)}});
+
+    // 📐 Patrones de línea distintos por año (hasta 6 años). Solid + 5 dash patterns.
+    //    Índice 0 = línea contínua · 1..5 = discontínuas con separaciones progresivas.
+    const YEAR_DASH = ['', '6,4', '2,3', '10,3,2,3', '4,2,2,2', '1,3'];
+    const YEAR_DASH_LBL = (isCA?['línia contínua','ratlles llargues','ratlles curtes','ratlles-punt','tres-uns','punts']:['línea continua','rayas largas','rayas cortas','raya-punto','tres-uno','puntos']);
 
     const state={
       mode:'single',
       topN:preselCount,
       enabled:new Set(fallbackActive.slice(0,preselCount)),
       yearSingle:String(currentYear),
-      yearA:defaultBaseYear,
-      yearB:defaultCompareYear
+      // 🆕 Multi-año: array de años seleccionados en modo compare (2-6).
+      years:[]
     };
+
+    // Rellena state.years con los N más recientes que tengan datos (o desde el año actual hacia atrás).
+    function _fillDefaultYears(n){
+      const pool = (yearsWithData||[]).slice().reverse();
+      // completar hasta N con años recientes aunque no tengan datos (para que el usuario pueda cambiarlo)
+      const yrs = [];
+      for(const y of pool){ if(yrs.length<n) yrs.push(String(y)); }
+      let y = parseInt(currentYear);
+      while(yrs.length<n){ const s=String(y--); if(!yrs.includes(s)) yrs.push(s); }
+      // ordena descendente
+      return yrs.sort((a,b)=>+b-+a).slice(0,n);
+    }
+    state.years = _fillDefaultYears(3);
+
+    // Renderiza las pastillas de año (una select por cada year slot)
+    function renderYearPills(){
+      const wrap = chartBack.querySelector('#_ch_years_row');
+      const opts = yearOptions;
+      wrap.innerHTML = state.years.map((y,idx)=>{
+        const dash = YEAR_DASH[idx];
+        const dashSvg = dash
+          ? `<svg width="26" height="6" style="vertical-align:middle"><line x1="1" y1="3" x2="25" y2="3" stroke="#22d3ee" stroke-width="2.4" stroke-dasharray="${dash}"/></svg>`
+          : `<svg width="26" height="6" style="vertical-align:middle"><line x1="1" y1="3" x2="25" y2="3" stroke="#22d3ee" stroke-width="2.4"/></svg>`;
+        return `<div style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;background:#0b1121;border:1px solid #22d3ee;border-radius:6px" data-testid="chart-year-slot-${idx}">
+          <span style="font-size:9px;color:#94a3b8;font-weight:700">Año ${idx+1}</span>
+          ${dashSvg}
+          <select data-year-idx="${idx}" class="_ch_year_slot" style="background:#141821;color:#22d3ee;border:1px solid #22d3ee;border-radius:4px;padding:3px 6px;font-size:12px;font-weight:700">${opts.replace(new RegExp('value="'+y+'"','g'),'value="'+y+'" selected')}</select>
+        </div>`;
+      }).join('');
+      wrap.querySelectorAll('.__x_marker').forEach(el=>{}); // no-op, placeholder
+      wrap.querySelectorAll('._ch_year_slot').forEach(sel=>{
+        sel.onchange = ev => {
+          const idx = +sel.dataset.yearIdx;
+          state.years[idx] = ev.target.value;
+          drawChart(); drawLegend();
+        };
+      });
+    }
 
     function drawChart(){
       const chosen=state.topN==='all'?fallbackActive:fallbackActive.slice(0,+state.topN);
@@ -2261,17 +2311,17 @@ function openStats(initialSection){
         for(const name of drawNames){
           const globalIdx=sortedNames.indexOf(name);
           const values=MESOS.map((_,mi)=>{const k=`${state.yearSingle}-${String(mi+1).padStart(2,'0')}`;return (st.data[k]||{})[name]||0});
-          series.push({name:`${name} · ${state.yearSingle}`, baseName:name, color:PALETTE[globalIdx%PALETTE.length], values, dashed:false});
+          series.push({name:`${name} · ${state.yearSingle}`, baseName:name, year:state.yearSingle, yearIdx:0, color:PALETTE[globalIdx%PALETTE.length], values, dashed:false});
         }
       } else {
-        // compare: dos líneas por autoescuela (A sólida, B discontinua)
+        // compare: N líneas por autoescuela (una por año seleccionado, cada una con dash distinto)
         for(const name of drawNames){
           const globalIdx=sortedNames.indexOf(name);
           const color=PALETTE[globalIdx%PALETTE.length];
-          const valA=MESOS.map((_,mi)=>{const k=`${state.yearA}-${String(mi+1).padStart(2,'0')}`;return (st.data[k]||{})[name]||0});
-          const valB=MESOS.map((_,mi)=>{const k=`${state.yearB}-${String(mi+1).padStart(2,'0')}`;return (st.data[k]||{})[name]||0});
-          series.push({name:`${name} · ${state.yearA}`, baseName:name, color, values:valA, dashed:false});
-          series.push({name:`${name} · ${state.yearB}`, baseName:name, color, values:valB, dashed:true});
+          state.years.forEach((y, yi) => {
+            const vals = MESOS.map((_,mi)=>{const k=`${y}-${String(mi+1).padStart(2,'0')}`;return (st.data[k]||{})[name]||0});
+            series.push({name:`${name} · ${y}`, baseName:name, year:String(y), yearIdx:yi, color, values:vals, dashed: yi>0, dashArr: YEAR_DASH[yi]||''});
+          });
         }
       }
       let maxY=0;
@@ -2292,27 +2342,81 @@ function openStats(initialSection){
       svg+=`</g>`;
       for(const s of series){
         const pts=s.values.map((v,mi)=>`${padL+stepX*mi},${padT+ch-(ch*(v/maxY))}`).join(' ');
-        const dash=s.dashed?'stroke-dasharray="6,4"':'';
+        const dashArr = s.dashArr || (s.dashed?'6,4':'');
+        const dash = dashArr ? `stroke-dasharray="${dashArr}"` : '';
         svg+=`<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" ${dash} />`;
+        // Marcador diferente por año: círculo lleno (año base), círculo hueco (2º año),
+        // rombo (3º), cuadrado (4º), triángulo (5º), estrella (6º)
+        const YEAR_MARKER = ['fillcircle','hollowcircle','diamond','square','triangle','star'];
+        const marker = YEAR_MARKER[s.yearIdx] || 'fillcircle';
         s.values.forEach((v,mi)=>{
           const x=padL+stepX*mi, y=padT+ch-(ch*(v/maxY));
-          svg+=`<circle cx="${x}" cy="${y}" r="${s.dashed?3:3.5}" fill="${s.color}" stroke="${s.dashed?'#0b1121':'none'}" stroke-width="${s.dashed?1.5:0}"><title>${s.name.replace(/</g,'&lt;')} · ${MESOS[mi]}: ${v}</title></circle>`;
-          if(v>0 && !s.dashed){svg+=`<text x="${x}" y="${y-7}" text-anchor="middle" font-size="9" fill="${s.color}" font-family="Consolas,monospace" font-weight="700">${v}</text>`;}
+          // Dibuja marcador según año
+          if(marker === 'fillcircle'){
+            svg+=`<circle cx="${x}" cy="${y}" r="3.5" fill="${s.color}"><title>${s.name.replace(/</g,'&lt;')} · ${MESOS[mi]}: ${v}</title></circle>`;
+          } else if(marker === 'hollowcircle'){
+            svg+=`<circle cx="${x}" cy="${y}" r="3.5" fill="#0b1121" stroke="${s.color}" stroke-width="1.8"><title>${s.name.replace(/</g,'&lt;')} · ${MESOS[mi]}: ${v}</title></circle>`;
+          } else if(marker === 'diamond'){
+            svg+=`<rect x="${x-3.2}" y="${y-3.2}" width="6.4" height="6.4" transform="rotate(45 ${x} ${y})" fill="${s.color}"><title>${s.name.replace(/</g,'&lt;')} · ${MESOS[mi]}: ${v}</title></rect>`;
+          } else if(marker === 'square'){
+            svg+=`<rect x="${x-3.2}" y="${y-3.2}" width="6.4" height="6.4" fill="${s.color}"><title>${s.name.replace(/</g,'&lt;')} · ${MESOS[mi]}: ${v}</title></rect>`;
+          } else if(marker === 'triangle'){
+            svg+=`<polygon points="${x},${y-4} ${x-3.5},${y+3} ${x+3.5},${y+3}" fill="${s.color}"><title>${s.name.replace(/</g,'&lt;')} · ${MESOS[mi]}: ${v}</title></polygon>`;
+          } else if(marker === 'star'){
+            svg+=`<polygon points="${x},${y-4} ${x+1.2},${y-1.2} ${x+4},${y-1.2} ${x+1.8},${y+0.8} ${x+2.6},${y+3.6} ${x},${y+2} ${x-2.6},${y+3.6} ${x-1.8},${y+0.8} ${x-4},${y-1.2} ${x-1.2},${y-1.2}" fill="${s.color}"><title>${s.name.replace(/</g,'&lt;')} · ${MESOS[mi]}: ${v}</title></polygon>`;
+          }
+          // Muestra número encima de TODOS los puntos (offset vertical por año para no solapar)
+          if(v>0){
+            const yOff = 8 + (s.yearIdx * 11); // apila los números por año
+            svg+=`<text x="${x}" y="${y-yOff}" text-anchor="middle" font-size="9" fill="${s.color}" font-family="Consolas,monospace" font-weight="700">${v}</text>`;
+          }
         });
       }
       svg+=`</svg>`;
       if(!series.length){svg=`<div style="padding:60px;text-align:center;color:#64748b;font-style:italic">${isCA?'Cap autoescola activa. Clica al llegenda per activar-ne.':'Ninguna autoescuela activa. Haz clic en la leyenda para activar.'}</div>`;}
-      chartBack.querySelector('#_ch_svg').innerHTML=svg;
+      // 📅 Cabecera de leyenda de AÑOS · muestra qué patrón/marcador corresponde a cada año
+      let yearHdr = '';
+      if(state.mode === 'compare' && state.years.length){
+        const YEAR_MARKER_SVG = [
+          (c)=>`<circle cx="10" cy="6" r="3.5" fill="${c}"/>`, // solid dot
+          (c)=>`<circle cx="10" cy="6" r="3.5" fill="none" stroke="${c}" stroke-width="1.8"/>`, // hollow
+          (c)=>`<rect x="6.8" y="2.8" width="6.4" height="6.4" transform="rotate(45 10 6)" fill="${c}"/>`, // diamond
+          (c)=>`<rect x="6.8" y="2.8" width="6.4" height="6.4" fill="${c}"/>`, // square
+          (c)=>`<polygon points="10,2 6.5,9 13.5,9" fill="${c}"/>`, // triangle
+          (c)=>`<polygon points="10,2 11.2,4.8 14,4.8 11.8,6.8 12.6,9.6 10,8 7.4,9.6 8.2,6.8 6,4.8 8.8,4.8" fill="${c}"/>` // star
+        ];
+        yearHdr = `<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:8px 12px;margin-bottom:10px;background:#0f172a;border:1px solid #1e293b;border-radius:6px">
+          <span style="font-size:11px;color:#94a3b8;font-weight:700;letter-spacing:.5px">${isCA?"LLEGENDA D'ANYS":"LEYENDA DE AÑOS"}:</span>`;
+        state.years.forEach((y, yi) => {
+          const dashArr = YEAR_DASH[yi] || '';
+          const dashAttr = dashArr ? ` stroke-dasharray="${dashArr}"` : '';
+          const markerFn = YEAR_MARKER_SVG[yi] || YEAR_MARKER_SVG[0];
+          yearHdr += `<div style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;background:#141821;border:1px solid #22d3ee;border-radius:5px" data-testid="year-legend-${y}">
+            <svg width="42" height="12" style="flex-shrink:0">
+              <line x1="2" y1="6" x2="38" y2="6" stroke="#22d3ee" stroke-width="2.4"${dashAttr}/>
+              ${markerFn('#22d3ee').replace(/cx="10"/g,'cx="20"').replace(/x="6.8"/g,'x="16.8"').replace(/points="10,/g,'points="20,').replace(/(\d+\.?\d*),(\d+\.?\d*)/g, (_,a,b)=>{
+                const na = parseFloat(a);
+                return (na>=6 && na<=14 ? na+10 : na) + ',' + b;
+              })}
+            </svg>
+            <span style="font-size:12px;color:#22d3ee;font-weight:700">${y}</span>
+          </div>`;
+        });
+        yearHdr += `</div>`;
+      }
+      chartBack.querySelector('#_ch_svg').innerHTML = yearHdr + svg;
       // Update title
       const t=chartBack.querySelector('#_ch_title');
       if(state.mode==='single') t.innerHTML=`📈 ${isCA?'Evolució':'Evolución'} · ${state.yearSingle}`;
-      else t.innerHTML=`⚖️ ${isCA?'Comparació':'Comparación'} · ${state.yearA} vs <span style="color:#22d3ee">${state.yearB}</span>`;
+      else t.innerHTML=`⚖️ ${isCA?'Comparació':'Comparación'} · <span style="color:#22d3ee">${state.years.join(' · ')}</span>`;
     }
 
     function drawLegend(){
       const chosen=state.topN==='all'?fallbackActive:fallbackActive.slice(0,+state.topN);
-      const totA=state.mode==='compare'?totalsFor(state.yearA):null;
-      const totB=state.mode==='compare'?totalsFor(state.yearB):totalsFor(state.yearSingle);
+      // En modo single: total del año único. En compare: totales de cada año.
+      const totsByYear = {};
+      if(state.mode==='compare'){ state.years.forEach(y => totsByYear[y] = totalsFor(y)); }
+      const totSingle = state.mode==='single' ? totalsFor(state.yearSingle) : null;
       const html=chosen.map(name=>{
         const idx=sortedNames.indexOf(name);
         const color=PALETTE[idx%PALETTE.length];
@@ -2320,17 +2424,27 @@ function openStats(initialSection){
         let content='';
         if(state.mode==='single'){
           content=`<div style="flex:1;font-size:12px;font-weight:600;color:${active?'#e2e8f0':'#64748b'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name.replace(/</g,'&lt;')}</div>
-            <div style="font-size:10px;color:#94a3b8;font-family:Consolas,monospace">${totB[name]||0}</div>`;
+            <div style="font-size:10px;color:#94a3b8;font-family:Consolas,monospace">${totSingle[name]||0}</div>`;
         } else {
-          const a=totA[name]||0, b=totB[name]||0;
-          const growth = a === 0 ? (b>0?'new':'—') : (((b-a)/a)*100);
-          let growthLbl, growthColor;
-          if(growth==='new'){growthLbl='NUEVO';growthColor='#22d3ee'}
-          else if(growth==='—'){growthLbl='—';growthColor='#64748b'}
-          else{const pct=growth;growthLbl=(pct>=0?'+':'')+pct.toFixed(1)+'%';growthColor=pct>0?'#3ddc97':(pct<0?'#f472b6':'#94a3b8')}
+          // Multi-año: muestra cada año con su total y variación vs anterior
+          const parts = state.years.map((y, yi) => {
+            const val = totsByYear[y][name] || 0;
+            const prevY = yi>0 ? state.years[yi-1] : null;
+            const prev = prevY ? (totsByYear[prevY][name] || 0) : null;
+            let arrow = '';
+            if(prev !== null && prev > 0){
+              const pct = ((val - prev) / prev) * 100;
+              const col = pct > 0.5 ? '#3ddc97' : (pct < -0.5 ? '#f472b6' : '#94a3b8');
+              const ar = pct > 0.5 ? '▲' : (pct < -0.5 ? '▼' : '—');
+              arrow = `<span style="color:${col};font-size:8px;margin-left:2px">${ar}${Math.abs(pct).toFixed(0)}%</span>`;
+            } else if(prev === 0 && val > 0){
+              arrow = `<span style="color:#22d3ee;font-size:8px;margin-left:2px">NUEVO</span>`;
+            }
+            return `<span style="display:inline-block;margin-right:6px"><span style="color:#94a3b8">${y}</span>:<span style="color:#e2e8f0;font-weight:700"> ${val}</span>${arrow}</span>`;
+          }).join('');
           content=`<div style="flex:1;overflow:hidden">
             <div style="font-size:12px;font-weight:600;color:${active?'#e2e8f0':'#64748b'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name.replace(/</g,'&lt;')}</div>
-            <div style="font-size:9px;color:#94a3b8;margin-top:2px"><span style="color:#94a3b8">${a}</span> → <span style="color:#22d3ee">${b}</span> · <span style="color:${growthColor};font-weight:700">${growthLbl}</span></div>
+            <div style="font-size:9px;color:#94a3b8;margin-top:2px;line-height:1.5">${parts}</div>
           </div>`;
         }
         return `<div class="ch-item" data-name="${name.replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:4px;background:${active?'#1e293b':'transparent'};border-radius:5px;cursor:pointer;opacity:${active?1:0.45};transition:all .15s ease" data-testid="chart-legend-item">
@@ -2349,12 +2463,18 @@ function openStats(initialSection){
         chartBack.querySelector('#_ch_year_single').style.display=state.mode==='single'?'inline-block':'none';
         chartBack.querySelector('#_ch_year_single').parentElement.style.display=state.mode==='single'?'flex':'none';
         chartBack.querySelector('#_ch_compare_wrap').style.display=state.mode==='compare'?'flex':'none';
+        if(state.mode==='compare') renderYearPills();
         drawChart();drawLegend();
       };
     });
     chartBack.querySelector('#_ch_year_single').onchange=ev=>{state.yearSingle=ev.target.value;drawChart();drawLegend();};
-    chartBack.querySelector('#_ch_year_a').onchange=ev=>{state.yearA=ev.target.value;drawChart();drawLegend();};
-    chartBack.querySelector('#_ch_year_b').onchange=ev=>{state.yearB=ev.target.value;drawChart();drawLegend();};
+    // 🆕 Selector del número de años a comparar (2-6)
+    chartBack.querySelector('#_ch_year_count').onchange=ev=>{
+      const n = parseInt(ev.target.value);
+      state.years = _fillDefaultYears(n);
+      renderYearPills();
+      drawChart();drawLegend();
+    };
     chartBack.querySelector('#_ch_top').onchange=ev=>{
       state.topN=ev.target.value;
       const chosen=state.topN==='all'?fallbackActive:fallbackActive.slice(0,+state.topN);
@@ -2363,7 +2483,7 @@ function openStats(initialSection){
     };
     chartBack.querySelector('#_ch_print').onclick=()=>{
       const modal=chartBack.querySelector('.modal');
-      const label = state.mode==='single'?state.yearSingle:`${state.yearA} vs ${state.yearB}`;
+      const label = state.mode==='single' ? state.yearSingle : state.years.join(' · ');
       printVisibleElement(modal, {
         title:`Estadísticas Autoescuelas · ${label}`,
         landscape:true, margins:'8mm',
@@ -7262,10 +7382,18 @@ function _buildAnnualReport(year, monthFilterIdx){
         // Tasas cobradas (separades per referència: quant se n'ha venut de stock)
         grandTotals.tasasVendidas = (grandTotals.tasasVendidas || 0) + amtTasa;
         // Desglossament per grup × concepte (total facturat = servei + tasa)
+        // 🔧 FIX Feb 2026 · dos cambios importantes:
+        //   1. Los EXTRAS (Foto/Duplicado/C.Oficial) van SIEMPRE a un grupo virtual "Otros"
+        //      (antes iban a "General" mezclados con CANJE sin grupo).
+        //   2. Solo cuentan las unidades con importe>0 (alinea con "Tráfico" de arriba).
+        //   Así el total del Desglose (excluyendo "Otros") = Tráfico de arriba.
+        const _catLowGC = String(cat||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        const _isExtraGC = /foto/.test(_catLowGC) || /duplic/.test(_catLowGC) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLowGC);
+        const grupoLabelFinal = _isExtraGC ? (currentLang==='es'?'Otros':'Altres') : grupoLabel;
         grandTotals.byGroupConcept = grandTotals.byGroupConcept || {};
-        grandTotals.byGroupConcept[grupoLabel] = grandTotals.byGroupConcept[grupoLabel] || {};
-        const gc = grandTotals.byGroupConcept[grupoLabel][cat] = grandTotals.byGroupConcept[grupoLabel][cat] || {count:0, total:0};
-        gc.count += 1;
+        grandTotals.byGroupConcept[grupoLabelFinal] = grandTotals.byGroupConcept[grupoLabelFinal] || {};
+        const gc = grandTotals.byGroupConcept[grupoLabelFinal][cat] = grandTotals.byGroupConcept[grupoLabelFinal][cat] || {count:0, total:0};
+        if(amtTotal > 0){ gc.count += 1; }  // 🔧 FIX: solo cuenta uds con importe>0
         gc.total += amtTotal;
       });
     });
@@ -7278,11 +7406,14 @@ function _buildAnnualReport(year, monthFilterIdx){
   //    todas las autoescolas de ese mes como conteo del mes. Así el usuario puede tener
   //    stats completas del año aunque haya empezado a usar el programa a mitad de año.
   //    Regla anti-doble-conteo: si ya hay CSV, se ignora el backfill (CSV = real).
+  //    🔧 FIX Feb 2026: respetar monthFilterIdx — si el usuario mira UN mes concreto,
+  //    solo aplicar backfill a ese mes (antes sumaba los 12 → total = año, no mes).
   if(comps.length === 1 && comps[0].key === 'trafic'){
     try{
       const _stats = JSON.parse(localStorage.getItem('caja.stats.v1')||'null');
       if(_stats && _stats.data){
         for(let mi=0; mi<12; mi++){
+          if(monthFilterIdx >= 0 && mi !== monthFilterIdx) continue;  // 🔧 FIX
           const monthKey = `${year}-${String(mi+1).padStart(2,'0')}`;
           const monthObj = _stats.data[monthKey];
           if(!monthObj) continue;
@@ -7803,20 +7934,44 @@ function openYearComparison(){
       landscape:true,
       margins:'6mm',
       extraCss:`@page { size: A4 landscape; margin: 6mm }
-        button, select, input, [data-no], .icon-btn { display:none !important }
+        button, select, input, [data-no], .icon-btn, .no-print { display:none !important }
         body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important }
         .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important }
         .modal{ padding:4mm !important; max-width:none !important; width:100% !important; border:none !important }
         h3{ color:#000 !important; font-size:13pt !important; margin:0 0 6pt 0 !important }
+        h4{ color:#000 !important; font-size:11pt !important; margin:10pt 0 4pt 0 !important; page-break-after:avoid; page-break-inside:avoid }
+        /* Cada sección grande empieza en su propia página si no cabe */
+        #ycChart, h4 { page-break-inside:avoid }
+        /* Tarjetas KPI en fila (evita que se apilen en portrait accidental) */
+        [style*="grid-template-columns"] { page-break-inside:avoid }
         table{ border-collapse:collapse !important; width:100% !important; font-size:8pt !important; page-break-inside:auto }
-        thead{ display:table-header-group } tr{ page-break-inside:avoid }
+        thead{ display:table-header-group } tr{ page-break-inside:avoid; page-break-after:auto }
         th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:8pt !important }
-        td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 4pt !important; font-size:8pt !important; word-wrap:break-word }`
+        td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 4pt !important; font-size:8pt !important; word-wrap:break-word }
+        /* SVG de gráfica: máximo alto para caber en una página */
+        svg{ max-width:100% !important; max-height:74mm !important; height:auto !important }
+        /* Fuerza salto limpio antes de "Resumen comparativo" (primer h4 después del chart) */
+        #ycChart + h4 { page-break-before: always !important; margin-top:0 !important }`
     });
   };
   const sel=back.querySelector('#ycCount');
   const bodyEl=back.querySelector('#ycBody');
-  const render=()=>{bodyEl.innerHTML=_buildYearComparison(yearNow,parseInt(sel.value))};
+  // 🔄 Reset años ocultos cuando se abre el modal (para no arrastrar estado entre sesiones)
+  window._ycHidden = new Set();
+  const render=()=>{
+    bodyEl.innerHTML=_buildYearComparison(yearNow,parseInt(sel.value));
+    // 🖱️ Wire toggle · clic en tarjeta KPI oculta/muestra ese año en la gráfica
+    bodyEl.querySelectorAll('.yc-kpi-card').forEach(card => {
+      const toggle = () => {
+        const y = String(card.dataset.year);
+        if(window._ycHidden.has(y)) window._ycHidden.delete(y);
+        else window._ycHidden.add(y);
+        render();
+      };
+      card.onclick = toggle;
+      card.onkeydown = ev => { if(ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); toggle(); } };
+    });
+  };
   sel.onchange=render;render();
   // 📈 Scroll suave hasta la gráfica al pulsar "Ver gráfica"
   back.querySelector('#ycGoChart').onclick=()=>{
@@ -7910,22 +8065,43 @@ function _buildYearComparison(latestYear,count){
     <div style="font-size:13px;color:#64748b;margin-top:4px">MediCar Plus · ${comps.map(c=>c.name).join(' + ')}</div>
   </div>`;
 
-  // KPIs por año
+  // 📎 Estado local (persistente entre re-renders): años ocultos por clic del usuario.
+  //    window._ycHidden es un Set de strings de años. Toggle al hacer clic en la tarjeta.
+  if(!window._ycHidden || !(window._ycHidden instanceof Set)) window._ycHidden = new Set();
+  const _hidden = window._ycHidden;
+  // Filtra: si el usuario oculta años, no computan en la gráfica.
+  const visibleYears = years.filter(y => !_hidden.has(String(y)));
+
+  // 🎨 Misma paleta que la gráfica → cada año tiene su color propio.
+  const YEAR_PALETTE = ['#ef4444','#f59e0b','#10b981','#06b6d4','#6366f1','#f5b301'];
+  const yearColor = (idx) => YEAR_PALETTE[idx % YEAR_PALETTE.length];
+
+  // KPIs por año · colores por año + clic para toggle
   html+=`<div style="display:grid;grid-template-columns:repeat(${years.length},1fr);gap:10px;margin-bottom:20px">`;
   const maxNeto=Math.max(1,...years.map(y=>byYear[y].neto));
-  years.forEach(y=>{
+  years.forEach((y, yi)=>{
     const d=byYear[y];const pct=d.neto?((d.neto/maxNeto)*100).toFixed(0):0;
-    html+=`<div style="background:#f8fafc;border:1px solid #cbd5e1;border-left:4px solid #f5b301;padding:14px;border-radius:6px">
-      <div style="font-size:11px;color:#64748b;letter-spacing:1px;text-transform:uppercase">${y}</div>
+    const col = yearColor(yi);
+    const isHidden = _hidden.has(String(y));
+    const activeOpacity = isHidden ? '0.35' : '1';
+    const activeBg = isHidden ? '#e5e7eb' : '#f8fafc';
+    html+=`<div class="yc-kpi-card no-print-toggle" data-year="${y}" data-testid="yc-kpi-${y}" role="button" tabindex="0" title="${L('Clica per amagar/mostrar aquest any al gràfic','Haz clic para ocultar/mostrar este año en la gráfica')}" style="background:${activeBg};border:1px solid #cbd5e1;border-left:4px solid ${col};padding:14px;border-radius:6px;cursor:pointer;opacity:${activeOpacity};transition:all .18s ease;user-select:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="display:inline-block;width:12px;height:12px;background:${col};border-radius:50%;flex-shrink:0"></span>
+          <div style="font-size:11px;color:#64748b;letter-spacing:1px;text-transform:uppercase;font-weight:700">${y}</div>
+        </div>
+        ${isHidden ? `<span style="font-size:9px;color:#94a3b8;font-weight:700">${L('OCULT','OCULTO')}</span>` : ''}
+      </div>
       <div style="font-size:22px;color:#0f172a;font-weight:700;margin-top:4px;font-family:'Courier New',monospace">${fmt(d.neto)}</div>
       <div style="font-size:12px;color:#475569;margin-top:6px">${d.cnt} ${L('entrades','entradas')}</div>
-      <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-top:8px;overflow:hidden"><div style="height:100%;background:#f5b301;width:${pct}%"></div></div>
+      <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-top:8px;overflow:hidden"><div style="height:100%;background:${col};width:${pct}%"></div></div>
     </div>`;
   });
   html+=`</div>`;
 
-  // 📈 Gráfica de líneas · comparativa de entradas mensuales por año (SVG nativo)
-  html+= _buildYearComparisonChart(years, byYear, MESES);
+  // 📈 Gráfica de líneas · SOLO con los años visibles (no ocultos)
+  html+= _buildYearComparisonChart(visibleYears, byYear, MESES);
 
   // Tabla comparativa totales
   html+=`<h4 style="color:#0f172a;font-family:Georgia,serif;border-bottom:1px solid #cbd5e1;padding-bottom:6px">📊 ${L('Resum comparatiu','Resumen comparativo')}</h4>

@@ -1863,3 +1863,57 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
   - Screenshot Playwright → `#ycChart` presente en DOM al abrir el modal.
 - **Notas**: gráfica renderiza en SVG puro → visible tanto en modal como en el PDF exportado. En Electron: recordar `Ctrl + Shift + R` tras actualizar.
 
+
+### 🎨 Gráfica interactiva multi-año + FIX PDF landscape · Feb 2026 (v2.html)
+
+**Feature: KPI cards con colores por año + toggle clicable** (Comparativa años):
+- Cada tarjeta KPI de año usa el color de su línea en la gráfica (rojo, ámbar, verde, cian, índigo, dorado).
+- Círculo de color + acento border-left + barra de progreso, todo del mismo color por año.
+- Clic en una tarjeta → oculta esa línea de la gráfica (opacity 0.35, badge "OCULTO"). Segundo clic → la vuelve a mostrar.
+- Estado en `window._ycHidden` (Set) que se resetea cada vez que se abre el modal.
+- Las tablas Resumen y Facturación mensual siguen mostrando TODOS los años (solo la gráfica se filtra).
+- Keyboard accessible: Enter/Space también dispara toggle.
+
+**Multi-año en Gráfico de Estadísticas Autoescuelas** (`openAutoescolasChart`):
+- Reemplazado "Comparar 2 años" (yearA/yearB) por multi-año 2-6.
+- Nueva UI: selector "AÑOS A COMPARAR" (2-6) + N pastillas de año con select individual.
+- Cada año usa un patrón de línea distinto: continua, rayas largas, rayas cortas, raya-punto, tres-uno, puntos.
+- Leyenda enriquecida: por autoescuela muestra el total de cada año seleccionado con variaciones vs año anterior.
+- Colores por autoescuela (no por año, para distinguir escuelas fácilmente).
+
+**FIX crítico PDF landscape** (`printVisibleElement`):
+- Bug: `return printHtml(html);` no pasaba `opts` → `printHtml` recibía `opts={}` → `isLandscape=false` SIEMPRE, aunque el callsite pasase `landscape:true`. Resultado: TODOS los PDF salían en portrait, con contenido cortado.
+- Fix: `return printHtml(html, {landscape, margins});` ahora sí pasa el flag.
+- Fix adicional: base CSS de `printVisibleElement` añade `max-height:none !important; overflow:visible !important` en `.modal` y descendientes → el clon del modal no queda limitado a 94vh cuando html2canvas lo captura, por lo que TODO el contenido se renderiza (no se corta por debajo).
+- Fix adicional: `.no-print { display:none !important }` en la CSS base → cabeceras de modales marcadas con `no-print` desaparecen del PDF en todos los prints.
+- Aplica a los 10+ callsites: Comparativa años, Facturación anual, Autoescuelas, Tráfico, Honorarios, Gastos, Cierre diario, etc.
+
+**Validación E2E PDF Comparativa años**:
+- Descarga real con Playwright → PDF 2 páginas landscape (842×595):
+  · P1: Título + 6 KPI cards coloreadas + Gráfica completa (350-650 en Y, 6 líneas) + header "Resumen comparativo"
+  · P2: Tabla Resumen (4 filas + variación) + Tabla Facturación mensual con LOS 12 MESES + FILA TOTAL
+- Sin cortes, todo visible.
+- `accounting_audit.js` → 102/102 invariantes contables PASS.
+- Sintaxis de los 10 bloques `<script>` limpia (`node -c`).
+
+
+### 🐛 3 FIX Informe Anual + Landing · Feb 2026
+
+**Bug 1 · Backfill sumaba los 12 meses en modo mensual** (`_buildAnnualReport`):
+- Síntoma: seleccionar "Enero" mostraba `grandTotals.cnt = 3763` (year-to-date) en vez del conteo real de enero.
+- Causa: el bucle `for(mi=0; mi<12; mi++)` que aplica backfill de `caja.stats.v1` no respetaba `monthFilterIdx`.
+- Fix: `if(monthFilterIdx >= 0 && mi !== monthFilterIdx) continue;` — el backfill solo aplica al mes filtrado.
+
+**Bug 3 · Desglose por grupo y tipo no cuadraba con Facturación por categoría**:
+- Síntoma: "Tráfico" (arriba) = 518, pero suma del Desglose (sin General) = ~578. Discrepancia de 43 uds fantasma.
+- Causa 1: `byGroupConcept.count += 1` contaba TODO, incluidas entradas con importe=0. `byConceptCnt` solo cuenta si importe>0. Desalineados.
+- Causa 2: extras (Foto/Duplicado/C.Oficial) iban a "General" mezclados con CANJE sin grupo → imposible cuadrar visualmente.
+- Fix 1: `if(amtTotal > 0){ gc.count += 1; }` — alinea con byConceptCnt.
+- Fix 2: extras se agrupan siempre en un grupo virtual **"Otros"** (o "Altres" en catalán) via `_isExtraGC ? 'Otros' : grupoLabel`. Ahora la suma del Desglose EXCLUYENDO "Otros" = "Tráfico" de arriba. ✓
+- Rename: "General" → "Otros" para extras (Fotos/Duplicado/C.Oficial), como pidió el usuario.
+
+**Bug 2 · Texto landing sin "comparativa de años"**:
+- Landings actualizados (`landing-medicarplus.html` y `landing-assets/index.html`): "estadísticas anuales/mensuales" → "estadísticas y comparativa de años".
+
+**Validación**: 102/102 invariantes contables pasan, sintaxis JS limpia en los 10 bloques.
+
