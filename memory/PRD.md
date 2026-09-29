@@ -1993,3 +1993,37 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 
 **Validación**: 102/102 invariantes contables PASS · sintaxis JS OK.
 
+
+### 🧪 Cobertura de Tests · Feb 2026
+
+**2 suites automatizadas · 159 verificaciones · 100% PASS**:
+
+**Suite 1** (`accounting_audit.js`): 102 invariantes históricos del programa
+- 3 años sintéticos (2024-2026) · ~14.163 entradas
+- TRAF/PRIV/HABER/DEBE/retornos/devoluciones/datáfono/traspasos
+- Ingresos, Gastos, Beneficio Neto (invariante universal)
+- KPI cards ≡ Resumen contable ≡ Resultado (3 fuentes = mismo beneficio)
+- Sync PC1↔PC2 · idempotencia · 10.000 entradas precisión céntimo
+- Entradas Totales = SOLO personas (excluye Foto/Dup/C.O.)
+
+**Suite 2** (`informe_anual_saldo_apertura.js`) — NUEVA: 57 verificaciones de los cambios recientes
+- CASO 1 · Auto-detección HABER "Otro" primer día ≥300€ → saldo apertura
+- CASO 2 · HABER concepto explícito "Saldo anterior" (fp:T → banco)
+- CASO 3 · Config saldoInicial (efectivo+banco+cambio) desde Ajustes
+- CASO 4 · Filtro mensual respeta saldo apertura solo en su mes
+- CASO 5 · byGroupConcept: extras van a "Otros" · 0€ no cuenta uds
+- CASO 6 · KPI Entradas = GIC (real) + Extras (>0€), sin doble conteo
+- CASO 7 · Reparto entre socios NO infla con saldo apertura
+- CASO 8 · CUADRE TOTAL: Caja/Banco = Facturación IRPF + Saldo Apertura
+- CASO 9 · Auto-detección rechaza HABER <300€
+- CASO 10 · Auto-detección rechaza concepto específico (ej. "Foto grupo")
+
+**Bug real descubierto y arreglado durante testing**:
+- `_isEntradaReal` para Empresa 1 (trafic) incluía extras del CSV → doble conteo con el nuevo `extrasCnt` en la tarjeta KPI. Fix: añadido `!_isExtraER` a la condición.
+
+**Comando para ejecutar**:
+```bash
+node /app/frontend/public/tests/accounting_audit.js
+node /app/frontend/public/tests/informe_anual_saldo_apertura.js
+```
+

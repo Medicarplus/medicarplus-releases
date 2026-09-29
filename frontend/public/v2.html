@@ -7428,7 +7428,14 @@ function _buildAnnualReport(year, monthFilterIdx){
         if(activeKey === 'trafic'){
           const _isDGT = (typeof isTramiteDGT === 'function') ? isTramiteDGT(e) : (e._csv === true);
           const _countZero = (typeof getCountZero === 'function') ? getCountZero() : false;
-          _isEntradaReal = _isDGT && (amtTotal > 0 || _countZero);
+          // 🔧 FIX feb 2026: EXCLUYE extras (Foto/Duplicado/C.Oficial) del GIC.
+          //    Antes: cualquier CSV DGT contaba como Tráfico incluidos los extras
+          //    → doble conteo en la nueva tarjeta KPI (GIC + Extras).
+          //    Ahora: GIC = solo tramites reales (Renov/Exped/Canj/Recup/Periodic/Inicial/Obten)
+          //          extras.cnt = Foto/Dup/C.Oficial >0€ (aparte)
+          const _catLowER = String(cat||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+          const _isExtraER = /foto/.test(_catLowER) || /duplic/.test(_catLowER) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLowER);
+          _isEntradaReal = _isDGT && (amtTotal > 0 || _countZero) && !_isExtraER;
         } else {
           const _catLow = String(cat||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
           const _isExtra = /foto/.test(_catLow) || /duplic/.test(_catLow) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(_catLow);
