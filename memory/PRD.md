@@ -1932,3 +1932,27 @@ Cambio mínimo en `importTrafficRows` (`v2.html`): la lógica de dedupe pasa de 
 
 **Validación**: 102/102 invariantes contables pasan · sintaxis JS OK en los 10 bloques.
 
+
+### 🎯 Entradas Totales · Desglose GIC + Extras · Feb 2026
+
+**Petición**: diferenciar en la tarjeta "Entradas Totales" del Informe Anual:
+- **GIC** (CSV DGT real, programa oficial de tráfico)
+- **Extras** (Foto/Duplicado/C.Oficial con importe > 0€)
+- **Total** = GIC + Extras
+
+**Implementación**:
+- Nuevo tracking `grandTotals.extrasCnt` + `grandTotals.extrasByMonth[]` que cuenta las entradas con concepto Foto/Duplicado/C.Oficial con `amtTotal > 0`. Se acumula dentro del mismo loop de entradas (después del `_isEntradaReal`).
+- Nueva tarjeta KPI custom con:
+  - Número grande: TOTAL (GIC + Extras)
+  - Subtítulo verde: `N GIC (CSV DGT)`
+  - Subtítulo ámbar: `+M extras (Foto/Dup/C.O.)`
+- Si no hay extras > 0€, la tarjeta simplemente indica "solo GIC (CSV DGT)".
+- `data-testid`: `kpi-entradas-total`, `kpi-entradas-total-num`, `kpi-entradas-gic`, `kpi-entradas-extras`.
+
+**Nota**: la lógica de contabilización de importados con `importe > 0` ya estaba correcta:
+- `byConceptCnt[cat]` solo incrementa si `amtTotal > 0` (line 7380)
+- `byGroupConcept[grupo][cat].count` solo incrementa si `amtTotal > 0` (fix reciente)
+- `_isEntradaReal` para Empresa 1 = `_isDGT && amtTotal > 0` (respeta el toggle "contar 0€")
+
+**Validación**: 102/102 invariantes contables OK · sintaxis JS OK.
+
