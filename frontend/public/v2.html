@@ -1700,11 +1700,22 @@ function openStats(initialSection){
     const monthSel=+$('#stMonth').value;
     $('#stMonth').style.display=mode==='month'?'':'none';
     const body=$('#stBody');
+    // 🎯 Feb 2026 · Filtrar autoescoles por año: solo mostrar las que tienen al menos 1 entrada
+    // (aunque sea 0) en cualquier mes del año seleccionado. Evita mostrar autoescoles ya cerradas
+    // de años pasados. Al añadir manualmente una nueva, se le crea placeholder Ene = 0 para que
+    // aparezca en el año actual.
+    const _autosDelYear = new Set();
+    for(let mi=0; mi<12; mi++){
+      const k = `${year}-${String(mi+1).padStart(2,'0')}`;
+      Object.keys(st.data[k]||{}).forEach(n => _autosDelYear.add(n));
+    }
+    const _autoscolesVisible = st.autoescoles.filter(n => _autosDelYear.has(n));
     if(mode==='month'){
       // Vista mensual: solo 1 mes
       const key=`${year}-${String(monthSel).padStart(2,'0')}`;
       const monthData=st.data[key]||{};
-      const rows=st.autoescoles.map((name,ri)=>{
+      const rows=_autoscolesVisible.map((name)=>{
+        const ri = st.autoescoles.indexOf(name);
         const v=monthData[name]||0;
         return `<tr><td style="padding:6px 10px;border:1px solid #2a3040;font-weight:600;background:#141821">${escapeHtml(name)} <button class="icon-btn" data-del="${ri}" title="Eliminar" style="float:right;font-size:10px">🗑</button></td><td class="st-cell" data-r="${ri}" data-m="${monthSel-1}" style="padding:6px 10px;border:1px solid #2a3040;text-align:center;cursor:cell">${v||''}</td></tr>`;
       }).join('');
@@ -1712,7 +1723,8 @@ function openStats(initialSection){
       body.innerHTML=`<table style="border-collapse:collapse;font-size:13px;font-family:'Consolas','Menlo',monospace;width:100%"><thead><tr style="background:#1a1e26"><th style="padding:10px;border:1px solid #2a3040;background:#1a1e26;min-width:250px;text-align:left">AUTOESCOLES · ${MESOS[monthSel-1]} ${year}</th><th style="padding:10px;border:1px solid #2a3040;min-width:120px">CERTIFICATS</th></tr></thead><tbody>${rows}</tbody><tfoot><tr style="background:#1f2530"><td style="padding:10px;border:1px solid #2a3040;font-weight:700">TOTAL ${MESOS[monthSel-1]} ${year}</td><td style="padding:10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#f5b301;font-size:16px">${total||''}</td></tr></tfoot></table>`;
     }else{
       // Vista anual
-      const rows=st.autoescoles.map((name,ri)=>{
+      const rows=_autoscolesVisible.map((name)=>{
+        const ri = st.autoescoles.indexOf(name);
         let tot=0;
         const cells=MESOS.map((_,mi)=>{const key=`${year}-${String(mi+1).padStart(2,'0')}`;const v=(st.data[key]||{})[name]||0;tot+=v;return `<td class="st-cell" data-r="${ri}" data-m="${mi}" style="padding:4px;border:1px solid #2a3040;text-align:center;cursor:cell;min-width:52px">${v||''}</td>`}).join('');
         return `<tr><td style="padding:6px 10px;border:1px solid #2a3040;font-weight:600;background:#141821;position:sticky;left:0;z-index:2">${escapeHtml(name)} <button class="icon-btn" data-del="${ri}" title="Eliminar" style="float:right;font-size:10px">🗑</button></td>${cells}<td style="padding:6px 10px;border:1px solid #2a3040;background:#1f2530;font-weight:700;color:#f5b301;text-align:center">${tot||''}</td></tr>`;
@@ -1769,8 +1781,28 @@ function openStats(initialSection){
       const n=(inp.value||'').trim();
       if(!n){toast(isCA?'Nom buit':'Nombre vacío');return}
       const st=loadStats();
+      // Comparación estricta (mismo texto exacto)
       if(st.autoescoles.includes(n)){toast(isCA?'Ja existeix':'Ya existe');return}
-      st.autoescoles.push(n);saveStats(st);m.remove();renderTable();
+      // 🎯 Comparación fuzzy: ROSSELL, ROSELL, A.E.ROSSELL → misma canónica
+      const _canonicalize = (s) => String(s||'')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')      // sin acentos
+        .toUpperCase()
+        .replace(/^(A\.?\s*E\.?\s*|AUTOESCOLA\s+|AUTOESCUELA\s+|A\.E\s+)/,'') // sin prefijo
+        .replace(/[^A-Z0-9]/g,'')                              // solo letras/números
+        .replace(/([A-Z])\1+/g,'$1');                          // doble letras → una
+      const canNew = _canonicalize(n);
+      const conflict = st.autoescoles.find(x => _canonicalize(x) === canNew);
+      if(conflict){
+        toast(isCA?`⚠️ Similar a "${conflict}" — ja existent`:`⚠️ Similar a "${conflict}" — ya existe`, 4000);
+        return;
+      }
+      // Añadir + crear placeholder en Enero del año actual para que aparezca en la tabla
+      st.autoescoles.push(n);
+      const curYear = $('#stYear').value;
+      const placeholderKey = `${curYear}-01`;
+      st.data[placeholderKey] = st.data[placeholderKey] || {};
+      if(!(n in st.data[placeholderKey])) st.data[placeholderKey][n] = 0;
+      saveStats(st); m.remove(); renderTable();
       toast(isCA?`✅ Afegida: ${n}`:`✅ Añadida: ${n}`);
     };
     m.querySelector('[data-yes]').onclick=doAdd;
