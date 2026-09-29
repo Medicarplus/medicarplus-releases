@@ -8957,32 +8957,32 @@ function _cambioBulkOp(data,rerender,mode){
   const desc=mode==='add'
     ? 'Indica cuántas piezas de cada tipo añades. Se descontarán de Caja o Banco (a tu elección) y se sumarán a la reserva.'
     : 'Indica cuántas piezas retiras. Se restarán de la reserva y sumarán en la caja física.';
-  back.innerHTML=`<div class="modal" style="max-width:520px;width:97%">
-    <div style="display:flex;align-items:center;gap:14px;margin:-16px -16px 16px -16px;padding:12px 18px;background:${color};color:#fff;border-radius:12px 12px 0 0">
-      <h3 style="margin:0;flex:1;font-family:Georgia,serif">${title}</h3>
-      <button class="btn" id="bkClose" style="background:#0f172a;color:#fff;border-color:#0f172a">✖</button>
+  back.innerHTML=`<div class="modal" style="max-width:520px;width:97%;max-height:96vh;display:flex;flex-direction:column;padding:10px 14px">
+    <div style="display:flex;align-items:center;gap:10px;margin:-10px -14px 8px -14px;padding:8px 14px;background:${color};color:#fff;border-radius:12px 12px 0 0;flex-shrink:0">
+      <h3 style="margin:0;flex:1;font-family:Georgia,serif;font-size:16px;line-height:1.2">${title}</h3>
+      <button class="btn" id="bkClose" style="background:#0f172a;color:#fff;border-color:#0f172a;padding:4px 10px">✖</button>
     </div>
-    <p class="small" style="color:#94a3b8;margin:0 0 12px">${desc}</p>
-    ${mode==='add' ? `<div style="background:#0f172a;border:1px solid #16a34a;border-radius:8px;padding:10px 12px;margin-bottom:14px">
-      <label style="color:#94a3b8;font-size:11px;letter-spacing:.5px;font-weight:700;display:block;margin-bottom:6px">💰 ¿De dónde sale el dinero?</label>
-      <div style="display:flex;gap:8px">
-        <label class="cambio-src-lbl" data-src="caja" style="flex:1;padding:10px;background:#1e293b;border:2px solid #16a34a;border-radius:6px;cursor:pointer;text-align:center;color:#7ee3aa;font-weight:700;font-size:13px">
-          <input type="radio" name="cambioSource" value="caja" checked style="margin-right:6px"/>💵 CAJA FÍSICA
+    <p class="small" style="color:#94a3b8;margin:0 0 8px;font-size:11px;line-height:1.35;flex-shrink:0">${desc}</p>
+    ${mode==='add' ? `<div style="background:#0f172a;border:1px solid #16a34a;border-radius:8px;padding:8px 10px;margin-bottom:8px;flex-shrink:0">
+      <label style="color:#94a3b8;font-size:10px;letter-spacing:.5px;font-weight:700;display:block;margin-bottom:5px">💰 ¿DE DÓNDE SALE EL DINERO?</label>
+      <div style="display:flex;gap:6px">
+        <label class="cambio-src-lbl" data-src="caja" style="flex:1;padding:7px;background:#1e293b;border:2px solid #16a34a;border-radius:6px;cursor:pointer;text-align:center;color:#7ee3aa;font-weight:700;font-size:12px">
+          <input type="radio" name="cambioSource" value="caja" checked style="margin-right:5px"/>💵 CAJA FÍSICA
         </label>
-        <label class="cambio-src-lbl" data-src="banco" style="flex:1;padding:10px;background:#1e293b;border:2px solid #334155;border-radius:6px;cursor:pointer;text-align:center;color:#94a3b8;font-weight:600;font-size:13px">
-          <input type="radio" name="cambioSource" value="banco" style="margin-right:6px"/>🏦 BANCO
+        <label class="cambio-src-lbl" data-src="banco" style="flex:1;padding:7px;background:#1e293b;border:2px solid #334155;border-radius:6px;cursor:pointer;text-align:center;color:#94a3b8;font-weight:600;font-size:12px">
+          <input type="radio" name="cambioSource" value="banco" style="margin-right:5px"/>🏦 BANCO
         </label>
       </div>
-      <div style="color:#64748b;font-size:11px;margin-top:6px;line-height:1.4">Se descontará automáticamente de la fuente elegida el mismo día (movimiento interno, no cuenta como gasto).</div>
+      <div style="color:#64748b;font-size:10px;margin-top:5px;line-height:1.3">Se descontará automáticamente de la fuente elegida (mov. interno, no cuenta como gasto).</div>
     </div>` : ''}
-    <div id="bkBody" style="max-height:60vh;overflow:auto"></div>
-    <div style="text-align:center;padding:14px 0;border-top:1px solid #1e293b;margin-top:10px">
-      <div class="small" style="color:#94a3b8">Total operación</div>
-      <div id="bkTotal" style="font-size:22px;color:${color};font-weight:700;font-family:'Courier New',monospace">0,00 €</div>
+    <div id="bkBody" style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden"></div>
+    <div style="text-align:center;padding:8px 0 6px;border-top:1px solid #1e293b;margin-top:6px;flex-shrink:0">
+      <div class="small" style="color:#94a3b8;font-size:10px">Total operación</div>
+      <div id="bkTotal" style="font-size:19px;color:${color};font-weight:700;font-family:'Courier New',monospace">0,00 €</div>
     </div>
-    <div style="text-align:right;margin-top:12px">
-      <button class="btn" id="bkCancel">Cancelar</button>
-      <button class="btn" id="bkOk" style="background:${color};color:#fff;border-color:${color};font-weight:700">${mode==='add'?'✓ Añadir':'✓ Sacar a caja'}</button>
+    <div style="display:flex;gap:8px;margin-top:6px;flex-shrink:0">
+      <button class="btn" id="bkCancel" style="flex:1;padding:8px 12px">Cancelar</button>
+      <button class="btn" id="bkOk" style="flex:1;background:${color};color:#fff;border-color:${color};font-weight:700;padding:8px 12px">${mode==='add'?'✓ Añadir':'✓ Sacar a caja'}</button>
     </div>
   </div>`;
   document.body.appendChild(back);
@@ -8997,10 +8997,10 @@ function _cambioBulkOp(data,rerender,mode){
     const unit=d.pack?`${d.packLabel}`:'unitat';
     const step=d.pack?'0.5':'1';
     const val=d.pack?d.pack:d.val;
-    return `<div style="display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid #1e293b">
-      <span style="flex:1;color:#e2e8f0">${emoji} ${d.label} <span style="color:#64748b;font-size:11px">· ${unit}</span></span>
-      <input type="number" min="0" max="9999" step="${step}" value="0" data-bk="${d.k}" data-val="${val}" style="width:80px;padding:6px 8px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;text-align:center;font-family:'Courier New',monospace;font-weight:700" />
-      <span class="small" style="width:70px;text-align:right;color:#7ee3aa;font-family:'Courier New',monospace" data-sub="${d.k}">0,00 €</span>
+    return `<div style="display:flex;align-items:center;gap:8px;padding:3px 3px;border-bottom:1px solid #1e293b">
+      <span style="flex:1;color:#e2e8f0;font-size:12px">${emoji} ${d.label} <span style="color:#64748b;font-size:10px">· ${unit}</span></span>
+      <input type="number" min="0" max="9999" step="${step}" value="0" data-bk="${d.k}" data-val="${val}" style="width:64px;padding:4px 6px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;text-align:center;font-family:'Courier New',monospace;font-weight:700;font-size:12px" />
+      <span class="small" style="width:58px;text-align:right;color:#7ee3aa;font-family:'Courier New',monospace;font-size:11px" data-sub="${d.k}">0,00 €</span>
     </div>`;
   }).join('');
   const recalc=()=>{
