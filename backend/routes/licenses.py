@@ -1634,6 +1634,73 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         - SMS del mes actual + total històric
         - Sender del mode MediCar Cloud (si l'usa)
         """
+        # 👑 Feb 2026 · Cas especial MASTER (owner). L'install_id pot ser:
+        #   - '__owner_pending__' (placeholder quan encara no ha enviat cap còpia)
+        #   - un install_id real registrat a sync_devices amb la MASTER_KEY
+        #   En qualsevol dels casos coll.find_one() no troba res perquè el MASTER
+        #   no està a db.licenses (validació offline). Retornem un doc sintètic.
+        import hashlib as _hl
+        MASTER_KEY_LITERAL = "MB-MASTER-BRUGULAT-2026-OWNER"
+        master_lkh = _hl.sha256(MASTER_KEY_LITERAL.encode()).hexdigest()
+        is_master = False
+        master_device = None
+        if install_id.startswith("__owner_"):
+            is_master = True
+        else:
+            master_device = await db["sync_devices"].find_one({
+                "install_id": install_id,
+                "license_key_hash": master_lkh,
+            })
+            if master_device:
+                is_master = True
+        if is_master:
+            from datetime import datetime as _dt, timezone as _tz
+            now_dt = _dt.now(_tz.utc)
+            synthetic_lic = {
+                "id": install_id,
+                "install_id": install_id,
+                "client_name": "👑 MediCar Plus (owner)",
+                "client_email": "owner@medicarplus.es",
+                "plan": "MASTER",
+                "status": "active",
+                "created_at": (master_device or {}).get("created_at") or now_dt.isoformat(),
+                "expires_at": None,
+                "duration_days": None,
+                "notes": "Cuenta propia del proveedor · validación offline con MASTER key.",
+                "last_verified_at": (master_device or {}).get("last_seen"),
+                "verify_count": int((master_device or {}).get("verify_count", 0) or 0),
+                "hwid_lock": None,
+                "hwid_locked_at": None,
+                "hwid_reset_count": 0,
+                "linked_hwids": None,
+                "linked_install_ids": None,
+                "referral_code": None,
+                "referred_by": None,
+                "referral_reward_count": 0,
+                "abuse_flags": None,
+                "message_count": 0,
+                "last_message_at": None,
+                "synthetic_master": True,
+                "placeholder": install_id.startswith("__owner_"),
+                "license_key": None,
+            }
+            return {
+                "license": synthetic_lic,
+                "activity": {
+                    "last_verify_at": synthetic_lic["last_verified_at"],
+                    "verify_count": synthetic_lic["verify_count"],
+                    "days_since_last_verify": None,
+                },
+                "sms": {
+                    "mode_used": "none",
+                    "byoa_campaigns": 0,
+                    "medicar_campaigns": 0,
+                    "current_month": {"period": f"{now_dt.year:04d}-{now_dt.month:02d}", "sent_count": 0, "cost_eur": 0.0, "billed": False, "medicar_sender": ""},
+                    "total_historic": {"sent_count": 0, "months": 0},
+                    "price_per_sms_eur": 0.0,
+                },
+                "master_owner": True,
+            }
         # 🔧 Fix: prioriza la licencia ACTIVA más reciente para este install_id.
         # Antes usaba find_one sin ordenar → podía devolver una licencia vieja
         # expirada/revocada con last_verify_at obsoleto (bug reportado: cliente
@@ -1967,6 +2034,34 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
     )
     async def get_license(install_id: str) -> LicenseRecord:
         install_id = install_id.strip().upper()
+        # 👑 Cas especial MASTER (owner) · retorna sintètic si install_id és el placeholder
+        # o correspon a un sync_device amb la MASTER_KEY.
+        import hashlib as _hl
+        MASTER_KEY_LITERAL = "MB-MASTER-BRUGULAT-2026-OWNER"
+        master_lkh = _hl.sha256(MASTER_KEY_LITERAL.encode()).hexdigest()
+        is_master_placeholder = install_id.startswith("__OWNER_") or install_id.startswith("__owner_")
+        master_device = None
+        if not is_master_placeholder:
+            master_device = await db["sync_devices"].find_one({
+                "install_id": install_id,
+                "license_key_hash": master_lkh,
+            })
+        if is_master_placeholder or master_device:
+            from datetime import datetime as _dt, timezone as _tz
+            now_dt = _dt.now(_tz.utc)
+            return _doc_to_record({
+                "id": install_id,
+                "install_id": install_id,
+                "client_name": "👑 MediCar Plus (owner)",
+                "client_email": "owner@medicarplus.es",
+                "plan": "MASTER",
+                "status": "active",
+                "created_at": (master_device or {}).get("created_at") or now_dt.isoformat(),
+                "notes": "Cuenta propia del proveedor · validación offline con MASTER key.",
+                "last_verified_at": (master_device or {}).get("last_seen"),
+                "_synthetic_master": True,
+                "_placeholder": is_master_placeholder,
+            })
         doc = await coll.find_one(
             {"install_id": install_id}, {"_id": 0}, sort=[("created_at", -1)]
         )
