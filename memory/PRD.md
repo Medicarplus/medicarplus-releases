@@ -1,4 +1,65 @@
 # MediCar Plus · PRD (Product Requirements Document)
+## 2026-02-28 · Test round-trip backup demostrado numéricamente ✅
+
+**Petición del usuario:** demostrar que restaurar una copia en un ordenador vacío deja TODO idéntico al ordenador original — dato a dato, céntimo a céntimo.
+
+**Solución:** creado `/app/frontend/public/tests/backup_roundtrip.js` — test automatizado end-to-end.
+
+**Metodología del test:**
+1. **Ordenador ORIGINAL** → se rellena localStorage con datos realistas en las 18 claves DATA_LS_KEYS (Empresa 1 + Empresa 2, 3 años, IRPF, saldos iniciales, reservas, cuadre, config, calendario…).
+2. **Backup** → llama a la MISMA función `_fullBackupData()` que usa la app real → serializa a JSON.
+3. **Transmisión HTTP simulada** → JSON.parse del payload (equivalente al viaje cliente → servidor → cliente).
+4. **Ordenador NUEVO** → localStorage vacío (0 claves).
+5. **Restauración** → aplica la MISMA lógica del cloud recovery flow → `setItem` por cada clave.
+6. **Comparación** → MD5 clave por clave + validación semántica del total contable + saldos iniciales E1/E2 + config + stats.
+
+**Resultado numérico:**
+- 18/18 claves con MD5 idéntico.
+- Total importes+tasas: 1.967,69 € original → 1.967,69 € restaurado. **Diferencia: 0,00 €.**
+- Saldo Inicial E1: 1.250,75 € efectivo + 8.890,20 € banco + 200 € cambio → **idéntico**.
+- Saldo Inicial E2: 340,50 € efectivo + 2.100 € banco + 50 € cambio → **idéntico**.
+- Config empresa (2 empresas + 2 socios + 5 precios) → **idéntico**.
+- Stats Autoescolas (4 meses × 3 autoescolas) → **idéntico**.
+
+**Test permanente:** el fichero queda en el repo. Cualquier cambio futuro en `DATA_LS_KEYS`, `_readAllDataKeys`, `_writeAllDataKeys` o `_fullBackupData` re-verifica automáticamente el round-trip. Si algo se rompe → falla el test → git blame → fix inmediato.
+
+**Estado global:** 4 test suites pasan (222 checks contables + round-trip end-to-end).
+
+
+## 2026-02-28 · Auditoría exhaustiva backup/restore — todo confirmado ✅
+
+**Petición:** garantizar que la copia guarda TODOS los datos y que al restaurar queda idéntico.
+
+**Método:** grep exhaustivo de todas las claves `caja.*` usadas por la app (28 encontradas). Filtrado de claves per-máquina/runtime (install id, license, sync tokens, twilio creds, api base, cache, seen uids, flags one-shot). Resultado: **18 claves DATA** que constituyen los datos reales del usuario.
+
+**Diff vs versión anterior:**
+- Añadido `caja.calendar.urls.v1` (URLs ICS de calendarios configuradas — se me había escapado en la primera whitelist).
+- Whitelist final: 18 claves (antes 17).
+
+**Verificación runtime (screenshot):**
+- `DATA_LS_KEYS.length === 18` ✓
+- `window.mcSync.sendCloudBackup === function` ✓
+- `document.getElementById('btnCloudSendNow')` presente ✓
+- `_readAllDataKeys` y `_writeAllDataKeys` funciones globales ✓
+- Endpoint `/api/sync/cloudbackup/send` responde con `license_not_found` a payload inválido → funcional ✓
+
+**Cadena completa validada:**
+
+| Flujo | Función | Claves |
+|-------|---------|--------|
+| Snapshot local (auto cada cambio) | `pushSnapshot()` | 18 en `data` + legacy fields |
+| Fichero JSON (autoguardar cada 30 min) | `autoSaveToFile()` | 18 en `data` + legacy fields |
+| Nube diaria (5s tras boot, si >20h) | `sendCloudBackup()` → `_fullBackupData()` | 18 en `data` |
+| Restore desde Historial | `openBackupHistory()` restore action | prioriza `data`, cae en legacy |
+| Restore desde fichero JSON | `restoreAll()` | prioriza `data`, cae en legacy |
+| Restore desde nube (recovery banner) | `cloud recovery flow` | itera y aplica todo `full.data` |
+| Manual "Enviar copia AHORA" | Botón `btnCloudSendNow` → `sendCloudBackup('manual')` | 18 claves |
+
+**Alineación backend:** `PREMIUM_PLANS = {PRM, PREMIUM, TRIAL, MASTER}` coincide exactamente entre frontend y backend. Endpoint acepta hasta 2 MB por copia (más que suficiente para caja completa multi-empresa multi-año).
+
+**Sin regresiones:** 222 tests contables pasan.
+
+
 ## 2026-02-28 · Fix: la copia en la nube no llegaba al panel admin
 
 **Problema reportado:** el cliente lleva 2 días con la app y el admin sigue viendo "Este cliente aún no tiene copias en la nube" en su panel de licencias.

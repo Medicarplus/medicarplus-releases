@@ -491,7 +491,7 @@
     const keys = (window.DATA_LS_KEYS && Array.isArray(window.DATA_LS_KEYS))
       ? window.DATA_LS_KEYS
       // Fallback (si sendCloudBackup se llamara antes de definir la whitelist)
-      : ['caja.v1','caja.cempla.v1','caja.datafono','caja.cempla.datafono','caja.stats.v1','caja.stats.aliases.v1','caja.stats.traffic.overrides.v1','caja.irpf.v1','caja.saldoInicial.trafic.v1','caja.saldoInicial.cempla.v1','caja.reserva.v1','caja.cempla.reserva.v1','caja.cuadre.overrides.v1','caja.config.v1','caja.calendar.history.v1','caja.calendar.status.v1','caja.count_zero'];
+      : ['caja.v1','caja.cempla.v1','caja.datafono','caja.cempla.datafono','caja.stats.v1','caja.stats.aliases.v1','caja.stats.traffic.overrides.v1','caja.irpf.v1','caja.saldoInicial.trafic.v1','caja.saldoInicial.cempla.v1','caja.reserva.v1','caja.cempla.reserva.v1','caja.cuadre.overrides.v1','caja.config.v1','caja.calendar.history.v1','caja.calendar.status.v1','caja.calendar.urls.v1','caja.count_zero'];
     const out = {};
     for(const k of keys){
       const raw = localStorage.getItem(k);
@@ -919,6 +919,7 @@ const DATA_LS_KEYS = [
   'caja.config.v1',                   // Configuración (empresa, socios, precios)
   'caja.calendar.history.v1',         // Historial de citas
   'caja.calendar.status.v1',          // Estado de citas
+  'caja.calendar.urls.v1',            // URLs ICS de calendarios configuradas por el usuario
   'caja.count_zero',                  // Toggle "Contar 0€"
 ];
 // 🌐 Exponer al scope global para que la sync IIFE (definida arriba) pueda usarla en backups
@@ -14892,8 +14893,8 @@ setTimeout(async ()=>{
 //   Antes: solo se disparaba dentro del callback de verifyOnline (fragil: si el server tarda,
 //   si el plan no es JWT, si la licencia no requiere check ese día → nunca se envía).
 //   Ahora: al arrancar la app, si la licencia es Premium/Trial/Master y la última copia
-//   tiene >20h, se envía en segundo plano. Además usa _fullBackupData (whitelist 17 claves)
-//   para incluir SIEMPRE saldo inicial, reserva cambio, cuadre, config, citas.
+//   tiene >20h, se envía en segundo plano. Además usa _fullBackupData (whitelist 18 claves)
+//   para incluir SIEMPRE saldo inicial, reserva cambio, cuadre, config, citas, URLs cal.
 setTimeout(async () => {
   try{
     if(!isLicenseActive()) return;
