@@ -10766,22 +10766,153 @@ $('#jsonInput').onchange=async ev=>{
     // 🔧 Feb 2026 · Si el fichero es v6+ trae `data` con mapa completo (fuente de verdad).
     //   Restaura TODAS las claves de golpe. Los bloques legacy debajo siguen funcionando
     //   para ficheros antiguos (v4/v5).
+    // 🚨 CRÍTICO Feb 2026 · MERGE INTELIGENTE por clave · antes se saltaban las claves
+    //   existentes en modo Fusionar → los datos de la copia SE PERDÍAN. Ahora se unen.
     if(obj.data && typeof obj.data === 'object'){
       const _keysApplied = [];
+      // Función que decide cómo mezclar cada clave conocida
+      const _smartMerge = (k, existingRaw, incoming) => {
+        // Si REEMPLAZAR: siempre escribe la de la copia (no merge)
+        if(replace) return incoming;
+        // Si destino está vacío: usa la copia
+        if(!existingRaw) return incoming;
+        // Si copia está vacía: preserva el destino
+        if(incoming === null || incoming === undefined || incoming === '') return null;
+        // Merge por tipo de clave
+        try{
+          const cur = typeof existingRaw === 'string' ? JSON.parse(existingRaw) : existingRaw;
+          const inc = typeof incoming === 'string' ? JSON.parse(incoming) : incoming;
+          if(k === 'caja.v1' || k === 'caja.cempla.v1'){
+            // {byDate:{"2026-01-15":{rows:[...]}}} → merge por fecha + dedup por id
+            const out = {byDate: Object.assign({}, cur.byDate||{})};
+            for(const [d, dayInc] of Object.entries(inc.byDate||{})){
+              if(!out.byDate[d]){ out.byDate[d] = dayInc; continue; }
+              const curDay = out.byDate[d];
+              const curRows = Array.isArray(curDay) ? curDay : (curDay.rows||[]);
+              const incRows = Array.isArray(dayInc) ? dayInc : (dayInc.rows||[]);
+              const seen = new Set(curRows.map(r => r && r.id).filter(Boolean));
+              const merged = curRows.slice();
+              for(const r of incRows){ if(!r) continue; if(r.id && seen.has(r.id)) continue; merged.push(r); if(r.id) seen.add(r.id); }
+              out.byDate[d] = Array.isArray(curDay) ? merged : Object.assign({}, curDay, {rows: merged});
+            }
+            return out;
+          }
+          if(k === 'caja.stats.v1'){
+            // {autoescoles:[...], data:{"YYYY-MM":{autoName:count}}} · unir autoescoles + merge data
+            const out = {
+              autoescoles: Array.from(new Set([...(cur.autoescoles||[]), ...(inc.autoescoles||[])])),
+              data: Object.assign({}, cur.data||{}),
+            };
+            for(const [m, o] of Object.entries(inc.data||{})){
+              out.data[m] = Object.assign({}, out.data[m]||{}, o);
+            }
+            // preservar otros campos que pudiera haber (targets, notes)
+            return Object.assign({}, cur, inc, out);
+          }
+          if(k === 'caja.irpf.v1'){
+            return {
+              months: Object.assign({}, cur.months||{}, inc.months||{}),
+              quarters: Object.assign({}, cur.quarters||{}, inc.quarters||{}),
+            };
+          }
+          if(k === 'caja.calendar.urls.v1'){
+            // Array de {name,url} · dedup por url
+            const seen = new Set((cur||[]).map(x => x && x.url));
+            const merged = (cur||[]).slice();
+            for(const x of (inc||[])){ if(x && !seen.has(x.url)){ merged.push(x); seen.add(x.url); } }
+            return merged;
+          }
+          if(k === 'caja.tarifas.rules.v1'){
+            // Array de reglas · dedup por id
+            const seen = new Set((cur||[]).map(x => x && x.id));
+            const merged = (cur||[]).slice();
+            for(const x of (inc||[])){ if(x && !seen.has(x.id)){ merged.push(x); seen.add(x.id); } }
+            return merged;
+          }
+          // Resto: objetos planos → la copia gana en campos coincidentes,
+          //        pero se preservan los campos que la copia NO trae.
+          if(cur && typeof cur === 'object' && !Array.isArray(cur) && inc && typeof inc === 'object' && !Array.isArray(inc)){
+            return Object.assign({}, cur, inc);
+          }
+          // Escalares o tipos diferentes: la copia gana
+          return inc;
+        }catch(e){
+          console.warn('smartMerge fallado para', k, e);
+          return incoming; // fallback: usa la copia
+        }
+      };
       for(const k of Object.keys(obj.data)){
         if(!DATA_LS_KEYS.includes(k)) continue;
         const v = obj.data[k];
         if(v === null || v === undefined || v === '') continue;
-        if(!replace && localStorage.getItem(k)) continue; // MERGE: respeta lo existente
-        localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+        const existing = localStorage.getItem(k);
+        const merged = _smartMerge(k, existing, v);
+        if(merged === null || merged === undefined) continue;
+        localStorage.setItem(k, typeof merged === 'string' ? merged : JSON.stringify(merged));
         _keysApplied.push(k);
       }
-      if(_keysApplied.length) log.push(isCA?`Còpia completa (${_keysApplied.length} claus)`:`Copia completa (${_keysApplied.length} claves)`);
+      // 🩺 Diagnóstico detallado por consola (para debug fácil si algo va mal)
+      try{
+        console.groupCollapsed(`📥 [Restore v6+] ${_keysApplied.length} claves aplicadas · replace=${replace}`);
+        _keysApplied.forEach(k => {
+          const raw = localStorage.getItem(k) || '';
+          console.log(`   ${k}: ${raw.length} bytes`);
+        });
+        // Claves que estaban en la copia pero NO se pudieron aplicar
+        const notApplied = Object.keys(obj.data).filter(k => DATA_LS_KEYS.includes(k) && !_keysApplied.includes(k));
+        if(notApplied.length){
+          console.warn(`   ⚠️ ${notApplied.length} claves de la copia NO se aplicaron:`, notApplied);
+        }
+        console.groupEnd();
+      }catch(_){}
+      if(_keysApplied.length){
+        // Desglose por sección para que el usuario vea claramente qué entró
+        const parts = [];
+        const _countByDate = (raw) => {
+          try{ const o = JSON.parse(raw||'{}'); return Object.values(o.byDate||{}).reduce((s,d)=> s + ((Array.isArray(d)?d.length:(d.rows||[]).length)),0); }catch(_){return 0;}
+        };
+        const _v1c = _keysApplied.includes('caja.v1') ? _countByDate(localStorage.getItem('caja.v1')) : 0;
+        const _cec = _keysApplied.includes('caja.cempla.v1') ? _countByDate(localStorage.getItem('caja.cempla.v1')) : 0;
+        if(_v1c) parts.push(isCA?`Tràfic: ${_v1c} apunts`:`Tráfico: ${_v1c} apuntes`);
+        if(_cec) parts.push(`${(window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2'}: ${_cec}`);
+        if(_keysApplied.includes('caja.stats.v1')){
+          try{
+            const s = JSON.parse(localStorage.getItem('caja.stats.v1')||'{}');
+            const nM = Object.keys(s.data||{}).length;
+            const nA = (s.autoescoles||[]).length;
+            if(nM) parts.push(isCA?`Autoescoles: ${nA} · ${nM} mesos`:`Autoescuelas: ${nA} · ${nM} meses`);
+          }catch(_){}
+        }
+        if(_keysApplied.includes('caja.irpf.v1')){
+          try{
+            const i = JSON.parse(localStorage.getItem('caja.irpf.v1')||'{}');
+            const nM = Object.keys(i.months||{}).length; const nQ = Object.keys(i.quarters||{}).length;
+            if(nM||nQ) parts.push(`IRPF: ${nM}m/${nQ}t`);
+          }catch(_){}
+        }
+        if(_keysApplied.includes('caja.saldoInicial.trafic.v1') || _keysApplied.includes('caja.saldoInicial.cempla.v1')) parts.push(isCA?'Saldo inicial':'Saldo inicial');
+        if(_keysApplied.includes('caja.config.v1')) parts.push(isCA?'Configuració':'Configuración');
+        if(_keysApplied.includes('caja.calendar.history.v1')) parts.push(isCA?'Cites':'Citas');
+        if(_keysApplied.includes('caja.tarifas.rules.v1')) parts.push(isCA?'Tarifes':'Tarifas');
+        const summary = parts.length ? parts.join(' · ') : `${_keysApplied.length} ${isCA?'claus':'claves'}`;
+        log.push(isCA?`Còpia completa (${summary})`:`Copia completa (${summary})`);
+      }
       // Refresca CFG en memoria para que la UI recoja el cambio de nombres/socios sin recargar
       try{ window.CFG = JSON.parse(localStorage.getItem('caja.config.v1'))||{}; }catch(_){}
       try{ if(typeof applyCompanyUI==='function') applyCompanyUI(); }catch(_){}
       state=loadState();render();
-      toast((isCA?`✅ ${replace?'Restaurat':'Fusionat'}: `:`✅ ${replace?'Restaurado':'Fusionado'}: `)+log.join(' · '),5000);
+      toast((isCA?`✅ ${replace?'Restaurat':'Fusionat'}: `:`✅ ${replace?'Restaurado':'Fusionado'}: `)+log.join(' · '),12000);
+      // 🔄 Mini banner ofreciendo recargar la app · algunas subvistas (stats, calendario)
+      //   no se re-renderizan solas hasta el próximo refresh completo.
+      try{
+        const banner = document.createElement('div');
+        banner.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#0f766e,#065f46);color:#d1fae5;padding:16px 24px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.4);z-index:99999;display:flex;align-items:center;gap:14px;font-family:Georgia,serif;font-size:14px;border:1px solid #14b8a6';
+        banner.innerHTML = `<span>🔄 ${isCA?'Recomana recarregar per veure totes les seccions actualitzades':'Se recomienda recargar para ver todas las secciones actualizadas'}</span><button style="padding:8px 16px;background:#f5b301;color:#0f172a;border:none;border-radius:8px;font-weight:800;cursor:pointer;font-family:Georgia,serif">${isCA?'🔄 Recarregar ara':'🔄 Recargar ahora'}</button><button style="padding:8px 12px;background:transparent;color:#a7f3d0;border:1px solid #14b8a6;border-radius:8px;cursor:pointer;font-family:Georgia,serif">${isCA?'Més tard':'Más tarde'}</button>`;
+        document.body.appendChild(banner);
+        banner.querySelector('button').onclick = () => location.reload();
+        banner.querySelectorAll('button')[1].onclick = () => banner.remove();
+        setTimeout(() => { if(banner.parentNode) banner.remove(); }, 30000);
+      }catch(_){}
       _promptMigrationOrRestoreNormal();
       return;
     }
