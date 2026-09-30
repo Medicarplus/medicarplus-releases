@@ -13361,6 +13361,20 @@ const LAST_SEEN_VERSION_KEY = 'caja.last_seen_version';
 // IMPORTANT: L'ordre importa. La primera entrada ha de ser la MÉS RECENT.
 // Cada versió té: { version, date (dd/mm/aaaa), highlights (array de strings HTML curts) }
 const CHANGELOG = [
+  { version:'2.3.0', date:'28/02/2026', highlights:[
+    '☁️ <b>Copia automática en la nube cada día</b>: al abrir la app, tus datos se guardan automáticamente en la nube de MediCar. Si algún día pierdes datos por avería, se puede restaurar todo tal cual estaba, sin perder ni un céntimo ni un apunte.',
+    '🚀 <b>Botón "Enviar copia AHORA"</b>: en el menú <b>💾 Copias de seguridad → ☁️ Enviar copia AHORA a la nube</b>. Fuerza un envío inmediato con toast confirmando el tamaño y el ID. Útil antes de operaciones importantes o cuando necesitas soporte técnico.',
+    '🛡️ <b>Copias a prueba de fallos de red</b>: si el wifi cae al enviar, la app reintenta hasta 4 veces (30s, 2min, 5min, 10min). Si todos los intentos fallan, guarda la copia en cola local y la vuelve a enviar al próximo arranque, hasta que salga. <b>Nunca pierdes una copia.</b>',
+    '📚 <b>Copias soportan décadas de datos</b>: compresión automática de gzip. Una caja de 3 años pesa 4 MB en pantalla → 92 KB en la nube. Soporta más de 30 años de historial sin problemas de espacio.',
+    '🏦 <b>Saldo Inicial independiente por empresa</b>: cuando tienes Empresa 2 configurada, aparecen pestañas 🚗 E1 y 🏥 E2 en la ventana de Saldo Inicial. Cada empresa tiene sus propios importes iniciales de efectivo, banco y cambio, totalmente separados.',
+    '🔢 <b>Números encima de cada punto en la gráfica Comparativa años</b>: como en la gráfica de Autoescuelas, ahora ves de un vistazo cuántas entradas hay cada mes en cada año, con contorno blanco para leerlos aunque las líneas se crucen.',
+    '📊 <b>Total entradas en Tráfico ahora suma años pasados</b>: al ver Estadísticas → Tráfico de años anteriores, la tarjeta "Total entradas" ya no se queda a 0 · suma los datos históricos que tenías en Autoescuelas.',
+    '🖨️ <b>Gráficas ya no se cortan al imprimir en PDF</b>: revisadas Comparativa años, Autoescuelas, Tráfico y Facturación · ahora todo el contenido cabe entero en el PDF sin recortes en los bordes ni etiquetas escondidas.',
+    '💳 <b>Widget "Por forma de pago" corregido</b>: ahora usa el total del datáfono que introduces cada día · antes decía "Tarjeta: 25 €" cuando en realidad habías cobrado miles. La prioridad es como pediste: si hay dato manual, manda el manual · si no, el automático.',
+    '🧹 <b>Informe Anual más limpio</b>: eliminado el bloque duplicado "Totales del período" del final del informe (Ingresado/Gastado/Beneficio) porque ya aparecía dos veces arriba. Menos ruido visual, misma información al alcance.',
+    '📝 <b>Selector de mes duplicado eliminado</b> en Estadísticas → Autoescuelas · antes había dos selectores para el mes, ahora sólo el de arriba manda.',
+    '⚙️ <b>Restauración de copia devuelve TODO idéntico</b>: al restaurar recuperas entradas, autoescuelas de todos los años, tráfico, saldo inicial de las dos empresas, reserva de cambio, IRPF, cuadre, config y citas. Sin diferencias · sin errores · sin datos perdidos.',
+  ]},
   { version:'2.2.1', date:'08/02/2026', highlights:[
     '🧮 <b>Cuadre de Caja renovado · pestañas por empresa</b>: ahora cada empresa se muestra en su propia pestaña con sus cifras totalmente separadas · pulsa <b>AutoEscola</b> o <b>CEMPLA</b> arriba del cuadre para cambiar de una a otra.',
     '📅 <b>Selector de fecha exacto en el Cuadre</b>: elige un día concreto y el cuadre suma <b>del día 1 del mes hasta ese día</b>. Ideal para cortes de caja a mediados de mes o cuadres semanales.',
