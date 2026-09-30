@@ -39,6 +39,21 @@
   .tip{background:#f0f9ff;border-left:4px solid #0284c7;padding:10px 14px;border-radius:5px;font-size:13.5px;margin:12px 0;color:#0c4a6e}
   .tip::before{content:"💡 ";font-weight:700}
   .btn-icon{display:inline-block;background:#0f172a;color:#f5b301;padding:2px 8px;border-radius:5px;font-size:12px;font-weight:700}
+  /* 🔍 Feb 2026 · Buscador de contenido en el manual */
+  .manual-search{position:relative;margin:0 0 18px}
+  .manual-search input{width:100%;padding:14px 18px 14px 48px;font-size:15px;font-family:inherit;border:2px solid #cbd5e1;border-radius:10px;background:#fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>") no-repeat 14px center;box-shadow:0 2px 6px rgba(0,0,0,.04);transition:all .15s}
+  .manual-search input:focus{outline:none;border-color:#f5b301;box-shadow:0 0 0 3px rgba(245,179,1,.15)}
+  .manual-search input::placeholder{color:#94a3b8}
+  .manual-search .search-clear{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:#e2e8f0;border:none;width:26px;height:26px;border-radius:50%;font-size:14px;cursor:pointer;color:#475569;display:none;line-height:1;padding:0}
+  .manual-search .search-clear:hover{background:#cbd5e1;color:#0f172a}
+  .manual-search .search-count{position:absolute;right:44px;top:50%;transform:translateY(-50%);font-size:12px;color:#64748b;font-weight:600;pointer-events:none;background:#f8fafc;padding:4px 9px;border-radius:6px;display:none}
+  mark.manual-hit{background:linear-gradient(180deg,transparent 55%,#fde047 55%);color:#0f172a;padding:0 2px;font-weight:700;border-radius:2px}
+  mark.manual-hit-active{background:#f5b301;color:#0f172a;box-shadow:0 0 0 2px #f5b301}
+  .manual-search-nav{display:none;position:absolute;right:80px;top:50%;transform:translateY(-50%);gap:2px;align-items:center}
+  .manual-search-nav.active{display:flex}
+  .manual-search-nav button{background:transparent;border:1px solid #cbd5e1;color:#475569;padding:3px 8px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600}
+  .manual-search-nav button:hover{background:#f8fafc;border-color:#94a3b8;color:#0f172a}
+  .manual-no-results{padding:16px 20px;background:#fef3c7;border-left:5px solid #f59e0b;border-radius:6px;margin:0 0 18px;color:#78350f;font-size:14px;display:none}
   footer{text-align:center;margin-top:36px;padding:20px;color:#64748b;font-size:12px;border-top:1px solid #cbd5e1}
   footer a{color:#f5b301}
 </style>
@@ -50,6 +65,20 @@
   <h1>📘 Manual de Usuario · MediCar Plus</h1>
   <p>Guía completa para usar el programa día a día · Versión 2.3.0 · Actualizado 28/02/2026</p>
 </header>
+
+<!-- 🔍 Buscador de contenido -->
+<div class="manual-search">
+  <input type="search" id="manualSearch" placeholder="Buscar en el manual… (ej: copia de seguridad, IRPF, saldo inicial)" autocomplete="off" data-testid="manual-search-input">
+  <span class="search-count" id="manualSearchCount">0 / 0</span>
+  <div class="manual-search-nav" id="manualSearchNav">
+    <button id="manualPrevHit" title="Coincidencia anterior (Shift+Enter)">↑</button>
+    <button id="manualNextHit" title="Coincidencia siguiente (Enter)">↓</button>
+  </div>
+  <button class="search-clear" id="manualSearchClear" title="Limpiar búsqueda">✕</button>
+</div>
+<div class="manual-no-results" id="manualNoResults">
+  <b>Sin resultados</b> para tu búsqueda. Prueba con menos palabras o con sinónimos (por ejemplo "backup" en lugar de "copia").
+</div>
 
 <nav class="tab-nav" role="tablist" aria-label="Manual de usuario">
   <button class="tab-btn active" data-tab="inicio" data-testid="tab-inicio">🚀 Empezar</button>
@@ -610,9 +639,184 @@ Manual de Usuario MediCar Plus v2.3.0 · Actualizado 28/02/2026<br>
     window.scrollTo({top: 0, behavior: 'smooth'});
   }
   btns.forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab, true)));
+  window.__manualSetTab = setTab;
   const url = new URL(location.href);
   const q = url.searchParams.get('tab');
   if(q) setTab(q, false);
+})();
+
+// 🔍 Feb 2026 · Buscador de contenido del manual
+//   Estrategia: usa Range + surroundContents para envolver coincidencias en <mark>.
+//   Si hay coincidencias, cambia a la primera pestaña con hits + scroll suave a la
+//   coincidencia activa. Enter/Shift+Enter navegan entre resultados.
+(function(){
+  const input   = document.getElementById('manualSearch');
+  const clear   = document.getElementById('manualSearchClear');
+  const count   = document.getElementById('manualSearchCount');
+  const nav     = document.getElementById('manualSearchNav');
+  const btnPrev = document.getElementById('manualPrevHit');
+  const btnNext = document.getElementById('manualNextHit');
+  const noRes   = document.getElementById('manualNoResults');
+  const panels  = document.querySelectorAll('.tab-panel');
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  if(!input) return;
+
+  let hits = [];       // array of {mark: <mark>, panel: name}
+  let activeIdx = -1;
+  let debounceTimer = null;
+
+  // Normaliza (quita acentos, minúsculas) para buscar en español/catalán
+  function norm(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+
+  // Elimina marks previos
+  function clearHits(){
+    document.querySelectorAll('mark.manual-hit').forEach(m => {
+      const parent = m.parentNode;
+      parent.replaceChild(document.createTextNode(m.textContent), m);
+      parent.normalize();
+    });
+    hits = [];
+    activeIdx = -1;
+    count.style.display = 'none';
+    nav.classList.remove('active');
+    noRes.style.display = 'none';
+    tabBtns.forEach(b => b.style.textDecoration = '');
+  }
+
+  function highlightIn(root, needleNorm){
+    // Recorre nodos de texto y crea marks
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node){
+        if(!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        const p = node.parentNode;
+        if(!p) return NodeFilter.FILTER_REJECT;
+        const tag = p.nodeName;
+        if(tag === 'SCRIPT' || tag === 'STYLE' || tag === 'MARK') return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    const nodes = [];
+    while(walker.nextNode()) nodes.push(walker.currentNode);
+    const panelName = root.dataset.panel;
+    for(const node of nodes){
+      const text = node.nodeValue;
+      const textN = norm(text);
+      let start = 0, idx;
+      const ranges = [];
+      while((idx = textN.indexOf(needleNorm, start)) !== -1){
+        ranges.push([idx, idx + needleNorm.length]);
+        start = idx + needleNorm.length;
+      }
+      if(!ranges.length) continue;
+      // Reconstruye el nodo con marks
+      const frag = document.createDocumentFragment();
+      let cur = 0;
+      for(const [s, e] of ranges){
+        if(s > cur) frag.appendChild(document.createTextNode(text.slice(cur, s)));
+        const mark = document.createElement('mark');
+        mark.className = 'manual-hit';
+        mark.textContent = text.slice(s, e);
+        frag.appendChild(mark);
+        hits.push({mark, panel: panelName});
+        cur = e;
+      }
+      if(cur < text.length) frag.appendChild(document.createTextNode(text.slice(cur)));
+      node.parentNode.replaceChild(frag, node);
+    }
+  }
+
+  function markActive(){
+    document.querySelectorAll('mark.manual-hit-active').forEach(m => m.classList.remove('manual-hit-active'));
+    if(activeIdx < 0 || activeIdx >= hits.length) return;
+    const h = hits[activeIdx];
+    // Cambia de pestaña si el hit no está en la activa
+    const activePanel = document.querySelector('.tab-panel.active');
+    if(!activePanel || activePanel.dataset.panel !== h.panel){
+      window.__manualSetTab && window.__manualSetTab(h.panel, false);
+    }
+    h.mark.classList.add('manual-hit-active');
+    setTimeout(() => {
+      h.mark.scrollIntoView({block: 'center', behavior: 'smooth'});
+    }, 80);
+  }
+
+  function updateCount(){
+    if(!hits.length){
+      count.style.display = 'none';
+      nav.classList.remove('active');
+      return;
+    }
+    count.textContent = `${activeIdx + 1} / ${hits.length}`;
+    count.style.display = 'block';
+    nav.classList.add('active');
+  }
+
+  function highlightTabButtonsWithHits(){
+    // Subraya en la barra de pestañas cuáles tienen coincidencias
+    const panelsWithHits = new Set(hits.map(h => h.panel));
+    tabBtns.forEach(b => {
+      b.style.textDecoration = panelsWithHits.has(b.dataset.tab) ? 'underline wavy #f5b301' : '';
+    });
+  }
+
+  function doSearch(term){
+    clearHits();
+    const q = term.trim();
+    clear.style.display = q ? 'block' : 'none';
+    if(q.length < 2) return;  // mínimo 2 caracteres para no matchear todo
+    const needle = norm(q);
+    // Busca en TODOS los paneles (activos y ocultos)
+    panels.forEach(p => highlightIn(p, needle));
+    highlightTabButtonsWithHits();
+    if(!hits.length){
+      noRes.style.display = 'block';
+      return;
+    }
+    activeIdx = 0;
+    markActive();
+    updateCount();
+  }
+
+  input.addEventListener('input', e => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => doSearch(e.target.value), 150);
+  });
+  input.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      if(!hits.length) return;
+      activeIdx = e.shiftKey ? (activeIdx - 1 + hits.length) % hits.length : (activeIdx + 1) % hits.length;
+      markActive();
+      updateCount();
+    } else if(e.key === 'Escape'){
+      input.value = '';
+      doSearch('');
+      input.blur();
+    }
+  });
+  btnPrev.addEventListener('click', () => {
+    if(!hits.length) return;
+    activeIdx = (activeIdx - 1 + hits.length) % hits.length;
+    markActive(); updateCount();
+  });
+  btnNext.addEventListener('click', () => {
+    if(!hits.length) return;
+    activeIdx = (activeIdx + 1) % hits.length;
+    markActive(); updateCount();
+  });
+  clear.addEventListener('click', () => { input.value = ''; doSearch(''); input.focus(); });
+
+  // Atajo teclado: Ctrl+F o "/" enfoca el buscador
+  document.addEventListener('keydown', e => {
+    if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f'){
+      e.preventDefault();
+      input.focus();
+      input.select();
+    } else if(e.key === '/' && document.activeElement.tagName !== 'INPUT'){
+      e.preventDefault();
+      input.focus();
+    }
+  });
 })();
 </script>
 
