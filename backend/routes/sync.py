@@ -487,17 +487,22 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
                 "last_seen": _now(),
                 "auto_registered_via": "cloudbackup",
             })
-        # Sanity: limitar tamaño (2 MB max por copia — más que suficiente)
+        # Sanity: limitar tamaño (10 MB max por copia — cubre 10+ años de una caja media)
         try:
             import json as _json
             _size = len(_json.dumps(body.data or {}))
         except Exception:
             _size = 0
-        MAX_BYTES = 2 * 1024 * 1024
+        MAX_BYTES = 10 * 1024 * 1024
         if _size > MAX_BYTES:
             raise HTTPException(status_code=413, detail=f"payload_too_large ({_size} > {MAX_BYTES})")
         now = _now()
         backup_id = str(uuid.uuid4())
+        # 🔒 Feb 2026 · SHA-256 del payload para verificación de integridad end-to-end.
+        #   El cliente puede volver a hashear localmente y comparar. Si difiere, sabe que
+        #   el servidor guardó datos corruptos y puede reintentar.
+        import hashlib as _hashlib
+        payload_sha256 = _hashlib.sha256(_json.dumps(body.data or {}, sort_keys=True).encode()).hexdigest()
         doc = {
             "backup_id": backup_id,
             "license_key_hash": lkh,
@@ -506,6 +511,7 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
             "data": body.data or {},
             "size_bytes": _size,
             "keys_count": len(body.data or {}),
+            "payload_sha256": payload_sha256,
             "created_at": now,
         }
         await db[COLL_CLOUD_BACKUPS].insert_one(doc)
@@ -520,7 +526,7 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
         logger.info("cloudbackup/send install=%s size=%d keys=%d rotated=%d",
                     body.install_id, _size, len(body.data or {}), len(old_ids))
         return {"ok": True, "backup_id": backup_id, "created_at": _iso(now),
-                "size_bytes": _size, "rotated": len(old_ids)}
+                "size_bytes": _size, "rotated": len(old_ids), "payload_sha256": payload_sha256}
 
     @router.get("/sync/cloudbackup/list")
     async def cloud_backup_list(license_key: str, install_id: str):
