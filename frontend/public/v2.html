@@ -481,8 +481,28 @@
     return await _post('/api/sync/backup/consume', { license_key: cfg.licenseKey, install_id: cfg.installId, backup_id: backupId });
   }
   // 🌤️ CLOUD BACKUP AUTOMÁTICO DIARIO (feb 2026) · archivo rotativo servidor (últimas 30)
+  //   🔧 FIX Feb 2026 · Antes usaba _snapshotLocalStorage() que EXCLUYE por SYNC_EXCLUDE_PREFIXES
+  //   claves LOCALES críticas (caja.saldoInicial.*, caja.cuadre.*). Resultado: al restaurar
+  //   desde la nube el usuario perdía el saldo inicial y ajustes del cuadre. Ahora usa
+  //   DATA_LS_KEYS (whitelist de 17 claves) que SIEMPRE viaja completa en el backup.
+  //   La restauración por SYNC (aplicaBackup en fusiones PC↔PC) sigue usando _isSyncable
+  //   para que las claves locales no crucen entre PCs. Backup ≠ Sync.
+  function _fullBackupData(){
+    const keys = (window.DATA_LS_KEYS && Array.isArray(window.DATA_LS_KEYS))
+      ? window.DATA_LS_KEYS
+      // Fallback (si sendCloudBackup se llamara antes de definir la whitelist)
+      : ['caja.v1','caja.cempla.v1','caja.datafono','caja.cempla.datafono','caja.stats.v1','caja.stats.aliases.v1','caja.stats.traffic.overrides.v1','caja.irpf.v1','caja.saldoInicial.trafic.v1','caja.saldoInicial.cempla.v1','caja.reserva.v1','caja.cempla.reserva.v1','caja.cuadre.overrides.v1','caja.config.v1','caja.calendar.history.v1','caja.calendar.status.v1','caja.count_zero'];
+    const out = {};
+    for(const k of keys){
+      const raw = localStorage.getItem(k);
+      if(raw === null || raw === '') continue;
+      try { out[k] = JSON.parse(raw); }
+      catch(e){ out[k] = raw; }
+    }
+    return out;
+  }
   async function sendCloudBackup(label){
-    const data = _snapshotLocalStorage();
+    const data = _fullBackupData();
     return await _post('/api/sync/cloudbackup/send', { license_key: cfg.licenseKey, install_id: cfg.installId, data, label: label || 'auto-daily' });
   }
   async function listCloudBackups(){
@@ -876,26 +896,77 @@ function saveState(){
 const SNAPS_KEY='caja.snapshots';
 const MAX_SNAPS=5;
 const MIN_SNAP_INTERVAL=15*60*1000; // 15 min mínimo entre snapshots auto
+// 🔧 Feb 2026 · WHITELIST de claves de datos incluidas en cada copia de seguridad.
+//   Cubre TODO lo que el usuario introduce a mano y necesita para restaurar en el mismo PC:
+//   entradas, datáfono, stats autoescolas + overrides + aliases, IRPF, saldo inicial,
+//   reserva cambio, ajustes cuadre, configuración empresa/socios, historial de citas,
+//   toggle contar 0€. NO incluye claves de instalación/licencia/preview (específicas de PC).
+const DATA_LS_KEYS = [
+  'caja.v1',                          // Entradas Empresa 1 (Tráfico)
+  'caja.cempla.v1',                   // Entradas Empresa 2 (Revisiones)
+  'caja.datafono',                    // Datáfono E1
+  'caja.cempla.datafono',             // Datáfono E2
+  'caja.stats.v1',                    // Estadísticas autoescolas
+  'caja.stats.aliases.v1',            // Aliases de autoescolas
+  'caja.stats.traffic.overrides.v1',  // Overrides manuales tabla Tráfico
+  'caja.irpf.v1',                     // IRPF (retenciones + pagos trimestrales)
+  'caja.saldoInicial.trafic.v1',      // Saldo inicial E1
+  'caja.saldoInicial.cempla.v1',      // Saldo inicial E2
+  'caja.reserva.v1',                  // Reserva de cambio E1
+  'caja.cempla.reserva.v1',           // Reserva de cambio E2
+  'caja.cuadre.overrides.v1',         // Ajustes manuales del Cuadre
+  'caja.config.v1',                   // Configuración (empresa, socios, precios)
+  'caja.calendar.history.v1',         // Historial de citas
+  'caja.calendar.status.v1',          // Estado de citas
+  'caja.count_zero',                  // Toggle "Contar 0€"
+];
+// 🌐 Exponer al scope global para que la sync IIFE (definida arriba) pueda usarla en backups
+try{ window.DATA_LS_KEYS = DATA_LS_KEYS; }catch(_){}
+function _readAllDataKeys(){
+  const out = {};
+  for(const k of DATA_LS_KEYS){
+    const v = localStorage.getItem(k);
+    if(v !== null && v !== '') out[k] = v;
+  }
+  return out;
+}
+function _writeAllDataKeys(map){
+  if(!map || typeof map !== 'object') return;
+  for(const k of Object.keys(map)){
+    if(!DATA_LS_KEYS.includes(k)) continue; // seguridad: solo claves conocidas
+    const v = map[k];
+    if(v !== null && v !== undefined && v !== '') localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+  }
+}
 function pushSnapshot(reason){
   try{
     const snaps=JSON.parse(localStorage.getItem(SNAPS_KEY)||'[]');
-    const cb=localStorage.getItem('caja.v1')||'';
-    const ce=localStorage.getItem('caja.cempla.v1')||'';
-    const df=localStorage.getItem('caja.datafono')||'';
-    const dfC=localStorage.getItem('caja.cempla.datafono')||'';
-    const stats=localStorage.getItem('caja.stats.v1')||'';
-    const irpf=localStorage.getItem('caja.irpf.v1')||'';
-    // 🔧 Feb 2026 · Incluir claves LOCALES críticas que antes se perdían al restaurar:
-    //   · Saldo inicial (E1/E2) · Reserva de cambio (E1/E2) · Overrides Cuadre
-    const si1=localStorage.getItem('caja.saldoInicial.trafic.v1')||'';
-    const si2=localStorage.getItem('caja.saldoInicial.cempla.v1')||'';
-    const res1=localStorage.getItem('caja.reserva.v1')||'';
-    const res2=localStorage.getItem('caja.cempla.reserva.v1')||'';
-    const cuadreOv=localStorage.getItem('caja.cuadre.overrides.v1')||'';
+    // 🔧 Feb 2026 · Snapshot completo usando la WHITELIST DATA_LS_KEYS.
+    //   Todo lo que el usuario introduzca a mano va aquí (17 claves cubren caja/stats/IRPF/
+    //   saldo inicial/reserva/cuadre/config/citas). Se guarda en `data` como mapa key→string.
+    //   Los campos legacy (cbTrafic, cempla, datafono, ...) se mantienen para compatibilidad
+    //   con código antiguo que lee snapshots individuales, pero al restaurar se prioriza `data`.
+    const data = _readAllDataKeys();
+    const cb=data['caja.v1']||'';
+    const ce=data['caja.cempla.v1']||'';
+    const df=data['caja.datafono']||'';
+    const dfC=data['caja.cempla.datafono']||'';
+    const stats=data['caja.stats.v1']||'';
+    const irpf=data['caja.irpf.v1']||'';
     const last=snaps[snaps.length-1];
-    // Si no hay cambios reales vs la última copia, no crear otra
-    if(last && last.cbTrafic===cb && last.cempla===ce && last.datafono===df && last.datafonoCempla===dfC && last.stats===stats && last.irpf===irpf && (last.saldoInicial1||'')===si1 && (last.saldoInicial2||'')===si2 && (last.reserva1||'')===res1 && (last.reserva2||'')===res2 && (last.cuadreOverrides||'')===cuadreOv) return false;
-    const snap={ts:Date.now(),reason:reason||'auto',cbTrafic:cb,cempla:ce,datafono:df,datafonoCempla:dfC,stats,irpf,saldoInicial1:si1,saldoInicial2:si2,reserva1:res1,reserva2:res2,cuadreOverrides:cuadreOv};
+    // Firma para detectar cambios: cubre TODAS las claves, no solo las 6 legacy.
+    const sig = JSON.stringify(data);
+    if(last && last._sig === sig) return false;
+    const snap={
+      ts:Date.now(),
+      reason:reason||'auto',
+      // Legacy (compat con restauradores antiguos):
+      cbTrafic:cb, cempla:ce, datafono:df, datafonoCempla:dfC, stats, irpf,
+      // Nuevo (fuente de verdad):
+      data,
+      _sig: sig,
+      _v: 2
+    };
     snaps.push(snap);
     while(snaps.length>MAX_SNAPS)snaps.shift();
     try{localStorage.setItem(SNAPS_KEY,JSON.stringify(snaps))}
@@ -914,10 +985,12 @@ async function autoSaveToFile(silent){
     if(!handle)return;
     const perm=await handle.queryPermission({mode:'readwrite'});
     if(perm!=='granted')return;
-    // 🔧 Feb 2026 · Incluir claves LOCALES críticas (saldo inicial, reserva de cambio, cuadre)
-    //   para que restaurar deje la caja idéntica a como estaba (antes se perdían).
+    // 🔧 Feb 2026 · Guardar TODAS las claves de datos via DATA_LS_KEYS whitelist.
+    //   Cubre entradas, datáfono, stats+aliases+overrides, IRPF, saldo inicial, reserva,
+    //   cuadre, config empresa/socios, historial de citas. Fuente única de verdad: `data`.
     const _pj=(k,d)=>{try{return JSON.parse(localStorage.getItem(k)||d);}catch(_){return JSON.parse(d);}};
     const all={
+      // Legacy (compat con restauradores antiguos)
       cbTrafic:_pj('caja.v1','{"byDate":{}}'),
       cempla:_pj('caja.cempla.v1','{"byDate":{}}'),
       datafono:_pj('caja.datafono','{}'),
@@ -929,10 +1002,18 @@ async function autoSaveToFile(silent){
       reserva1:_pj('caja.reserva.v1','null'),
       reserva2:_pj('caja.cempla.reserva.v1','null'),
       cuadreOverrides:_pj('caja.cuadre.overrides.v1','null'),
-      _v:5,_ts:Date.now()
+      statsAliases:_pj('caja.stats.aliases.v1','null'),
+      trafOverrides:_pj('caja.stats.traffic.overrides.v1','null'),
+      config:_pj('caja.config.v1','null'),
+      calendarHist:_pj('caja.calendar.history.v1','null'),
+      calendarStat:_pj('caja.calendar.status.v1','null'),
+      countZero:localStorage.getItem('caja.count_zero')||null,
+      // Fuente de verdad para restauradores nuevos
+      data:_readAllDataKeys(),
+      _v:6,_ts:Date.now()
     };
-    // Firma para detectar cambios (excluye _ts)
-    const sig=JSON.stringify({a:all.cbTrafic,b:all.cempla,c:all.datafono,d:all.datafonoCempla,e:all.stats,f:all.irpf,g:all.saldoInicial1,h:all.saldoInicial2,i:all.reserva1,j:all.reserva2,k:all.cuadreOverrides});
+    // Firma diff: cubre TODO (usa data)
+    const sig=JSON.stringify(all.data);
     if(sig===_lastAutoSaveContent){if(!silent)toast('✓ Sin cambios · no hace falta guardar',2000);return}
     const content=JSON.stringify(all,null,2);
     // SAFETY: never write empty/truncated content
@@ -995,24 +1076,58 @@ function openBackupHistory(){
     if(btn.dataset.act==='restore'){
       confirmModal('↩ Restaurar esta copia',`¿Restaurar la copia del <b>${new Date(snap.ts).toLocaleString('es-ES')}</b>?<br><br>Antes de sustituir, se guardará una nueva copia de seguridad del estado actual.`,()=>{
         pushSnapshot('preRestore');
-        if(snap.cbTrafic)localStorage.setItem('caja.v1',snap.cbTrafic);
-        if(snap.cempla)localStorage.setItem('caja.cempla.v1',snap.cempla);
-        if(snap.datafono)localStorage.setItem('caja.datafono',snap.datafono);
-        if(snap.datafonoCempla)localStorage.setItem('caja.cempla.datafono',snap.datafonoCempla);
-        if(snap.stats)localStorage.setItem('caja.stats.v1',snap.stats);
-        if(snap.irpf)localStorage.setItem('caja.irpf.v1',snap.irpf);
-        // 🔧 Feb 2026 · Restaurar también claves locales críticas (saldo inicial, reserva, cuadre)
-        //   Se usa setItem si el snapshot lo trae; si no lo trae (snapshot antiguo pre-fix),
-        //   NO se toca el valor actual para no borrar datos válidos del usuario.
-        if(snap.saldoInicial1)localStorage.setItem('caja.saldoInicial.trafic.v1',snap.saldoInicial1);
-        if(snap.saldoInicial2)localStorage.setItem('caja.saldoInicial.cempla.v1',snap.saldoInicial2);
-        if(snap.reserva1)localStorage.setItem('caja.reserva.v1',snap.reserva1);
-        if(snap.reserva2)localStorage.setItem('caja.cempla.reserva.v1',snap.reserva2);
-        if(snap.cuadreOverrides)localStorage.setItem('caja.cuadre.overrides.v1',snap.cuadreOverrides);
-        state=loadState();render();toast('✅ Copia restaurada correctamente',3500);back.remove();
+        // 🔧 Feb 2026 · Prioriza `data` (mapa completo · 17 claves). Si el snapshot es
+        //   antiguo (sin `data`), cae en los campos legacy para no perder capacidad de
+        //   restaurar copias creadas antes de este fix.
+        if(snap.data && typeof snap.data === 'object'){
+          _writeAllDataKeys(snap.data);
+        } else {
+          if(snap.cbTrafic)localStorage.setItem('caja.v1',snap.cbTrafic);
+          if(snap.cempla)localStorage.setItem('caja.cempla.v1',snap.cempla);
+          if(snap.datafono)localStorage.setItem('caja.datafono',snap.datafono);
+          if(snap.datafonoCempla)localStorage.setItem('caja.cempla.datafono',snap.datafonoCempla);
+          if(snap.stats)localStorage.setItem('caja.stats.v1',snap.stats);
+          if(snap.irpf)localStorage.setItem('caja.irpf.v1',snap.irpf);
+          if(snap.saldoInicial1)localStorage.setItem('caja.saldoInicial.trafic.v1',snap.saldoInicial1);
+          if(snap.saldoInicial2)localStorage.setItem('caja.saldoInicial.cempla.v1',snap.saldoInicial2);
+          if(snap.reserva1)localStorage.setItem('caja.reserva.v1',snap.reserva1);
+          if(snap.reserva2)localStorage.setItem('caja.cempla.reserva.v1',snap.reserva2);
+          if(snap.cuadreOverrides)localStorage.setItem('caja.cuadre.overrides.v1',snap.cuadreOverrides);
+        }
+        state=loadState();
+        try{ window.CFG = JSON.parse(localStorage.getItem('caja.config.v1'))||{}; }catch(_){}
+        try{ if(typeof applyCompanyUI==='function') applyCompanyUI(); }catch(_){}
+        render();toast('✅ Copia restaurada correctamente',3500);back.remove();
       },'↩ Restaurar');
     }else if(btn.dataset.act==='download'){
-      const obj={cbTrafic:JSON.parse(snap.cbTrafic||'{"byDate":{}}'),cempla:JSON.parse(snap.cempla||'{"byDate":{}}'),datafono:JSON.parse(snap.datafono||'{}'),datafonoCempla:JSON.parse(snap.datafonoCempla||'{}'),stats:JSON.parse(snap.stats||'null'),irpf:JSON.parse(snap.irpf||'{"months":{},"quarters":{}}'),saldoInicial1:snap.saldoInicial1?JSON.parse(snap.saldoInicial1):null,saldoInicial2:snap.saldoInicial2?JSON.parse(snap.saldoInicial2):null,reserva1:snap.reserva1?JSON.parse(snap.reserva1):null,reserva2:snap.reserva2?JSON.parse(snap.reserva2):null,cuadreOverrides:snap.cuadreOverrides?JSON.parse(snap.cuadreOverrides):null,_v:5,_ts:snap.ts};
+      // 🔧 Feb 2026 · El JSON de descarga incluye el mapa completo (`data`) + campos
+      //   legacy parseados para compat con `restoreAll` cuando se sube el fichero.
+      const _parseIf = s => { try{ return s ? JSON.parse(s) : null; }catch(_){ return null; } };
+      const _d = snap.data || {};
+      const obj = {
+        cbTrafic: _parseIf(_d['caja.v1']||snap.cbTrafic) || {byDate:{}},
+        cempla:   _parseIf(_d['caja.cempla.v1']||snap.cempla) || {byDate:{}},
+        datafono: _parseIf(_d['caja.datafono']||snap.datafono) || {},
+        datafonoCempla: _parseIf(_d['caja.cempla.datafono']||snap.datafonoCempla) || {},
+        stats:    _parseIf(_d['caja.stats.v1']||snap.stats),
+        irpf:     _parseIf(_d['caja.irpf.v1']||snap.irpf) || {months:{},quarters:{}},
+        saldoInicial1: _parseIf(_d['caja.saldoInicial.trafic.v1']||snap.saldoInicial1),
+        saldoInicial2: _parseIf(_d['caja.saldoInicial.cempla.v1']||snap.saldoInicial2),
+        reserva1:      _parseIf(_d['caja.reserva.v1']||snap.reserva1),
+        reserva2:      _parseIf(_d['caja.cempla.reserva.v1']||snap.reserva2),
+        cuadreOverrides: _parseIf(_d['caja.cuadre.overrides.v1']||snap.cuadreOverrides),
+        // 🔧 Feb 2026 · Campos nuevos (autoescolas aliases, overrides tabla tráfico, config, citas)
+        statsAliases:  _parseIf(_d['caja.stats.aliases.v1']),
+        trafOverrides: _parseIf(_d['caja.stats.traffic.overrides.v1']),
+        config:        _parseIf(_d['caja.config.v1']),
+        calendarHist:  _parseIf(_d['caja.calendar.history.v1']),
+        calendarStat:  _parseIf(_d['caja.calendar.status.v1']),
+        countZero:     _d['caja.count_zero'] || null,
+        // Mapa completo para restauradores nuevos (fuente de verdad)
+        data: snap.data || null,
+        _v: 6,
+        _ts: snap.ts
+      };
       const a=document.createElement('a');a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(obj,null,2));a.download=`SNAPSHOT-${new Date(snap.ts).toISOString().slice(0,19).replace(/[:.]/g,'-')}.json`;a.click();
     }
   });
@@ -10188,6 +10303,27 @@ $('#jsonInput').onchange=async ev=>{
   const restoreAll=(replace)=>{
     pushSnapshot('preRestore');
     const log=[];
+    // 🔧 Feb 2026 · Si el fichero es v6+ trae `data` con mapa completo (fuente de verdad).
+    //   Restaura TODAS las claves de golpe. Los bloques legacy debajo siguen funcionando
+    //   para ficheros antiguos (v4/v5).
+    if(obj.data && typeof obj.data === 'object'){
+      const _keysApplied = [];
+      for(const k of Object.keys(obj.data)){
+        if(!DATA_LS_KEYS.includes(k)) continue;
+        const v = obj.data[k];
+        if(v === null || v === undefined || v === '') continue;
+        if(!replace && localStorage.getItem(k)) continue; // MERGE: respeta lo existente
+        localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+        _keysApplied.push(k);
+      }
+      if(_keysApplied.length) log.push(isCA?`Còpia completa (${_keysApplied.length} claus)`:`Copia completa (${_keysApplied.length} claves)`);
+      // Refresca CFG en memoria para que la UI recoja el cambio de nombres/socios sin recargar
+      try{ window.CFG = JSON.parse(localStorage.getItem('caja.config.v1'))||{}; }catch(_){}
+      try{ if(typeof applyCompanyUI==='function') applyCompanyUI(); }catch(_){}
+      state=loadState();render();
+      toast((isCA?`✅ ${replace?'Restaurat':'Fusionat'}: `:`✅ ${replace?'Restaurado':'Fusionado'}: `)+log.join(' · '),5000);
+      return;
+    }
     if(hasDual||hasOnlyCB){
       if(replace)localStorage.setItem('caja.v1',JSON.stringify(obj.cbTrafic));
       else{const cur=JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}');for(const[d,arr]of Object.entries(obj.cbTrafic.byDate||{})){cur.byDate[d]=cur.byDate[d]||[];_mergeArrDedup(cur.byDate[d],arr)}localStorage.setItem('caja.v1',JSON.stringify(cur))}

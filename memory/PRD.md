@@ -1,4 +1,34 @@
 # MediCar Plus · PRD (Product Requirements Document)
+## 2026-02-28 · Fix CRÍTICO: Cloud Backup incluía solo datos parciales
+
+**El bug real detrás de la pérdida de datos:** `sendCloudBackup()` (línea 484) usaba `_snapshotLocalStorage()` que filtra por `_isSyncable()` — este filtro excluye TODAS las claves con prefijo `caja.saldoInicial.`, `caja.cuadre.`, `caja.install.`, `caja.sync.`, `caja.license.`, `caja.plan.preview.` y `caja.__sync`.
+
+**Efecto:** las copias diarias en la nube NO contenían el Saldo Inicial ni los ajustes manuales del Cuadre. Al restaurar (cloud recovery banner) estos datos se perdían para siempre. Confusión adicional: el fix anterior arreglaba pushSnapshot local, autoSaveToFile y restoreAll, pero NO el cloud backup que es el flujo automático diario.
+
+**Fix aplicado (`v2.html`):**
+
+1. **`DATA_LS_KEYS` expuesto al scope global** (`window.DATA_LS_KEYS`) para que la IIFE de sync (que se define arriba en el fichero) pueda usarla en el backup.
+
+2. **Nueva función `_fullBackupData()`** dentro de la IIFE de sync: usa la whitelist de 17 claves de datos + fallback hardcoded para robustez. NO usa `_isSyncable()`.
+
+3. **`sendCloudBackup()` ahora usa `_fullBackupData()`** en lugar de `_snapshotLocalStorage()`. Backup completo garantizado.
+
+4. **Sync entre PCs (`pushNow`/`pullNow`/`sendBackup`) sigue usando `_snapshotLocalStorage()`** — así las claves locales (saldoInicial, cuadre overrides) NUNCA cruzan entre PCs, cada PC tiene su valor propio. Backup ≠ Sync.
+
+**Comportamiento:**
+- Sync PC↔PC: SOLO datos comunes (entradas, IRPF, stats, config). ✓
+- Backup local (snapshot / autoSaveToFile): las 17 claves DATA_LS_KEYS. ✓
+- Backup nube (sendCloudBackup): las 17 claves DATA_LS_KEYS. ✓ (fix)
+
+**Verificación:** 222 tests contables pasan · `DATA_LS_KEYS.length === 17` accesible en runtime · `window.mcSync.sendCloudBackup` sigue disponible.
+
+**Limitación honesta:** las copias que ya están en la nube (creadas antes de este fix) siguen sin tener el saldo inicial. Se puede regenerar manualmente:
+1. Ir a Configuración → 🏦 Saldo Inicial y volver a meterlo.
+2. A partir de las próximas 20h la copia diaria en nube se enviará completa.
+
+**Recordatorio:** `Ctrl + Shift + R` en Electron.
+
+
 ## 2026-02-28 · Fix crítico backup/restore + Saldo Inicial por empresa (E1/E2)
 
 ### 🔴 A) Bug crítico: la restauración de copia perdía el Saldo Inicial
