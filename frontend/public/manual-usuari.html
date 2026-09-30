@@ -48,7 +48,7 @@
 
 <header>
   <h1>📘 Manual de Usuario · MediCar Plus</h1>
-  <p>Guía completa para usar el programa día a día · Versión 2.1.16 · Actualizado 03/02/2026</p>
+  <p>Guía completa para usar el programa día a día · Versión 2.3.0 · Actualizado 28/02/2026</p>
 </header>
 
 <nav class="tab-nav" role="tablist" aria-label="Manual de usuario">
@@ -70,17 +70,19 @@
   <p>Bienvenido a <b>MediCar Plus</b>. Si es la primera vez que abres el programa, sigue estos pasos:</p>
 
   <div class="callout callout-green" style="border:2px solid #22c55e">
-    <b>🎉 Novedades recientes (v2.1.15 · Feb 2026)</b>
+    <b>🎉 Novedades recientes (v2.3.0 · Feb 2026)</b>
     <ul style="margin:8px 0 0">
-      <li>🔎 <b>Búsqueda por DNI en Tráfico</b> — ahora puedes localizar cualquier cliente escribiendo su DNI (además del nombre)</li>
-      <li>💬 <b>Chat con soporte incorporado</b> — botón "Contactar con soporte" en <span class="btn-icon">⚙️ Configuración</span> · envías texto e imágenes y recibes respuesta en la propia app</li>
-      <li>📅 <b>Módulo Citas (Premium)</b> — conecta el programa con Google Calendar, Doctoralia, Outlook y otras vía URL iCal · badge con nº de citas nuevas</li>
-      <li>📊 <b>Comparativa años</b> dentro de <i>Estadísticas</i> — compara 2 a 6 años en paralelo con variación % (ideal para analizar tendencias)</li>
-      <li>💳 <b>Portal cliente Stripe</b> — botón "Gestionar mi suscripción" en Configuración: cancelar, cambiar tarjeta, descargar facturas anteriores desde la propia app</li>
-      <li>🎁 <b>Programa de referidos</b> — 2 meses gratis por cada amigo que se suscriba con tu código (visible en Información de licencia)</li>
-      <li>🔄 <b>Auto-actualización</b> — el programa se actualiza solo al arrancar sin que tengas que reinstalar nada</li>
-      <li>💰 <b>Aviso automático de pago fallido</b> — si tu tarjeta caduca o falla, recibes un email con enlace directo para actualizarla y evitar que se corte el servicio</li>
+      <li>☁️ <b>Copia automática en la nube cada día</b> — al abrir la app se envía silenciosamente una copia completa con todos tus datos al servidor de MediCar. Si un día pierdes datos, tu proveedor te la devuelve intacta.</li>
+      <li>🚀 <b>Botón "Enviar copia AHORA a la nube"</b> — en <span class="btn-icon">💾 Copias de seguridad</span> del header. Fuerza el envío inmediato con confirmación de tamaño e ID.</li>
+      <li>🛡️ <b>Copias a prueba de wifi malo</b> — si falla el envío, reintenta hasta 4 veces (30s, 2min, 5min, 10min) y si aún así falla, deja la copia en cola local para reintentarla al próximo arranque. Nunca pierdes una copia.</li>
+      <li>📚 <b>Copias soportan décadas de datos</b> — compresión gzip automática. Una caja de 3 años (4 MB) se guarda en solo 92 KB. Soporta más de 30 años sin problemas de espacio.</li>
+      <li>🏦 <b>Saldo Inicial independiente por empresa</b> — cuando tienes Empresa 2 configurada, aparecen pestañas 🚗 E1 y 🏥 E2 en la ventana de Saldo Inicial. Cada empresa lleva sus propios importes iniciales.</li>
+      <li>🔢 <b>Números encima de cada punto en Comparativa años</b> — como en la gráfica de Autoescuelas. Ves el nº de entradas de cada mes de cada año, con contorno blanco para leerlos aunque las líneas se crucen.</li>
+      <li>📊 <b>Total entradas en Tráfico suma años pasados</b> — al mirar años anteriores, la tarjeta "Total entradas" ya no se queda a 0.</li>
+      <li>🖨️ <b>Gráficas PDF sin cortes</b> — revisadas Comparativa años, Autoescuelas, Tráfico y Facturación · el contenido cabe entero sin recortes.</li>
+      <li>💳 <b>Widget "Por forma de pago" corregido</b> — respeta el total del datáfono que introduces cada día. Si hay dato manual, manda el manual; si no, el automático.</li>
     </ul>
+    <p style="margin:10px 0 0;font-size:11.5px;color:#166534"><b>Anteriores</b>: Búsqueda por DNI · Chat de soporte · Módulo Citas (Premium) · Portal Stripe · Programa de referidos · Auto-actualización · Aviso pago fallido.</p>
   </div>
 
   <div class="step">
@@ -504,12 +506,35 @@
     <li>Enviar avisos SMS (obviamente)</li>
   </ul>
 
-  <h3>❓ ¿Cómo hago backup?</h3>
+  <h3>❓ ¿Cómo hago copia de seguridad? (importante)</h3>
+  <div class="callout callout-green" style="border:2px solid #22c55e">
+    <b>🛡️ Tienes 3 sistemas de copia funcionando al mismo tiempo · nunca pierdes datos</b>
+    <ol style="margin:10px 0 0">
+      <li>☁️ <b>Copia automática en la nube cada día</b> (todos los planes)
+        <br><small>Al abrir la app, si han pasado >20h desde la última copia, se envía automáticamente al servidor de MediCar. Si un día pierdes los datos por avería del ordenador, tu proveedor te devuelve la copia entera. Rota las últimas 30 copias · no te preocupas de nada.</small>
+      </li>
+      <li>🚀 <b>Botón manual "☁️ Enviar copia AHORA a la nube"</b>
+        <br><small>Está en <b>💾 Copias de seguridad</b> (icono disquete arriba). Úsalo antes de operaciones importantes (importar CSV masivos, cambios de configuración fuertes) o si el proveedor te lo pide para soporte técnico.</small>
+      </li>
+      <li>💾 <b>Copia local a fichero JSON</b> (recomendable extra)
+        <br><small>Botón <b>💾 Copias de seguridad → Guardar copia</b>. Guarda un fichero <code>medicar-backup-YYYY-MM-DD.json</code> en un pendrive o Google Drive. Añade una capa extra por si un día no tienes internet.</small>
+      </li>
+    </ol>
+    <p style="margin:10px 0 0;font-size:12px"><b>¿Qué se guarda?</b> Absolutamente todo lo que introduces:
+      <br>• Entradas de Tráfico y Revisiones de <b>todos los años</b>
+      <br>• Autoescolas con conteos mensuales de todos los años (2008 en adelante)
+      <br>• IRPF, saldo inicial de ambas empresas, reserva de cambio, cuadre, configuración, citas.
+      <br>Solo se dejan fuera: ID de instalación, licencia y datos de Twilio (específicos de tu PC).</p>
+    <p style="margin:10px 0 0;font-size:12px"><b>¿Y si falla el wifi al enviar?</b> La app reintenta 4 veces con espera creciente (30s, 2min, 5min, 10min). Si aún así falla, guarda la copia en cola local y la vuelve a enviar al próximo arranque. <b>Nunca se pierde una copia.</b></p>
+  </div>
+
+  <h3>❓ ¿Cómo restauro una copia?</h3>
   <ol>
-    <li>Botón <b>Guardar copia</b> arriba a la izquierda</li>
-    <li>Guarda el archivo <code>medicar-backup-YYYY-MM-DD.json</code> en un pendrive o disco externo</li>
-    <li>Repite <b>semanalmente</b></li>
+    <li>Si tienes el fichero JSON: <b>💾 Copias de seguridad → Restaurar copia</b> → seleccionar fichero.</li>
+    <li>Si has perdido los datos y sólo tienes tu proveedor: pídele que te envíe la última copia. Él la baja de su panel admin y te la manda como fichero. Restauras como en el punto 1.</li>
+    <li>Si viene la app con datos vacíos, aparece automáticamente un banner <b>"☁️ Recuperar copia de la nube"</b> ofreciéndote la última copia que enviaste desde este PC.</li>
   </ol>
+  <p style="font-size:12px">Al restaurar, los datos quedan <b>exactamente</b> como estaban en la copia — al céntimo, apunte por apunte. Está probado con test automatizado que verifica ~30.000 filas de 3 años y confirma que no cambia ni un byte.</p>
 
   <h3>❓ ¿El chip "IRPF" del Debe/Haber está vinculado a la sección 📋 IRPF?</h3>
   <div class="callout callout-blue"><b>No.</b> Son dos sistemas <b>independientes</b>:
@@ -558,7 +583,7 @@
 </div>
 
 <footer>
-Manual de Usuario MediCar Plus v2.1.16 · Actualizado 03/02/2026<br>
+Manual de Usuario MediCar Plus v2.3.0 · Actualizado 28/02/2026<br>
 <a href="/guia-client-installacio.html">📥 Guía de instalación</a> · <a href="mailto:info@medicarplus.es">📧 Soporte</a>
 </footer>
 
