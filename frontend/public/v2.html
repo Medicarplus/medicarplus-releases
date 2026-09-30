@@ -885,10 +885,17 @@ function pushSnapshot(reason){
     const dfC=localStorage.getItem('caja.cempla.datafono')||'';
     const stats=localStorage.getItem('caja.stats.v1')||'';
     const irpf=localStorage.getItem('caja.irpf.v1')||'';
+    // 🔧 Feb 2026 · Incluir claves LOCALES críticas que antes se perdían al restaurar:
+    //   · Saldo inicial (E1/E2) · Reserva de cambio (E1/E2) · Overrides Cuadre
+    const si1=localStorage.getItem('caja.saldoInicial.trafic.v1')||'';
+    const si2=localStorage.getItem('caja.saldoInicial.cempla.v1')||'';
+    const res1=localStorage.getItem('caja.reserva.v1')||'';
+    const res2=localStorage.getItem('caja.cempla.reserva.v1')||'';
+    const cuadreOv=localStorage.getItem('caja.cuadre.overrides.v1')||'';
     const last=snaps[snaps.length-1];
     // Si no hay cambios reales vs la última copia, no crear otra
-    if(last&&last.cbTrafic===cb&&last.cempla===ce&&last.datafono===df&&last.datafonoCempla===dfC&&last.stats===stats&&last.irpf===irpf)return false;
-    const snap={ts:Date.now(),reason:reason||'auto',cbTrafic:cb,cempla:ce,datafono:df,datafonoCempla:dfC,stats,irpf};
+    if(last && last.cbTrafic===cb && last.cempla===ce && last.datafono===df && last.datafonoCempla===dfC && last.stats===stats && last.irpf===irpf && (last.saldoInicial1||'')===si1 && (last.saldoInicial2||'')===si2 && (last.reserva1||'')===res1 && (last.reserva2||'')===res2 && (last.cuadreOverrides||'')===cuadreOv) return false;
+    const snap={ts:Date.now(),reason:reason||'auto',cbTrafic:cb,cempla:ce,datafono:df,datafonoCempla:dfC,stats,irpf,saldoInicial1:si1,saldoInicial2:si2,reserva1:res1,reserva2:res2,cuadreOverrides:cuadreOv};
     snaps.push(snap);
     while(snaps.length>MAX_SNAPS)snaps.shift();
     try{localStorage.setItem(SNAPS_KEY,JSON.stringify(snaps))}
@@ -907,9 +914,25 @@ async function autoSaveToFile(silent){
     if(!handle)return;
     const perm=await handle.queryPermission({mode:'readwrite'});
     if(perm!=='granted')return;
-    const all={cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),datafonoCempla:JSON.parse(localStorage.getItem('caja.cempla.datafono')||'{}'),stats:JSON.parse(localStorage.getItem('caja.stats.v1')||'null'),irpf:JSON.parse(localStorage.getItem('caja.irpf.v1')||'{"months":{},"quarters":{}}'),_v:4,_ts:Date.now()};
+    // 🔧 Feb 2026 · Incluir claves LOCALES críticas (saldo inicial, reserva de cambio, cuadre)
+    //   para que restaurar deje la caja idéntica a como estaba (antes se perdían).
+    const _pj=(k,d)=>{try{return JSON.parse(localStorage.getItem(k)||d);}catch(_){return JSON.parse(d);}};
+    const all={
+      cbTrafic:_pj('caja.v1','{"byDate":{}}'),
+      cempla:_pj('caja.cempla.v1','{"byDate":{}}'),
+      datafono:_pj('caja.datafono','{}'),
+      datafonoCempla:_pj('caja.cempla.datafono','{}'),
+      stats:_pj('caja.stats.v1','null'),
+      irpf:_pj('caja.irpf.v1','{"months":{},"quarters":{}}'),
+      saldoInicial1:_pj('caja.saldoInicial.trafic.v1','null'),
+      saldoInicial2:_pj('caja.saldoInicial.cempla.v1','null'),
+      reserva1:_pj('caja.reserva.v1','null'),
+      reserva2:_pj('caja.cempla.reserva.v1','null'),
+      cuadreOverrides:_pj('caja.cuadre.overrides.v1','null'),
+      _v:5,_ts:Date.now()
+    };
     // Firma para detectar cambios (excluye _ts)
-    const sig=JSON.stringify({a:all.cbTrafic,b:all.cempla,c:all.datafono,d:all.datafonoCempla,e:all.stats,f:all.irpf});
+    const sig=JSON.stringify({a:all.cbTrafic,b:all.cempla,c:all.datafono,d:all.datafonoCempla,e:all.stats,f:all.irpf,g:all.saldoInicial1,h:all.saldoInicial2,i:all.reserva1,j:all.reserva2,k:all.cuadreOverrides});
     if(sig===_lastAutoSaveContent){if(!silent)toast('✓ Sin cambios · no hace falta guardar',2000);return}
     const content=JSON.stringify(all,null,2);
     // SAFETY: never write empty/truncated content
@@ -978,10 +1001,18 @@ function openBackupHistory(){
         if(snap.datafonoCempla)localStorage.setItem('caja.cempla.datafono',snap.datafonoCempla);
         if(snap.stats)localStorage.setItem('caja.stats.v1',snap.stats);
         if(snap.irpf)localStorage.setItem('caja.irpf.v1',snap.irpf);
+        // 🔧 Feb 2026 · Restaurar también claves locales críticas (saldo inicial, reserva, cuadre)
+        //   Se usa setItem si el snapshot lo trae; si no lo trae (snapshot antiguo pre-fix),
+        //   NO se toca el valor actual para no borrar datos válidos del usuario.
+        if(snap.saldoInicial1)localStorage.setItem('caja.saldoInicial.trafic.v1',snap.saldoInicial1);
+        if(snap.saldoInicial2)localStorage.setItem('caja.saldoInicial.cempla.v1',snap.saldoInicial2);
+        if(snap.reserva1)localStorage.setItem('caja.reserva.v1',snap.reserva1);
+        if(snap.reserva2)localStorage.setItem('caja.cempla.reserva.v1',snap.reserva2);
+        if(snap.cuadreOverrides)localStorage.setItem('caja.cuadre.overrides.v1',snap.cuadreOverrides);
         state=loadState();render();toast('✅ Copia restaurada correctamente',3500);back.remove();
       },'↩ Restaurar');
     }else if(btn.dataset.act==='download'){
-      const obj={cbTrafic:JSON.parse(snap.cbTrafic||'{"byDate":{}}'),cempla:JSON.parse(snap.cempla||'{"byDate":{}}'),datafono:JSON.parse(snap.datafono||'{}'),datafonoCempla:JSON.parse(snap.datafonoCempla||'{}'),stats:JSON.parse(snap.stats||'null'),irpf:JSON.parse(snap.irpf||'{"months":{},"quarters":{}}'),_v:4,_ts:snap.ts};
+      const obj={cbTrafic:JSON.parse(snap.cbTrafic||'{"byDate":{}}'),cempla:JSON.parse(snap.cempla||'{"byDate":{}}'),datafono:JSON.parse(snap.datafono||'{}'),datafonoCempla:JSON.parse(snap.datafonoCempla||'{}'),stats:JSON.parse(snap.stats||'null'),irpf:JSON.parse(snap.irpf||'{"months":{},"quarters":{}}'),saldoInicial1:snap.saldoInicial1?JSON.parse(snap.saldoInicial1):null,saldoInicial2:snap.saldoInicial2?JSON.parse(snap.saldoInicial2):null,reserva1:snap.reserva1?JSON.parse(snap.reserva1):null,reserva2:snap.reserva2?JSON.parse(snap.reserva2):null,cuadreOverrides:snap.cuadreOverrides?JSON.parse(snap.cuadreOverrides):null,_v:5,_ts:snap.ts};
       const a=document.createElement('a');a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(obj,null,2));a.download=`SNAPSHOT-${new Date(snap.ts).toISOString().slice(0,19).replace(/[:.]/g,'-')}.json`;a.click();
     }
   });
@@ -4094,6 +4125,24 @@ function renderByConcept(list){const map={};list.forEach(e=>{if(e.retorno)return
 // por empresa. NUNCA entra en estadísticas (no es una entrada de facturación),
 // solo se suma al "saldo anterior" a partir de la fecha de arranque.
 function _saldoInicialKey(){ return 'caja.saldoInicial.'+(currentCompany||'main')+'.v1' }
+// 🔧 Feb 2026 · Helper con comp explícito (para el modal multi-empresa)
+function _saldoInicialKeyFor(comp){ return 'caja.saldoInicial.'+(comp||'main')+'.v1' }
+function getSaldoInicialFor(comp){
+  try{
+    const raw = localStorage.getItem(_saldoInicialKeyFor(comp));
+    if(!raw) return null;
+    const p = JSON.parse(raw);
+    if(!p || !p.fecha) return null;
+    const banco = (p.banco !== undefined) ? +p.banco : ((+p.tarjeta||0)+(+p.transf||0)+(+p.bizum||0));
+    return { fecha: p.fecha, efectivo: +p.efectivo || 0, banco: banco || 0, cambio: +p.cambio || 0, nota: p.nota || '' };
+  }catch(e){ return null }
+}
+function setSaldoInicialFor(comp, obj){
+  const key = _saldoInicialKeyFor(comp);
+  if(!obj || obj._delete){ localStorage.removeItem(key); return; }
+  const clean = { fecha: obj.fecha, efectivo: +obj.efectivo || 0, banco: +obj.banco || 0, cambio: +obj.cambio || 0, nota: obj.nota || '' };
+  localStorage.setItem(key, JSON.stringify(clean));
+}
 function getSaldoInicial(){
   try{
     const raw = localStorage.getItem(_saldoInicialKey());
@@ -4218,16 +4267,35 @@ function saldoInicialAplicable(date){
 // 🎨 Modal de configuración del Saldo inicial. Permite arrancar con dinero
 // que ya tenía el cliente antes de usar la app. NUNCA cuenta como facturación.
 function openSaldoInicial(){
-  const si = getSaldoInicial() || {fecha:'', efectivo:0, banco:0, cambio:0, nota:''};
+  // 🔧 Feb 2026 · Multi-empresa: si Empresa 2 está configurada, aparecen pestañas para
+  //   configurar el saldo inicial de cada una por separado. Cada empresa tiene su propia
+  //   clave en localStorage (caja.saldoInicial.trafic.v1 · caja.saldoInicial.cempla.v1).
+  const _c1Name = (window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1';
+  const _c2Name = (window.CFG&&CFG.company2&&CFG.company2.name)||'';
+  const _hasC2 = !!_c2Name;
+  let _modalComp = currentCompany || 'trafic';
+  // Buffer en memoria de los cambios NO guardados de cada empresa (permite cambiar de
+  // pestaña sin perder lo escrito · solo se persiste al pulsar "Guardar")
+  const _buf = {
+    trafic: getSaldoInicialFor('trafic') || {fecha:'', efectivo:0, banco:0, cambio:0, nota:''},
+    cempla: getSaldoInicialFor('cempla') || {fecha:'', efectivo:0, banco:0, cambio:0, nota:''}
+  };
+  const si = _buf[_modalComp];
   const today = new Date().toISOString().slice(0,10);
   const back = document.createElement('div'); back.className='modal-back';
   // z-index alto para aparecer por encima del wizard de Configuración (99998)
   back.style.zIndex = '99999';
+  const _tabsHtml = _hasC2 ? `
+    <div id="siTabs" style="display:flex;gap:6px;margin-bottom:14px;background:#0b1121;border:1px solid #1e293b;border-radius:8px;padding:4px">
+      <button data-comp="trafic" data-testid="si-tab-c1" style="flex:1;padding:8px 12px;border:none;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;background:${_modalComp==='trafic'?'#38bdf8':'transparent'};color:${_modalComp==='trafic'?'#0f172a':'#94a3b8'}">🚗 ${_c1Name}</button>
+      <button data-comp="cempla" data-testid="si-tab-c2" style="flex:1;padding:8px 12px;border:none;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;background:${_modalComp==='cempla'?'#38bdf8':'transparent'};color:${_modalComp==='cempla'?'#0f172a':'#94a3b8'}">🏥 ${_c2Name}</button>
+    </div>` : '';
   back.innerHTML = `<div class="modal" style="max-width:520px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
       <h3 style="margin:0;color:#38bdf8;font-family:Georgia,serif">🏦 Saldo inicial</h3>
       <button data-close style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">×</button>
     </div>
+    ${_tabsHtml}
     <p style="color:#94a3b8;font-size:13px;margin:8px 0 12px;line-height:1.5">
       ¿Empiezas a usar MediCar Plus a mediados de año y ya tenías dinero en caja o banco? Introduce aquí ese saldo de partida. <b style="color:#38bdf8">No se cuenta como facturación</b>: solo aparece en el "Saldo anterior" para que las cifras cuadren desde el día uno.
     </p>
@@ -4272,7 +4340,7 @@ function openSaldoInicial(){
 
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button id="siSave" data-testid="saldo-inicial-save" style="flex:1;padding:12px 16px;background:linear-gradient(135deg,#38bdf8,#0284c7);color:#0f172a;border:none;border-radius:8px;font-weight:800;font-size:14px;cursor:pointer">💾 Guardar saldo inicial</button>
-      ${si.fecha ? `<button id="siDelete" data-testid="saldo-inicial-delete" style="padding:12px 16px;background:#7f1d1d;color:#fecaca;border:1px solid #b91c1c;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">🗑 Borrar</button>` : ''}
+      <button id="siDelete" data-testid="saldo-inicial-delete" style="display:${si.fecha?'inline-block':'none'};padding:12px 16px;background:#7f1d1d;color:#fecaca;border:1px solid #b91c1c;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">🗑 Borrar</button>
       <button data-close style="padding:12px 16px;background:#1e293b;color:#94a3b8;border:1px solid #475569;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer">Cancelar</button>
     </div>
 
@@ -4320,11 +4388,57 @@ function openSaldoInicial(){
   fields.forEach(id => back.querySelector('#'+id).addEventListener('input', recalc));
   recalc();
 
-  // Aviso si hay entradas anteriores a la fecha SI
+  // 🔄 Guarda los valores actuales en el buffer de la empresa activa (sin persistir)
+  const _saveToBuffer = ()=>{
+    _buf[_modalComp] = {
+      fecha:    back.querySelector('#siFecha').value || '',
+      efectivo: +back.querySelector('#siEfectivo').value || 0,
+      banco:    +back.querySelector('#siBanco').value    || 0,
+      cambio:   +back.querySelector('#siCambio').value   || 0,
+      nota:     back.querySelector('#siNota').value.trim() || ''
+    };
+  };
+  // 🔄 Refresca los inputs desde el buffer + actualiza tab styles + visibilidad del Borrar
+  const _refreshFormFromBuffer = ()=>{
+    const cur = _buf[_modalComp] || {fecha:'', efectivo:0, banco:0, cambio:0, nota:''};
+    back.querySelector('#siFecha').value = cur.fecha || today;
+    back.querySelector('#siEfectivo').value = cur.efectivo || '';
+    back.querySelector('#siBanco').value    = cur.banco    || '';
+    back.querySelector('#siCambio').value   = cur.cambio   || '';
+    back.querySelector('#siNota').value     = cur.nota     || '';
+    recalc();
+    // Toggle Borrar solo si esta empresa YA tiene un saldo persistido
+    const _persisted = getSaldoInicialFor(_modalComp);
+    const delBtnEl = back.querySelector('#siDelete');
+    if(delBtnEl) delBtnEl.style.display = (_persisted && _persisted.fecha) ? 'inline-block' : 'none';
+    // Actualiza tabs
+    back.querySelectorAll('#siTabs button').forEach(btn => {
+      const active = btn.dataset.comp === _modalComp;
+      btn.style.background = active ? '#38bdf8' : 'transparent';
+      btn.style.color = active ? '#0f172a' : '#94a3b8';
+    });
+  };
+  // 🖱️ Click en tabs → guarda buffer actual y cambia de empresa
+  if(_hasC2){
+    back.querySelectorAll('#siTabs button').forEach(btn => {
+      btn.onclick = ()=>{
+        const next = btn.dataset.comp;
+        if(next === _modalComp) return;
+        _saveToBuffer();
+        _modalComp = next;
+        _refreshFormFromBuffer();
+        checkWarn();
+      };
+    });
+  }
+
+  // Aviso si hay entradas anteriores a la fecha SI (lee la empresa activa del modal)
   const checkWarn = ()=>{
     const f = back.querySelector('#siFecha').value;
     if(!f) return;
-    const previas = Object.keys(state.byDate||{}).filter(d => d < f);
+    let _compState;
+    try{ _compState = JSON.parse(localStorage.getItem(KEYS[_modalComp])||'{"byDate":{}}'); }catch(_){ _compState = {byDate:{}}; }
+    const previas = Object.keys(_compState.byDate||{}).filter(d => d < f);
     const w = back.querySelector('#siWarn');
     if(previas.length){
       w.style.display='block';
@@ -4346,27 +4460,31 @@ function openSaldoInicial(){
       cambio:   +back.querySelector('#siCambio').value   || 0,
       nota:     back.querySelector('#siNota').value.trim() || ''
     };
-    setSaldoInicial(obj);
+    setSaldoInicialFor(_modalComp, obj);
+    _buf[_modalComp] = obj;
     // 💰 Sincroniza la Reserva de cambio con el campo "cambio" del Saldo inicial:
     //  · Si cambio > 0 → siembra _bulk pendiente de repartir en denominaciones.
     //  · Si cambio = 0 → LIMPIA la semilla anterior (así puedes reiniciar el saldo
     //    inicial sin arrastrar un _bulk viejo que ya no quieres).
+    //  🔧 Feb 2026: usa la clave de reserva de la empresa activa del modal (E1/E2 independientes).
+    const _resKey = _modalComp === 'cempla' ? 'caja.cempla.reserva.v1' : 'caja.reserva.v1';
     try{
-      const existing = loadCambio() || {};
+      let existing = {};
+      try{ existing = JSON.parse(localStorage.getItem(_resKey) || '{}') || {}; }catch(_){ existing = {}; }
       const denomsSum = CAMBIO_DENOMS.reduce((s,d)=>s+cambioSubtotal(d,existing),0);
       if(obj.cambio > 0){
         // Solo siembra si aún no hay denominaciones puestas (evita pisar datos del cliente)
         if(denomsSum === 0){
           existing._bulk_seed = obj.cambio;
           existing._bulk = obj.cambio;
-          saveCambio(existing);
+          localStorage.setItem(_resKey, JSON.stringify(existing));
         }
       } else {
         // cambio = 0 → borra la semilla anterior si existía
         let changed = false;
         if(existing._bulk_seed !== undefined){ delete existing._bulk_seed; changed = true; }
         if(existing._bulk !== undefined){ delete existing._bulk; changed = true; }
-        if(changed) saveCambio(existing);
+        if(changed) localStorage.setItem(_resKey, JSON.stringify(existing));
       }
     }catch(e){ console.warn('sync reserva cambio', e); }
     toast('🏦 Saldo inicial guardado');
@@ -4379,7 +4497,8 @@ function openSaldoInicial(){
   if(delBtn){
     delBtn.onclick = ()=>{
       if(!confirm('¿Borrar el saldo inicial? El saldo anterior volverá a calcularse solo desde las entradas del día.')) return;
-      setSaldoInicial({_delete:true});
+      setSaldoInicialFor(_modalComp, {_delete:true});
+      _buf[_modalComp] = {fecha:'', efectivo:0, banco:0, cambio:0, nota:''};
       toast('🗑 Saldo inicial borrado');
       back.remove();
       try{ if(typeof renderDay==='function') renderDay(); }catch(e){}
@@ -10111,6 +10230,22 @@ $('#jsonInput').onchange=async ev=>{
       const nTrim=Object.keys(obj.irpf.quarters||{}).length;
       log.push(isCA?`IRPF (${nMesos} mesos, ${nTrim} trimestres)`:`IRPF (${nMesos} meses, ${nTrim} trimestres)`);
     }
+    // 🔧 Feb 2026 · Restaurar claves LOCALES críticas (saldo inicial, reserva de cambio,
+    //   overrides del cuadre). En modo REPLACE sobrescribe; en modo MERGE respeta el
+    //   valor actual si ya existe (no pisa datos válidos del PC destino).
+    const _restoreLocalKey = (fromObj, lsKey, label) => {
+      if(fromObj === undefined || fromObj === null) return;
+      const _existing = localStorage.getItem(lsKey);
+      if(replace || !_existing){
+        localStorage.setItem(lsKey, JSON.stringify(fromObj));
+        log.push(label);
+      }
+    };
+    _restoreLocalKey(obj.saldoInicial1, 'caja.saldoInicial.trafic.v1', isCA?'Saldo inicial E1':'Saldo inicial E1');
+    _restoreLocalKey(obj.saldoInicial2, 'caja.saldoInicial.cempla.v1', isCA?'Saldo inicial E2':'Saldo inicial E2');
+    _restoreLocalKey(obj.reserva1, 'caja.reserva.v1', isCA?'Reserva canvi E1':'Reserva cambio E1');
+    _restoreLocalKey(obj.reserva2, 'caja.cempla.reserva.v1', isCA?'Reserva canvi E2':'Reserva cambio E2');
+    _restoreLocalKey(obj.cuadreOverrides, 'caja.cuadre.overrides.v1', isCA?'Ajustos Cuadre':'Ajustes Cuadre');
     if(hasSingle){
       if(replace)localStorage.setItem(KEYS[currentCompany],JSON.stringify(obj));
       else{for(const[d,arr]of Object.entries(obj.byDate)){const list=entriesOf(d);_mergeArrDedup(list,arr)}saveState()}

@@ -1,4 +1,42 @@
 # MediCar Plus · PRD (Product Requirements Document)
+## 2026-02-28 · Fix crítico backup/restore + Saldo Inicial por empresa (E1/E2)
+
+### 🔴 A) Bug crítico: la restauración de copia perdía el Saldo Inicial
+
+**Problema reportado:** al restaurar una copia de seguridad, el "Saldo inicial" configurado al empezar a usar el programa NO se recuperaba. Idéntico problema con la Reserva de cambio y los ajustes manuales del Cuadre de Caja.
+
+**Root cause:** `pushSnapshot()`, `autoSaveToFile()` y el handler de `restoreAll()` solo copiaban 6 claves (`caja.v1`, `caja.cempla.v1`, `caja.datafono`, `caja.cempla.datafono`, `caja.stats.v1`, `caja.irpf.v1`). Estas otras 5 claves LOCALES críticas nunca entraban en la copia y por tanto tampoco salían en el restore:
+- `caja.saldoInicial.trafic.v1` · `caja.saldoInicial.cempla.v1`
+- `caja.reserva.v1` · `caja.cempla.reserva.v1`
+- `caja.cuadre.overrides.v1`
+
+**Fix aplicado en `v2.html`:**
+1. **`pushSnapshot`** (línea 879): ahora incluye `saldoInicial1/2`, `reserva1/2`, `cuadreOverrides` en cada snapshot. La comprobación de "cambios reales vs último" contempla también estos campos.
+2. **Restore desde Historial de copias** (línea 972): setItem con los nuevos campos. Si el snapshot no los trae (pre-fix), NO se toca el localStorage actual (protección).
+3. **Download de snapshot** (línea 984): incluye los nuevos campos parseados + bump `_v:5`.
+4. **`autoSaveToFile`** (línea 903): guarda las 11 claves. Firma de diff cubre todo.
+5. **`restoreAll`** (línea 10106): nuevo helper `_restoreLocalKey()` que aplica cada clave respetando modo REPLACE/MERGE. En MERGE no pisa si ya existe (evita corromper datos válidos del PC destino).
+
+**Comportamiento con snapshots antiguos (pre-fix):**
+- Restaurar un snapshot antiguo ya NO borra el saldoInicial actual (`if(snap.saldoInicial1)` protege).
+- Los snapshots creados a partir de ahora sí serán 100% reversibles.
+
+### 🟢 B) Saldo Inicial multi-empresa (E1/E2) con pestañas
+
+**Petición:** cuando hay Empresa 2 configurada, poder introducir un Saldo Inicial independiente para cada una.
+
+**Solución:** en `openSaldoInicial()`:
+- Nuevos helpers `_saldoInicialKeyFor(comp)` / `getSaldoInicialFor(comp)` / `setSaldoInicialFor(comp, obj)`.
+- Si `CFG.company2.name` está definido, aparecen pestañas `🚗 E1` / `🏥 E2` al inicio del modal.
+- Buffer en memoria (`_buf.trafic` + `_buf.cempla`) que permite cambiar de pestaña sin perder lo escrito.
+- Al pulsar Guardar: persiste SOLO la pestaña activa en su clave (`caja.saldoInicial.trafic.v1` o `caja.saldoInicial.cempla.v1`) y sincroniza la reserva de cambio de esa empresa (`caja.reserva.v1` o `caja.cempla.reserva.v1`).
+- Botón Borrar toggling por pestaña + aviso de entradas anteriores lee las entradas de la empresa activa del modal.
+
+**Verificación:** 222/222 tests contables pasan (accounting_audit 102 + informe_anual 106 + migration_conservation 14). Preview carga sin errores JS.
+
+**Recordatorio:** `Ctrl + Shift + R` en Electron para refrescar cache.
+
+
 ## 2026-02-28 · Fix crítico: "Por forma de pago" ignoraba el datáfono manual
 
 **Problema reportado (msg 499):** en el Informe Anual, la tarjeta "TARJETA" de "Por forma de pago" mostraba solo 25€ mientras que EFECTIVO mostraba 38.544,55€ (99.9%). El usuario cada día mete manualmente el total del datáfono (dfManual), y ese valor debería dominar los cálculos de cobros por tarjeta.
