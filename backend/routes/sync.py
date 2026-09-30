@@ -470,13 +470,23 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
 
         🔧 Feb 2026 · Disponible para TODOS los planes (Standard, Premium, Trial, Master).
            El admin necesita ver copias de todos sus clientes por si pierden datos.
+        🔧 Feb 2026 · Auto-registra el dispositivo en sync_devices si no está aún.
+           Antes: MASTER (que salta heartbeat) fallaba con 403 device_not_authorized.
+           Ahora: al primer envío de copia se auto-registra silenciosamente.
         """
         lic = await _find_license(body.license_key)
         if not lic:
             raise HTTPException(status_code=404, detail="license_not_found")
         lkh = _key_hash(body.license_key)
         if not await _is_device_authorized(lkh, body.install_id):
-            raise HTTPException(status_code=403, detail="device_not_authorized")
+            # Auto-register on first cloud backup (MASTER + Standard sin heartbeat previo)
+            await db[COLL_DEVICES].insert_one({
+                "license_key_hash": lkh,
+                "install_id": body.install_id,
+                "created_at": _now(),
+                "last_seen": _now(),
+                "auto_registered_via": "cloudbackup",
+            })
         # Sanity: limitar tamaño (2 MB max por copia — más que suficiente)
         try:
             import json as _json
@@ -793,15 +803,49 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
 
     @router.get("/sync/admin/list-licenses")
     async def admin_list_licenses(admin_license_key: str):
-        """👑 Lista licencias activas para el selector de destino en la UI admin."""
+        """👑 Lista licencias activas para el selector de destino en la UI admin.
+
+        🔧 Feb 2026 · Incluye el propio MASTER (owner) al principio para que el
+           admin pueda ver también sus propias copias en el panel. El MASTER no
+           está en `db.licenses` (validación offline), así que se inyecta a mano.
+        """
         if (admin_license_key or "").strip() != MASTER_KEY:
             raise HTTPException(status_code=403, detail="admin_only")
+        # 👑 Inyectar el MASTER con TODOS los install_ids que hayan enviado copias
+        #    (para que el admin pueda seleccionar cualquiera de sus propios PCs)
+        master_lkh = _key_hash(MASTER_KEY)
+        master_devices_cursor = db[COLL_DEVICES].find(
+            {"license_key_hash": master_lkh},
+            {"install_id": 1, "last_seen": 1, "_id": 0},
+        ).sort("last_seen", -1)
+        master_install_ids = []
+        async for d in master_devices_cursor:
+            iid = d.get("install_id")
+            if iid: master_install_ids.append(iid)
+        out = []
+        if master_install_ids:
+            for iid in master_install_ids:
+                out.append({
+                    "license_key": MASTER_KEY,
+                    "client_email": "owner@medicarplus.es",
+                    "client_name": "👑 MediCar Plus (owner)",
+                    "plan": "MASTER",
+                    "install_id": iid,
+                })
+        else:
+            # Aún sin envíos, muestra el owner con install_id vacío por si envía después
+            out.append({
+                "license_key": MASTER_KEY,
+                "client_email": "owner@medicarplus.es",
+                "client_name": "👑 MediCar Plus (owner) · sin copias aún",
+                "plan": "MASTER",
+                "install_id": None,
+            })
         cursor = db.licenses.find(
             {"status": {"$ne": "revoked"}},
             {"license_key": 1, "client_email": 1, "client_name": 1,
              "plan": 1, "install_id": 1, "created_at": 1, "_id": 0},
         ).sort("created_at", -1).limit(500)
-        out = []
         async for d in cursor:
             out.append({
                 "license_key": d.get("license_key"),

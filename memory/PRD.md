@@ -1,4 +1,31 @@
 # MediCar Plus · PRD (Product Requirements Document)
+## 2026-02-28 · MASTER (owner) también envía y aparece en el panel admin
+
+**Petición:** el usuario admin usa el programa también en su propio centro con MASTER key. Necesita verse a sí mismo en su panel admin para poder restaurar sus propias copias si pierde datos.
+
+**Root cause encontrado:**
+1. **Sync cycle salta por completo el MASTER** (`v2.html` línea 15037) → nunca hace heartbeat → `install_id` MASTER nunca se registra en `sync_devices` → `/api/sync/cloudbackup/send` respondía **403 device_not_authorized**.
+2. **`admin_list_licenses` solo lee `db.licenses`** — el MASTER no está en DB (validación offline con `_synthetic_master_license()`), así que nunca aparecía en el selector del admin panel.
+
+**Fixes aplicados (backend `sync.py`):**
+
+1. **`/api/sync/cloudbackup/send`**: si el dispositivo NO está en `sync_devices`, se **auto-registra silenciosamente** en el primer envío con flag `auto_registered_via: 'cloudbackup'`. Antes daba 403, ahora acepta. Aplica a MASTER + Standard + cualquier plan que no haga heartbeat previo.
+
+2. **`/api/sync/admin/list-licenses`**: al principio de la lista se inyecta el MASTER (con todos los `install_ids` reales que hayan enviado alguna copia, uno por línea). Si aún no ha enviado nada, muestra "👑 MediCar Plus (owner) · sin copias aún" con install_id null. El resto de licencias del DB va después.
+
+**Verificación live contra el backend:**
+- Endpoint `list-licenses` con MASTER key devuelve 31 entradas · las 2 primeras son el MASTER con sus 2 install_ids reales ✓
+- Endpoint `cloudbackup/send` con MASTER key + install_id nuevo retorna `{ok:true, backup_id:...}` ✓
+- Endpoint `admin/cloudbackup/list` con el install_id nuevo devuelve 1 copia ✓
+
+**Sin regresiones:** round-trip backup pasa · 222 tests contables pasan.
+
+**Cómo lo verá el usuario en su panel admin:**
+1. Abre el selector de licencias → primero aparece "👑 MediCar Plus (owner)" con los install_ids de cada uno de sus PCs.
+2. Selecciona el suyo → ve la lista de copias con fechas, tamaño y ID.
+3. Puede descargar cualquier copia o enviársela como restauración a sí mismo si un día pierde datos.
+
+
 ## 2026-02-28 · Cloud backup ampliado a TODOS los planes
 
 **Petición:** el usuario (admin/proveedor) necesita tener copia en la nube de todos sus clientes independientemente del plan — Standard, Premium, Trial o Master — por si pierden datos.
