@@ -531,7 +531,33 @@
     if(!cfg.licenseKey) return { ok:false, error:'Sin licencia activada · abre la app y activa una clave primero' };
     if(!cfg.installId)  return { ok:false, error:'Falta install_id · recarga la app (Ctrl+Shift+R)' };
     const data = _fullBackupData();
-    return await _post('/api/sync/cloudbackup/send', { license_key: cfg.licenseKey, install_id: cfg.installId, data, label: label || 'auto-daily' });
+    // 🗜️ Feb 2026 · Compresión gzip cliente (CompressionStream API · Chrome 80+, Electron).
+    //   Reduce ~5-10x el tamaño de envío. Backend acepta ambos formatos: si mandamos
+    //   data_gz_b64, ignora `data`. Fallback silencioso a envío sin comprimir si algo falla.
+    let payload = { license_key: cfg.licenseKey, install_id: cfg.installId, label: label || 'auto-daily' };
+    try{
+      if(typeof CompressionStream !== 'undefined'){
+        const json = JSON.stringify(data);
+        const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
+        const compressedBlob = await new Response(stream).blob();
+        const compressedBuf = await compressedBlob.arrayBuffer();
+        // base64 encode (chunked para no reventar la stack con arrays largos)
+        const bytes = new Uint8Array(compressedBuf);
+        let bin = '';
+        const CHUNK = 0x8000;
+        for(let i = 0; i < bytes.length; i += CHUNK){
+          bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+        }
+        payload.data_gz_b64 = btoa(bin);
+        payload.data = {};  // vacío para reducir payload (backend usa data_gz_b64)
+      } else {
+        payload.data = data;  // fallback sin comprimir
+      }
+    }catch(e){
+      console.warn('☁️ compresión falló, envío sin comprimir:', e);
+      payload.data = data;
+    }
+    return await _post('/api/sync/cloudbackup/send', payload);
   }
   // 🛡️ Feb 2026 · Cloud backup CON RETRY + COLA PERSISTENTE
   //   Garantiza que ni un fallo de red pierda la copia. Estrategia:

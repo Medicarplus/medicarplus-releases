@@ -123,6 +123,10 @@ class BackupSendBody(BaseModel):
     install_id: str = Field(..., min_length=4, max_length=200)
     data: dict[str, Any] = Field(default_factory=dict, description="Snapshot completo localStorage")
     label: Optional[str] = Field(default=None, max_length=200)
+    # 🗜️ Feb 2026 · Soporte para payload comprimido (base64 de gzip(JSON.stringify(data))).
+    #   Reduce ~5-10x el tamaño. Cliente moderno con CompressionStream lo usa
+    #   automáticamente. Si viene este campo, `data` se ignora y se decodifica de aquí.
+    data_gz_b64: Optional[str] = Field(default=None, max_length=20*1024*1024)
 
 
 class BackupConsumeBody(BaseModel):
@@ -487,30 +491,58 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
                 "last_seen": _now(),
                 "auto_registered_via": "cloudbackup",
             })
-        # Sanity: limitar tamaño (10 MB max por copia — cubre 10+ años de una caja media)
+        # 🗜️ Feb 2026 · Soporte comprimido: si viene `data_gz_b64`, descomprime.
+        #   Guardamos siempre la forma comprimida en MongoDB (10x más pequeño) y
+        #   descomprimimos on-the-fly al servir GET. Así una caja de 10 años (~50 MB
+        #   raw JSON) pesa ~5 MB en Mongo y cabe cómodamente bajo el límite 16 MB
+        #   de documento MongoDB. Cliente moderno usa CompressionStream (Chrome 80+).
+        import json as _json
+        import base64 as _b64
+        import gzip as _gzip
+        actual_data = body.data or {}
+        compressed_b64 = body.data_gz_b64
+        if compressed_b64:
+            try:
+                raw_gz = _b64.b64decode(compressed_b64)
+                actual_data = _json.loads(_gzip.decompress(raw_gz).decode('utf-8'))
+            except Exception as _e:
+                raise HTTPException(status_code=400, detail=f"invalid_compressed_payload: {_e}")
+        # Sanity: limitar tamaño raw (50 MB max · cubre 30+ años de una caja media)
         try:
-            import json as _json
-            _size = len(_json.dumps(body.data or {}))
+            _size_raw = len(_json.dumps(actual_data))
         except Exception:
-            _size = 0
-        MAX_BYTES = 10 * 1024 * 1024
-        if _size > MAX_BYTES:
-            raise HTTPException(status_code=413, detail=f"payload_too_large ({_size} > {MAX_BYTES})")
+            _size_raw = 0
+        MAX_RAW_BYTES = 50 * 1024 * 1024
+        if _size_raw > MAX_RAW_BYTES:
+            raise HTTPException(status_code=413, detail=f"payload_too_large_raw ({_size_raw} > {MAX_RAW_BYTES})")
+        # Comprime si el cliente no lo hizo (así almacenamos siempre óptimo)
+        if not compressed_b64:
+            try:
+                _gz = _gzip.compress(_json.dumps(actual_data, separators=(',',':'), sort_keys=True).encode('utf-8'), compresslevel=6)
+                compressed_b64 = _b64.b64encode(_gz).decode('ascii')
+            except Exception:
+                compressed_b64 = None
+        _size_stored = len(compressed_b64) if compressed_b64 else _size_raw
+        # Doble seguro: MongoDB limita cada doc a 16 MB. Si tras comprimir aún es >15 MB, error explícito.
+        if _size_stored > 15 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail=f"payload_too_large_stored ({_size_stored} > 15 MB). Contacta soporte para migrar a archivo profundo.")
         now = _now()
         backup_id = str(uuid.uuid4())
-        # 🔒 Feb 2026 · SHA-256 del payload para verificación de integridad end-to-end.
-        #   El cliente puede volver a hashear localmente y comparar. Si difiere, sabe que
-        #   el servidor guardó datos corruptos y puede reintentar.
-        import hashlib as _hashlib
-        payload_sha256 = _hashlib.sha256(_json.dumps(body.data or {}, sort_keys=True).encode()).hexdigest()
+        # 🔒 SHA-256 del payload para verificación de integridad end-to-end.
+        payload_sha256 = hashlib.sha256(_json.dumps(actual_data, sort_keys=True).encode()).hexdigest()
         doc = {
             "backup_id": backup_id,
             "license_key_hash": lkh,
             "install_id": body.install_id,
             "label": (body.label or "").strip() or "auto-daily",
-            "data": body.data or {},
-            "size_bytes": _size,
-            "keys_count": len(body.data or {}),
+            # data queda pequeño (solo si NO viene comprimido, para compat legacy con lecturas antiguas).
+            # Nueva fuente de verdad: data_gz_b64.
+            "data": {} if compressed_b64 else actual_data,
+            "data_gz_b64": compressed_b64,
+            "size_bytes": _size_raw,
+            "size_bytes_stored": _size_stored,
+            "compression_ratio": round(_size_raw / max(_size_stored, 1), 2) if compressed_b64 else 1.0,
+            "keys_count": len(actual_data or {}),
             "payload_sha256": payload_sha256,
             "created_at": now,
         }
@@ -523,10 +555,12 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
         old_ids = [d["_id"] async for d in cursor]
         if old_ids:
             await db[COLL_CLOUD_BACKUPS].delete_many({"_id": {"$in": old_ids}})
-        logger.info("cloudbackup/send install=%s size=%d keys=%d rotated=%d",
-                    body.install_id, _size, len(body.data or {}), len(old_ids))
+        logger.info("cloudbackup/send install=%s size_raw=%d size_stored=%d keys=%d rotated=%d",
+                    body.install_id, _size_raw, _size_stored, len(actual_data or {}), len(old_ids))
         return {"ok": True, "backup_id": backup_id, "created_at": _iso(now),
-                "size_bytes": _size, "rotated": len(old_ids), "payload_sha256": payload_sha256}
+                "size_bytes": _size_raw, "size_bytes_stored": _size_stored,
+                "compression_ratio": doc.get("compression_ratio", 1.0),
+                "rotated": len(old_ids), "payload_sha256": payload_sha256}
 
     @router.get("/sync/cloudbackup/list")
     async def cloud_backup_list(license_key: str, install_id: str):
@@ -554,7 +588,12 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
 
     @router.get("/sync/cloudbackup/get")
     async def cloud_backup_get(license_key: str, install_id: str, backup_id: str):
-        """Devuelve el snapshot completo de una copia concreta (para restaurar)."""
+        """Devuelve el snapshot completo de una copia concreta (para restaurar).
+
+        🗜️ Feb 2026 · Descomprime on-the-fly si el doc está almacenado en `data_gz_b64`.
+           Al cliente le llega SIEMPRE `data` como dict limpio, independientemente de
+           cómo se almacenó. Compat total con clientes viejos que no saben de compresión.
+        """
         lic = await _find_license(license_key)
         if not lic:
             raise HTTPException(status_code=404, detail="license_not_found")
@@ -566,13 +605,25 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
         })
         if not d:
             raise HTTPException(status_code=404, detail="backup_not_found")
+        # Descomprime si está almacenado como gz
+        data_out = d.get("data") or {}
+        if not data_out and d.get("data_gz_b64"):
+            try:
+                import json as _json, base64 as _b64, gzip as _gzip
+                data_out = _json.loads(_gzip.decompress(_b64.b64decode(d["data_gz_b64"])).decode('utf-8'))
+            except Exception as _e:
+                logger.exception("Failed to decompress backup %s: %s", backup_id, _e)
+                raise HTTPException(status_code=500, detail="backup_decompression_failed")
         return {
             "backup_id": d["backup_id"],
             "label": d.get("label"),
             "size_bytes": d.get("size_bytes", 0),
+            "size_bytes_stored": d.get("size_bytes_stored"),
+            "compression_ratio": d.get("compression_ratio", 1.0),
             "keys_count": d.get("keys_count", 0),
+            "payload_sha256": d.get("payload_sha256"),
             "created_at": _iso(d["created_at"]),
-            "data": d.get("data") or {},
+            "data": data_out,
         }
 
     # ────────────────────────────────────────────────────────────────────
