@@ -504,13 +504,27 @@
       ? window.DATA_LS_KEYS
       // Fallback (si sendCloudBackup se llamara antes de definir la whitelist)
       : ['caja.v1','caja.cempla.v1','caja.datafono','caja.cempla.datafono','caja.stats.v1','caja.stats.aliases.v1','caja.stats.traffic.overrides.v1','caja.irpf.v1','caja.saldoInicial.trafic.v1','caja.saldoInicial.cempla.v1','caja.reserva.v1','caja.cempla.reserva.v1','caja.cuadre.overrides.v1','caja.config.v1','caja.calendar.history.v1','caja.calendar.status.v1','caja.calendar.urls.v1','caja.count_zero'];
+    const excl = (window.BACKUP_EXCLUDE_KEYS && Array.isArray(window.BACKUP_EXCLUDE_KEYS)) ? window.BACKUP_EXCLUDE_KEYS : [];
     const out = {};
+    // 1) Whitelist explícita
     for(const k of keys){
       const raw = localStorage.getItem(k);
       if(raw === null || raw === '') continue;
       try { out[k] = JSON.parse(raw); }
       catch(e){ out[k] = raw; }
     }
+    // 2) Auto-descubrimiento de cualquier `caja.*` no excluida → nunca perdemos datos
+    try{
+      for(let i = 0; i < localStorage.length; i++){
+        const k = localStorage.key(i);
+        if(!k || !k.startsWith('caja.')) continue;
+        if(k in out) continue;
+        if(excl.includes(k)) continue;
+        const raw = localStorage.getItem(k);
+        if(raw === null || raw === '') continue;
+        try{ out[k] = JSON.parse(raw); }catch(_){ out[k] = raw; }
+      }
+    }catch(_){}
     // 🖥️ Feb 2026 · Metadada de MIGRACIÓ · install_id + license key + hostname
     //   Al restaurar en un PC diferent, el sistema detecta que l'install_id no
     //   coincideix i ofereix al usuari fer una MIGRACIÓ (copiar l'install_id
@@ -1120,15 +1134,56 @@ const DATA_LS_KEYS = [
   'caja.calendar.urls.v1',            // URLs ICS de calendarios configuradas por el usuario
   'caja.count_zero',                  // Toggle "Contar 0€"
   'caja.tarifas.rules.v1',            // 💰 Reglas de tarifas personalizadas (patrón + importe → nombre)
+  // 🆕 Feb 2026 · Claves de datos que faltaban en la whitelist original
+  'caja.cambio.history.v1',           // Historial de cambio de reserva (movimientos)
+  'caja.notif.template.v1',           // Plantilla de mensaje SMS de aviso citas
+  'caja.notif.settings.v1',           // Config notificaciones (hora, activo/no)
+  'caja.twilio.mode.v1',              // Modo Twilio: 'byoa' (cuenta propia) | 'medicar' (créditos)
+  'caja.twilio.medicar.sender.v1',    // Sender name para modo medicar
+  'caja.stats.seed.2026.jan-may',     // Flag que marca semilla aplicada (evita re-seed en restore)
+  'caja.stats.pollution.cleaned.v1',  // Flag limpieza aplicada
+  'caja.stats.backfill.loaded.v1',    // Timestamp del último histórico cargado desde Excel
 ];
 // 🌐 Exponer al scope global para que la sync IIFE (definida arriba) pueda usarla en backups
 try{ window.DATA_LS_KEYS = DATA_LS_KEYS; }catch(_){}
+
+// 🚫 Claves EXCLUIDAS de la copia · son específicas de cada PC/instalación y
+// NO deben viajar (licencia, install_id, credenciales de servicios, flags UI).
+// Todo LO DEMÁS que empiece por `caja.*` se auto-incluye en la copia aunque
+// no esté en la whitelist explícita → así nunca se escapa ningún dato del usuario.
+const BACKUP_EXCLUDE_KEYS = [
+  'caja.install.id.v1','caja.install.v1',
+  'caja.license.v1','caja.license.v3','caja.license.lastcheck.v1',
+  'caja.geminiKey','caja.twilio.creds.v1',    // credenciales sensibles
+  'caja.apibase.v1','caja.apibase.ts.v1','caja.apibase.appver.v1','caja.apibase.override.v1',
+  'caja.cloud.recovery.skipped','caja.cloudbackup.last.v1','caja.cloudbackup.pending.v1',
+  'caja.snapshots',            // historial local de pushSnapshot (se regenera)
+  'caja.ai.history.v1',        // historial consultas IA (efímero)
+  'caja.master.ever.v1','caja.plan.preview.v1','caja.sync.modeChosen.v1','caja.aiOnboardSeen',
+  'caja.lang','caja.company','caja.referral.received.v1','caja.billing.email.v1',
+  'caja.last_seen_version','caja.calendar.cache.v1','caja.calendar.seen_uids.v1','caja.calendar.unread.v1',
+];
+try{ window.BACKUP_EXCLUDE_KEYS = BACKUP_EXCLUDE_KEYS; }catch(_){}
 function _readAllDataKeys(){
   const out = {};
+  // 1) Claves de la whitelist explícita (garantiza que se guarden siempre)
   for(const k of DATA_LS_KEYS){
     const v = localStorage.getItem(k);
     if(v !== null && v !== '') out[k] = v;
   }
+  // 2) Auto-descubrimiento: cualquier otra clave `caja.*` no excluida
+  //    Protege contra "el usuario tiene datos en una clave nueva que
+  //    yo no puse en la whitelist" → se copia igualmente.
+  try{
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(!k || !k.startsWith('caja.')) continue;
+      if(k in out) continue;
+      if(BACKUP_EXCLUDE_KEYS.includes(k)) continue;
+      const v = localStorage.getItem(k);
+      if(v !== null && v !== '') out[k] = v;
+    }
+  }catch(_){}
   return out;
 }
 function _writeAllDataKeys(map){
@@ -9949,12 +10004,26 @@ $('#btnExport').onclick=async ev=>{
   //   Ara el fitxer local és FONT DE VERITAT igual que la còpia núvol.
   const _lsAll = (function(){
     const keys = (window.DATA_LS_KEYS && Array.isArray(window.DATA_LS_KEYS)) ? window.DATA_LS_KEYS : [];
+    const excl = (window.BACKUP_EXCLUDE_KEYS && Array.isArray(window.BACKUP_EXCLUDE_KEYS)) ? window.BACKUP_EXCLUDE_KEYS : [];
     const out = {};
+    // 1) Whitelist explícita
     for(const k of keys){
       const raw = localStorage.getItem(k);
       if(raw === null || raw === '') continue;
       try { out[k] = JSON.parse(raw); } catch(e){ out[k] = raw; }
     }
+    // 2) Auto-descubrimiento · cualquier `caja.*` con datos que no esté excluida
+    try{
+      for(let i = 0; i < localStorage.length; i++){
+        const k = localStorage.key(i);
+        if(!k || !k.startsWith('caja.')) continue;
+        if(k in out) continue;
+        if(excl.includes(k)) continue;
+        const raw = localStorage.getItem(k);
+        if(raw === null || raw === '') continue;
+        try{ out[k] = JSON.parse(raw); }catch(_){ out[k] = raw; }
+      }
+    }catch(_){}
     return out;
   })();
   // 📱 Snapshot SMS del servidor (campanyes + consum) per si es restaura en un PC nou
@@ -10842,7 +10911,12 @@ $('#jsonInput').onchange=async ev=>{
         }
       };
       for(const k of Object.keys(obj.data)){
-        if(!DATA_LS_KEYS.includes(k)) continue;
+        // Filtro: aceptamos claves de la whitelist O cualquier `caja.*` no excluida
+        //   Así se restauran datos aunque estén en claves nuevas que aún no aparecen
+        //   en DATA_LS_KEYS (auto-descubrimiento simétrico al backup).
+        const _excluded = (window.BACKUP_EXCLUDE_KEYS||[]).includes(k);
+        const _accepted = DATA_LS_KEYS.includes(k) || (k.startsWith('caja.') && !_excluded);
+        if(!_accepted) continue;
         const v = obj.data[k];
         if(v === null || v === undefined || v === '') continue;
         const existing = localStorage.getItem(k);
