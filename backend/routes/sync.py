@@ -467,12 +467,13 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
     async def cloud_backup_send(body: BackupSendBody):
         """Guarda una NUEVA copia (no upsert). Mantiene rotativo las últimas 30
         por install_id. Se llama silenciosamente 1 vez cada 24h desde la app.
+
+        🔧 Feb 2026 · Disponible para TODOS los planes (Standard, Premium, Trial, Master).
+           El admin necesita ver copias de todos sus clientes por si pierden datos.
         """
         lic = await _find_license(body.license_key)
         if not lic:
             raise HTTPException(status_code=404, detail="license_not_found")
-        if not _is_premium(lic):
-            raise HTTPException(status_code=403, detail="cloudbackup_requires_premium")
         lkh = _key_hash(body.license_key)
         if not await _is_device_authorized(lkh, body.install_id):
             raise HTTPException(status_code=403, detail="device_not_authorized")

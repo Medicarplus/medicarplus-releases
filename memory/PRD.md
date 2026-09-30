@@ -1,4 +1,25 @@
 # MediCar Plus · PRD (Product Requirements Document)
+## 2026-02-28 · Cloud backup ampliado a TODOS los planes
+
+**Petición:** el usuario (admin/proveedor) necesita tener copia en la nube de todos sus clientes independientemente del plan — Standard, Premium, Trial o Master — por si pierden datos.
+
+**Cambios:**
+
+1. **Backend `sync.py`** (línea 474): eliminado `if not _is_premium(lic): raise 403 cloudbackup_requires_premium`. El endpoint `/api/sync/cloudbackup/send` ahora acepta cualquier licencia activa.
+
+2. **Frontend `v2.html`** disparador automático: eliminado el check `if(!isPremium) return`. Se envía copia cada 20h para cualquier plan.
+
+3. **Frontend `v2.html`** botón manual `#btnCloudSendNow`: quitado `display:none` inicial + quitado el toggle condicional en la apertura del menú. Ahora siempre visible en el menú Backup.
+
+**Verificación runtime:**
+- Botón `#btnCloudSendNow` con `initialDisplay: ''` (visible sin necesidad de toggle) ✓
+- Whitelist DATA_LS_KEYS 18 claves accesible ✓
+- Backend responde correctamente a payloads de cualquier plan ✓
+- Round-trip backup pasa ✓
+
+**Otros endpoints premium (sync push/pull entre PCs) siguen siendo Premium+** — esa restricción es correcta porque es funcionalidad avanzada de sincronización. Solo se abrió cloudbackup/send que es la que alimenta el panel admin.
+
+
 ## 2026-02-28 · Test round-trip backup demostrado numéricamente ✅
 
 **Petición del usuario:** demostrar que restaurar una copia en un ordenador vacío deja TODO idéntico al ordenador original — dato a dato, céntimo a céntimo.

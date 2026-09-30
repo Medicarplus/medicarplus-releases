@@ -578,7 +578,7 @@
         <button class="btn" id="btnExport" style="background:#1a3a2a;border-color:#3ddc97;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-testid="btn-save-backup">💾 Guardar copia</button>
         <button class="btn" id="btnImportJson" style="background:#3a2f1a;border-color:#f5b301;color:#fed7aa;font-weight:600;width:100%;text-align:left" data-testid="btn-restore-backup">📂 Restaurar copia</button>
         <button class="btn" id="btnHistory" style="background:#1f3a2e;border-color:#2a5e44;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-testid="btn-history">🛡️ Historial de copias</button>
-        <button class="btn" id="btnCloudSendNow" style="display:none;background:#0f2a3e;border-color:#38bdf8;color:#bae6fd;font-weight:600;width:100%;text-align:left" data-testid="btn-cloud-send-now" title="Envía inmediatamente una copia completa a la nube (soporte técnico)">☁️ Enviar copia AHORA a la nube</button>
+        <button class="btn" id="btnCloudSendNow" style="background:#0f2a3e;border-color:#38bdf8;color:#bae6fd;font-weight:600;width:100%;text-align:left" data-testid="btn-cloud-send-now" title="Envía inmediatamente una copia completa a la nube (soporte técnico)">☁️ Enviar copia AHORA a la nube</button>
         <button class="btn" id="btnSendSyncCopy" style="background:#2a1f3a;border-color:#f5b301;color:#fed7aa;font-weight:600;width:100%;text-align:left" data-testid="btn-send-sync-copy">📤 Enviar copia al otro PC</button>
       </div>
     </div>
@@ -4815,9 +4815,7 @@ $('#btnBackupToggle').onclick=(e)=>{
           txt.innerHTML = `<span style="color:#86efac">✅ ${humanAgo}</span> · <span style="color:#94a3b8;font-size:9px">${dateHuman}</span>`;
         }
       } else if(box){ box.style.display='none'; }
-      // 🌤️ Mostrar botón "Enviar copia AHORA" solo si es Premium
-      const btnSend = $('#btnCloudSendNow');
-      if(btnSend) btnSend.style.display = isPremium ? '' : 'none';
+      // 🌤️ Botón "Enviar copia AHORA" siempre visible (todos los planes)
     }catch(_){/* silencioso */}
   }
   m.style.display=willOpen?'flex':'none'
@@ -14900,11 +14898,8 @@ setTimeout(async () => {
     if(!isLicenseActive()) return;
     const lic = getLicense();
     if(!lic || !lic.key) return;
-    const _plan = (lic.plan||'').toString().toUpperCase();
-    const _type = (lic.type||'').toString().toUpperCase();
-    const PREMIUM_PLANS = ['PRM','PREMIUM','TRIAL','MASTER'];
-    const isPremium = PREMIUM_PLANS.includes(_plan) || _type === 'MASTER' || _type === 'TRIAL';
-    if(!isPremium) return;
+    // 🔧 Feb 2026 · Copia en nube disponible en TODOS los planes (Standard, Premium, Trial, Master).
+    //   El admin del proveedor necesita tener siempre una copia por si el cliente pierde datos.
     const LAST_CB = 'caja.cloudbackup.last.v1';
     const lastCb = parseInt(localStorage.getItem(LAST_CB)||'0');
     const hoursSinceCb = (Date.now()-lastCb)/(1000*60*60);
