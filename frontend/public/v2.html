@@ -578,6 +578,7 @@
         <button class="btn" id="btnExport" style="background:#1a3a2a;border-color:#3ddc97;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-testid="btn-save-backup">💾 Guardar copia</button>
         <button class="btn" id="btnImportJson" style="background:#3a2f1a;border-color:#f5b301;color:#fed7aa;font-weight:600;width:100%;text-align:left" data-testid="btn-restore-backup">📂 Restaurar copia</button>
         <button class="btn" id="btnHistory" style="background:#1f3a2e;border-color:#2a5e44;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-testid="btn-history">🛡️ Historial de copias</button>
+        <button class="btn" id="btnCloudSendNow" style="display:none;background:#0f2a3e;border-color:#38bdf8;color:#bae6fd;font-weight:600;width:100%;text-align:left" data-testid="btn-cloud-send-now" title="Envía inmediatamente una copia completa a la nube (soporte técnico)">☁️ Enviar copia AHORA a la nube</button>
         <button class="btn" id="btnSendSyncCopy" style="background:#2a1f3a;border-color:#f5b301;color:#fed7aa;font-weight:600;width:100%;text-align:left" data-testid="btn-send-sync-copy">📤 Enviar copia al otro PC</button>
       </div>
     </div>
@@ -4813,6 +4814,9 @@ $('#btnBackupToggle').onclick=(e)=>{
           txt.innerHTML = `<span style="color:#86efac">✅ ${humanAgo}</span> · <span style="color:#94a3b8;font-size:9px">${dateHuman}</span>`;
         }
       } else if(box){ box.style.display='none'; }
+      // 🌤️ Mostrar botón "Enviar copia AHORA" solo si es Premium
+      const btnSend = $('#btnCloudSendNow');
+      if(btnSend) btnSend.style.display = isPremium ? '' : 'none';
     }catch(_){/* silencioso */}
   }
   m.style.display=willOpen?'flex':'none'
@@ -4821,6 +4825,23 @@ document.addEventListener('click',(e)=>{const box=$('#btnBackupBox');const menu=
 // Tanca el menú després de clicar Guardar/Restaurar (els handlers reals estan més avall)
 $('#btnExport').addEventListener('click',()=>{setTimeout(()=>{const m=$('#btnBackupMenu');if(m)m.style.display='none'},50)});
 $('#btnImportJson').addEventListener('click',()=>{setTimeout(()=>{const m=$('#btnBackupMenu');if(m)m.style.display='none'},50)});
+// 🌤️ Botón manual "Enviar copia AHORA a la nube" · fuerza envío inmediato con backup completo
+const _btnCloudSendNow = document.getElementById('btnCloudSendNow');
+if(_btnCloudSendNow) _btnCloudSendNow.addEventListener('click', async ()=>{
+  const m = $('#btnBackupMenu'); if(m) m.style.display = 'none';
+  if(!window.mcSync || !window.mcSync.sendCloudBackup){ toast('⚠️ Sync no inicializado · abre la app de nuevo', 4000); return; }
+  toast('☁️ Enviando copia completa a la nube…', 2500);
+  try{
+    const r = await window.mcSync.sendCloudBackup('manual');
+    if(r && r.ok){
+      localStorage.setItem('caja.cloudbackup.last.v1', String(Date.now()));
+      const kb = Math.round((r.size_bytes||0)/1024);
+      toast(`✅ Copia enviada · ${kb} KB · ID ${(r.backup_id||'').slice(0,8)}`, 5000);
+    } else {
+      toast('❌ Error al enviar copia: ' + (r && r.error || 'desconocido'), 5000);
+    }
+  }catch(e){ toast('❌ Error enviando copia: ' + (e && e.message || e), 5000); }
+});
 $('#btnLedger').onclick=()=>{$('#btnAccountingMenu').style.display='none';openLedger()};
 $('#btnIrpf').onclick=()=>{$('#btnAccountingMenu').style.display='none';openIRPF()};
 const _bCuadre = document.getElementById('btnCuadreCaja'); if(_bCuadre) _bCuadre.onclick=()=>{ const menu=$('#btnAccountingMenu'); if(menu) menu.style.display='none'; openCuadreCaja(); };
@@ -14867,6 +14888,36 @@ setTimeout(async ()=>{
     };
   }catch(e){ console.warn('cloud recovery check fail:', e); }
 }, 2000);
+// 🌤️ CLOUD BACKUP AUTOMÁTICO · disparador INDEPENDIENTE (feb 2026)
+//   Antes: solo se disparaba dentro del callback de verifyOnline (fragil: si el server tarda,
+//   si el plan no es JWT, si la licencia no requiere check ese día → nunca se envía).
+//   Ahora: al arrancar la app, si la licencia es Premium/Trial/Master y la última copia
+//   tiene >20h, se envía en segundo plano. Además usa _fullBackupData (whitelist 17 claves)
+//   para incluir SIEMPRE saldo inicial, reserva cambio, cuadre, config, citas.
+setTimeout(async () => {
+  try{
+    if(!isLicenseActive()) return;
+    const lic = getLicense();
+    if(!lic || !lic.key) return;
+    const _plan = (lic.plan||'').toString().toUpperCase();
+    const _type = (lic.type||'').toString().toUpperCase();
+    const PREMIUM_PLANS = ['PRM','PREMIUM','TRIAL','MASTER'];
+    const isPremium = PREMIUM_PLANS.includes(_plan) || _type === 'MASTER' || _type === 'TRIAL';
+    if(!isPremium) return;
+    const LAST_CB = 'caja.cloudbackup.last.v1';
+    const lastCb = parseInt(localStorage.getItem(LAST_CB)||'0');
+    const hoursSinceCb = (Date.now()-lastCb)/(1000*60*60);
+    if(hoursSinceCb < 20) return;  // ya se envió en las últimas 20h
+    if(!window.mcSync || !window.mcSync.sendCloudBackup){ console.warn('☁️ mcSync no disponible aún'); return; }
+    const r = await window.mcSync.sendCloudBackup('auto-daily');
+    if(r && r.ok){
+      localStorage.setItem(LAST_CB, String(Date.now()));
+      console.info('☁️ Backup en la nube enviado (boot) ·', Math.round((r.size_bytes||0)/1024), 'KB · ID', (r.backup_id||'').slice(0,8));
+    } else {
+      console.warn('☁️ Backup NO enviado:', r);
+    }
+  }catch(e){ console.warn('☁️ cloud backup boot fail:', e && e.message || e); }
+}, 5000);
 // Botons ⚙️ Configuració + 🔓 Sortir/Canviar llicència al header
 setTimeout(()=>{
   const sigParent=document.getElementById('licSigBox');

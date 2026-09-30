@@ -1,4 +1,40 @@
 # MediCar Plus · PRD (Product Requirements Document)
+## 2026-02-28 · Fix: la copia en la nube no llegaba al panel admin
+
+**Problema reportado:** el cliente lleva 2 días con la app y el admin sigue viendo "Este cliente aún no tiene copias en la nube" en su panel de licencias.
+
+**Root cause:** el disparo del cloud backup diario estaba ENTERAMENTE dentro del callback `.then()` de `verifyOnline()` (línea 13804), que solo se ejecuta cuando:
+1. `lic.type === 'JWT'` (bug: si tenía licencia MASTER no se verificaba online, backup nunca se disparaba).
+2. `daysSinceCheck > CHECK_INTERVAL_DAYS` (bug: si el check ya se hizo hoy, no re-fire).
+3. Servidor de licencias responde con `ok:true` (bug: si timeout o error, se salta silencioso).
+
+Cualquiera de esas 3 condiciones fallando → sin copia diaria.
+
+**Fix aplicado (`v2.html`):**
+
+1. **Trigger INDEPENDIENTE** al arrancar la app (5s después del boot, tras el check de recovery):
+   - Solo requiere: licencia activa + plan Premium/Trial/Master + última copia >20h.
+   - No depende de `verifyOnline` ni del tipo de licencia.
+   - Usa `_fullBackupData()` (whitelist 17 claves completa).
+   
+2. **Botón manual "☁️ Enviar copia AHORA a la nube"** en el menú de Backup (visible solo para Premium/Trial/Master):
+   - Fuerza envío inmediato con backup completo.
+   - Muestra toast con tamaño KB e ID de la copia al confirmar.
+   - Útil para: soporte técnico, verificar que llega al admin, y como respaldo antes de operaciones críticas.
+
+**Cadena reforzada:**
+- Cliente Master abre app → 5s → disparo automático → copia completa a la nube. ✓ (antes: MASTER nunca disparaba)
+- Cliente Premium abre app 2 días seguidos → 2 copias diarias. ✓
+- Cliente presiona "Enviar copia AHORA" → copia inmediata visible en el admin panel. ✓ (nuevo)
+
+**Verificación runtime:**
+- `DATA_LS_KEYS.length === 17` ✓
+- `document.getElementById('btnCloudSendNow')` accesible ✓
+- `window.mcSync.sendCloudBackup` es función ✓
+
+**Recordatorio:** cliente pulsa `Ctrl + Shift + R` en Electron para cargar la nueva versión, y el admin verá la copia en cuanto la app haga boot o pulse el botón manual.
+
+
 ## 2026-02-28 · Fix CRÍTICO: Cloud Backup incluía solo datos parciales
 
 **El bug real detrás de la pérdida de datos:** `sendCloudBackup()` (línea 484) usaba `_snapshotLocalStorage()` que filtra por `_isSyncable()` — este filtro excluye TODAS las claves con prefijo `caja.saldoInicial.`, `caja.cuadre.`, `caja.install.`, `caja.sync.`, `caja.license.`, `caja.plan.preview.` y `caja.__sync`.
