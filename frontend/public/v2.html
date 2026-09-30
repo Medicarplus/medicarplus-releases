@@ -792,6 +792,7 @@
         <button class="btn" id="btnHistory" style="background:#1f3a2e;border-color:#2a5e44;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-testid="btn-history">🛡️ Historial de copias</button>
         <button class="btn" id="btnCloudSendNow" style="background:#0f2a3e;border-color:#38bdf8;color:#bae6fd;font-weight:600;width:100%;text-align:left" data-testid="btn-cloud-send-now" title="Envía inmediatamente una copia completa a la nube (soporte técnico)">☁️ Enviar copia AHORA a la nube</button>
         <button class="btn" id="btnSendSyncCopy" style="background:#2a1f3a;border-color:#f5b301;color:#fed7aa;font-weight:600;width:100%;text-align:left" data-testid="btn-send-sync-copy">📤 Enviar copia al otro PC</button>
+        <button class="btn" id="btnDiagnostic" style="background:#3a1f1f;border-color:#ef4444;color:#fecaca;font-weight:600;width:100%;text-align:left" data-testid="btn-diagnostic" title="Descarga un JSON con TODAS las claves de localStorage · útil para soporte técnico si algo no aparece tras restaurar">🩺 Diagnóstico completo (soporte)</button>
       </div>
     </div>
     <div class="btn-dropdown" id="btnAccounting" style="position:relative;display:inline-block">
@@ -5031,6 +5032,82 @@ $('#btnHistory').onclick=()=>{$('#btnBackupMenu').style.display='none';openBacku
 $('#btnSendSyncCopy').onclick=()=>{
   $('#btnBackupMenu').style.display='none';
   if(typeof window.openSyncSettings === 'function') window.openSyncSettings();
+};
+
+// 🩺 DIAGNÓSTICO COMPLETO · Feb 2026 · descarga JSON con TODAS las claves de
+//    localStorage + IndexedDB (si hay) para soporte técnico. Sin filtros ni
+//    exclusiones — así vemos EXACTAMENTE qué hay y dónde.
+$('#btnDiagnostic').onclick = async () => {
+  $('#btnBackupMenu').style.display='none';
+  const diag = {
+    _diagnostic: 'MediCar Plus diagnostic v1',
+    _createdAt: new Date().toISOString(),
+    _userAgent: navigator.userAgent,
+    _appVersion: (window.appInfo && window.appInfo.version) || 'web',
+    _installId: localStorage.getItem('caja.install.id.v1') || '',
+    _localStorage: {},
+    _localStorageStats: { keys: 0, total_bytes: 0 },
+    _indexedDB: {},
+    _indexedDBError: null,
+  };
+  // 1) TODO el localStorage sin filtro
+  try{
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      const v = localStorage.getItem(k);
+      diag._localStorage[k] = v;
+      diag._localStorageStats.keys++;
+      diag._localStorageStats.total_bytes += (v||'').length;
+    }
+  }catch(e){ diag._localStorageError = String(e); }
+  // 2) IndexedDB (si la app usa) · listamos las bases y objectStores
+  try{
+    if(indexedDB && indexedDB.databases){
+      const dbs = await indexedDB.databases();
+      for(const info of dbs){
+        try{
+          const db = await new Promise((res, rej) => {
+            const req = indexedDB.open(info.name);
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+          });
+          const storeNames = Array.from(db.objectStoreNames);
+          const dbInfo = { version: db.version, stores: {} };
+          for(const store of storeNames){
+            try{
+              const tx = db.transaction(store, 'readonly');
+              const os = tx.objectStore(store);
+              const count = await new Promise((res, rej) => {
+                const r = os.count(); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+              });
+              const allData = count < 500 ? await new Promise((res, rej) => {
+                const r = os.getAll(); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+              }) : `${count} rows (too many to include)`;
+              dbInfo.stores[store] = { count, data: allData };
+            }catch(e){ dbInfo.stores[store] = { error: String(e) }; }
+          }
+          diag._indexedDB[info.name] = dbInfo;
+          db.close();
+        }catch(e){ diag._indexedDB[info.name] = { error: String(e) }; }
+      }
+    } else {
+      diag._indexedDB._note = 'indexedDB.databases no disponible en este navegador';
+    }
+  }catch(e){ diag._indexedDBError = String(e); }
+  // 3) Descargar como JSON
+  const blob = new Blob([JSON.stringify(diag, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const today = new Date().toISOString().split('T')[0];
+  a.download = `medicar_diagnostic_${today}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  try{
+    const isCA=(typeof currentLang!=='undefined' && currentLang==='ca');
+    toast(isCA?`🩺 Diagnòstic descarregat · ${diag._localStorageStats.keys} claus · ${(diag._localStorageStats.total_bytes/1024).toFixed(1)} KB · envia\'l al suport`
+              :`🩺 Diagnóstico descargado · ${diag._localStorageStats.keys} claves · ${(diag._localStorageStats.total_bytes/1024).toFixed(1)} KB · envíalo al soporte`, 8000);
+  }catch(_){ alert('Diagnóstico descargado. Envíalo al soporte técnico.'); }
 };
 // 🪗 Accordion top-menu: solo uno de los 4 desplegables superiores (Copias de seguridad,
 // Contabilidad, Estadísticas, Utilidades) puede estar abierto a la vez. Al abrir uno,
