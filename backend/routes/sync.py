@@ -45,7 +45,7 @@ def _synthetic_master_license() -> dict:
         "plan": "MASTER",
         "plan_family": "MASTER",
         "status": "active",
-        "client_email": "owner@medicarplus.es",
+        "client_email": "marc@medicarplus.es",
         "_synthetic": True,
     }
 
@@ -884,7 +884,7 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
             for iid in master_install_ids:
                 out.append({
                     "license_key": MASTER_KEY,
-                    "client_email": "owner@medicarplus.es",
+                    "client_email": "marc@medicarplus.es",
                     "client_name": "👑 MediCar Plus (owner)",
                     "plan": "MASTER",
                     "install_id": iid,
@@ -893,7 +893,7 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
             # Aún sin envíos, muestra el owner con install_id vacío por si envía después
             out.append({
                 "license_key": MASTER_KEY,
-                "client_email": "owner@medicarplus.es",
+                "client_email": "marc@medicarplus.es",
                 "client_name": "👑 MediCar Plus (owner) · sin copias aún",
                 "plan": "MASTER",
                 "install_id": None,
