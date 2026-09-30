@@ -5989,11 +5989,12 @@ window._getTariffRules = function(){
   }catch(_){}
   // 🌱 Seed inicial · si nunca se configuró, incluir la regla histórica del
   //   centro del owner (Canje 66,50€) para no romper la detección existente.
+  //   Palabras SIN acentos → matchean castellano+catalán a la vez.
   //   Otros centros pueden borrarla y añadir las suyas.
   const seed = [{
     id: 'canje-default',
-    tipos: ['Expedición','Expedició','Obtención','Obtenció'],
-    grupos: ['Conducción','Conducció'],
+    tipos: ['Expedicion','Obtencion'],
+    grupos: ['Conduccion'],
     importeExacto: 66.50,
     importeMin: null, importeMax: null,
     resultado: 'Canje',
@@ -6025,8 +6026,25 @@ window._matchTariffRule = function(entry){
   if(!entry) return null;
   const rules = window._getTariffRules() || [];
   if(!rules.length) return null;
-  const tipoN = (entry.tipo||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  const grupoN = (entry.grupo||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const norm = s => String(s||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')  // quita tildes
+    .replace(/[.\-_]/g,' ').replace(/\s+/g,' ').trim();
+  // 🔤 Match "por raíz" · una palabra de la regla y una palabra del apunte
+  //   coinciden si comparten prefijo de ≥5 chars normalizados. Así
+  //   "Expedicion" (regla) ↔ "Expedición" (es) ↔ "Expedició" (ca): las 3
+  //   comparten "expedicio" (9 chars).
+  const wordsMatch = (a, b) => {
+    if(!a || !b) return false;
+    if(b.includes(a) || a.includes(b)) return true;
+    const common = Math.min(a.length, b.length);
+    if(common < 5) return false;
+    for(let i = common; i >= 5; i--){
+      if(a.slice(0,i) === b.slice(0,i)) return true;
+    }
+    return false;
+  };
+  const tipoN = norm(entry.tipo);
+  const grupoN = norm(entry.grupo);
   const imp = +entry.importe || 0;
   let best = null; let bestScore = -1;
   for(const r of rules){
@@ -6034,21 +6052,13 @@ window._matchTariffRule = function(entry){
     let score = 0;
     // Tipos (opcional): si hay al menos uno definido, DEBE coincidir alguno
     if(Array.isArray(r.tipos) && r.tipos.length){
-      const anyMatch = r.tipos.some(t => {
-        const tn = String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
-        if(!tn) return false;
-        return tipoN.includes(tn) || tipoN.startsWith(tn.slice(0,4)); // permisivo: substring o prefijo 4 chars
-      });
+      const anyMatch = r.tipos.some(t => wordsMatch(norm(t), tipoN));
       if(!anyMatch) continue;
       score += 2;
     }
     // Grupos (opcional): si hay definidos, DEBE coincidir alguno
     if(Array.isArray(r.grupos) && r.grupos.length){
-      const anyMatch = r.grupos.some(g => {
-        const gn = String(g||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
-        if(!gn) return false;
-        return grupoN.includes(gn);
-      });
+      const anyMatch = r.grupos.some(g => wordsMatch(norm(g), grupoN));
       if(!anyMatch) continue;
       score += 2;
     }
@@ -15248,12 +15258,12 @@ function openTariffsEditor(){
     return `<div class="tariff-row" data-idx="${idx}" style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px;margin-bottom:10px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
         <div>
-          <label style="display:block;font-size:10px;color:#94a3b8;letter-spacing:1px;margin-bottom:4px">${L('SI TIPUS CONTÉ','SI TIPO CONTIENE')} <span style="color:#64748b;font-weight:400">${L('(opcional · separa amb coma)','(opcional · separa con coma)')}</span></label>
-          <input data-testid="tariff-tipos-${idx}" type="text" value="${tipos.replace(/"/g,'&quot;')}" placeholder="${L('Ex: Expedició, Expedición, Obtención','Ej: Expedición, Expedició, Obtención')}" data-field="tipos" style="width:100%;box-sizing:border-box;padding:8px;background:#141821;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:12.5px">
+          <label style="display:block;font-size:10px;color:#94a3b8;letter-spacing:1px;margin-bottom:4px">${L('SI TIPUS CONTÉ','SI TIPO CONTIENE')} <span style="color:#64748b;font-weight:400">${L('(opcional)','(opcional)')}</span></label>
+          <input data-testid="tariff-tipos-${idx}" type="text" value="${tipos.replace(/"/g,'&quot;')}" placeholder="${L('Ex: Expedicion, Obtencion (sense accents, val per CA i ES)','Ej: Expedicion, Obtencion (sin tildes, vale para CA y ES)')}" data-field="tipos" style="width:100%;box-sizing:border-box;padding:8px;background:#141821;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:12.5px">
         </div>
         <div>
           <label style="display:block;font-size:10px;color:#94a3b8;letter-spacing:1px;margin-bottom:4px">${L('I GRUP CONTÉ','Y GRUPO CONTIENE')} <span style="color:#64748b;font-weight:400">${L('(opcional)','(opcional)')}</span></label>
-          <input data-testid="tariff-grupos-${idx}" type="text" value="${grupos.replace(/"/g,'&quot;')}" placeholder="${L('Ex: Conducció, Conducción','Ej: Conducción, Conducció')}" data-field="grupos" style="width:100%;box-sizing:border-box;padding:8px;background:#141821;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:12.5px">
+          <input data-testid="tariff-grupos-${idx}" type="text" value="${grupos.replace(/"/g,'&quot;')}" placeholder="${L('Ex: Conduccion','Ej: Conduccion')}" data-field="grupos" style="width:100%;box-sizing:border-box;padding:8px;background:#141821;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:12.5px">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:8px">
@@ -15323,7 +15333,7 @@ function openTariffsEditor(){
       <button data-testid="tariffs-close" id="tariffsClose" type="button" style="background:none;border:none;color:#94a3b8;font-size:26px;cursor:pointer;padding:0 4px;line-height:1">×</button>
     </div>
     <div style="background:#0e1a2e;border:1px solid #1e293b;border-radius:8px;padding:12px 14px;font-size:12px;color:#93c5fd;line-height:1.65;margin-bottom:16px">
-      💡 <b>${L('Com funciona','Cómo funciona')}:</b> ${L('Al importar un CSV o afegir manualment un apunte, l\'app comprova si coincideix amb alguna regla teva. Si sí, la usa per classificar-lo a l\'estadística. Si no, deixa el tipus com estava. Els filtres accepten variants d\'idioma (ex: escriu «Expedició, Expedición» separats per coma).','Al importar un CSV o añadir manualmente un apunte, la app comprueba si coincide con alguna regla tuya. Si sí, la usa para clasificarlo en la estadística. Si no, deja el tipo como estaba. Los filtros aceptan variantes de idioma (ej: escribe «Expedición, Expedició» separados por coma).')}
+      💡 <b>${L('Com funciona','Cómo funciona')}:</b> ${L('Al importar un CSV o afegir manualment un apunte, l\'app comprova si coincideix amb alguna regla teva. Si sí, la usa per classificar-lo a l\'estadística. Si no, deixa el tipus com estava. <b>Escriu sense accents</b>: «Expedicion» detecta tant «Expedición» com «Expedició» automàticament (mateixa arrel).','Al importar un CSV o añadir manualmente un apunte, la app comprueba si coincide con alguna regla tuya. Si sí, la usa para clasificarlo en la estadística. Si no, deja el tipo como estaba. <b>Escribe sin tildes</b>: «Expedicion» detecta tanto «Expedición» como «Expedició» automáticamente (misma raíz).')}
     </div>
     <div id="tariffList" style="margin-bottom:14px"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px">

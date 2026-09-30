@@ -33,6 +33,7 @@ const DATA_LS_KEYS = [
   'caja.calendar.status.v1',
   'caja.calendar.urls.v1',
   'caja.count_zero',
+  'caja.tarifas.rules.v1',    // 💰 Feb 2026 · reglas de tarifas personalizadas
 ];
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -204,6 +205,16 @@ function crearOrdenadorOriginal(){
   // 📁 Toggle Contar 0€
   ls.setItem('caja.count_zero', '1');
 
+  // 💰 Feb 2026 · Reglas de tarifas personalizadas configuradas por el usuario
+  //   Son datos críticos que también deben viajar en la copia. Simulamos 3
+  //   reglas típicas: Canje, Duplicado, y una tarifa fija (Foto carné).
+  ls.setItem('caja.tarifas.rules.v1', JSON.stringify([
+    { id:'canje-user',    tipos:['Expedicion','Obtencion'], grupos:['Conduccion'], importeExacto:66.50, resultado:'Canje',      notes:'Regla del centro médico' },
+    { id:'duplicado-user',tipos:['Duplicado'],              grupos:[],             importeExacto:25.00, resultado:'Duplicat',  notes:'' },
+    { id:'foto-user',     tipos:[],                         grupos:[],             importeExacto:4.00,  resultado:'Foto carné', notes:'Precio fijo del centro' },
+    { id:'renov-rango',   tipos:['Renovacion'],             grupos:['Conduccion'], importeMin:78, importeMax:95, resultado:'Renovación B', notes:'Rango de precios reales' },
+  ]));
+
   return ls;
 }
 
@@ -336,6 +347,22 @@ function ejecutarTest(){
   const stR = JSON.parse(lsNuevo.getItem('caja.stats.v1'));
   const statsOK = JSON.stringify(stO) === JSON.stringify(stR);
 
+  // 💰 Validación específica: reglas de tarifas personalizadas
+  console.log(`\n════════════════════════════════════════════════════════════════`);
+  console.log(`   💰 TARIFAS PERSONALIZADAS (patrones para clasificar apuntes)`);
+  console.log(`════════════════════════════════════════════════════════════════`);
+  const tarifasO = JSON.parse(lsOriginal.getItem('caja.tarifas.rules.v1') || '[]');
+  const tarifasR = JSON.parse(lsNuevo.getItem('caja.tarifas.rules.v1') || '[]');
+  console.log(`   Reglas ORIGINALES:    ${tarifasO.length}`);
+  console.log(`   Reglas RESTAURADAS:   ${tarifasR.length}`);
+  tarifasO.forEach((r, i) => {
+    const rr = tarifasR[i] || {};
+    const equal = JSON.stringify(r) === JSON.stringify(rr);
+    const detail = `tipos=${(r.tipos||[]).length} grupos=${(r.grupos||[]).length} exacto=${r.importeExacto} rango=${r.importeMin||'-'}..${r.importeMax||'-'} → "${r.resultado}"`;
+    console.log(`   ${equal ? '✅' : '❌'}  Regla ${i+1}: ${detail}`);
+  });
+  const tarifasOK = JSON.stringify(tarifasO) === JSON.stringify(tarifasR);
+
   console.log(`\n════════════════════════════════════════════════════════════════`);
   console.log(`   📊 RESUMEN FINAL`);
   console.log(`════════════════════════════════════════════════════════════════`);
@@ -344,9 +371,10 @@ function ejecutarTest(){
   console.log(`   🏦 Saldos Iniciales E1+E2 idénticos:   ${saldosOK ? '✅ SÍ' : '❌ NO'}`);
   console.log(`   ⚙️  Configuración empresa idéntica:     ${configOK ? '✅ SÍ' : '❌ NO'}`);
   console.log(`   📈 Stats Autoescolas idénticas:        ${statsOK ? '✅ SÍ' : '❌ NO'}`);
+  console.log(`   💰 Tarifas personalizadas idénticas:   ${tarifasOK ? '✅ SÍ' : '❌ NO'}`);
   console.log('');
 
-  const todoOK = fail === 0 && contabilidadOK && saldosOK && configOK && statsOK;
+  const todoOK = fail === 0 && contabilidadOK && saldosOK && configOK && statsOK && tarifasOK;
   if(todoOK){
     console.log('   🎉 RESULTADO: TODAS LAS VALIDACIONES PASARON');
     console.log('   → La restauración deja el ordenador IDÉNTICO al original, dato a dato.');

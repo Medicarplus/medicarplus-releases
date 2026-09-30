@@ -197,7 +197,7 @@ console.log('\n🧪 TEST 10 · Caso real: importar CSV con mezcla de operaciones
 console.log('════════════════════════════════════════════════════════════════');
 reset();
 window._saveTariffRules([
-  { id: 'canje', tipos:['Expedición','Expedició'], grupos:['Conducción','Conducció'], importeExacto: 66.50, resultado: 'Canje' },
+  { id: 'canje', tipos:['Expedicion'], grupos:['Conduccion'], importeExacto: 66.50, resultado: 'Canje' },
   { id: 'foto', tipos:[], grupos:[], importeExacto: 4, resultado: 'Foto carné' },
   { id: 'co', tipos:['Certificado'], grupos:[], importeExacto: 20, resultado: 'Certificado Oficial' },
 ]);
@@ -223,6 +223,109 @@ check(counts['Canje'] === 2, `agregado: 2 Canjes (recibió ${counts['Canje']})`)
 check(counts['Foto carné'] === 1, `agregado: 1 Foto carné`);
 check(counts['Certificado Oficial'] === 1, `agregado: 1 CO`);
 check(counts['Renovación'] === 1 && counts['Duplicado'] === 1, 'agregado: renov + duplicado sin tocar');
+
+// ═══════════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 11 · Match POR RAÍZ · escribir sin tildes vale para CA+ES');
+console.log('════════════════════════════════════════════════════════════════');
+reset();
+// El usuario escribe UNA sola palabra sin tildes por regla · debe matchear
+// tanto la castellana como la catalana automáticamente (misma raíz).
+window._saveTariffRules([
+  { id: 'canje',      tipos:['Expedicion'],  grupos:['Conduccion'],  importeExacto: 66.50, resultado: 'Canje' },
+  { id: 'renov',      tipos:['Renovacion'],  grupos:['Conduccion'],  importeMin: 78, importeMax: 100, resultado: 'Renov Cond' },
+  { id: 'recup',      tipos:['Recuperacion'], grupos:[],             importeMin: 100, importeMax: 300, resultado: 'Recuperación' },
+  { id: 'duplic',     tipos:['Duplicado'],   grupos:[],              importeExacto: 25, resultado: 'Duplicat' },
+  { id: 'ciclomotor', tipos:[],              grupos:['Ciclomotor'],  importeMin: 50, importeMax: 100, resultado: 'Trámite ciclo' },
+]);
+
+// A) EXPEDICIÓN (es) + EXPEDICIÓ (ca) con Conducción/Conducció
+check(window._matchTariffRule({kind:'TRAF',tipo:'Expedición',grupo:'Conducción',importe:66.50}) === 'Canje',
+      'raíz: "Expedicion" regla ↔ "Expedición" (es) → Canje');
+check(window._matchTariffRule({kind:'TRAF',tipo:'Expedició',grupo:'Conducció',importe:66.50}) === 'Canje',
+      'raíz: "Expedicion" regla ↔ "Expedició" (ca) → Canje (misma raíz expedicio)');
+check(window._matchTariffRule({kind:'TRAF',tipo:'EXPEDICION',grupo:'CONDUCCION',importe:66.50}) === 'Canje',
+      'raíz: mayúsculas también matchean');
+
+// B) RENOVACIÓN (es) + RENOVACIÓ (ca)
+check(window._matchTariffRule({kind:'TRAF',tipo:'Renovación',grupo:'Conducción',importe:80}) === 'Renov Cond',
+      'raíz: "Renovacion" regla ↔ "Renovación" (es) → Renov Cond');
+check(window._matchTariffRule({kind:'TRAF',tipo:'Renovació',grupo:'Conducció',importe:80}) === 'Renov Cond',
+      'raíz: "Renovacion" regla ↔ "Renovació" (ca) → Renov Cond');
+
+// C) RECUPERACIÓN (es) + RECUPERACIÓ (ca)
+check(window._matchTariffRule({kind:'TRAF',tipo:'Recuperación',grupo:'Conducción',importe:150}) === 'Recuperación',
+      'raíz: "Recuperacion" ↔ "Recuperación" (es)');
+check(window._matchTariffRule({kind:'TRAF',tipo:'Recuperació',grupo:'Conducció',importe:150}) === 'Recuperación',
+      'raíz: "Recuperacion" ↔ "Recuperació" (ca)');
+
+// D) DUPLICADO (es) + DUPLICAT (ca)
+check(window._matchTariffRule({kind:'TRAF',tipo:'Duplicado',grupo:'',importe:25}) === 'Duplicat',
+      'raíz: "Duplicado" (es) matchea la regla');
+check(window._matchTariffRule({kind:'TRAF',tipo:'Duplicat',grupo:'',importe:25}) === 'Duplicat',
+      'raíz: "Duplicado" regla ↔ "Duplicat" (ca) → Duplicat (raíz común "duplica")');
+
+// E) GRUPO CICLOMOTOR (mismo nombre en ambos idiomas)
+check(window._matchTariffRule({kind:'TRAF',tipo:'Renovación',grupo:'Ciclomotor',importe:60}) === 'Trámite ciclo',
+      'grupo: "Ciclomotor" matchea');
+
+// F) NO matchea si son palabras distintas de raíz diferente
+check(window._matchTariffRule({kind:'TRAF',tipo:'Certificado',grupo:'Conducción',importe:66.50}) === null,
+      'raíz: "Certificado" NO comparte raíz con "Expedicion" → null');
+// La entrada "Expedición Ciclomotor 66,50€" NO matchea la regla Canje (grupo Ciclomotor ≠ Conduccion)
+// pero SÍ matchea la regla "ciclomotor" (grupo=Ciclomotor + importe 66,50 dentro del rango 50-100).
+check(window._matchTariffRule({kind:'TRAF',tipo:'Expedición',grupo:'Ciclomotor',importe:66.50}) === 'Trámite ciclo',
+      'raíz: Expedición Ciclomotor 66,50€ NO es canje pero sí Trámite ciclo (matchea la regla más apropiada)');
+
+// G) Mezcla realista del CSV con solo raíces sin tildes
+const mixedCA_ES = [
+  { kind:'TRAF', tipo:'Expedición',   grupo:'Conducción',  importe:66.50 }, // Canje
+  { kind:'TRAF', tipo:'Expedició',    grupo:'Conducció',   importe:66.50 }, // Canje (ca)
+  { kind:'TRAF', tipo:'Renovación',   grupo:'Conducción',  importe:80.00 }, // Renov Cond
+  { kind:'TRAF', tipo:'Renovació',    grupo:'Conducció',   importe:85.00 }, // Renov Cond (ca)
+  { kind:'TRAF', tipo:'Recuperació',  grupo:'',            importe:200.00 }, // Recuperación
+  { kind:'TRAF', tipo:'Duplicat',     grupo:'',            importe:25.00 }, // Duplicat
+  { kind:'TRAF', tipo:'Renovación',   grupo:'Ciclomotor',  importe:65.00 }, // Trámite ciclo
+];
+const results = mixedCA_ES.map(e => window._matchTariffRule(e));
+const expectedMixed = ['Canje','Canje','Renov Cond','Renov Cond','Recuperación','Duplicat','Trámite ciclo'];
+check(JSON.stringify(results) === JSON.stringify(expectedMixed),
+      `CSV mixto CA+ES con reglas sin tildes: ${JSON.stringify(results)}`);
+
+// ═══════════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 12 · Espacios, mayúsculas, guiones y puntos no importan');
+console.log('════════════════════════════════════════════════════════════════');
+reset();
+window._saveTariffRules([
+  { id:'canje', tipos:['Expedicion'], grupos:['Conduccion'], importeExacto:66.50, resultado:'Canje' },
+]);
+check(window._matchTariffRule({kind:'TRAF',tipo:'  EXPEDICIÓN  ',grupo:'CONDUCCIÓN',importe:66.50}) === 'Canje',
+      'trim: espacios sobrantes al inicio/fin no importan');
+check(window._matchTariffRule({kind:'TRAF',tipo:'expedicion',grupo:'conduccion',importe:66.50}) === 'Canje',
+      'mayus/minus: todo lowercase también matchea');
+check(window._matchTariffRule({kind:'TRAF',tipo:'Exped.',grupo:'Conduc.',importe:66.50}) === 'Canje',
+      'abreviaturas con punto: "Exped." matchea gracias a prefijo común');
+check(window._matchTariffRule({kind:'TRAF',tipo:'Expedicio-B',grupo:'Conducció-A2',importe:66.50}) === 'Canje',
+      'guiones y sufijos: la raíz se detecta igual');
+
+// ═══════════════════════════════════════════════════════════════════
+console.log('\n🧪 TEST 13 · Regla del CENTRO MÉDICO (owner) sigue funcionando igual');
+console.log('════════════════════════════════════════════════════════════════');
+reset();
+// El seed inicial que el owner ya tiene configurado en su centro
+const ownerRule = window._getTariffRules(); // debe hacer seed
+check(ownerRule.length === 1 && ownerRule[0].resultado === 'Canje', 'seed default = 1 regla Canje');
+// Verificamos con los CSV reales que le llegan al owner
+const ownerCsv = [
+  { kind:'TRAF', tipo:'Expedició',  grupo:'Conducció',  importe:66.50, nombre:'JORDI FONT' },
+  { kind:'TRAF', tipo:'Expedició',  grupo:'Conducció',  importe:66.50, nombre:'MARIA SOLE' },
+  { kind:'TRAF', tipo:'Renovació',  grupo:'Conducció',  importe:80.00, nombre:'PERE MAS' },
+  { kind:'TRAF', tipo:'Expedició',  grupo:'Ciclomotor', importe:66.50, nombre:'ARNAU RIU' }, // NO es canje (ciclomotor)
+  { kind:'TRAF', tipo:'Obtenció',   grupo:'Conducció',  importe:66.50, nombre:'CLARA ROIG' }, // Sí es canje (obtenció alt)
+];
+const ownerResults = ownerCsv.map(e => window._effectiveTipo(e));
+const ownerExpected = ['Canje','Canje','Renovació','Expedició','Canje'];
+check(JSON.stringify(ownerResults) === JSON.stringify(ownerExpected),
+      `Owner CSV clasificado bien: ${JSON.stringify(ownerResults)}`);
 
 // ═══════════════════════════════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════════════════════════════');
