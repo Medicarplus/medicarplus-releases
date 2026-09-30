@@ -1321,6 +1321,131 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             "audit_log": audit_docs,
         }
 
+    # ---------- 🧹 PURGE de datos de prueba (Feb 2026) ----------
+    #   Elimina TODAS las licencias, suscripciones, pagos y datos ligados
+    #   EXCEPTO las que coincidan con `keep_emails` (lista de emails a conservar).
+    #   MASTER (owner) siempre se conserva (no está en `licenses`).
+    #   Requiere admin token. Devuelve un resumen detallado de qué se ha borrado.
+    @router.post(
+        "/admin/purge-test-data",
+        dependencies=[Depends(require_admin)],
+    )
+    async def purge_test_data(request: Request):
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        keep_emails = body.get("keep_emails") or []
+        if isinstance(keep_emails, str):
+            keep_emails = [keep_emails]
+        keep_emails_lower = [e.lower().strip() for e in keep_emails if e]
+        confirm = body.get("confirm") or ""
+        if confirm != "SI-BORRAR-TODO-EXCEPTO-KEEP":
+            raise HTTPException(
+                status_code=400,
+                detail="Requires body {confirm: 'SI-BORRAR-TODO-EXCEPTO-KEEP', keep_emails: [...]}",
+            )
+        # 1) Identificar licencias a conservar (por email)
+        keep_docs = []
+        if keep_emails_lower:
+            keep_docs = await coll.find(
+                {"client_email": {"$in": keep_emails_lower}}, {"install_id": 1, "_id": 0}
+            ).to_list(100)
+        keep_install_ids = [d["install_id"] for d in keep_docs if d.get("install_id")]
+
+        # 2) Identificar TODAS las licencias a borrar
+        all_lics = await coll.find({}, {"install_id": 1, "client_email": 1, "_id": 0}).to_list(2000)
+        del_install_ids = [
+            l["install_id"] for l in all_lics
+            if l.get("install_id") and l.get("install_id") not in keep_install_ids
+        ]
+
+        summary = {
+            "keep_emails": keep_emails_lower,
+            "keep_install_ids": keep_install_ids,
+            "deleted": {},
+        }
+
+        # 3) Borrar de las colecciones ligadas a install_id (si hay install_ids a borrar)
+        collections_with_install_id = [
+            "licenses", "installations", "sync_devices", "sync_cloud_backups",
+            "sms_campaigns", "sms_usage_medicar", "sms_usage_errors",
+            "support_messages", "license_audit", "license_requests",
+            "subscriptions", "payments", "referrals",
+            "cloudbackup_events", "renewal_reminders_sent",
+        ]
+        all_colls_available = await db.list_collection_names()
+        if del_install_ids:
+            for coll_name in collections_with_install_id:
+                if coll_name not in all_colls_available:
+                    continue
+                try:
+                    # target=install_id (audit log usa 'target' en algunos casos)
+                    q = {"install_id": {"$in": del_install_ids}}
+                    res = await db[coll_name].delete_many(q)
+                    if res.deleted_count > 0:
+                        summary["deleted"][coll_name] = res.deleted_count
+                    # Extra: license_audit puede usar `target` en lugar de install_id
+                    if coll_name == "license_audit":
+                        res2 = await db[coll_name].delete_many({"target": {"$in": del_install_ids}})
+                        if res2.deleted_count > 0:
+                            summary["deleted"][coll_name] = summary["deleted"].get(coll_name, 0) + res2.deleted_count
+                except Exception as e:
+                    logger.exception(f"purge · fallo en {coll_name}: {e}")
+                    summary["deleted"][coll_name] = f"ERROR: {e}"
+
+        # 4) Borrar suscripciones Stripe huérfanas (por email de test si no llevan install_id)
+        try:
+            if "subscriptions" in all_colls_available:
+                res = await db["subscriptions"].delete_many({
+                    "customer_email": {"$nin": keep_emails_lower + [None, ""]}
+                })
+                if res.deleted_count > 0:
+                    summary["deleted"]["subscriptions_by_email"] = res.deleted_count
+        except Exception as e:
+            logger.warning(f"purge subscriptions by email fallado: {e}")
+
+        # 5) Borrar PAYMENTS (colección Stripe invoices) que NO pertenecen a los emails conservados.
+        #   `payments` no tiene install_id; se filtra por `customer_email`.
+        #   Esto es lo que hace bajar el "Total facturado" del dashboard a 0€ tras purgar test data.
+        try:
+            if "payments" in all_colls_available:
+                # Borrar todos EXCEPTO los que tengan customer_email dentro de keep_emails
+                if keep_emails_lower:
+                    res = await db["payments"].delete_many({
+                        "customer_email": {"$nin": keep_emails_lower}
+                    })
+                else:
+                    res = await db["payments"].delete_many({})
+                if res.deleted_count > 0:
+                    summary["deleted"]["payments_all"] = res.deleted_count
+        except Exception as e:
+            logger.warning(f"purge payments fallado: {e}")
+
+        # 6) Recalcular stats globales (billing counters)
+        summary["remaining_licenses"] = await coll.count_documents({})
+        if "subscriptions" in all_colls_available:
+            summary["remaining_subscriptions"] = await db["subscriptions"].count_documents({})
+        if "payments" in all_colls_available:
+            summary["remaining_payments"] = await db["payments"].count_documents({})
+            pipeline = [{"$match": {"status": "paid"}}, {"$group": {"_id": None, "total_cents": {"$sum": "$amount_cents"}}}]
+            total_cents = 0
+            async for d in db["payments"].aggregate(pipeline):
+                total_cents = d.get("total_cents", 0) or 0
+            summary["remaining_total_paid_eur"] = round(total_cents / 100.0, 2)
+
+        # Audit
+        try:
+            await _audit(request, "licenses.purge_test_data", "*", extra={
+                "keep_emails": keep_emails_lower,
+                "deleted_install_ids_count": len(del_install_ids),
+                "deleted_summary": summary["deleted"],
+            })
+        except Exception:
+            pass
+
+        return summary
+
     # ---------- List ----------
     @router.get(
         "",
