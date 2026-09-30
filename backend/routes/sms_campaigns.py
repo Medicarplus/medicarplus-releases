@@ -701,4 +701,103 @@ def build_router(db):
                     })
         return {"query": q, "results": results, "total": len(results), "truncated": truncated}
 
+    # ────────────────────────────────────────────────────────────────
+    # 🗂️ BACKUP / RESTORE SMS (Feb 2026)
+    # Endpoints PÚBLICS (només install_id) perquè el client pugui
+    # incloure les estadístiques SMS del servidor dins la seva
+    # còpia de seguretat i restaurar-les si un dia esborra tot i
+    # torna a instal·lar (potser amb un nou install_id).
+    # ────────────────────────────────────────────────────────────────
+    @router.get("/backup-export")
+    async def backup_export_sms(install_id: str):
+        """Exporta TOTES les campanyes SMS + consum mensual d'un install_id.
+
+        Retorna una estructura serialitzable que el client pot embeure
+        dins la seva còpia de seguretat local/núvol. No requereix admin
+        token perquè el client és propietari de les seves pròpies dades.
+        """
+        if not install_id:
+            return {"install_id": "", "campaigns": [], "usage": [], "count": 0}
+        # Campanyes: filtrar per install_id (les campanyes tenen install_id opcional)
+        camp_cursor = db.sms_campaigns.find({"install_id": install_id}).sort("created_at", -1)
+        campaigns = []
+        async for c in camp_cursor:
+            c["id"] = c.pop("_id", None)
+            campaigns.append(c)
+        # Consum mensual medicar
+        usage_cursor = db.sms_usage_medicar.find({"install_id": install_id}).sort("period", -1)
+        usage = []
+        async for u in usage_cursor:
+            u["_id"] = str(u.get("_id", ""))
+            usage.append(u)
+        return {
+            "install_id": install_id,
+            "campaigns": campaigns,
+            "usage": usage,
+            "count": len(campaigns),
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    class SmsBackupImportReq(BaseModel):
+        install_id: str
+        campaigns: List[dict] = []
+        usage: List[dict] = []
+
+    @router.post("/backup-import")
+    async def backup_import_sms(body: SmsBackupImportReq):
+        """Restaura campanyes + consum SMS d'una còpia dins l'install_id actual.
+
+        - Fa UPSERT per campanya (id → _id). Si ja existeix, s'actualitza.
+        - Fa UPSERT per consum mensual (install_id + period).
+        - Re-etiqueta TOTES les campanyes amb el nou install_id (per si el PC
+          es nou i l'install_id ha canviat) perquè la llista /campaigns torni
+          a veure-les tal com estaven.
+        """
+        if not body.install_id:
+            raise HTTPException(status_code=400, detail="install_id_required")
+        target_install = body.install_id
+        camp_restored = 0
+        usage_restored = 0
+        for c in (body.campaigns or []):
+            if not isinstance(c, dict):
+                continue
+            cid = c.get("id") or c.get("_id") or str(uuid.uuid4())
+            doc = {k: v for k, v in c.items() if k not in ("id", "_id")}
+            doc["_id"] = cid
+            # Re-atar al install_id actual per si ha canviat de PC
+            doc["install_id"] = target_install
+            try:
+                await db.sms_campaigns.update_one(
+                    {"_id": cid},
+                    {"$set": doc},
+                    upsert=True,
+                )
+                camp_restored += 1
+            except Exception as e:
+                logger.warning(f"backup-import campaign {cid} fallada: {e}")
+        for u in (body.usage or []):
+            if not isinstance(u, dict):
+                continue
+            period = u.get("period")
+            if not period:
+                continue
+            doc = {k: v for k, v in u.items() if k not in ("_id",)}
+            doc["install_id"] = target_install
+            doc["period"] = period
+            try:
+                await db.sms_usage_medicar.update_one(
+                    {"install_id": target_install, "period": period},
+                    {"$set": doc},
+                    upsert=True,
+                )
+                usage_restored += 1
+            except Exception as e:
+                logger.warning(f"backup-import usage {period} fallada: {e}")
+        return {
+            "ok": True,
+            "install_id": target_install,
+            "campaigns_restored": camp_restored,
+            "usage_periods_restored": usage_restored,
+        }
+
     return router

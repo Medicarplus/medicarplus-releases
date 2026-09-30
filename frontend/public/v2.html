@@ -511,8 +511,65 @@
       try { out[k] = JSON.parse(raw); }
       catch(e){ out[k] = raw; }
     }
+    // 🖥️ Feb 2026 · Metadada de MIGRACIÓ · install_id + license key + hostname
+    //   Al restaurar en un PC diferent, el sistema detecta que l'install_id no
+    //   coincideix i ofereix al usuari fer una MIGRACIÓ (copiar l'install_id
+    //   original per què SMS/licència/subscripció del servidor segueixin igual).
+    try{
+      const _origin = {
+        install_id: localStorage.getItem('caja.install.id.v1') || '',
+        license_key: (function(){ try{ const l=JSON.parse(localStorage.getItem('caja.license.v1')||'null')||{}; return l.key||l.license_key||''; }catch(_){ return ''; } })(),
+        exported_at: new Date().toISOString(),
+        app_version: (window.appInfo && window.appInfo.version) || 'web',
+        hostname: (window.appInfo && window.appInfo.hostname) || '',
+      };
+      if(_origin.install_id) out['__origin__'] = _origin;
+    }catch(_){}
     return out;
   }
+  // 📱 SNAPSHOT SMS SERVIDOR · descarrega les campanyes+consum del server per l'install_id
+  //   S'inclou dins la còpia com a clau especial '__server_sms__' → si restaures en un altre
+  //   PC (nou install_id) el restore fa POST a /sms/backup-import i re-etiqueta les campanyes
+  //   al install_id nou → l'usuari veu les seves estadístiques SMS igual que abans.
+  async function _fetchServerSmsSnapshot(){
+    try{
+      if(!cfg.installId){
+        cfg.installId = localStorage.getItem('caja.install.id.v1') || '';
+      }
+      if(!cfg.installId) return null;
+      const base = cfg.apiBase || (typeof window !== 'undefined' && window.API_BASE) || (typeof location !== 'undefined' ? location.origin : '');
+      const url = base + '/api/sms/backup-export?install_id=' + encodeURIComponent(cfg.installId);
+      const r = await fetch(url, { headers: { 'Accept':'application/json' } });
+      if(!r.ok) return null;
+      const j = await r.json();
+      if(!j || (typeof j !== 'object')) return null;
+      const camps = Array.isArray(j.campaigns) ? j.campaigns : [];
+      const usage = Array.isArray(j.usage) ? j.usage : [];
+      if(camps.length === 0 && usage.length === 0) return null; // res a guardar
+      return { campaigns: camps, usage, exported_at: j.exported_at || new Date().toISOString() };
+    }catch(e){ console.warn('fetch SMS snapshot fallado:', e); return null }
+  }
+  async function _applyServerSmsSnapshot(snap){
+    try{
+      if(!snap || typeof snap !== 'object') return { ok:false, reason:'empty' };
+      if(!cfg.installId){
+        cfg.installId = localStorage.getItem('caja.install.id.v1') || '';
+      }
+      if(!cfg.installId) return { ok:false, reason:'no_install_id' };
+      const base = cfg.apiBase || (typeof window !== 'undefined' && window.API_BASE) || (typeof location !== 'undefined' ? location.origin : '');
+      const url = base + '/api/sms/backup-import';
+      const body = {
+        install_id: cfg.installId,
+        campaigns: Array.isArray(snap.campaigns) ? snap.campaigns : [],
+        usage: Array.isArray(snap.usage) ? snap.usage : [],
+      };
+      const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      if(!r.ok) return { ok:false, reason:'http_'+r.status };
+      const j = await r.json();
+      return { ok:true, campaigns_restored: j.campaigns_restored||0, usage_periods_restored: j.usage_periods_restored||0 };
+    }catch(e){ console.warn('apply SMS snapshot fallado:', e); return { ok:false, reason:'exception' } }
+  }
+  try{ window.mcSmsBackup = { fetch: _fetchServerSmsSnapshot, apply: _applyServerSmsSnapshot }; }catch(_){}
   async function sendCloudBackup(label){
     // 🔧 Feb 2026 · Guard robusto para modo TRIAL/STD antes de que init() haya corrido.
     //   Fallback: leemos licencia/installId directamente de localStorage si cfg está vacío.
@@ -531,6 +588,13 @@
     if(!cfg.licenseKey) return { ok:false, error:'Sin licencia activada · abre la app y activa una clave primero' };
     if(!cfg.installId)  return { ok:false, error:'Falta install_id · recarga la app (Ctrl+Shift+R)' };
     const data = _fullBackupData();
+    // 📱 Feb 2026 · Incloure snapshot SMS del servidor (campanyes + consum mensual)
+    //   dins la còpia · així si un dia el client restaura en un PC nou el sistema
+    //   re-atarà les estadístiques SMS al nou install_id automàticament.
+    try{
+      const smsSnap = await _fetchServerSmsSnapshot();
+      if(smsSnap) data['__server_sms__'] = smsSnap;
+    }catch(_){}
     // 🗜️ Feb 2026 · Compresión gzip cliente (CompressionStream API · Chrome 80+, Electron).
     //   Reduce ~5-10x el tamaño de envío. Backend acepta ambos formatos: si mandamos
     //   data_gz_b64, ignora `data`. Fallback silencioso a envío sin comprimir si algo falla.
@@ -9759,17 +9823,52 @@ async function saveStoredHandle(h){return _idb({mode:'readwrite',fn:s=>s.put(h,'
 async function clearStoredHandle(){return _idb({mode:'readwrite',fn:s=>s.delete('backupHandle')})}
 $('#btnExport').onclick=async ev=>{
   const isCA=(typeof currentLang!=='undefined' && currentLang==='ca');
+  // 🔧 Feb 2026 · Usar la MISMA whitelist completa que la copia de nube (18 claves)
+  //   antes solo guardaba 6 claves legacy (cbTrafic, cempla, datafono, dfCempla, stats, irpf)
+  //   → se perdian saldo inicial, reserva, cuadre, aliases, overrides, config, citas.
+  //   Ara el fitxer local és FONT DE VERITAT igual que la còpia núvol.
+  const _lsAll = (function(){
+    const keys = (window.DATA_LS_KEYS && Array.isArray(window.DATA_LS_KEYS)) ? window.DATA_LS_KEYS : [];
+    const out = {};
+    for(const k of keys){
+      const raw = localStorage.getItem(k);
+      if(raw === null || raw === '') continue;
+      try { out[k] = JSON.parse(raw); } catch(e){ out[k] = raw; }
+    }
+    return out;
+  })();
+  // 📱 Snapshot SMS del servidor (campanyes + consum) per si es restaura en un PC nou
+  let _smsSnap = null;
+  try{
+    if(window.mcSmsBackup && window.mcSmsBackup.fetch){
+      _smsSnap = await window.mcSmsBackup.fetch();
+    }
+  }catch(_){}
   const all={
     _signature:'MEDICAR-PLUS-BACKUP-V4', // 🔒 firma per validar restauracions · evita restaurar JSON aliens
     _createdAt:new Date().toISOString(),
     _appVersion:(window.appInfo&&window.appInfo.version)||'web',
+    // Legacy (compat amb restauradors antics v4/v5)
     cbTrafic:JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),
     cempla:JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),
     datafono:JSON.parse(localStorage.getItem('caja.datafono')||'{}'),
     datafonoCempla:JSON.parse(localStorage.getItem('caja.cempla.datafono')||'{}'),
     stats:JSON.parse(localStorage.getItem('caja.stats.v1')||'null'),
     irpf:JSON.parse(localStorage.getItem('caja.irpf.v1')||'{"months":{},"quarters":{}}'),
-    _v:4
+    // 🔧 NOU: mapa complet (font de veritat per restauradors v6+)
+    data:_lsAll,
+    // 📱 Snapshot SMS servidor (si hi ha) · el restore fa POST a /sms/backup-import
+    __server_sms__: _smsSnap || undefined,
+    // 🖥️ Metadada de MIGRACIÓ (install_id + license key origen) · permet detectar
+    //   quan es restaura en un PC diferent i oferir copiar l'install_id.
+    __origin__: {
+      install_id: localStorage.getItem('caja.install.id.v1') || '',
+      license_key: (function(){ try{ const l=JSON.parse(localStorage.getItem('caja.license.v1')||'null')||{}; return l.key||l.license_key||''; }catch(_){ return ''; } })(),
+      exported_at: new Date().toISOString(),
+      app_version: (window.appInfo && window.appInfo.version) || 'web',
+      hostname: (window.appInfo && window.appInfo.hostname) || '',
+    },
+    _v:6
   };
   const contents=JSON.stringify(all,null,2);
   // SAFETY checks
@@ -10464,6 +10563,86 @@ $('#jsonInput').onchange=async ev=>{
   const restoreAll=(replace)=>{
     pushSnapshot('preRestore');
     const log=[];
+    // 🖥️ MIGRACIÓ DE PC · Feb 2026
+    //   Si la copia porta un install_id origen DIFERENT del actual → el usuari està
+    //   restaurant en un ordinador nou (o va reinstal·lar). Preguntar-li si vol MIGRAR
+    //   (copiar install_id origen → SMS/llicència/subscripció del servidor segueixen intactes
+    //   sense necessitat de re-atar res) o RESTAURAR NORMAL (mantenir install_id actual i
+    //   re-atar les campanyes SMS al nou install_id).
+    const _originIid = (obj && obj.__origin__ && obj.__origin__.install_id) || '';
+    const _currentIid = localStorage.getItem('caja.install.id.v1') || '';
+    const _needsMigrationChoice = !!(_originIid && _currentIid && _originIid !== _currentIid);
+
+    const _applySmsSnapshotSilent = async () => {
+      try{
+        if(obj && obj.__server_sms__ && window.mcSmsBackup && window.mcSmsBackup.apply){
+          const res = await window.mcSmsBackup.apply(obj.__server_sms__);
+          if(res && res.ok){
+            const nc = res.campaigns_restored||0;
+            const nu = res.usage_periods_restored||0;
+            if(nc || nu){
+              try{ toast((isCA?`📱 Estadístiques SMS restaurades: ${nc} campanyes · ${nu} mesos de consum`:`📱 Estadísticas SMS restauradas: ${nc} campañas · ${nu} meses de consumo`), 6000); }catch(_){}
+            }
+          }
+        }
+      }catch(_){}
+    };
+    // 🖥️ Modal de MIGRACIÓ DE PC · pregunta a l'usuari si vol copiar l'install_id origen
+    //   Si SÍ → sobreescriu caja.install.id.v1 amb l'origen (SMS/licència/subscripció del
+    //          servidor segueixen intactes sense necessitat de re-atar res) + reload.
+    //   Si NO → manté l'install_id actual + re-atar SMS al nou install_id.
+    const _promptMigrationOrRestoreNormal = () => {
+      if(!_needsMigrationChoice){
+        // Origen == actual (o no hi ha metadata): comportament normal, re-atar SMS
+        _applySmsSnapshotSilent();
+        return;
+      }
+      const back = document.createElement('div');
+      back.className = 'modal-back';
+      back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;z-index:100002;backdrop-filter:blur(8px);padding:20px';
+      const originShort = _originIid.slice(0,8);
+      const currentShort = _currentIid.slice(0,8);
+      const exportedAt = (obj.__origin__ && obj.__origin__.exported_at) ? new Date(obj.__origin__.exported_at).toLocaleString(isCA?'ca-ES':'es-ES') : '—';
+      back.innerHTML = `<div class="modal" style="max-width:640px;padding:26px">
+        <h3 style="color:#f5b301;margin-top:0;font-size:20px">🖥️ ${isCA?'Vols migrar de ordinador?':'¿Quieres migrar de ordenador?'}</h3>
+        <div style="background:#0e1a2e;border:1px solid #1e293b;border-radius:8px;padding:14px;margin:14px 0;font-size:13px;color:#cbd5e1;line-height:1.7">
+          ${isCA?'Aquesta còpia ve d\'un ordinador <b>diferent</b> del actual':'Esta copia viene de un ordenador <b>diferente</b> al actual'}:<br>
+          <span style="color:#94a3b8">${isCA?'Origen':'Origen'}:</span> <code style="color:#f5b301">${originShort}…</code> · <span style="color:#94a3b8">${isCA?'exportat':'exportado'}: ${exportedAt}</span><br>
+          <span style="color:#94a3b8">${isCA?'Aquest PC':'Este PC'}:</span> <code style="color:#22c55e">${currentShort}…</code>
+        </div>
+        <div style="background:#052e16;border-left:3px solid #22c55e;border-radius:6px;padding:12px 16px;margin:12px 0;font-size:13px;color:#a7f3d0;line-height:1.65;cursor:pointer" id="migrate-yes" data-testid="migrate-yes">
+          <b style="color:#7ee3aa;font-size:14px">✅ ${isCA?'SÍ, migrar-ho tot a aquest PC (recomanat)':'SÍ, migrarlo todo a este PC (recomendado)'}</b><br>
+          ${isCA?"Copiarà l'identificador d'instal·lació de la còpia. Les <b>estadístiques SMS</b>, <b>llicència</b> i <b>subscripció</b> del servidor seguiran <b>intactes</b> sense haver de re-atar res. És com si aquest fos el mateix ordinador d'abans.":"Copiará el identificador de instalación de la copia. Las <b>estadísticas SMS</b>, <b>licencia</b> y <b>suscripción</b> del servidor seguirán <b>intactas</b> sin tener que re-atar nada. Es como si este fuera el mismo ordenador de antes."}
+        </div>
+        <div style="background:#1e293b;border-left:3px solid #64748b;border-radius:6px;padding:12px 16px;font-size:12.5px;color:#cbd5e1;line-height:1.55;cursor:pointer" id="migrate-no" data-testid="migrate-no">
+          <b style="color:#cbd5e1">📥 ${isCA?'NO, només restaurar en aquest PC':'NO, solo restaurar en este PC'}</b><br>
+          ${isCA?"Manté l'identificador d'aquest PC. Les campanyes SMS antigues es <b>re-ataran automàticament</b> al identificador nou. Útil si vols conservar aquest PC com a nou terminal independent (ex: segona franquícia).":"Mantiene el identificador de este PC. Las campañas SMS antiguas se <b>re-atarán automáticamente</b> al identificador nuevo. Útil si quieres conservar este PC como nuevo terminal independiente (ej: segunda franquicia)."}
+        </div>
+      </div>`;
+      document.body.appendChild(back);
+      back.querySelector('#migrate-yes').onclick = () => {
+        try{ localStorage.setItem('caja.install.id.v1', _originIid); }catch(_){}
+        // Migrar també la licence si porta metadata i és diferent
+        try{
+          const originLic = (obj.__origin__ && obj.__origin__.license_key) || '';
+          if(originLic){
+            const curLicRaw = localStorage.getItem('caja.license.v1');
+            const curLic = curLicRaw ? JSON.parse(curLicRaw) : {};
+            if(!curLic.key && !curLic.license_key){
+              // No hi ha llicència local encara · guardem la de la còpia
+              localStorage.setItem('caja.license.v1', JSON.stringify({ key: originLic }));
+            }
+          }
+        }catch(_){}
+        back.remove();
+        toast(isCA?'🖥️ Migració completada · recarregant...':'🖥️ Migración completada · recargando...', 3000);
+        setTimeout(()=>location.reload(), 900);
+      };
+      back.querySelector('#migrate-no').onclick = () => {
+        back.remove();
+        _applySmsSnapshotSilent();
+      };
+    };
     // 🔧 Feb 2026 · Si el fichero es v6+ trae `data` con mapa completo (fuente de verdad).
     //   Restaura TODAS las claves de golpe. Los bloques legacy debajo siguen funcionando
     //   para ficheros antiguos (v4/v5).
@@ -10483,6 +10662,7 @@ $('#jsonInput').onchange=async ev=>{
       try{ if(typeof applyCompanyUI==='function') applyCompanyUI(); }catch(_){}
       state=loadState();render();
       toast((isCA?`✅ ${replace?'Restaurat':'Fusionat'}: `:`✅ ${replace?'Restaurado':'Fusionado'}: `)+log.join(' · '),5000);
+      _promptMigrationOrRestoreNormal();
       return;
     }
     if(hasDual||hasOnlyCB){
@@ -10550,6 +10730,7 @@ $('#jsonInput').onchange=async ev=>{
     }
     state=loadState();render();
     toast((isCA?`✅ ${replace?'Restaurat':'Fusionat'}: `:`✅ ${replace?'Restaurado':'Fusionado'}: `)+log.join(' · '),5000);
+    _promptMigrationOrRestoreNormal();
   };
   const info=[];
   if(cntCB)info.push(isCA?`<b>${cntCB}</b> fitxes Tràfic`:`<b>${cntCB}</b> fichas Tráfico`);
@@ -15026,13 +15207,81 @@ setTimeout(async ()=>{
       try{
         const full = await window.mcSync.getCloudBackup(latest.backup_id);
         if(!full || !full.data){ alert('❌ Error al descargar la copia. Reinténtalo.'); btn.disabled=false; btn.textContent='✅ Sí, restaurar ahora'; return; }
-        // Aplicar snapshot: escribir todas las claves
+        // 📱 Extreure snapshot SMS si el porta i restaurar-lo al servidor (background)
+        const _smsSnap = full.data['__server_sms__'] || null;
+        // 🖥️ Metadada de migració (install_id origen)
+        const _origin = full.data['__origin__'] || null;
+        const _originIid = (_origin && _origin.install_id) || '';
+        const _currentIid = localStorage.getItem('caja.install.id.v1') || '';
+        // Aplicar snapshot: escribir todas las claves (excloent claus especials)
         let restored = 0;
         Object.entries(full.data).forEach(([k, v]) => {
+          if(k === '__server_sms__' || k === '__origin__') return; // no és localStorage
           const val = v && v.value != null ? v.value : v;
           try{ localStorage.setItem(k, typeof val === 'string' ? val : JSON.stringify(val)); restored++; }catch(_){}
         });
-        alert(`✅ Restauración completa · ${restored} elementos recuperados de la copia del ${dateHuman}.\n\nLa app se recargará ahora.`);
+        // 🖥️ MIGRACIÓ · si el install_id origen és diferent del actual → preguntar
+        const needsMigration = !!(_originIid && _currentIid && _originIid !== _currentIid);
+        if(needsMigration){
+          // Reemplaça el modal actual amb un de migració
+          back.innerHTML = `<div style="background:linear-gradient(160deg,#0e1a2e,#0b1220);border:1px solid #f5b30144;border-radius:16px;padding:26px;max-width:640px;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+            <h3 style="color:#f5b301;margin-top:0;font-size:20px">🖥️ ¿Migración de ordenador?</h3>
+            <div style="background:#0e1a2e;border:1px solid #1e293b;border-radius:8px;padding:14px;margin:14px 0;font-size:13px;color:#cbd5e1;line-height:1.7">
+              La copia descargada viene de un ordenador <b>diferente</b>:<br>
+              <span style="color:#94a3b8">Origen:</span> <code style="color:#f5b301">${_originIid.slice(0,8)}…</code><br>
+              <span style="color:#94a3b8">Este PC:</span> <code style="color:#22c55e">${_currentIid.slice(0,8)}…</code>
+            </div>
+            <div style="background:#052e16;border-left:3px solid #22c55e;border-radius:6px;padding:12px 16px;margin:12px 0;font-size:13px;color:#a7f3d0;line-height:1.65;cursor:pointer" id="cb-migrate-yes" data-testid="cb-migrate-yes">
+              <b style="color:#7ee3aa;font-size:14px">✅ SÍ, migrar todo a este PC (recomendado)</b><br>
+              Copiará el identificador de instalación del ordenador antiguo. Las <b>estadísticas SMS</b>, <b>licencia</b> y <b>suscripción</b> del servidor seguirán intactas.
+            </div>
+            <div style="background:#1e293b;border-left:3px solid #64748b;border-radius:6px;padding:12px 16px;font-size:12.5px;color:#cbd5e1;line-height:1.55;cursor:pointer" id="cb-migrate-no" data-testid="cb-migrate-no">
+              <b style="color:#cbd5e1">📥 NO, solo restaurar en este PC (segunda instalación)</b><br>
+              Mantiene el identificador de este PC. Las campañas SMS antiguas se re-atarán al identificador nuevo.
+            </div>
+          </div>`;
+          back.querySelector('#cb-migrate-yes').onclick = () => {
+            try{ localStorage.setItem('caja.install.id.v1', _originIid); }catch(_){}
+            try{
+              const originLic = (_origin && _origin.license_key) || '';
+              if(originLic){
+                const curLic = (function(){ try{return JSON.parse(localStorage.getItem('caja.license.v1')||'null')||{};}catch(_){return {};} })();
+                if(!curLic.key && !curLic.license_key){
+                  localStorage.setItem('caja.license.v1', JSON.stringify({ key: originLic }));
+                }
+              }
+            }catch(_){}
+            alert(`✅ Migración completa · ${restored} elementos recuperados + estadísticas SMS del servidor intactas.\n\nLa app se recargará ahora.`);
+            location.reload();
+          };
+          back.querySelector('#cb-migrate-no').onclick = async () => {
+            let smsMsg = '';
+            if(_smsSnap && window.mcSmsBackup && window.mcSmsBackup.apply){
+              try{
+                const res = await window.mcSmsBackup.apply(_smsSnap);
+                if(res && res.ok){
+                  const nc = res.campaigns_restored||0, nu = res.usage_periods_restored||0;
+                  if(nc || nu) smsMsg = `\n📱 Estadísticas SMS re-atadas: ${nc} campañas · ${nu} meses.`;
+                }
+              }catch(_){}
+            }
+            alert(`✅ Restauración completa · ${restored} elementos recuperados.${smsMsg}\n\nLa app se recargará ahora.`);
+            location.reload();
+          };
+          return;
+        }
+        // 📱 Restaurar SMS al servidor sota l'install_id ACTUAL (cas no migració)
+        let smsMsg = '';
+        if(_smsSnap && window.mcSmsBackup && window.mcSmsBackup.apply){
+          try{
+            const res = await window.mcSmsBackup.apply(_smsSnap);
+            if(res && res.ok){
+              const nc = res.campaigns_restored||0, nu = res.usage_periods_restored||0;
+              if(nc || nu) smsMsg = `\n📱 Estadísticas SMS: ${nc} campañas · ${nu} meses de consumo restaurados.`;
+            }
+          }catch(_){}
+        }
+        alert(`✅ Restauración completa · ${restored} elementos recuperados de la copia del ${dateHuman}.${smsMsg}\n\nLa app se recargará ahora.`);
         location.reload();
       }catch(err){
         alert('❌ Error inesperado: ' + (err && err.message || err));

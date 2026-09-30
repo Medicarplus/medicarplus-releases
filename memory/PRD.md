@@ -1,4 +1,33 @@
 # MediCar Plus · PRD (Product Requirements Document)
+## 2026-09-30 · MIGRACIÓN DE PC + SMS EN COPIAS · 84 tests PASADOS
+
+**Escenario del usuario:** "si mi cliente cambia de ordenador (voluntario o avería), no debe perder ni un dato. La copia debe llevar TODO — SMS, citas, contabilidad — y restaurar exactamente igual."
+
+**Cambios:**
+1. **Backend endpoints nuevos** (`/app/backend/routes/sms_campaigns.py`):
+   - `GET /api/sms/backup-export?install_id=X` — exporta todas las campañas + consumo mensual del install_id (público, sin admin token)
+   - `POST /api/sms/backup-import` — recibe {install_id, campaigns[], usage[]} y hace UPSERT re-etiquetando al install_id destino (permite migración a nuevo PC)
+2. **Frontend** (`/app/frontend/public/v2.html`):
+   - `_fullBackupData()` ahora incluye `__origin__` (install_id + license_key + hostname + timestamp) para detectar cambio de PC
+   - Nuevos helpers `window.mcSmsBackup.fetch()` y `.apply()` expuestos globalmente
+   - `sendCloudBackup()` incluye `__server_sms__` (snapshot server SMS) en cada copia
+   - `#btnExport` (copia local JSON) ahora guarda **las 18 claves completas** (antes solo 6 legacy) + `__server_sms__` + `__origin__`
+   - **Modal de MIGRACIÓN** cuando el install_id origen ≠ actual: usuario elige entre "Migrar todo a este PC" (copia install_id origen, SMS/licencia intactas) o "Solo restaurar en este PC" (mantiene install_id nuevo, re-ata SMS)
+   - Aplicado tanto en restore local (`#btnImportJson`) como en el cloud recovery banner al arrancar
+3. **Manual usuario** (`manual-usuari.html`): sección nueva "¿Cómo cambio de ordenador sin perder datos?"
+
+**Tests:**
+- `test_backup_e2e.py`: **59 OK / 0 FAIL** (12 tests, incluye 4 nuevos: SMS export vacío, roundtrip, validación 400, E2E con migración completa)
+- `backup_roundtrip.js`: **18/18 claves idénticas byte-a-byte**, contabilidad 1967.69€=1967.69€, saldos E1+E2 idénticos
+- **Simulación migración**: 25/25 checks OK (3 años de datos + 10 campañas SMS + 9 meses consumo → todo intacto tras cambio de PC)
+
+**Colecciones server ligadas a install_id que sobreviven a migración:**
+- `sms_campaigns`, `sms_usage_medicar` (arrastradas en la copia como `__server_sms__`)
+- `licenses`, `subscriptions`, `installations` (sobreviven porque al MIGRAR se copia el install_id origen, sin necesidad de re-atar)
+
+---
+
+
 ## 2026-02-28 · Test E2E backup completo · 23/23 PASADOS
 
 **Creado `/app/backend/tests/test_backup_e2e.py`** con 8 tests que cubren TODOS los escenarios contra el backend real.

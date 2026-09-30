@@ -124,6 +124,8 @@ def _doc_to_record(doc: dict, include_key: bool = False) -> LicenseRecord:
         abuse_flags=doc.get("abuse_flags") if isinstance(doc.get("abuse_flags"), list) else None,
         message_count=int(doc.get("message_count", 0) or 0),
         last_message_at=_to_dt(doc.get("last_message_at")),
+        synthetic_master=bool(doc.get("_synthetic_master") or doc.get("synthetic_master")) or None,
+        placeholder=bool(doc.get("_placeholder") or doc.get("placeholder")) or None,
         license_key=doc.get("license_key") if include_key else None,
     )
 

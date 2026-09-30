@@ -553,8 +553,26 @@
       <br>• Entradas de Tráfico y Revisiones de <b>todos los años</b>
       <br>• Autoescolas con conteos mensuales de todos los años (2008 en adelante)
       <br>• IRPF, saldo inicial de ambas empresas, reserva de cambio, cuadre, configuración, citas.
-      <br>Solo se dejan fuera: ID de instalación, licencia y datos de Twilio (específicos de tu PC).</p>
+      <br>• 📱 <b>Estadísticas SMS del servidor</b>: campañas enviadas + consumo mensual (Feb 2026).
+      <br>• 🖥️ <b>Identificador de instalación</b> del ordenador origen (para migrar de PC sin perder nada).
+      <br>Solo se dejan fuera: datos de Twilio propios (credenciales) que se recuperan re-configurando en el nuevo PC.</p>
     <p style="margin:10px 0 0;font-size:12px"><b>¿Y si falla el wifi al enviar?</b> La app reintenta 4 veces con espera creciente (30s, 2min, 5min, 10min). Si aún así falla, guarda la copia en cola local y la vuelve a enviar al próximo arranque. <b>Nunca se pierde una copia.</b></p>
+  </div>
+
+  <h3>❓ ¿Cómo cambio de ordenador sin perder datos? (migración)</h3>
+  <div class="callout callout-green"><b>Es sencillo · Feb 2026</b>
+    <ol style="margin:10px 0 0">
+      <li>En el <b>ordenador viejo</b>, pulsa <b>💾 Copias de seguridad → Guardar copia</b> y guarda el fichero en un pendrive (o Google Drive / Dropbox / OneDrive). También sirve la copia diaria automática que ya tienes en la nube.</li>
+      <li>Instala MediCar Plus en el <b>ordenador nuevo</b>.</li>
+      <li>Al abrirlo, si la copia estaba en la nube, aparece un banner <b>"☁️ Recuperar copia de la nube"</b> — haz clic. Si tienes el fichero JSON, pulsa <b>📂 Restaurar copia</b> y selecciónalo.</li>
+      <li>La app detecta automáticamente que la copia viene de <b>otro ordenador</b> y te pregunta:
+        <ul style="margin-top:8px">
+          <li><b>✅ SÍ, migrar todo a este PC (recomendado)</b> — copia el identificador de instalación del ordenador viejo. Tu <b>licencia</b>, tus <b>estadísticas SMS</b> y tu <b>suscripción</b> siguen intactas sin re-atar nada. Es como si el ordenador nuevo <b>fuera</b> el viejo.</li>
+          <li><b>📥 NO, solo restaurar en este PC</b> — mantiene el identificador nuevo y re-etiqueta las campañas SMS antiguas al nuevo identificador. Útil si quieres tener <b>dos ordenadores independientes</b> (ej: segunda oficina).</li>
+        </ul>
+      </li>
+    </ol>
+    <b style="color:#059669">Resultado:</b> zero pérdida de datos · caja, autoescolas, SMS, citas, IRPF, saldo inicial, reserva… todo <b>al céntimo</b> como estaba.
   </div>
 
   <h3>❓ ¿Cómo restauro una copia?</h3>
@@ -563,7 +581,7 @@
     <li>Si has perdido los datos y sólo tienes tu proveedor: pídele que te envíe la última copia. Él la baja de su panel admin y te la manda como fichero. Restauras como en el punto 1.</li>
     <li>Si viene la app con datos vacíos, aparece automáticamente un banner <b>"☁️ Recuperar copia de la nube"</b> ofreciéndote la última copia que enviaste desde este PC.</li>
   </ol>
-  <p style="font-size:12px">Al restaurar, los datos quedan <b>exactamente</b> como estaban en la copia — al céntimo, apunte por apunte. Está probado con test automatizado que verifica ~30.000 filas de 3 años y confirma que no cambia ni un byte.</p>
+  <p style="font-size:12px">Al restaurar, los datos quedan <b>exactamente</b> como estaban en la copia — al céntimo, apunte por apunte. Está probado con test automatizado que verifica ~30.000 filas de 3 años y confirma que no cambia ni un byte. La restauración también arrastra las <b>estadísticas SMS</b> del servidor y ofrece <b>migrar el identificador</b> si vienes de otro ordenador.</p>
 
   <h3>❓ ¿El chip "IRPF" del Debe/Haber está vinculado a la sección 📋 IRPF?</h3>
   <div class="callout callout-blue"><b>No.</b> Son dos sistemas <b>independientes</b>:

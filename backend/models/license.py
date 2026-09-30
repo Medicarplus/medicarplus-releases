@@ -126,6 +126,10 @@ class LicenseRecord(BaseModel):
     # Stats agregados (Feb 2026 · Panel admin)
     message_count: Optional[int] = 0
     last_message_at: Optional[datetime] = None
+    # 👑 Marcador de registre sintètic MASTER (owner) · Feb 2026
+    #   Permet al panell admin distingir aquesta fila i mostrar un badge especial.
+    synthetic_master: Optional[bool] = None
+    placeholder: Optional[bool] = None
     # La clau JWT — es retorna només al moment de generar-la. En verificar
     # només retornem metadades.
     license_key: Optional[str] = None

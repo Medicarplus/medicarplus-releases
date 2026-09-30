@@ -310,6 +310,205 @@ def test_size_limits(res):
         cleanup_install(install_id)
 
 
+def test_sms_backup_export_empty(res):
+    """9. SMS backup-export sin datos → devuelve arrays vacíos"""
+    print('\n📱 Test 9: SMS backup-export sin datos')
+    install_id = f'TEST-SMS-EMPTY-{uuid.uuid4().hex[:8]}'
+    try:
+        r = _get(f'/api/sms/backup-export?install_id={install_id}')
+        res.check(r.get('install_id') == install_id, f'install_id retornat correcte')
+        res.check(r.get('campaigns') == [], 'campaigns list vacía')
+        res.check(r.get('usage') == [], 'usage list vacía')
+        res.check(r.get('count') == 0, 'count=0')
+    finally:
+        pass
+
+
+def test_sms_backup_roundtrip(res):
+    """10. SMS backup export → import re-atado a install_id nuevo (migración)"""
+    print('\n🔁 Test 10: SMS backup roundtrip con migración install_id')
+    install_a = f'TEST-SMS-A-{uuid.uuid4().hex[:8]}'
+    install_b = f'TEST-SMS-B-{uuid.uuid4().hex[:8]}'
+    try:
+        # 1) POST import: inject 3 campaigns + 2 months usage bajo install_a
+        payload = {
+            'install_id': install_a,
+            'campaigns': [
+                {'id': f'camp1-{install_a}', 'name': 'Campanya Març', 'created_at': '2026-03-01',
+                 'sent_count': 12, 'error_count': 1, 'filtered_invalid': 0,
+                 'contacts': [{'name': 'Pere', 'phone': '600111222', 'status': 'sent'}]},
+                {'id': f'camp2-{install_a}', 'name': 'Campanya Abril', 'created_at': '2026-04-05',
+                 'sent_count': 25, 'error_count': 0, 'contacts': []},
+                {'id': f'camp3-{install_a}', 'name': 'Campanya Maig', 'created_at': '2026-05-10',
+                 'sent_count': 7, 'error_count': 2, 'contacts': []},
+            ],
+            'usage': [
+                {'period': '2026-03', 'sent_count': 12},
+                {'period': '2026-04', 'sent_count': 25},
+            ],
+        }
+        r = _post('/api/sms/backup-import', payload)
+        res.check(r.get('ok') is True, 'import ok=True')
+        res.check(r.get('campaigns_restored') == 3, f'3 campanyes restaurades (rec: {r.get("campaigns_restored")})')
+        res.check(r.get('usage_periods_restored') == 2, f'2 mesos consum restaurats (rec: {r.get("usage_periods_restored")})')
+
+        # 2) Export desde install_a → debe traer las 3
+        got_a = _get(f'/api/sms/backup-export?install_id={install_a}')
+        res.check(len(got_a.get('campaigns', [])) == 3, f'export install_a → 3 campanyes ({len(got_a.get("campaigns", []))})')
+        res.check(len(got_a.get('usage', [])) == 2, f'export install_a → 2 usage')
+
+        # Nombres esperados (los 3 nombres) → verifica que están todos (set-compare)
+        names_a = sorted([c['name'] for c in got_a['campaigns']])
+        expected = sorted(['Campanya Abril', 'Campanya Març', 'Campanya Maig'])
+        res.check(names_a == expected,
+                  f'noms recuperats coincideixen: {names_a}')
+
+        # Sent count total
+        sent_total_a = sum(c.get('sent_count', 0) for c in got_a['campaigns'])
+        res.check(sent_total_a == 44, f'sent_count total {sent_total_a} == 44 (12+25+7)')
+
+        # 3) MIGRACIÓN → import a install_b con el mismo payload snapshot
+        payload_b = {
+            'install_id': install_b,
+            'campaigns': got_a['campaigns'],
+            'usage': got_a['usage'],
+        }
+        r_b = _post('/api/sms/backup-import', payload_b)
+        res.check(r_b.get('ok'), 'migració ok')
+        res.check(r_b.get('campaigns_restored') == 3, '3 campanyes migrades')
+
+        # 4) Export desde install_b → debe traer las 3 re-atadas
+        got_b = _get(f'/api/sms/backup-export?install_id={install_b}')
+        res.check(len(got_b.get('campaigns', [])) == 3, f'install_b té ara les 3 campanyes')
+        names_b = sorted([c['name'] for c in got_b['campaigns']])
+        res.check(names_b == names_a, 'noms idèntics a A i B (migración completa)')
+        sent_total_b = sum(c.get('sent_count', 0) for c in got_b['campaigns'])
+        res.check(sent_total_b == sent_total_a, f'sent_count total idèntic: {sent_total_b} == {sent_total_a}')
+
+        # 5) Cero pérdida de datos numéricos por campanya
+        map_a = {c['id']: c for c in got_a['campaigns']}
+        map_b = {c['id']: c for c in got_b['campaigns']}
+        for cid, ca in map_a.items():
+            cb = map_b.get(cid)
+            if not cb:
+                res.check(False, f'campaign {cid} no trobada a install_b')
+                continue
+            res.check(ca.get('sent_count') == cb.get('sent_count'), f'sent_count[{cid}] igual')
+            res.check(ca.get('error_count') == cb.get('error_count'), f'error_count[{cid}] igual')
+    finally:
+        # Cleanup en Mongo
+        try:
+            import asyncio
+            from motor.motor_asyncio import AsyncIOMotorClient
+            from dotenv import load_dotenv
+            load_dotenv('/app/backend/.env')
+            async def _clean():
+                c = AsyncIOMotorClient(os.environ['MONGO_URL'])
+                db = c[os.environ['DB_NAME']]
+                await db.sms_campaigns.delete_many({'install_id': {'$in': [install_a, install_b]}})
+                await db.sms_usage_medicar.delete_many({'install_id': {'$in': [install_a, install_b]}})
+            asyncio.run(_clean())
+        except Exception as e:
+            print(f'  ⚠️ SMS cleanup fallado: {e}')
+
+
+def test_sms_backup_bad_input(res):
+    """11. SMS backup-import valida install_id obligatori"""
+    print('\n🛡️ Test 11: SMS backup-import validació')
+    try:
+        r = requests.post(f'{API_URL}/api/sms/backup-import',
+                          json={'install_id': '', 'campaigns': [], 'usage': []}, timeout=10)
+        res.check(r.status_code == 400, f'HTTP 400 sense install_id (rebut {r.status_code})')
+    except Exception as e:
+        res.check(False, f'excepció inesperada: {e}')
+
+
+def test_full_cloud_backup_with_sms_and_migration(res):
+    """12. E2E complet: cloud backup + snapshot SMS embegut + migració install_id"""
+    print('\n🎯 Test 12: Cloud backup complet amb SMS + migració')
+    install_old = f'TEST-MIG-OLD-{uuid.uuid4().hex[:8]}'
+    install_new = f'TEST-MIG-NEW-{uuid.uuid4().hex[:8]}'
+    try:
+        # 1) Sembrem SMS al servidor sota install_old
+        _post('/api/sms/backup-import', {
+            'install_id': install_old,
+            'campaigns': [
+                {'id': f'mig-c1-{install_old}', 'name': 'C1', 'sent_count': 5, 'created_at': '2026-01-01'},
+                {'id': f'mig-c2-{install_old}', 'name': 'C2', 'sent_count': 10, 'created_at': '2026-02-01'},
+            ],
+            'usage': [{'period': '2026-01', 'sent_count': 5}, {'period': '2026-02', 'sent_count': 10}],
+        })
+
+        # 2) Export SMS del server (simula el fetch del client abans de guardar còpia)
+        sms_snapshot = _get(f'/api/sms/backup-export?install_id={install_old}')
+        res.check(len(sms_snapshot['campaigns']) == 2, 'SMS snapshot té 2 campanyes')
+
+        # 3) Client crea còpia núvol amb data + __server_sms__ + __origin__ embegut
+        data = fixture_realistic()
+        data['__server_sms__'] = {'campaigns': sms_snapshot['campaigns'], 'usage': sms_snapshot['usage']}
+        data['__origin__'] = {'install_id': install_old, 'license_key': MASTER_KEY, 'exported_at': datetime.now().isoformat()}
+        b64, raw_size, gz_size = compress_gz_b64(data)
+        r = _post('/api/sync/cloudbackup/send', {
+            'license_key': MASTER_KEY,
+            'install_id': install_old,
+            'data_gz_b64': b64,
+            'label': 'test-migration',
+        })
+        res.check(r.get('ok'), 'còpia núvol enviada')
+        backup_id = r['backup_id']
+
+        # 4) Ordinador NOU (install_new) restaura la còpia
+        got = _get(f'/api/sync/cloudbackup/get?license_key={MASTER_KEY}&install_id={install_old}&backup_id={backup_id}')
+        restored = got['data']
+        res.check('__server_sms__' in restored, 'còpia porta __server_sms__ embegut')
+        res.check('__origin__' in restored, 'còpia porta __origin__ metadata')
+        res.check(restored['__origin__']['install_id'] == install_old, 'origin.install_id correcte')
+
+        # 5) Simulem "MIGRAR" · re-inject SMS a install_new i verifiquem que campanyes estan re-atades
+        sms_data = restored['__server_sms__']
+        r_mig = _post('/api/sms/backup-import', {
+            'install_id': install_new,
+            'campaigns': sms_data['campaigns'],
+            'usage': sms_data['usage'],
+        })
+        res.check(r_mig.get('campaigns_restored') == 2, 'migració SMS: 2 campanyes')
+
+        # 6) Verify: install_new té les campanyes ara
+        got_new = _get(f'/api/sms/backup-export?install_id={install_new}')
+        res.check(len(got_new['campaigns']) == 2, 'install_new té 2 campanyes migrades')
+        names_new = sorted([c['name'] for c in got_new['campaigns']])
+        res.check(names_new == ['C1', 'C2'], 'noms de campanyes idèntics després de migració')
+        sent_new = sum(c.get('sent_count', 0) for c in got_new['campaigns'])
+        res.check(sent_new == 15, f'sent_count total {sent_new} == 15 (5+10)')
+
+        # 7) Verify: la caja (contabilitat) també ha sobreviscut a través del backup
+        res.check(restored.get('caja.v1'), 'caja.v1 recuperat')
+        res.check(restored.get('caja.saldoInicial.trafic.v1'), 'saldo inicial E1 recuperat')
+        res.check(restored.get('caja.config.v1'), 'config empresa recuperat')
+        # Comptem entrades del dia
+        caja = json.loads(restored['caja.v1']) if isinstance(restored['caja.v1'], str) else restored['caja.v1']
+        # data['caja.v1'] al fixture és string json; però al GET pot venir com dict; suportem tots dos
+        if isinstance(caja, str):
+            caja = json.loads(caja)
+        res.check(len(caja['byDate']['2026-02-28']['rows']) == 2, '2 entrades del dia 28 conservades')
+    finally:
+        cleanup_install(install_old)
+        cleanup_install(install_new)
+        try:
+            import asyncio
+            from motor.motor_asyncio import AsyncIOMotorClient
+            from dotenv import load_dotenv
+            load_dotenv('/app/backend/.env')
+            async def _clean():
+                c = AsyncIOMotorClient(os.environ['MONGO_URL'])
+                db = c[os.environ['DB_NAME']]
+                await db.sms_campaigns.delete_many({'install_id': {'$in': [install_old, install_new]}})
+                await db.sms_usage_medicar.delete_many({'install_id': {'$in': [install_old, install_new]}})
+            asyncio.run(_clean())
+        except Exception as e:
+            print(f'  ⚠️ Migration cleanup fallado: {e}')
+
+
 # ─────────────────────────────────────────────────────────────────────
 def main():
     print('════════════════════════════════════════════════════════════════')
@@ -328,6 +527,10 @@ def main():
         test_integrity_sha256,
         test_rotation,
         test_size_limits,
+        test_sms_backup_export_empty,
+        test_sms_backup_roundtrip,
+        test_sms_backup_bad_input,
+        test_full_cloud_backup_with_sms_and_migration,
     ]
     for t in tests:
         try:
