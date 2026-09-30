@@ -1,4 +1,33 @@
 # MediCar Plus · PRD (Product Requirements Document)
+## 2026-02-28 · Fix bug crítico "Cannot read properties of null (reading 'replace')"
+
+**Reporte usuario:** cliente TRIAL pulsa el botón "☁️ Enviar copia AHORA a la nube" y sale toast rojo `"Error enviando copia: Cannot read properties of null (reading 'replace')"`.
+
+**Root cause:** condición de carrera en el boot:
+1. `mcSync.init()` se ejecuta con delays de 2.5s, 5s, 10s, 20s, 40s.
+2. El disparador auto de cloud backup y el botón manual pueden dispararse ANTES de que `init()` haya completado.
+3. Cuando `sendCloudBackup()` corre sin init → `cfg.apiBase` es `null`.
+4. La función `_url()` hace `cfg.apiBase.replace(/\/$/,'')` → **TypeError null.replace**.
+
+**Fix aplicado en `v2.html`:**
+
+1. **`_url()` fallback multi-nivel:** si `cfg.apiBase` es null, usa `window.API_BASE` → `location.origin` (si es http/https) → cadena vacía. Consistente con el patrón que ya usa `getApiUrl()` en otras partes.
+
+2. **`sendCloudBackup()` auto-completa cfg:** si `licenseKey`/`installId`/`apiBase` están vacíos, los intenta leer de localStorage antes de rechazar. Devuelve mensaje humano en lugar de romper:
+   - Sin licencia → `{ok:false, error:'Sin licencia activada · abre la app y activa una clave primero'}`
+   - Sin install_id → `{ok:false, error:'Falta install_id · recarga la app (Ctrl+Shift+R)'}`
+
+**Verificación runtime:**
+- Llamada a `sendCloudBackup` en preview (sin activar licencia) devuelve el mensaje humano en lugar del crash ✓
+- Round-trip backup pasa ✓
+- Tests contables pasan ✓
+
+**Comportamiento correcto ahora:**
+- Cliente TRIAL sin problemas de init → envío OK.
+- Cliente TRIAL con init retrasado → envío OK (fallbacks recuperan la config).
+- Cliente sin licencia (imposible en app activa) → mensaje claro en toast en vez de crash.
+
+
 ## 2026-02-28 · MASTER (owner) también envía y aparece en el panel admin
 
 **Petición:** el usuario admin usa el programa también en su propio centro con MASTER key. Necesita verse a sí mismo en su panel admin para poder restaurar sus propias copias si pierde datos.

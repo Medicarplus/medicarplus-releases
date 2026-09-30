@@ -236,7 +236,19 @@
   let autosyncTimer = null;
   let currentMode = 'independent';
   let currentPeers = [];
-  const _url = (p) => `${cfg.apiBase.replace(/\/$/,'')}${p}`;
+  const _url = (p) => {
+    // 🔧 Feb 2026 · guard robusto: si init() aún no corrió (race con auto-trigger de
+    //   cloudbackup al boot, o botón manual pulsado muy pronto), cae en fallbacks:
+    //   window.API_BASE (definido globalmente) → location.origin → cadena vacía.
+    //   Sin este guard, cfg.apiBase=null → .replace() lanza "Cannot read properties of null".
+    let base = cfg.apiBase;
+    if(!base){
+      if(typeof window !== 'undefined' && window.API_BASE) base = window.API_BASE;
+      else if(typeof location !== 'undefined' && location.origin && location.origin !== 'null' && !location.origin.startsWith('file:')) base = location.origin;
+      else base = '';
+    }
+    return `${(base||'').replace(/\/$/,'')}${p}`;
+  };
   const _headers = { 'Content-Type': 'application/json' };
   async function _post(path, body){
     const r = await fetch(_url(path), { method:'POST', headers:_headers, body: JSON.stringify(body) });
@@ -502,6 +514,22 @@
     return out;
   }
   async function sendCloudBackup(label){
+    // 🔧 Feb 2026 · Guard robusto para modo TRIAL/STD antes de que init() haya corrido.
+    //   Fallback: leemos licencia/installId directamente de localStorage si cfg está vacío.
+    if(!cfg.licenseKey){
+      try{
+        const lic = JSON.parse(localStorage.getItem('caja.license.v1')||'null');
+        if(lic && (lic.key || lic.license_key)) cfg.licenseKey = lic.key || lic.license_key;
+      }catch(_){}
+    }
+    if(!cfg.installId){
+      cfg.installId = localStorage.getItem('caja.install.id.v1') || '';
+    }
+    if(!cfg.apiBase){
+      cfg.apiBase = (typeof location !== 'undefined' ? location.origin : '');
+    }
+    if(!cfg.licenseKey) return { ok:false, error:'Sin licencia activada · abre la app y activa una clave primero' };
+    if(!cfg.installId)  return { ok:false, error:'Falta install_id · recarga la app (Ctrl+Shift+R)' };
     const data = _fullBackupData();
     return await _post('/api/sync/cloudbackup/send', { license_key: cfg.licenseKey, install_id: cfg.installId, data, label: label || 'auto-daily' });
   }

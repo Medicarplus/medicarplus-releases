@@ -1335,6 +1335,40 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             query["status"] = status_filter
         cursor = coll.find(query, {"_id": 0}).sort("created_at", -1).limit(limit)
         docs = await cursor.to_list(limit)
+        # 👑 Feb 2026 · Inyectar entradas sintéticas del propio MASTER (owner)
+        #   para que aparezcan en el panel admin. El MASTER no está en `db.licenses`
+        #   (validación offline con MASTER_KEY hardcodeada), así que se lee de
+        #   `sync_devices` cada install_id que haya enviado alguna copia a la nube.
+        try:
+            import hashlib as _hashlib
+            MASTER_KEY_LITERAL = "MB-MASTER-BRUGULAT-2026-OWNER"
+            master_lkh = _hashlib.sha256(MASTER_KEY_LITERAL.encode()).hexdigest()
+            master_devices = await db["sync_devices"].find(
+                {"license_key_hash": master_lkh},
+                {"install_id": 1, "created_at": 1, "last_seen": 1, "_id": 0},
+            ).sort("last_seen", -1).to_list(length=20)
+            for md in master_devices:
+                iid = md.get("install_id")
+                if not iid: continue
+                # No duplicar si por alguna razón ya está en docs
+                if any(d.get("install_id") == iid for d in docs): continue
+                synthetic = {
+                    "install_id": iid,
+                    "client_name": "👑 MediCar Plus (owner)",
+                    "client_email": "owner@medicarplus.es",
+                    "plan": "MASTER",
+                    "status": "active",
+                    "created_at": md.get("created_at") or _now(),
+                    "expires_at": None,
+                    "duration_days": None,
+                    "notes": "Cuenta propia del proveedor (MASTER key). No está en la DB de licencias — se muestra a partir de sync_devices para poder acceder a sus copias en la nube.",
+                    "last_verified_at": md.get("last_seen"),
+                    "verify_count": 0,
+                    "_synthetic_master": True,
+                }
+                docs.insert(0, synthetic)  # va al principio de la lista
+        except Exception:  # noqa: BLE001
+            logger.exception("failed to inject master entries")
         # Enriquece cada licencia con message_count agregado desde support_messages
         try:
             iids = [d.get("install_id") for d in docs if d.get("install_id")]
