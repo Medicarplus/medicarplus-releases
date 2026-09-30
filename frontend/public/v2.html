@@ -1119,6 +1119,7 @@ const DATA_LS_KEYS = [
   'caja.calendar.status.v1',          // Estado de citas
   'caja.calendar.urls.v1',            // URLs ICS de calendarios configuradas por el usuario
   'caja.count_zero',                  // Toggle "Contar 0€"
+  'caja.tarifas.rules.v1',            // 💰 Reglas de tarifas personalizadas (patrón + importe → nombre)
 ];
 // 🌐 Exponer al scope global para que la sync IIFE (definida arriba) pueda usarla en backups
 try{ window.DATA_LS_KEYS = DATA_LS_KEYS; }catch(_){}
@@ -5967,11 +5968,120 @@ const _btnStatE2 = document.getElementById('btnStatEmpresa2'); if(_btnStatE2) _b
 // 🏥 Normalizador de sinónimos para TIPOS de Empresa 2 (revisiones deportivas)
 // Une variantes de escritura al mismo canónico. Ej: P.esforç, Prueba esfuerzo,
 // Prova esforç → "Prueba de esfuerzo".
+// 💰 SISTEMA DE TARIFAS PERSONALIZADAS · Feb 2026
+//   Permite al usuario definir sus PROPIAS reglas para clasificar apuntes.
+//   Cada regla combina hasta 3 criterios (tipo/grupo/importe) y asigna un
+//   NOMBRE personalizado. Ej: "Expedición + Conducción + 66,50€ → Canje".
+//   Otros centros pueden crear sus propias reglas ("Reposició → Recuperación", etc.)
+//
+//   Formato de regla:
+//     { id, tipos:['Expedición','Expedició'], grupos:['Conducción'],
+//       importeExacto: 66.50,  // o bien:
+//       importeMin: 60, importeMax: 70,
+//       resultado: 'Canje' }
+window._getTariffRules = function(){
+  try{
+    const raw = localStorage.getItem('caja.tarifas.rules.v1');
+    if(raw){
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr)) return arr;
+    }
+  }catch(_){}
+  // 🌱 Seed inicial · si nunca se configuró, incluir la regla histórica del
+  //   centro del owner (Canje 66,50€) para no romper la detección existente.
+  //   Otros centros pueden borrarla y añadir las suyas.
+  const seed = [{
+    id: 'canje-default',
+    tipos: ['Expedición','Expedició','Obtención','Obtenció'],
+    grupos: ['Conducción','Conducció'],
+    importeExacto: 66.50,
+    importeMin: null, importeMax: null,
+    resultado: 'Canje',
+    notes: 'Regla por defecto · edítala o bórrala si tu centro cobra distinto.',
+  }];
+  try{ localStorage.setItem('caja.tarifas.rules.v1', JSON.stringify(seed)); }catch(_){}
+  return seed;
+};
+window._saveTariffRules = function(rules){
+  try{
+    if(!Array.isArray(rules)) return false;
+    const clean = rules.filter(r => r && (r.resultado||'').trim()).map(r => ({
+      id: r.id || ('r-'+Date.now()+'-'+Math.random().toString(36).slice(2,7)),
+      tipos: Array.isArray(r.tipos) ? r.tipos.filter(x => x && x.trim()) : [],
+      grupos: Array.isArray(r.grupos) ? r.grupos.filter(x => x && x.trim()) : [],
+      importeExacto: (r.importeExacto != null && r.importeExacto !== '') ? +r.importeExacto : null,
+      importeMin: (r.importeMin != null && r.importeMin !== '') ? +r.importeMin : null,
+      importeMax: (r.importeMax != null && r.importeMax !== '') ? +r.importeMax : null,
+      resultado: String(r.resultado||'').trim(),
+      notes: String(r.notes||'').trim(),
+    }));
+    localStorage.setItem('caja.tarifas.rules.v1', JSON.stringify(clean));
+    return true;
+  }catch(_){ return false }
+};
+// Aplica las reglas a un apunte · retorna el nombre del `resultado` de la
+// regla que mejor encaja (más criterios definidos = más específica gana).
+window._matchTariffRule = function(entry){
+  if(!entry) return null;
+  const rules = window._getTariffRules() || [];
+  if(!rules.length) return null;
+  const tipoN = (entry.tipo||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const grupoN = (entry.grupo||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const imp = +entry.importe || 0;
+  let best = null; let bestScore = -1;
+  for(const r of rules){
+    if(!r.resultado) continue;
+    let score = 0;
+    // Tipos (opcional): si hay al menos uno definido, DEBE coincidir alguno
+    if(Array.isArray(r.tipos) && r.tipos.length){
+      const anyMatch = r.tipos.some(t => {
+        const tn = String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+        if(!tn) return false;
+        return tipoN.includes(tn) || tipoN.startsWith(tn.slice(0,4)); // permisivo: substring o prefijo 4 chars
+      });
+      if(!anyMatch) continue;
+      score += 2;
+    }
+    // Grupos (opcional): si hay definidos, DEBE coincidir alguno
+    if(Array.isArray(r.grupos) && r.grupos.length){
+      const anyMatch = r.grupos.some(g => {
+        const gn = String(g||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+        if(!gn) return false;
+        return grupoN.includes(gn);
+      });
+      if(!anyMatch) continue;
+      score += 2;
+    }
+    // Importe: exacto (con 1 céntimo de tolerancia) o rango
+    if(r.importeExacto != null && r.importeExacto !== ''){
+      if(Math.abs(imp - r.importeExacto) > 0.005) continue;
+      score += 3;
+    } else if((r.importeMin != null && r.importeMin !== '') || (r.importeMax != null && r.importeMax !== '')){
+      const lo = (r.importeMin != null && r.importeMin !== '') ? +r.importeMin : -Infinity;
+      const hi = (r.importeMax != null && r.importeMax !== '') ? +r.importeMax : Infinity;
+      if(imp < lo || imp > hi) continue;
+      score += 1;
+    }
+    // Si no había NI tipo NI grupo NI importe definidos, la regla no aplica
+    // (queremos evitar que una regla vacía capture todo por accidente).
+    if(score === 0) continue;
+    if(score > bestScore){ bestScore = score; best = r; }
+  }
+  return best ? best.resultado : null;
+};
 // 🔄 Canje automático: si es Expedición/Obtención + Grupo Conducción + 66,50€ → cuenta como Canje.
 // (Regla exacta: los canjes de carnet siempre son de Conducción — otros grupos NO son canjes).
 // Función virtual (no modifica el entry guardado, solo devuelve el tipo efectivo para stats).
 window._effectiveTipo = function(e){
   if(!e || e.kind !== 'TRAF') return e && e.tipo;
+  // 💰 PRIORIDAD 1: reglas de tarifas personalizadas configuradas por el usuario
+  try{
+    const custom = window._matchTariffRule(e);
+    if(custom) return custom;
+  }catch(_){}
+  // 🔄 PRIORIDAD 2 (fallback histórico): Canje 66,50€ Conducción · se conserva
+  //   por compatibilidad si el usuario borra TODAS sus reglas y no tiene ninguna
+  //   custom. Si ha configurado reglas propias, esta línea nunca actúa.
   const tipoNorm = (e.tipo||'').toString().toLowerCase();
   const grupoNorm = (e.grupo||'').toString().toLowerCase();
   const imp = +e.importe || 0;
@@ -14969,6 +15079,16 @@ function showConfigWizard(isFirstRun){
     +'<button id="cfgOpenNovedades" type="button" data-testid="cfg-open-novedades" style="padding:9px 14px;background:linear-gradient(135deg,#f97316,#c2410c);color:#fff;border:none;border-radius:8px;font-family:Georgia,serif;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap">'+L('Veure novetats','Ver novedades')+'</button>'
     +'</div>'
     +'</div>'
+    // 💰 Feb 2026 · Tarifas personalizadas · opcional · cada centro crea sus propios patrones
+    +'<div style="background:#0a1f2a;border:1px solid #14b8a6;border-radius:10px;padding:14px;margin-bottom:22px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">'
+    +'<div>'
+    +'<label style="font-size:11px;color:#14b8a6;letter-spacing:1.5px;font-weight:700">💰 '+L('TARIFES PERSONALITZADES (opcional)','TARIFAS PERSONALIZADAS (opcional)')+'</label>'
+    +'<div style="font-size:12px;color:#94a3b8;margin-top:6px;line-height:1.5">'+L('Crea patrons per detectar automàticament classes al importar CSV. Ex: <b>Expedició + Conducció + 66,50€ → Canvi</b>. Opcional; si no ho configures, res canvia.','Crea patrones para detectar automáticamente clases al importar CSV. Ej: <b>Expedición + Conducción + 66,50€ → Canje</b>. Opcional; si no lo configuras, nada cambia.')+'</div>'
+    +'</div>'
+    +'<button id="cfgOpenTariffs" type="button" data-testid="cfg-open-tariffs" style="padding:9px 14px;background:linear-gradient(135deg,#14b8a6,#0f766e);color:#fff;border:none;border-radius:8px;font-family:Georgia,serif;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap">'+L('Configurar-les','Configurarlas')+'</button>'
+    +'</div>'
+    +'</div>'
     +'<div id="cfgErr" style="color:#ef4444;font-size:12px;margin-bottom:12px;display:none"></div>'
     +'<div style="display:flex;gap:10px;justify-content:'+(isFirstRun?'center':'flex-end')+'">'
     +(!isFirstRun?'<button id="cfgCancel" style="padding:12px 22px;background:transparent;border:1.5px solid #64748b;border-radius:8px;color:#cbd5e1;cursor:pointer;font-family:Georgia,serif">'+L('Cancel·la','Cancelar')+'</button>':'')
@@ -15072,6 +15192,14 @@ function showConfigWizard(isFirstRun){
       try{ showWhatsNew(true); }catch(e){ console.warn('showWhatsNew', e); }
     };
   }
+  // 💰 Tarifas personalizadas · Feb 2026
+  const cfgOpenTariffs = back.querySelector('#cfgOpenTariffs');
+  if(cfgOpenTariffs){
+    cfgOpenTariffs.onclick = ()=>{
+      try{ if(typeof openTariffsEditor === 'function') openTariffsEditor(); }
+      catch(e){ console.warn('openTariffsEditor', e); }
+    };
+  }
   const save=()=>{
     const n1=back.querySelector('#cfgC1').value.trim();
     const n2=back.querySelector('#cfgC2').value.trim();
@@ -15096,6 +15224,150 @@ function showConfigWizard(isFirstRun){
   const cancel=back.querySelector('#cfgCancel');
   if(cancel)cancel.onclick=()=>back.remove();
 }
+
+// ============================================================================
+// 💰 EDITOR DE TARIFAS PERSONALIZADAS · Feb 2026
+// ============================================================================
+// Permite al usuario crear/editar/eliminar reglas que clasifican apuntes.
+// Cada regla combina: tipos + grupos + importe (exacto o rango) → nombre resultado.
+// Se guarda en localStorage bajo `caja.tarifas.rules.v1` y se incluye en copias.
+// ============================================================================
+function openTariffsEditor(){
+  const isCA = (typeof currentLang !== 'undefined' && currentLang === 'ca');
+  const L = (ca, es) => isCA ? ca : es;
+  let rules = (window._getTariffRules() || []).map(r => Object.assign({}, r));
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:100003;backdrop-filter:blur(8px);padding:20px;overflow-y:auto';
+  const renderRow = (r, idx) => {
+    const tipos = Array.isArray(r.tipos) ? r.tipos.join(', ') : '';
+    const grupos = Array.isArray(r.grupos) ? r.grupos.join(', ') : '';
+    const iExact = (r.importeExacto != null && r.importeExacto !== '') ? r.importeExacto : '';
+    const iMin = (r.importeMin != null && r.importeMin !== '') ? r.importeMin : '';
+    const iMax = (r.importeMax != null && r.importeMax !== '') ? r.importeMax : '';
+    return `<div class="tariff-row" data-idx="${idx}" style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px;margin-bottom:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
+        <div>
+          <label style="display:block;font-size:10px;color:#94a3b8;letter-spacing:1px;margin-bottom:4px">${L('SI TIPUS CONTÉ','SI TIPO CONTIENE')} <span style="color:#64748b;font-weight:400">${L('(opcional · separa amb coma)','(opcional · separa con coma)')}</span></label>
+          <input data-testid="tariff-tipos-${idx}" type="text" value="${tipos.replace(/"/g,'&quot;')}" placeholder="${L('Ex: Expedició, Expedición, Obtención','Ej: Expedición, Expedició, Obtención')}" data-field="tipos" style="width:100%;box-sizing:border-box;padding:8px;background:#141821;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:12.5px">
+        </div>
+        <div>
+          <label style="display:block;font-size:10px;color:#94a3b8;letter-spacing:1px;margin-bottom:4px">${L('I GRUP CONTÉ','Y GRUPO CONTIENE')} <span style="color:#64748b;font-weight:400">${L('(opcional)','(opcional)')}</span></label>
+          <input data-testid="tariff-grupos-${idx}" type="text" value="${grupos.replace(/"/g,'&quot;')}" placeholder="${L('Ex: Conducció, Conducción','Ej: Conducción, Conducció')}" data-field="grupos" style="width:100%;box-sizing:border-box;padding:8px;background:#141821;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:12.5px">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:8px">
+        <div>
+          <label style="display:block;font-size:10px;color:#94a3b8;letter-spacing:1px;margin-bottom:4px">${L('IMPORT EXACTE €','IMPORTE EXACTO €')}</label>
+          <input data-testid="tariff-exact-${idx}" type="number" step="0.01" value="${iExact}" placeholder="66.50" data-field="importeExacto" style="width:100%;box-sizing:border-box;padding:8px;background:#141821;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:12.5px;text-align:right">
+        </div>
+        <div>
+          <label style="display:block;font-size:10px;color:#94a3b8;letter-spacing:1px;margin-bottom:4px">${L('O RANG MÍN €','O RANGO MÍN €')}</label>
+          <input data-testid="tariff-min-${idx}" type="number" step="0.01" value="${iMin}" placeholder="60" data-field="importeMin" style="width:100%;box-sizing:border-box;padding:8px;background:#141821;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:12.5px;text-align:right">
+        </div>
+        <div>
+          <label style="display:block;font-size:10px;color:#94a3b8;letter-spacing:1px;margin-bottom:4px">${L('RANG MÀX €','RANGO MÁX €')}</label>
+          <input data-testid="tariff-max-${idx}" type="number" step="0.01" value="${iMax}" placeholder="70" data-field="importeMax" style="width:100%;box-sizing:border-box;padding:8px;background:#141821;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:Georgia,serif;font-size:12.5px;text-align:right">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
+        <div>
+          <label style="display:block;font-size:10px;color:#14b8a6;letter-spacing:1px;margin-bottom:4px;font-weight:700">→ ${L('CLASSIFICA COM','CLASIFICAR COMO')}</label>
+          <input data-testid="tariff-resultado-${idx}" type="text" value="${(r.resultado||'').replace(/"/g,'&quot;')}" placeholder="${L('Ex: Canvi, Traspàs, Pràctica…','Ej: Canje, Traspaso, Práctica…')}" data-field="resultado" style="width:100%;box-sizing:border-box;padding:9px;background:#0a1f2a;border:1px solid #14b8a6;border-radius:6px;color:#f0fdfa;font-family:Georgia,serif;font-size:13.5px;font-weight:700" maxlength="40">
+        </div>
+        <button data-testid="tariff-delete-${idx}" type="button" data-action="delete" style="padding:9px 12px;background:#7f1d1d;color:#fecaca;border:1px solid #ef4444;border-radius:6px;cursor:pointer;font-family:Georgia,serif;font-size:12px;height:36px">🗑 ${L('Eliminar','Eliminar')}</button>
+      </div>
+    </div>`;
+  };
+  const render = () => {
+    const list = back.querySelector('#tariffList');
+    if(!list) return;
+    if(!rules.length){
+      list.innerHTML = `<div style="text-align:center;color:#64748b;padding:30px;font-style:italic;font-size:13px">${L('No hi ha cap regla configurada. Fes clic a « + Afegir regla » per crear la primera.','No hay ninguna regla configurada. Haz clic en « + Añadir regla » para crear la primera.')}</div>`;
+      return;
+    }
+    list.innerHTML = rules.map((r, i) => renderRow(r, i)).join('');
+    // Bind eventos
+    list.querySelectorAll('[data-field]').forEach(el => {
+      el.oninput = (e) => {
+        const row = e.target.closest('.tariff-row');
+        const idx = parseInt(row.dataset.idx, 10);
+        const field = e.target.dataset.field;
+        let v = e.target.value;
+        if(field === 'tipos' || field === 'grupos'){
+          rules[idx][field] = v.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+        } else if(field === 'importeExacto' || field === 'importeMin' || field === 'importeMax'){
+          rules[idx][field] = v === '' ? null : (+v);
+        } else {
+          rules[idx][field] = v;
+        }
+      };
+    });
+    list.querySelectorAll('[data-action="delete"]').forEach(el => {
+      el.onclick = (e) => {
+        const row = e.currentTarget.closest('.tariff-row');
+        const idx = parseInt(row.dataset.idx, 10);
+        if(confirm(L('¿Eliminar aquesta regla?','¿Eliminar esta regla?'))){
+          rules.splice(idx, 1);
+          render();
+        }
+      };
+    });
+  };
+  back.innerHTML = `<div style="background:linear-gradient(135deg,#0f2027,#0a1a24);border:2px solid #14b8a6;border-radius:16px;padding:26px;max-width:820px;width:100%;max-height:92vh;overflow:auto;color:#e2e8f0;font-family:Georgia,serif;box-shadow:0 20px 60px rgba(0,0,0,.6)">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:12px">
+      <div>
+        <h2 style="margin:0;color:#14b8a6;font-size:22px">💰 ${L('Tarifes personalitzades','Tarifas personalizadas')}</h2>
+        <p style="color:#94a3b8;margin:8px 0 0;font-size:12.5px;line-height:1.55">${L('Cada regla combina fins a 3 filtres (tipus, grup, import) i classifica el resultat com el nom que triïs. La regla més específica guanya. Si esborres totes les regles, l\'app torna al comportament original.','Cada regla combina hasta 3 filtros (tipo, grupo, importe) y clasifica el resultado como el nombre que elijas. La regla más específica gana. Si borras todas las reglas, la app vuelve al comportamiento original.')}</p>
+      </div>
+      <button data-testid="tariffs-close" id="tariffsClose" type="button" style="background:none;border:none;color:#94a3b8;font-size:26px;cursor:pointer;padding:0 4px;line-height:1">×</button>
+    </div>
+    <div style="background:#0e1a2e;border:1px solid #1e293b;border-radius:8px;padding:12px 14px;font-size:12px;color:#93c5fd;line-height:1.65;margin-bottom:16px">
+      💡 <b>${L('Com funciona','Cómo funciona')}:</b> ${L('Al importar un CSV o afegir manualment un apunte, l\'app comprova si coincideix amb alguna regla teva. Si sí, la usa per classificar-lo a l\'estadística. Si no, deixa el tipus com estava. Els filtres accepten variants d\'idioma (ex: escriu «Expedició, Expedición» separats per coma).','Al importar un CSV o añadir manualmente un apunte, la app comprueba si coincide con alguna regla tuya. Si sí, la usa para clasificarlo en la estadística. Si no, deja el tipo como estaba. Los filtros aceptan variantes de idioma (ej: escribe «Expedición, Expedició» separados por coma).')}
+    </div>
+    <div id="tariffList" style="margin-bottom:14px"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px">
+      <button data-testid="tariff-add" id="tariffAdd" type="button" style="padding:10px 16px;background:linear-gradient(135deg,#14b8a6,#0f766e);color:#fff;border:none;border-radius:8px;font-family:Georgia,serif;font-size:13px;font-weight:700;cursor:pointer">+ ${L('Afegir regla','Añadir regla')}</button>
+      <div>
+        <button data-testid="tariffs-cancel" id="tariffsCancel" type="button" style="padding:10px 18px;background:transparent;color:#cbd5e1;border:1.5px solid #64748b;border-radius:8px;cursor:pointer;font-family:Georgia,serif;margin-right:8px">${L('Cancel·lar','Cancelar')}</button>
+        <button data-testid="tariffs-save" id="tariffsSave" type="button" style="padding:10px 24px;background:linear-gradient(135deg,#f5b301,#d97706);color:#0f172a;border:none;border-radius:8px;font-family:Georgia,serif;font-size:14px;font-weight:800;cursor:pointer">✓ ${L('Desar','Guardar')}</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(back);
+  render();
+  back.querySelector('#tariffAdd').onclick = () => {
+    rules.push({
+      id: 'r-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),
+      tipos: [], grupos: [], importeExacto: null, importeMin: null, importeMax: null,
+      resultado: '',
+    });
+    render();
+    // Focus el nou camp «resultat»
+    setTimeout(() => {
+      const inputs = back.querySelectorAll('[data-field="resultado"]');
+      if(inputs.length) inputs[inputs.length-1].focus();
+    }, 50);
+  };
+  back.querySelector('#tariffsClose').onclick = () => back.remove();
+  back.querySelector('#tariffsCancel').onclick = () => back.remove();
+  back.querySelector('#tariffsSave').onclick = () => {
+    // Validar: cada regla ha de tenir «resultado» + almenys 1 criteri (tipus/grup/import)
+    const invalid = rules.find(r => {
+      const hasCrit = (Array.isArray(r.tipos) && r.tipos.length) || (Array.isArray(r.grupos) && r.grupos.length) || (r.importeExacto != null && r.importeExacto !== '') || (r.importeMin != null && r.importeMin !== '') || (r.importeMax != null && r.importeMax !== '');
+      return !(r.resultado||'').trim() || !hasCrit;
+    });
+    if(invalid){
+      alert(L('⚠️ Cada regla ha de tenir un nom («Classifica com…») i almenys un criteri (tipus, grup o import).','⚠️ Cada regla debe tener un nombre («Clasificar como…») y al menos un criterio (tipo, grupo o importe).'));
+      return;
+    }
+    window._saveTariffRules(rules);
+    back.remove();
+    try{ toast('💰 '+L('Tarifes desades. Es re-classificaran a partir d\'ara.','Tarifas guardadas. Se reclasificarán a partir de ahora.'), 4500); }catch(_){}
+    try{ if(typeof render==='function') render(); }catch(_){}
+  };
+}
+try{ window.openTariffsEditor = openTariffsEditor; }catch(_){}
 // ============================================================================
 // NETEJA COMERCIAL (v3) · elimina metges pre-cargats de instal·lacions antigues
 // ============================================================================
