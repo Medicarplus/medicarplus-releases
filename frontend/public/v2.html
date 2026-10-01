@@ -262,7 +262,9 @@
   }
   const SYNC_EXCLUDE_PREFIXES = ['caja.saldoInicial.','caja.install.','caja.sync.','caja.license.','caja.plan.preview.','caja.apibase.','caja.__sync','caja.cuadre.'];
   function _isSyncable(k){
-    if(!k || !k.startsWith('caja.')) return false;
+    if(!k) return false;
+    // 🎯 Oct 2026 · Acepta claves de datos: caja.*, migration.*, integrity.*
+    if(!k.startsWith('caja.') && !k.startsWith('migration.') && !k.startsWith('integrity.')) return false;
     for(const p of SYNC_EXCLUDE_PREFIXES){ if(k.startsWith(p)) return false; }
     return true;
   }
@@ -587,7 +589,12 @@
     try{
       for(let i = 0; i < localStorage.length; i++){
         const k = localStorage.key(i);
-        if(!k || !k.startsWith('caja.')) continue;
+        if(!k) continue;
+        // 🎯 Oct 2026 · Prefijos de datos que SÍ viajan en la copia:
+        //   · caja.*            → datos operativos y configuración
+        //   · migration.*       → backups de migración entre versiones (131 KB · histórico)
+        //   · integrity.*       → snapshots de integridad para auditoría
+        if(!k.startsWith('caja.') && !k.startsWith('migration.') && !k.startsWith('integrity.')) continue;
         if(k in out) continue;
         if(excl.includes(k)) continue;
         const raw = localStorage.getItem(k);
@@ -11095,7 +11102,7 @@ $('#jsonInput').onchange=async ev=>{
         //   Así se restauran datos aunque estén en claves nuevas que aún no aparecen
         //   en DATA_LS_KEYS (auto-descubrimiento simétrico al backup).
         const _excluded = (window.BACKUP_EXCLUDE_KEYS||[]).includes(k);
-        const _accepted = DATA_LS_KEYS.includes(k) || (k.startsWith('caja.') && !_excluded);
+        const _accepted = DATA_LS_KEYS.includes(k) || ((k.startsWith('caja.') || k.startsWith('migration.') || k.startsWith('integrity.')) && !_excluded);
         if(!_accepted) continue;
         const v = obj.data[k];
         if(v === null || v === undefined || v === '') continue;
