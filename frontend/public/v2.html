@@ -16473,7 +16473,7 @@ document.addEventListener('keydown', function(ev){
         📦 <b>Esta copia contiene:</b><br>${linea.join(' · ')}
       </div>`;
     }
-    back.innerHTML = `<div class="modal" style="max-width:560px"><div style="text-align:center;margin-bottom:12px"><div style="font-size:44px">📨</div><h3 style="margin:8px 0 6px;color:#f5b301;font-family:Georgia,serif">Copia pendiente de restaurar</h3><p style="color:#94a3b8;font-size:13px;line-height:1.55;margin:0">Recibiste una copia del otro ordenador${backup.label?` (<i>${backup.label}</i>)`:''} enviada <b data-testid="backup-banner-reltime" style="color:#22c55e">${rel}</b> (${new Date(backup.created_at).toLocaleString('es-ES')}).</p><p style="color:#64748b;font-size:11.5px;margin:6px 0 0;font-style:italic">Siempre se muestra la copia más reciente enviada; las anteriores quedan descartadas.</p></div>${previewHtml}<div style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35);border-radius:8px;padding:12px;color:#bfdbfe;font-size:12.5px;line-height:1.55;margin:14px 0">✅ Se hará <b>fusión sin duplicados</b>: solo se añadirá lo que TÚ no tengas. Nada se sobrescribe.</div><div style="display:flex;gap:8px"><button id="bkApply" data-testid="backup-banner-apply" style="flex:1;padding:12px;background:linear-gradient(135deg,#22c55e,#15803d);color:#fff;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">✅ Aplicar copia (fusionar)</button><button id="bkLater" data-testid="backup-banner-later" style="padding:12px 18px;background:#1e293b;color:#94a3b8;border:1px solid #475569;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">Más tarde</button></div></div>`;
+    back.innerHTML = `<div class="modal" style="max-width:560px"><div style="text-align:center;margin-bottom:12px"><div style="font-size:44px">📨</div><h3 style="margin:8px 0 6px;color:#f5b301;font-family:Georgia,serif">Copia pendiente de restaurar</h3><p style="color:#94a3b8;font-size:13px;line-height:1.55;margin:0">Recibiste una copia del otro ordenador${backup.label?` (<i>${backup.label}</i>)`:''} enviada <b data-testid="backup-banner-reltime" style="color:#22c55e">${rel}</b> (${new Date(backup.created_at).toLocaleString('es-ES')}).</p><p style="color:#64748b;font-size:11.5px;margin:6px 0 0;font-style:italic">Siempre se muestra la copia más reciente enviada; las anteriores quedan descartadas.</p></div>${previewHtml}<div style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35);border-radius:8px;padding:12px;color:#bfdbfe;font-size:12.5px;line-height:1.55;margin:14px 0">✅ Se hará <b>fusión sin duplicados</b>: solo se añadirá lo que TÚ no tengas. Nada se sobrescribe.</div><div style="display:flex;gap:8px"><button id="bkApply" data-testid="backup-banner-apply" style="flex:1;padding:12px;background:linear-gradient(135deg,#22c55e,#15803d);color:#fff;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">✅ Aplicar copia (fusionar)</button><button id="bkReject" data-testid="backup-banner-reject" style="padding:12px 14px;background:#1e293b;color:#f87171;border:1px solid #ef4444;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer" title="Descartar esta copia · no volverá a aparecer">❌ Rechazar</button><button id="bkLater" data-testid="backup-banner-later" style="padding:12px 14px;background:#1e293b;color:#94a3b8;border:1px solid #475569;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer" title="Volver a mostrar en el próximo inicio">⏱️ Más tarde</button></div></div>`;
     document.body.appendChild(back);
     back.querySelector('#bkApply').onclick = async () => {
       const btn = back.querySelector('#bkApply');
@@ -16512,6 +16512,22 @@ document.addEventListener('keydown', function(ev){
         btn.disabled = false; btn.textContent = '✅ Aplicar copia (fusionar)';
         const errDiv = back.querySelector('#bkApplyErr') || (()=>{ const d=document.createElement('div'); d.id='bkApplyErr'; d.setAttribute('data-testid','backup-apply-error'); d.style.cssText='color:#f87171;font-size:12px;font-weight:700;text-align:center;margin-top:10px'; btn.parentElement.insertAdjacentElement('afterend', d); return d; })();
         errDiv.textContent = '⚠️ Error al aplicar: ' + (e && e.message ? e.message : 'inténtalo de nuevo') + '. Nada se ha perdido, vuelve a intentarlo.';
+      }
+    };
+    back.querySelector('#bkReject').onclick = async () => {
+      // 🚨 Oct 2026 · Rechazar copia · consume el backup en el server sin aplicar nada,
+      //   así no vuelve a salir en próximos inicios. Confirmación simple para evitar errores.
+      const sure = confirm('¿Rechazar esta copia?\n\nSe descartará y NO volverá a aparecer. Tus datos actuales NO se modifican.');
+      if(!sure) return;
+      const btn = back.querySelector('#bkReject');
+      btn.disabled = true; btn.textContent = '⏳ Rechazando…';
+      try{
+        await window.mcSync.consumeBackup(backup.backup_id);
+        _bkBannerId = null; back.remove();
+        try{ if(typeof toast==='function') toast('❌ Copia rechazada · no volverá a aparecer'); }catch(_){}
+      }catch(e){
+        btn.disabled = false; btn.textContent = '❌ Rechazar';
+        alert('No se pudo rechazar: ' + (e && e.message ? e.message : 'inténtalo de nuevo'));
       }
     };
     back.querySelector('#bkLater').onclick = () => { _bkSnoozedId = backup.backup_id; _bkBannerId = null; back.remove(); };
