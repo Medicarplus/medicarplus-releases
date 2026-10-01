@@ -530,16 +530,17 @@
     return out;
   }
   async function sendBackup(label, opts){
-    // 🚨 Oct 2026 · El emisor SIEMPRE envía TODO. El receptor fusiona sin duplicados
-    //   con _mergeSnapshots (anti-duplicación verificada en 25+ tests). Antes había
-    //   un filtro "Solo día" que descartaba autoescuelas/IRPF/tarifas · bug reportado.
-    const data = _snapshotLocalStorage();
+    let data = _snapshotLocalStorage();
+    const scope = opts && opts.scope;
     const day = opts && opts.day;
     let finalLabel = label || null;
-    // Si venía scope=day, solo cambiamos la etiqueta visual · el payload es completo.
-    if(opts && opts.scope === 'day' && day){
+    if(scope === 'day' && day){
+      // 🎯 Oct 2026 · "Solo día" filtra los APUNTES DIARIOS (CSV) de ese día,
+      //   pero el resto (autoescuelas, IRPF, tarifas, config, aliases, calendarios,
+      //   saldos, reservas) viaja ÍNTEGRO para no perder nunca datos nuevos.
+      data = _filterSnapshotByDay(data, day);
       const dayHuman = day.split('-').reverse().join('/');
-      finalLabel = (label ? label + ' · ' : '') + 'Marcado día ' + dayHuman;
+      finalLabel = (label ? label + ' · ' : '') + 'Solo día ' + dayHuman;
     }
     return await _post('/api/sync/backup/send', { license_key: cfg.licenseKey, install_id: cfg.installId, data, label: finalLabel });
   }
