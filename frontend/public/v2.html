@@ -2218,6 +2218,7 @@ function openStats(initialSection){
       <button class="btn btn-primary" id="stPrint">📥 ${isCA?'Descarregar PDF':'Descargar PDF'}</button>
       <button class="btn" data-no>✕ ${isCA?'Tancar':'Cerrar'}</button>
     </div>
+    <div id="stDedupBanner" data-testid="st-dedup-banner" style="display:none"></div>
     <div id="stBody" style="flex:1;overflow:auto" data-testid="st-body"></div>
     <div id="stFooterHint" class="small" style="margin-top:8px;color:var(--muted)">💡 ${isCA?'Fes clic en qualsevol casella per editar. Els totals es calculen automàticament.':'Haz clic en cualquier casilla para editar. Los totales se calculan automáticamente.'}</div>
   </div>`;
@@ -2497,7 +2498,15 @@ function openStats(initialSection){
       }
     }
     const pairs=[];
-    // Union-Find: agrupa todas las variantes y cada no-canónica apunta al root (max certs)
+    // Union-Find: agrupa todas las variantes y cada no-canónica apunta al root.
+    //   Ganador = quien tenga MÁS MESES con datos (prioridad) → MÁS certs → nombre más largo.
+    //   Así el histórico A.E.MABEL (8 meses) gana sobre MABEL (1 mes) aunque empaten certs.
+    const _rank=(n)=>[(monthsOf[n]||0), (totals[n]||0), (n||'').length];
+    const _betterRoot=(a,b)=>{
+      const ra=_rank(a), rb=_rank(b);
+      for(let i=0;i<ra.length;i++){ if(ra[i]!==rb[i]) return ra[i]>rb[i]?a:b; }
+      return a;
+    };
     const uf={}; list.forEach(n=>uf[n]=n);
     const find=(x)=>{ while(uf[x]!==x){ uf[x]=uf[uf[x]]; x=uf[x]; } return x; };
     for(let i=0;i<list.length;i++){
@@ -2505,8 +2514,9 @@ function openStats(initialSection){
         if(_similarity(list[i], list[j])<0.80)continue;
         const ra=find(list[i]), rb=find(list[j]);
         if(ra===rb)continue;
-        const [w,l] = (totals[ra]||0) >= (totals[rb]||0) ? [ra,rb] : [rb,ra];
-        uf[l]=w;
+        const winner=_betterRoot(ra,rb);
+        const loser=winner===ra?rb:ra;
+        uf[loser]=winner;
       }
     }
     for(const n of list){
@@ -2588,10 +2598,49 @@ function openStats(initialSection){
       m.remove();
       renderTable();
       refreshUndoBtn();
+      refreshDedupBanner();
       toast(isCA?`✅ Fusionats ${checked.length} duplicats`:`✅ Fusionados ${checked.length} duplicados`, 3500);
     };
   };
+  // 🧠 Oct 2026 · Scan proactivo de duplicados al abrir el panel + tras cada import/fusión.
+  //   Si detecta pares (sim ≥ 0.80), muestra un banner no intrusivo con botón directo.
+  const _scanDupPairs=()=>{
+    const stX=loadStats();
+    const list=(stX.autoescoles||[]).slice();
+    if(list.length<2)return 0;
+    const uf={}; list.forEach(n=>uf[n]=n);
+    const find=(x)=>{ while(uf[x]!==x){ uf[x]=uf[uf[x]]; x=uf[x]; } return x; };
+    for(let i=0;i<list.length;i++){
+      for(let j=i+1;j<list.length;j++){
+        if(_similarity(list[i], list[j])<0.80)continue;
+        const ra=find(list[i]), rb=find(list[j]);
+        if(ra!==rb) uf[list[j]]=ra;
+      }
+    }
+    let count=0;
+    for(const n of list){ if(find(n)!==n) count++; }
+    return count;
+  };
+  const refreshDedupBanner=()=>{
+    const banner=back.querySelector('#stDedupBanner');
+    if(!banner)return;
+    const n=_scanDupPairs();
+    if(n>0){
+      banner.style.display='block';
+      banner.innerHTML=`<div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.4);border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:18px">💡</span>
+        <span style="color:#a7f3d0;font-size:13px;line-height:1.45;flex:1;min-width:200px">${isCA?`Hem detectat <b>${n}</b> autoescola(es) que semblen duplicades (per exemple MABEL i A.E.MABEL). Pots fusionar-les d'un clic.`:`Hemos detectado <b>${n}</b> autoescuela(s) que parecen duplicadas (por ejemplo MABEL y A.E.MABEL). Puedes fusionarlas de un clic.`}</span>
+        <button class="btn" data-dedup-banner-open style="background:#10b981;color:#042f2e;border-color:#10b981;font-weight:700;padding:6px 14px">🧹 ${isCA?'Fusionar':'Fusionar'}</button>
+      </div>`;
+      const btn=banner.querySelector('[data-dedup-banner-open]');
+      if(btn) btn.onclick=()=>back.querySelector('#stDedup').click();
+    }else{
+      banner.style.display='none';
+      banner.innerHTML='';
+    }
+  };
   refreshUndoBtn();
+  refreshDedupBanner();
   // 📥 Cargar histórico DESDE EL EXCEL DEL CLIENTE (feb 2026)
   // Cada cliente sube su propio archivo .xls/.xlsx con varias hojas (una por año).
   // El parser detecta automáticamente:
@@ -2920,8 +2969,19 @@ function openStats(initialSection){
       if(isMasterOwner && STAT_ALIAS[rawU])return false;
       // El nom canònic tal com quedaria (raw normalitzat) no és present a la llista actual
       const canon=canonicalName(rawU);
-      return !st.autoescoles.includes(canon);
+      if(st.autoescoles.includes(canon))return false;
+      // 🧠 Oct 2026 · Auto-match fuzzy ≥90% contra las existentes: si hay match claro
+      //   (MABEL≡A.E.MABEL, DAINA≡A.E.DAINA, LLUÇANES≡LLUCANÈS, M2≡A.E.M-2, AVANÇADA≡AVANÇA)
+      //   se asigna automáticamente SIN mostrar el modal de revisión.
+      const auto=_bestMatch(rawU, st.autoescoles, 0.90);
+      if(auto){
+        clientMap[rawU]=auto.name;      // guarda el alias para futuros imports
+        return false;                     // ya no es "new"
+      }
+      return true;
     });
+    // Persistir los alias auto-detectados antes del review/apply
+    saveStatsAliases(clientMap);
     const applyImport=()=>{
       // Reagrupar per canonical després que l'usuari hagi confirmat mappings
       const cm=loadStatsAliases();
@@ -3482,7 +3542,7 @@ function openStats(initialSection){
       margins:'6mm',
       extraCss:`
         @page { size: A4 landscape; margin: 6mm }
-        button, select, input, [data-no], #stSectionSwitch, .icon-btn, [data-del], #stFooterHint, #stImport, #stAdd, #stClearAll, #stDeleteMonth, #stDedup, #stUndo, #stChart { display:none !important }
+        button, select, input, [data-no], #stSectionSwitch, .icon-btn, [data-del], #stFooterHint, #stImport, #stAdd, #stClearAll, #stDeleteMonth, #stDedup, #stUndo, #stChart, #stDedupBanner { display:none !important }
         body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important }
         .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important }
         .modal{ padding:4mm !important; max-width:none !important; width:100% !important }
