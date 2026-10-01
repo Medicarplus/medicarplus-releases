@@ -261,10 +261,16 @@
     return r.json();
   }
   const SYNC_EXCLUDE_PREFIXES = ['caja.saldoInicial.','caja.install.','caja.sync.','caja.license.','caja.plan.preview.','caja.apibase.','caja.__sync','caja.cuadre.'];
+  // 🔒 Oct 2026 · Claves excluidas EXACT MATCH del sync entre PCs (NO del backup en nube).
+  //   caja.irpf.v1 · El IRPF es faena de la secretaria/gestor local, el gerente no la toca.
+  //                 Se queda en el PC que lo gestiona y NO se propaga en el sync diario.
+  //                 Sí se incluye en el cloud backup (DATA_LS_KEYS) para restaurar en caso
+  //                 de pérdida en el mismo PC.
+  const SYNC_EXCLUDE_EXACT = new Set(['caja.irpf.v1']);
   function _isSyncable(k){
     if(!k) return false;
-    // 🎯 Oct 2026 · Acepta claves de datos: caja.*, migration.*, integrity.*
     if(!k.startsWith('caja.') && !k.startsWith('migration.') && !k.startsWith('integrity.')) return false;
+    if(SYNC_EXCLUDE_EXACT.has(k)) return false;
     for(const p of SYNC_EXCLUDE_PREFIXES){ if(k.startsWith(p)) return false; }
     return true;
   }
@@ -507,10 +513,13 @@
   function _filterSnapshotByDay(snap, dayIso){
     // 🚨 Oct 2026 · FIX CRÍTICO · "Solo día" filtra apuntes/datáfono POR ESE DÍA
     //   pero los datos HISTÓRICOS y la CONFIGURACIÓN viajan SIEMPRE enteros.
-    //   Antes se perdían las autoescuelas (caja.stats.v1), IRPF, tarifas, config,
+    //   Antes se perdían las autoescuelas (caja.stats.v1), tarifas, config,
     //   aliases, calendarios y saldos iniciales cuando se enviaba un solo día.
+    // 🔒 Oct 2026 · caja.irpf.v1 EXCLUIDO · es faena de la secretaria local,
+    //   el gerente no la toca. Si llega aquí (defensa en profundidad), se descarta.
     const out = {};
     Object.entries(snap || {}).forEach(([k, v]) => {
+      if(k === 'caja.irpf.v1') return;  // 🔒 NO se envía al gerente
       // Empresa 1 / Empresa 2 (byDate arrays) → SOLO el día
       if(k === 'caja.v1' || k === 'caja.cempla.v1'){
         const bd = (v && v.byDate) || {};
@@ -524,7 +533,7 @@
         return;
       }
       // 🎯 TODO LO DEMÁS (histórico + configuración) VIAJA ÍNTEGRO:
-      //   caja.stats.v1 (autoescuelas 1998-2026 · 343 meses), caja.irpf.v1,
+      //   caja.stats.v1 (autoescuelas 1998-2026 · 343 meses),
       //   caja.tarifas.rules.v1, caja.config.v1, aliases/overrides, calendarios,
       //   caja.reserva.*, caja.saldoInicial.*, caja.cuadre.*, count_zero, etc.
       out[k] = v;
@@ -17417,6 +17426,9 @@ document.addEventListener('keydown', function(ev){
             const k = localStorage.key(i);
             // Excluye claves locales (saldoInicial, install_id, sync, license, plan preview)
             if(!k || !k.startsWith('caja.')) continue;
+            // 🔒 Oct 2026 · caja.irpf.v1 excluido · faena de la secretaria/gestor,
+            //   no viaja al gerente. Sí se guarda en cloud backup para restaurar.
+            if(k === 'caja.irpf.v1') continue;
             if(k.startsWith('caja.saldoInicial.') || k.startsWith('caja.install.') ||
                k.startsWith('caja.sync.') || k.startsWith('caja.license.') ||
                k.startsWith('caja.apibase.') || k.startsWith('caja.__sync') ||
