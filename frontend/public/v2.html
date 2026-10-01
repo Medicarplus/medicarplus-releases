@@ -503,35 +503,43 @@
   // caja.v1.byDate[date], caja.cempla.v1.byDate[date], datáfono[date] y cempla.datafono[date].
   // Reserva de cambio se envía completa (cajón físico único).
   function _filterSnapshotByDay(snap, dayIso){
+    // 🚨 Oct 2026 · FIX CRÍTICO · "Solo día" filtra apuntes/datáfono POR ESE DÍA
+    //   pero los datos HISTÓRICOS y la CONFIGURACIÓN viajan SIEMPRE enteros.
+    //   Antes se perdían las autoescuelas (caja.stats.v1), IRPF, tarifas, config,
+    //   aliases, calendarios y saldos iniciales cuando se enviaba un solo día.
     const out = {};
     Object.entries(snap || {}).forEach(([k, v]) => {
-      // Empresa 1 / Empresa 2 (byDate arrays)
+      // Empresa 1 / Empresa 2 (byDate arrays) → SOLO el día
       if(k === 'caja.v1' || k === 'caja.cempla.v1'){
         const bd = (v && v.byDate) || {};
         const oneDay = bd[dayIso] ? { [dayIso]: bd[dayIso] } : {};
         out[k] = Object.assign({}, v, { byDate: oneDay });
         return;
       }
-      // Datáfono por fecha (dict {fecha: importe})
+      // Datáfono por fecha (dict {fecha: importe}) → SOLO ese día
       if(k === 'caja.datafono' || k === 'caja.cempla.datafono'){
         if(v && typeof v === 'object' && v[dayIso] !== undefined) out[k] = { [dayIso]: v[dayIso] };
         return;
       }
-      // Reserva de cambio → siempre entera (cajón físico único)
-      if(k === 'caja.reserva.v1' || k === 'caja.cempla.reserva.v1'){ out[k] = v; return; }
-      // Todo lo demás (stats agregadas, irpf, saldos, config…) → NO se envía al enviar "solo un día"
+      // 🎯 TODO LO DEMÁS (histórico + configuración) VIAJA ÍNTEGRO:
+      //   caja.stats.v1 (autoescuelas 1998-2026 · 343 meses), caja.irpf.v1,
+      //   caja.tarifas.rules.v1, caja.config.v1, aliases/overrides, calendarios,
+      //   caja.reserva.*, caja.saldoInicial.*, caja.cuadre.*, count_zero, etc.
+      out[k] = v;
     });
     return out;
   }
   async function sendBackup(label, opts){
-    let data = _snapshotLocalStorage();
-    const scope = opts && opts.scope;
+    // 🚨 Oct 2026 · El emisor SIEMPRE envía TODO. El receptor fusiona sin duplicados
+    //   con _mergeSnapshots (anti-duplicación verificada en 25+ tests). Antes había
+    //   un filtro "Solo día" que descartaba autoescuelas/IRPF/tarifas · bug reportado.
+    const data = _snapshotLocalStorage();
     const day = opts && opts.day;
     let finalLabel = label || null;
-    if(scope === 'day' && day){
-      data = _filterSnapshotByDay(data, day);
+    // Si venía scope=day, solo cambiamos la etiqueta visual · el payload es completo.
+    if(opts && opts.scope === 'day' && day){
       const dayHuman = day.split('-').reverse().join('/');
-      finalLabel = (label ? label + ' · ' : '') + 'Solo día ' + dayHuman;
+      finalLabel = (label ? label + ' · ' : '') + 'Marcado día ' + dayHuman;
     }
     return await _post('/api/sync/backup/send', { license_key: cfg.licenseKey, install_id: cfg.installId, data, label: finalLabel });
   }
@@ -16749,19 +16757,11 @@ document.addEventListener('keydown', function(ev){
                k.startsWith('caja.plan.preview.')) continue;
             try{ data[k] = JSON.parse(localStorage.getItem(k)); }catch(e){ data[k] = localStorage.getItem(k); }
           }
-          // Filtrar por día si procede (mismo criterio que sendBackup)
+          // 🚨 Oct 2026 · SIEMPRE envía TODO. Receptor fusiona sin duplicar.
+          //   El flag scope=day solo añade una etiqueta visual, NO filtra el payload.
+          //   Fix del bug reportado: antes "Solo día" descartaba autoescuelas/stats.
           if(admScope==='day' && admDay){
-            const filtered = {};
-            Object.entries(data).forEach(([k,v])=>{
-              if(k==='caja.v1' || k==='caja.cempla.v1'){
-                const bd=(v&&v.byDate)||{}; const oneDay = bd[admDay]?{[admDay]:bd[admDay]}:{};
-                filtered[k] = Object.assign({},v,{byDate:oneDay});
-              } else if(k==='caja.datafono' || k==='caja.cempla.datafono'){
-                if(v && typeof v==='object' && v[admDay]!==undefined) filtered[k] = {[admDay]:v[admDay]};
-              } else if(k==='caja.reserva.v1' || k==='caja.cempla.reserva.v1'){ filtered[k] = v; }
-              // resto se omite (stats, irpf, etc.)
-            });
-            data = filtered;
+            // NO filtrar. Solo etiqueta cambiará abajo.
           }
           // 🎯 Oct 2026 · Añadir __preview__ para que el receptor vea el desglose
           //   en el banner "Aplicar copia" + validación anti-pérdida silenciosa.
