@@ -5939,19 +5939,21 @@ function _hasExplicitGastoMarker(e){
 function _isGastoEntry(e){
   if(!e || e.kind !== 'DH' || (e.importe||0) <= 0) return false;
   if(e.tipo !== 'DEBE') return false;
-  // 1) Marca explícita "Gasto:" — regla determinista, gana siempre
-  if(_hasExplicitGastoMarker(e)) return true;
-  // 2) Detección por keywords (fallback para datos antiguos y comodidad)
-  //    Excluir si ya es un honorario detectado (sin marca explícita)
+  // 🎯 Oct 2026 · REGLA SIMPLE Y CORRECTA:
+  //   TODO lo que está en DEBE (dinero saliendo de la empresa) ES un gasto,
+  //   EXCEPTO lo que ya es un honorario (nómina/faena/colaborador autónomo).
+  //   Así cuadra siempre con el Excel del contable: factura, recibo, cuota,
+  //   impuesto, SS, bancos, material, nombres propios de proveedor (F/PULIT,
+  //   BOGADERIA, ASSOCIACIÓ ASCREME, F/OFIOSONA, F/COPY PRATS…), TODO cuenta.
+  //   Honoraris aparte: aparecen en la categoría HONORARIS con su toggle propio.
   if(typeof _isHonorarioLikeEntry === 'function' && _isHonorarioLikeEntry(e)) return false;
-  const bag = (String(e.nombre||'')+' '+String(e.tipo||'')+' '+String(e.concepto||'')+' '+String(e.grupo||''));
-  return !!_gsMatchKeyword(bag);
+  return true;
 }
 function _gsCategoryLabel(cat){
-  return {LUZ:'Luz', AGUA:'Agua', GAS:'Gas', ALQUILER:'Alquiler', TELEFONO:'Teléfono', INTERNET:'Internet', GESTORIA:'Gestoría', SEGURO:'Seguros', MATERIAL:'Material', IRPF:'IRPF', IVA:'IVA', TASAS:'Tasas', MANTENIMIENTO:'Mantenim.', COMBUSTIBLE:'Combustible', BANCO_COM:'Comisiones', OTROS:'Otros'}[cat] || cat;
+  return {LUZ:'Luz', AGUA:'Agua', GAS:'Gas', ALQUILER:'Alquiler', TELEFONO:'Teléfono', INTERNET:'Internet', GESTORIA:'Gestoría', SEGURO:'Seguros', MATERIAL:'Material', IRPF:'IRPF', IVA:'IVA', TASAS:'Tasas', MANTENIMIENTO:'Mantenim.', COMBUSTIBLE:'Combustible', BANCO_COM:'Comisiones', HONORARIS:'Honoraris/Nómina', OTROS:'Otros'}[cat] || cat;
 }
 function _gsCategoryColor(cat){
-  return {LUZ:'#fbbf24', AGUA:'#22d3ee', GAS:'#f97316', ALQUILER:'#c084fc', TELEFONO:'#3ddc97', INTERNET:'#7ec8ff', GESTORIA:'#a3e635', SEGURO:'#f472b6', MATERIAL:'#fca5a5', IRPF:'#ef4444', IVA:'#f59e0b', TASAS:'#94a3b8', MANTENIMIENTO:'#60a5fa', COMBUSTIBLE:'#e879f9', BANCO_COM:'#818cf8', OTROS:'#e2e8f0'}[cat] || '#94a3b8';
+  return {LUZ:'#fbbf24', AGUA:'#22d3ee', GAS:'#f97316', ALQUILER:'#c084fc', TELEFONO:'#3ddc97', INTERNET:'#7ec8ff', GESTORIA:'#a3e635', SEGURO:'#f472b6', MATERIAL:'#fca5a5', IRPF:'#ef4444', IVA:'#f59e0b', TASAS:'#94a3b8', MANTENIMIENTO:'#60a5fa', COMBUSTIBLE:'#e879f9', BANCO_COM:'#818cf8', HONORARIS:'#f9a8d4', OTROS:'#e2e8f0'}[cat] || '#94a3b8';
 }
 function openGastosPanel(){
   const allEntries = [];
@@ -5962,15 +5964,14 @@ function openGastosPanel(){
       const bd = raw.byDate || {};
       for(const iso of Object.keys(bd)){
         for(const e of (bd[iso]||[])){
-          if(_isGastoEntry(e)){
-            const bag2 = (e.nombre||'')+' '+(e.tipo||'')+' '+(e.concepto||'');
-            const match = _gsMatchKeyword(bag2);
-            // Si es Gasto explícito sin keyword conocido, cae en OTROS
-            const cat = match ? match.cat : (_hasExplicitGastoMarker(e) ? 'OTROS' : 'MATERIAL');
-            // Limpia el prefijo "Gasto:" del nombre mostrado para que quede legible
-            const displayName = String(e.nombre||'(sin concepto)').replace(/^\s*gasto\s*[:\-·]\s*/i,'').trim() || '(sin concepto)';
-            allEntries.push({date: iso, name: displayName, amount: +e.importe||0, company: comp, fp: e.fp||'', cat, explicit: _hasExplicitGastoMarker(e)});
-          }
+          const isGasto = _isGastoEntry(e);
+          const isHono  = e && e.kind==='DH' && e.tipo==='DEBE' && (e.importe||0)>0 && typeof _isHonorarioLikeEntry === 'function' && _isHonorarioLikeEntry(e);
+          if(!isGasto && !isHono) continue;
+          const bag2 = (e.nombre||'')+' '+(e.tipo||'')+' '+(e.concepto||'');
+          const match = _gsMatchKeyword(bag2);
+          const cat = isHono ? 'HONORARIS' : (match ? match.cat : (_hasExplicitGastoMarker(e) ? 'OTROS' : 'MATERIAL'));
+          const displayName = String(e.nombre||'(sin concepto)').replace(/^\s*gasto\s*[:\-·]\s*/i,'').trim() || '(sin concepto)';
+          allEntries.push({date: iso, name: displayName, amount: +e.importe||0, company: comp, fp: e.fp||'', cat, explicit: _hasExplicitGastoMarker(e), isHono});
         }
       }
     }catch(_){}
@@ -5999,8 +6000,14 @@ function openGastosPanel(){
   back.innerHTML = `<div class="gs-modal" style="background:#111827;border:1px solid #334155;border-radius:12px;padding:22px;max-width:960px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);font-family:Arial,Helvetica,sans-serif" data-testid="gastos-modal">
     <div class="no-print" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px">
       <div><h3 style="margin:0;color:#f472b6;font-family:Georgia,serif">🧾 Gastos · Facturas y recibos operativos</h3><div id="_gs_subtitle" style="font-size:11px;color:#94a3b8;margin-top:3px"></div></div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <label style="font-size:10px;color:#94a3b8;font-weight:700">AÑO</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:10px;color:#94a3b8;font-weight:700">EMPRESA</label>
+        <select id="_gs_comp" data-testid="gastos-company-select" style="background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;padding:6px 10px;font-size:13px">
+          <option value="trafic">${typeof _companyName==='function'?_companyName('trafic'):'TRAFIC'}</option>
+          <option value="cempla">${typeof _companyName==='function'?_companyName('cempla'):'CEMPLA'}</option>
+          <option value="__BOTH__">📊 Ambas (comparativa)</option>
+        </select>
+        <label style="font-size:10px;color:#94a3b8;font-weight:700;margin-left:6px">AÑO</label>
         <select id="_gs_year" data-testid="gastos-year-select" style="background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;padding:6px 10px;font-size:13px">
           ${allYears.map(y => `<option value="${y}" ${y===currentYear?'selected':''}>${y}</option>`).join('')}
         </select>
@@ -6009,6 +6016,9 @@ function openGastosPanel(){
           <option value="__ALL__">📆 Todo el año</option>
           ${MONTH_NAMES.map((mn,i)=>{ const mm=String(i+1).padStart(2,'0'); return `<option value="${mm}" ${mm===currentMonth?'selected':''}>${mn}</option>`; }).join('')}
         </select>
+        <label style="font-size:10px;color:#94a3b8;font-weight:700;margin-left:6px;display:flex;align-items:center;gap:5px;cursor:pointer;background:#1e293b;padding:5px 10px;border-radius:6px;border:1px solid #475569" title="Incluir honoraris, nóminas y faena en el total (como en tu Excel)">
+          <input type="checkbox" id="_gs_hono" data-testid="gastos-include-hono" checked style="width:14px;height:14px;cursor:pointer"/> Incluir honoraris
+        </label>
         <button id="_gs_print" data-testid="gastos-print" style="background:linear-gradient(135deg,#f472b6,#be185d);color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px">🖨️ Imprimir</button>
         <button id="_gs_close" data-testid="gastos-close" style="background:#334155;color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer">✕ Cerrar</button>
       </div>
@@ -6018,12 +6028,16 @@ function openGastosPanel(){
   </div>`;
   document.body.appendChild(back);
 
-  function renderBody(year, monthNum){
+  function renderBody(year, monthNum, compFilter, includeHono){
     // monthNum = '__ALL__' → todo el año | 'MM' → mes concreto
+    // compFilter = 'trafic' | 'cempla' | '__BOTH__'
+    // includeHono = true/false → cuenta honoraris, nóminas y faena como gasto
     const filtered = allEntries.filter(e => {
       if(e.date.substring(0,4) !== year) return false;
-      if(monthNum === '__ALL__') return true;
-      return e.date.substring(5,7) === monthNum;
+      if(monthNum !== '__ALL__' && e.date.substring(5,7) !== monthNum) return false;
+      if(compFilter !== '__BOTH__' && e.company !== compFilter) return false;
+      if(e.isHono && !includeHono) return false;
+      return true;
     });
     const byMonth = {};
     const byCategory = {};
@@ -6075,9 +6089,15 @@ function openGastosPanel(){
 
   const yearSel = back.querySelector('#_gs_year');
   const monthSel = back.querySelector('#_gs_month');
-  const rerender = () => renderBody(yearSel.value, monthSel.value);
+  const compSel = back.querySelector('#_gs_comp');
+  const honoChk = back.querySelector('#_gs_hono');
+  // Empresa inicial: la actual del app si existe, si no 'trafic'
+  try{ if(typeof currentCompany !== 'undefined' && (currentCompany==='trafic'||currentCompany==='cempla')) compSel.value = currentCompany; }catch(_){}
+  const rerender = () => renderBody(yearSel.value, monthSel.value, compSel.value, honoChk.checked);
   yearSel.addEventListener('change', rerender);
   monthSel.addEventListener('change', rerender);
+  compSel.addEventListener('change', rerender);
+  honoChk.addEventListener('change', rerender);
   back.querySelector('#_gs_close').onclick = () => back.remove();
   back.querySelector('#_gs_print').onclick = () => {
     const modal = back.querySelector('.gs-modal');
