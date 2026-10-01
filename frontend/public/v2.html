@@ -16765,11 +16765,25 @@ document.addEventListener('keydown', function(ev){
                k.startsWith('caja.plan.preview.')) continue;
             try{ data[k] = JSON.parse(localStorage.getItem(k)); }catch(e){ data[k] = localStorage.getItem(k); }
           }
-          // 🚨 Oct 2026 · SIEMPRE envía TODO. Receptor fusiona sin duplicar.
-          //   El flag scope=day solo añade una etiqueta visual, NO filtra el payload.
-          //   Fix del bug reportado: antes "Solo día" descartaba autoescuelas/stats.
+          // 🎯 Oct 2026 · "Solo día" filtra solo los APUNTES DIARIOS (caja.v1/cempla/datafono)
+          //   al día concreto. Autoescuelas, IRPF, tarifas, config, aliases, calendarios,
+          //   saldos y reservas viajan ÍNTEGROS siempre · el receptor fusiona sin duplicar.
           if(admScope==='day' && admDay){
-            // NO filtrar. Solo etiqueta cambiará abajo.
+            const filtered = {};
+            Object.entries(data).forEach(([k,v])=>{
+              if(k==='caja.v1' || k==='caja.cempla.v1'){
+                // Apuntes diarios: SOLO el día concreto
+                const bd=(v&&v.byDate)||{}; const oneDay = bd[admDay]?{[admDay]:bd[admDay]}:{};
+                filtered[k] = Object.assign({},v,{byDate:oneDay});
+              } else if(k==='caja.datafono' || k==='caja.cempla.datafono'){
+                // Datáfono: SOLO el día
+                if(v && typeof v==='object' && v[admDay]!==undefined) filtered[k] = {[admDay]:v[admDay]};
+              } else {
+                // Resto (histórico/configuración): ÍNTEGRO
+                filtered[k] = v;
+              }
+            });
+            data = filtered;
           }
           // 🎯 Oct 2026 · Añadir __preview__ para que el receptor vea el desglose
           //   en el banner "Aplicar copia" + validación anti-pérdida silenciosa.
