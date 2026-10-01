@@ -2212,6 +2212,7 @@ function openStats(initialSection){
       <button class="btn st-autos-only" id="stAdd">+ ${isCA?'Autoescola':'Autoescuela'}</button>
       <button class="btn st-autos-only" id="stClearAll" style="background:#7f1d1d;color:#fecaca;border-color:#b91c1c" title="${isCA?'Elimina totes les autoescoles i les seves dades':'Elimina todas las autoescuelas y sus datos'}">🗑 ${isCA?'Buidar tot':'Vaciar todo'}</button>
       <button class="btn st-autos-only" id="stDeleteMonth" data-testid="st-delete-month" style="background:#78350f;color:#fed7aa;border-color:#c2410c" title="${isCA?'Esborra només un mes concret':'Borra solo un mes concreto'}">🗓 ${isCA?'Esborrar mes':'Borrar mes'}</button>
+      <button class="btn st-autos-only" id="stDedup" data-testid="st-dedup" style="background:#1e3a5f;color:#a7f3d0;border-color:#10b981" title="${isCA?'Detecta i fusiona autoescoles duplicades':'Detecta y fusiona autoescuelas duplicadas'}">🧹 ${isCA?'Fusionar duplicats':'Fusionar duplicados'}</button>
       <button class="btn st-autos-only" id="stUndo" data-testid="st-undo" style="background:#1e293b;color:#fde68a;border-color:#f59e0b;display:none" title="${isCA?'Desfer últim canvi':'Deshacer último cambio'}">↶ ${isCA?'Desfer':'Deshacer'}</button>
       <button class="btn st-autos-only" id="stChart" data-testid="st-chart" style="background:#1e293b;border-color:#22d3ee;color:#22d3ee" title="${isCA?'Gràfic d\'evolució mensual':'Gráfico de evolución mensual'}">📈 ${isCA?'Gràfic':'Gráfico'}</button>
       <button class="btn btn-primary" id="stPrint">📥 ${isCA?'Descarregar PDF':'Descargar PDF'}</button>
@@ -2478,6 +2479,118 @@ function openStats(initialSection){
       false
     );
   };
+  // 🧹 Oct 2026 · Detectar y fusionar autoescuelas duplicadas que YA están en la lista.
+  //   Cubre: MABEL≡A.E.MABEL · DAINA≡A.E.DAINA · M2≡A.E.M-2 (CENTELLES) · LLUÇANES≡LLUCANÈS
+  //         AVANÇADA≡AVANÇA · AVANSADA≡AVANÇA · MLIST≡MOLIST · MOLIST(CALLDETENES)≡MOLIST (CALLDETENES)
+  //   Respeta sedes DISTINTAS: MOLIST ≠ MOLIST CALLDETENES.
+  back.querySelector('#stDedup').onclick=()=>{
+    const st=loadStats();
+    const list=(st.autoescoles||[]).slice();
+    if(list.length<2){ toast(isCA?'Només hi ha '+list.length+' autoescola':'Solo hay '+list.length+' autoescuela'); return; }
+    const totals={}, monthsOf={};
+    for(const n of list){ totals[n]=0; monthsOf[n]=0; }
+    for(const k of Object.keys(st.data||{})){
+      for(const [n,v] of Object.entries(st.data[k]||{})){
+        if(totals[n]===undefined)continue;
+        totals[n]+=(+v||0);
+        if(+v>0) monthsOf[n]++;
+      }
+    }
+    const pairs=[];
+    // Union-Find: agrupa todas las variantes y cada no-canónica apunta al root (max certs)
+    const uf={}; list.forEach(n=>uf[n]=n);
+    const find=(x)=>{ while(uf[x]!==x){ uf[x]=uf[uf[x]]; x=uf[x]; } return x; };
+    for(let i=0;i<list.length;i++){
+      for(let j=i+1;j<list.length;j++){
+        if(_similarity(list[i], list[j])<0.80)continue;
+        const ra=find(list[i]), rb=find(list[j]);
+        if(ra===rb)continue;
+        const [w,l] = (totals[ra]||0) >= (totals[rb]||0) ? [ra,rb] : [rb,ra];
+        uf[l]=w;
+      }
+    }
+    for(const n of list){
+      const root=find(n);
+      if(root !== n){
+        pairs.push({source:n, target:root, score:_similarity(n, root)});
+      }
+    }
+    if(!pairs.length){ toast(isCA?'✅ No hi ha duplicats':'✅ No hay duplicados', 2500); return; }
+    pairs.sort((a,b)=>b.score-a.score);
+    const rowsHtml=pairs.map((p,idx)=>{
+      const pct=Math.round(p.score*100);
+      const sCert=totals[p.source]||0, tCert=totals[p.target]||0;
+      const sMon=monthsOf[p.source]||0, tMon=monthsOf[p.target]||0;
+      const mesTxt=(n)=>n===1?(isCA?'mes':'mes'):(isCA?'mesos':'meses');
+      return `<tr style="border-bottom:1px solid #1e293b" data-testid="dedup-row-${idx}">
+        <td style="padding:8px"><input type="checkbox" data-dedup-check data-idx="${idx}" checked style="width:16px;height:16px;cursor:pointer"></td>
+        <td style="padding:8px;font-family:'Consolas',monospace;color:#fca5a5"><b>${escapeHtml(p.source)}</b><br><span class="small" style="color:#94a3b8">${sCert} certs · ${sMon} ${mesTxt(sMon)}</span></td>
+        <td style="padding:8px;text-align:center;color:#22d3ee;font-size:18px">→</td>
+        <td style="padding:8px;font-family:'Consolas',monospace;color:#a7f3d0"><b>${escapeHtml(p.target)}</b><br><span class="small" style="color:#94a3b8">${tCert} certs · ${tMon} ${mesTxt(tMon)}</span></td>
+        <td style="padding:8px;text-align:center;color:${pct>=95?'#22c55e':pct>=90?'#84cc16':'#f59e0b'};font-weight:700">${pct}%</td>
+      </tr>`;
+    }).join('');
+    const m=document.createElement('div');m.className='modal-back';m.style.zIndex='650';
+    m.innerHTML=`<div class="modal" style="max-width:900px;width:calc(100vw - 40px)">
+      <h3 style="color:#10b981;margin-top:0">🧹 ${isCA?'Fusionar autoescoles duplicades':'Fusionar autoescuelas duplicadas'}</h3>
+      <p class="small" style="color:#94a3b8;line-height:1.5">${isCA?`Hem detectat <b>${pairs.length}</b> parell(s) possibles. Es sumaran els certificats mes a mes a l'autoescola amb més dades i l'altra s'eliminarà. Destila les files que NO vols fusionar.`:`Hemos detectado <b>${pairs.length}</b> par(es) posibles. Se sumarán los certificados mes a mes en la autoescuela con más datos y la otra se eliminará. Destilda las filas que NO quieras fusionar.`}</p>
+      <div style="max-height:55vh;overflow:auto;border:1px solid #1e293b;border-radius:8px;margin:12px 0">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead><tr style="background:#1a1e26;position:sticky;top:0;z-index:2">
+            <th style="padding:10px;width:40px"></th>
+            <th style="padding:10px;text-align:left;color:#94a3b8">${isCA?'S\'elimina':'Se elimina'}</th>
+            <th style="padding:10px"></th>
+            <th style="padding:10px;text-align:left;color:#94a3b8">${isCA?'Es queda':'Se queda'}</th>
+            <th style="padding:10px;text-align:center;color:#94a3b8;width:80px">${isCA?'Similitud':'Similitud'}</th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <div style="font-size:11px;color:#64748b">💡 ${isCA?'Es guardarà un snapshot per si vols desfer-ho.':'Se guardará un snapshot por si quieres deshacerlo.'}</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" data-no>${isCA?'Cancel·lar':'Cancelar'}</button>
+          <button class="btn btn-primary" data-yes data-testid="dedup-apply">${isCA?'Fusionar seleccionades':'Fusionar seleccionadas'}</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.appendChild(m);
+    m.querySelector('[data-no]').onclick=()=>m.remove();
+    m.addEventListener('click',ev=>{if(ev.target===m)m.remove()});
+    m.querySelector('[data-yes]').onclick=()=>{
+      const checked=[...m.querySelectorAll('[data-dedup-check]:checked')].map(cb=>+cb.dataset.idx);
+      if(!checked.length){ toast(isCA?'No has seleccionat cap':'No has seleccionado ninguno'); return; }
+      // Resolución transitiva: si A→B y B→C, A y B → C
+      const chain={};
+      checked.forEach(i=>{ chain[pairs[i].source]=pairs[i].target });
+      const resolve=(n)=>{ let x=n, g=0; while(chain[x] && g++<10) x=chain[x]; return x; };
+      snapshotStatsForUndo(isCA?`Fusionats ${checked.length} duplicats`:`Fusionados ${checked.length} duplicados`);
+      const cur=loadStats();
+      const aliases=loadStatsAliases();
+      // Fusión mes a mes
+      for(const k of Object.keys(cur.data||{})){
+        const row=cur.data[k]||{};
+        const newRow={};
+        for(const [n,v] of Object.entries(row)){
+          const final=resolve(n);
+          newRow[final]=(newRow[final]||0)+(+v||0);
+        }
+        cur.data[k]=newRow;
+      }
+      const toRemove=new Set(checked.map(i=>pairs[i].source));
+      cur.autoescoles=(cur.autoescoles||[]).filter(n=>!toRemove.has(n));
+      // Alias para futuros imports: SOURCE_UPPER → TARGET
+      for(const i of checked){
+        aliases[pairs[i].source.toUpperCase()]=resolve(pairs[i].source);
+      }
+      saveStats(cur);
+      saveStatsAliases(aliases);
+      m.remove();
+      renderTable();
+      refreshUndoBtn();
+      toast(isCA?`✅ Fusionats ${checked.length} duplicats`:`✅ Fusionados ${checked.length} duplicados`, 3500);
+    };
+  };
   refreshUndoBtn();
   // 📥 Cargar histórico DESDE EL EXCEL DEL CLIENTE (feb 2026)
   // Cada cliente sube su propio archivo .xls/.xlsx con varias hojas (una por año).
@@ -2632,18 +2745,16 @@ function openStats(initialSection){
   };
   // 🧠 Oct 2026 · Fuzzy matching para auto-detectar autoescuelas duplicadas por typo/variación
   //   Casos: MOLIST(CALLDETENES) == MOLIST (CALLDETENES) == MLIST (CALLDETENES)
-  //          A.E.DAINA == DAINA · AVANÇA == AVANSA · ROSSELL == ROSELL
+  //          A.E.DAINA == DAINA · AVANÇA == AVANSADA == AVANÇADA · ROSSELL == ROSELL
+  //          M2 == A.E.M-2 (CENTELLES)   ← nombre corto prefijo
   //   PERO: MOLIST (sola) !== MOLIST CALLDETENES (son sedes DIFERENTES del usuario)
   function _normalizeAutoName(s){
     return String(s||'')
       .toUpperCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')   // quita tildes/acentos
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')   // quita tildes/acentos (Ç→C)
       .replace(/^A\.?E\.?\s*[-·.]?\s*/,'')               // quita prefijo "A.E." / "AE"
-      .replace(/[^A-Z0-9\s()]/g,' ')                      // signos → espacio
-      .replace(/\s+/g,' ')                                 // normaliza espacios
-      .replace(/\s*\(\s*/g,' ').replace(/\s*\)\s*/g,'')   // paréntesis → espacio
-      .trim()
-      .replace(/\s+/g,'');                                 // compacta final
+      .replace(/[^A-Z0-9]/g,'')                           // quita TODO lo no alfanumérico (espacios, guiones, paréntesis, comas, comillas, puntos)
+      .replace(/S/g,'C');                                  // fonética catalana: S/Ç/C → C (AVANSA≡AVANÇA)
   }
   function _levDist(a, b){
     // Levenshtein clásico · número mínimo de inserciones/deleciones/sustituciones
@@ -2663,13 +2774,22 @@ function openStats(initialSection){
     return dp[m][n];
   }
   function _similarity(a, b){
-    // Devuelve 0..1 · 1 = idénticos. Basado en Levenshtein normalizado.
-    //   · "MOLIST" vs "MOLISTCALLDETENES" → 0.35 (NO fusiona · sedes distintas)
-    //   · "MLISTCALLDETENES" vs "MOLISTCALLDETENES" → 0.94 (fusiona · typo)
-    //   · "AVANSA" vs "AVANCA" → 0.83 (fusiona · tildes)
+    // Devuelve 0..1 · 1 = idénticos.
+    //   · Idénticos tras normalizar → 1.0 (MABEL ≡ A.E.MABEL)
+    //   · Nombre corto (≤3) prefijo del otro → 0.95 (M2 ≡ M2CENTELLES)
+    //   · Prefijo con ≤3 letras extra → 0.92 (AVANCA ≡ AVANCADA)
+    //   · Prefijo con ≥4 letras extra → Levenshtein normal (MOLIST ≠ MOLISTCALLDETENES: 0.35)
+    //   · Resto → Levenshtein (MLIST ≡ MOLIST: 0.94)
     const na = _normalizeAutoName(a), nb = _normalizeAutoName(b);
     if(!na || !nb) return 0;
     if(na === nb) return 1;
+    const [sh, lo] = na.length <= nb.length ? [na,nb] : [nb,na];
+    if(lo.startsWith(sh)){
+      const extra = lo.length - sh.length;
+      if(sh.length <= 3) return 0.95;         // "M2" prefijo de "M2CENTELLES" → variante corta
+      if(extra <= 3)      return 0.92;         // "AVANCA" prefijo de "AVANCADA" → feminino/plural
+      // extra >= 4 con prefijo largo: puede ser sede distinta → cae a Levenshtein
+    }
     const dist = _levDist(na, nb);
     const maxLen = Math.max(na.length, nb.length);
     return maxLen === 0 ? 0 : (1 - (dist / maxLen));
@@ -2759,6 +2879,35 @@ function openStats(initialSection){
     }
     if(!Object.keys(rawCounts).length){toast(isCA?'El CSV no conté cap fila vàlida':'El CSV no contiene ninguna fila válida · Revisa que las columnas sean "CODIGO";"TOTAL"',4000);return}
     const st=loadStats();
+    // 🧹 Oct 2026 · Pre-clustering: dentro del MISMO CSV agrupa variantes/typos de la misma
+    //   autoescuela ANTES del review. Ejemplo: MOLIST(CALLDETENES)=5, MOLIST (CALLDETENES)=1,
+    //   MLIST(CALLDETENES)=1 → MOLIST(CALLDETENES)=7 (gana el que tiene más certs).
+    //   Respeta sedes distintas (MOLIST ≠ MOLIST CALLDETENES).
+    (function _clusterRaws(){
+      const keys=Object.keys(rawCounts).sort((a,b)=>(rawCounts[b]||0)-(rawCounts[a]||0));
+      const parent={}; keys.forEach(k=>parent[k]=k);
+      const find=(x)=>{ while(parent[x]!==x){ parent[x]=parent[parent[x]]; x=parent[x]; } return x; };
+      for(let i=0;i<keys.length;i++){
+        for(let j=i+1;j<keys.length;j++){
+          const a=keys[i], b=keys[j];
+          if(find(a)===find(b))continue;
+          if(_similarity(a,b)>=0.80){
+            // Union: el de más certificados queda como canonical
+            const ra=find(a), rb=find(b);
+            const [winner,loser] = (rawCounts[ra]||0) >= (rawCounts[rb]||0) ? [ra,rb] : [rb,ra];
+            parent[loser]=winner;
+          }
+        }
+      }
+      const clustered={};
+      for(const k of keys){
+        const canon=find(k);
+        clustered[canon]=(clustered[canon]||0)+(rawCounts[k]||0);
+      }
+      // Reemplazar
+      for(const k of Object.keys(rawCounts)) delete rawCounts[k];
+      Object.assign(rawCounts, clustered);
+    })();
     // Detectar codis "nous" (adaptatius): raw no mapejat per aliases del client (i, si és Master, tampoc per STAT_ALIAS), i el seu canònic no és a la llista de l'usuari.
     const clientMap=loadStatsAliases();
     let isMasterOwner=false;
@@ -3333,7 +3482,7 @@ function openStats(initialSection){
       margins:'6mm',
       extraCss:`
         @page { size: A4 landscape; margin: 6mm }
-        button, select, input, [data-no], #stSectionSwitch, .icon-btn, [data-del], #stFooterHint, #stImport, #stAdd, #stClearAll, #stDeleteMonth, #stUndo, #stChart { display:none !important }
+        button, select, input, [data-no], #stSectionSwitch, .icon-btn, [data-del], #stFooterHint, #stImport, #stAdd, #stClearAll, #stDeleteMonth, #stDedup, #stUndo, #stChart { display:none !important }
         body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important }
         .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important }
         .modal{ padding:4mm !important; max-width:none !important; width:100% !important }
