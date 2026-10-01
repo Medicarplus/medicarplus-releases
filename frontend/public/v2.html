@@ -8483,15 +8483,16 @@ function openIRPF(){
       cb.innerHTML = `<div class="modal" style="max-width:500px;background:#faf6e8;color:#1a1a1a">
         <h3 style="color:#78350f;margin-top:0;font-family:Georgia,serif">💸 ${L('Enviar IRPF a Debe/Haber','Enviar IRPF a Debe/Haber')}</h3>
         <p style="font-size:13px;color:#78350f;line-height:1.5">${L(`S'afegirà una línia <b>DEBE</b> (despesa) a <b>${compName(irpfComp)}</b>. Pots ajustar la data, el concepte o l'import abans de confirmar.`,`Se añadirá una línea <b>DEBE</b> (gasto) a <b>${compName(irpfComp)}</b>. Puedes ajustar la fecha, el concepto o el importe antes de confirmar.`)}</p>
+        <style>#_sdhDate,#_sdhConcept,#_sdhAmount,#_sdhFp{background:#fff !important;color:#1a1a1a !important;caret-color:#1a1a1a}#_sdhDate::-webkit-calendar-picker-indicator{filter:invert(.3)}</style>
         <div style="display:grid;grid-template-columns:110px 1fr;gap:10px;margin:14px 0;align-items:center">
           <label style="color:#78350f;font-weight:700">${L('Data','Fecha')}:</label>
-          <input type="date" id="_sdhDate" value="${todayISO}" style="padding:8px;border:1px solid #b45309;border-radius:5px;background:#fff;color:#1a1a1a"/>
+          <input type="date" id="_sdhDate" value="${todayISO}" style="padding:8px;border:1px solid #b45309;border-radius:5px"/>
           <label style="color:#78350f;font-weight:700">${L('Concepte','Concepto')}:</label>
-          <input type="text" id="_sdhConcept" value="${escapeHtml(defConcept)}" style="padding:8px;border:1px solid #b45309;border-radius:5px;background:#fff;color:#1a1a1a"/>
+          <input type="text" id="_sdhConcept" value="${escapeHtml(defConcept)}" style="padding:8px;border:1px solid #b45309;border-radius:5px"/>
           <label style="color:#78350f;font-weight:700">${L('Import','Importe')}:</label>
-          <input type="text" id="_sdhAmount" value="${String(irpfAmount).replace('.',',')}" style="padding:8px;border:1px solid #b45309;border-radius:5px;background:#fff;color:#1a1a1a;font-weight:700"/>
+          <input type="text" id="_sdhAmount" value="${String(irpfAmount).replace('.',',')}" style="padding:8px;border:1px solid #b45309;border-radius:5px;font-weight:700"/>
           <label style="color:#78350f;font-weight:700">${L('Mètode','Método')}:</label>
-          <select id="_sdhFp" style="padding:8px;border:1px solid #b45309;border-radius:5px;background:#fff;color:#1a1a1a">
+          <select id="_sdhFp" style="padding:8px;border:1px solid #b45309;border-radius:5px">
             <option value="E">💵 ${L('Efectiu','Efectivo')}</option>
             <option value="X">🏦 ${L('Transferència','Transferencia')}</option>
             <option value="T">💳 ${L('Targeta','Tarjeta')}</option>
