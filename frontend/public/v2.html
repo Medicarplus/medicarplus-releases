@@ -16084,11 +16084,19 @@ setTimeout(()=>{
   }
   async function pullChanges(lic, iid, since){
     const u = getApiUrl('/api/sync/pull') + '?license_key='+encodeURIComponent(lic.key) + '&install_id='+encodeURIComponent(iid) + (since?'&since='+encodeURIComponent(since):'');
-    const r = await fetch(u); if(!r.ok) throw new Error('pull HTTP '+r.status); return await r.json();
+    const r = await fetch(u);
+    // 🩹 Oct 2026 · HTTP 409 = device_mode_independent · NO es un error, es un estado normal
+    //   (el PC está marcado como "Independiente" en el modal sync). Devolver vacío
+    //   para que el badge no muestre ⚠️ inútilmente al usuario.
+    if(r.status === 409){ return {entries:{}, cloud_updated_at:null, mode:'independent'}; }
+    if(!r.ok) throw new Error('pull HTTP '+r.status);
+    return await r.json();
   }
   async function pushChanges(lic, iid, entries){
     const r = await fetch(getApiUrl('/api/sync/push'), {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({license_key:lic.key, install_id:iid, entries})});
-    if(!r.ok) throw new Error('push HTTP '+r.status); return await r.json();
+    if(r.status === 409){ return {ok:true, mode:'independent'}; } // 🩹 Oct 2026 · modo independiente, normal
+    if(!r.ok) throw new Error('push HTTP '+r.status);
+    return await r.json();
   }
   function applyRemote(entries){
     const localTs = loadTs(); let applied=0;
@@ -16755,6 +16763,34 @@ document.addEventListener('keydown', function(ev){
             });
             data = filtered;
           }
+          // 🎯 Oct 2026 · Añadir __preview__ para que el receptor vea el desglose
+          //   en el banner "Aplicar copia" + validación anti-pérdida silenciosa.
+          try{
+            const s = data['caja.stats.v1'] || {};
+            const v1 = data['caja.v1'] || {};
+            const cmp = data['caja.cempla.v1'] || {};
+            const countRows = (b) => {
+              let c = 0;
+              for(const d of Object.keys(b||{})){
+                const rows = Array.isArray(b[d]) ? b[d] : (b[d]?.rows||[]);
+                c += rows.length;
+              }
+              return c;
+            };
+            data['__preview__'] = {
+              autoescoles_count: Array.isArray(s.autoescoles) ? s.autoescoles.length : 0,
+              stats_months:      s.data ? Object.keys(s.data).length : 0,
+              stats_years:       s.data ? new Set(Object.keys(s.data).map(m=>m.split('-')[0])).size : 0,
+              trafic_days:       v1.byDate ? Object.keys(v1.byDate).length : 0,
+              trafic_entries:    countRows(v1.byDate),
+              cempla_days:       cmp.byDate ? Object.keys(cmp.byDate).length : 0,
+              cempla_entries:    countRows(cmp.byDate),
+              tarifas_rules:     Array.isArray(data['caja.tarifas.rules.v1']) ? data['caja.tarifas.rules.v1'].length : 0,
+              total_keys:        Object.keys(data).length,
+              generated_at:      new Date().toISOString(),
+              from_admin:        true,
+            };
+          }catch(_){}
           const base = _apiBase().replace(/\/$/, '');
           const r = await fetch(`${base}/api/sync/admin/push-to-license`, {
             method:'POST', headers:{'Content-Type':'application/json'},
