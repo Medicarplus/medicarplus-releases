@@ -1776,10 +1776,14 @@ html,body{margin:0;padding:0;background:#fff;color:#000;font-family:'Segoe UI',A
 body{padding:8px}
 table{border-collapse:collapse;width:100%;page-break-inside:auto}
 thead{display:table-header-group}
-tr{page-break-inside:avoid;page-break-after:auto}
+tr{page-break-inside:avoid;page-break-after:auto; orphans:3; widows:3}
+tfoot, tfoot tr{page-break-inside:avoid !important; break-inside:avoid !important}
+thead+tbody tr:first-child{page-break-before:avoid !important}
 th,td{padding:6px 8px;border:1px solid #999;vertical-align:middle}
 h1,h2,h3,h4{margin:6px 0 10px 0;page-break-after:avoid;page-break-inside:avoid}
-h1+*,h2+*,h3+*,h4+*{page-break-before:avoid}
+h1+*,h2+*,h3+*,h4+*{page-break-before:avoid !important; break-before:avoid !important}
+.pdf-section-sm, .pdf-keep{page-break-inside:avoid !important; break-inside:avoid !important}
+p, li{orphans:3; widows:3}
 img,svg{max-width:100% !important;page-break-inside:avoid;break-inside:avoid}
 button{display:none !important}
 .no-print{display:none !important}
@@ -2068,7 +2072,11 @@ function openLibroRegistro(){
         .modal{ padding:4mm !important; max-width:none !important; width:100% !important; border:none !important }
         h3{ color:#000 !important; font-size:13pt !important; margin:0 0 6pt 0 !important }
         table{ border-collapse:collapse !important; width:100% !important; font-size:8pt !important; page-break-inside:auto }
-        thead{ display:table-header-group } tr{ page-break-inside:avoid }
+        thead{ display:table-header-group } tr{ page-break-inside:avoid; orphans:3; widows:3 }
+        tfoot, tfoot tr{ page-break-inside:avoid !important; break-inside:avoid !important }
+        thead+tbody tr:first-child{ page-break-before:avoid !important }
+        h1+*, h2+*, h3+*, h4+*, h5+*{ page-break-before:avoid !important; break-before:avoid !important }
+        .pdf-section-sm, .pdf-keep{ page-break-inside:avoid !important; break-inside:avoid !important }
         th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:8pt !important }
         td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 4pt !important; font-size:8pt !important; word-wrap:break-word }`
     });
@@ -3023,6 +3031,9 @@ function openStats(initialSection){
   table.leg{width:100%;border-collapse:collapse;font-size:8.5pt}
   table.leg thead{display:table-header-group}
   table.leg tr{page-break-inside:avoid}
+  tfoot,tfoot tr{page-break-inside:avoid !important;break-inside:avoid !important}
+  h1+*,h2+*,h3+*,h4+*{page-break-before:avoid !important;break-before:avoid !important}
+  .leyenda,.chart-box{page-break-inside:avoid !important;break-inside:avoid !important}
   table.leg td{padding:2mm 3mm;border-bottom:1px dotted #cbd5e1;vertical-align:middle}
   table.leg tr:last-child td{border-bottom:none}
   .col-color{width:6mm;text-align:center}
@@ -3085,6 +3096,9 @@ function openStats(initialSection){
         thead tr, thead th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:${anual?'2pt 3pt':'4pt 6pt'} !important; font-weight:700 !important; font-size:${anual?'7pt':'9pt'} !important; word-wrap:break-word; overflow-wrap:break-word }
         tbody td{ border:1px solid #999 !important; color:#000 !important; padding:${anual?'2pt 3pt':'3pt 5pt'} !important; word-wrap:break-word; overflow-wrap:break-word }
         tfoot tr, tfoot td{ background:#ddd !important; color:#000 !important; border:1px solid #666 !important; font-weight:700 !important; padding:${anual?'2pt 3pt':'3pt 5pt'} !important }
+        tfoot{page-break-inside:avoid !important;break-inside:avoid !important}
+        h1+*, h2+*, h3+*, h4+*{page-break-before:avoid !important;break-before:avoid !important}
+        thead+tbody tr:first-child{page-break-before:avoid !important}
         .st-cell{ text-align:center !important }
         /* Columna nombre autoescuela más ancha, resto compacto */
         table th:first-child, table td:first-child{ width:${anual?'18%':'40%'} !important; text-align:left !important }
@@ -3668,7 +3682,7 @@ function openStats(initialSection){
       // Desglose profesional (Tipo·Grupo·Precio) para incluir en el PDF anual
       const detailRowsData = _trafBuildDetail(year);
       const detailPdf = _trafDetailBlockPdfHtml(detailRowsData, year, null);
-      html=`<html><head><title>Estadísticas Tráfico ${year}</title><style>@page{size:A4 landscape;margin:8mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}html,body{margin:0;padding:0;width:100%;overflow-x:hidden}body{font-family:Arial,sans-serif;color:#000;font-size:11px}h1{text-align:center;margin:0 0 12pt 0;font-size:15pt}h2{margin-top:14pt;font-size:12pt;text-align:left;color:#1e3a5f;page-break-before:auto;page-break-after:avoid}table{width:100%;border-collapse:collapse;font-size:9pt;page-break-inside:auto;table-layout:auto;margin-bottom:6pt}thead{display:table-header-group}tr{page-break-inside:avoid}th,td{border:1px solid #333;padding:3pt 4pt;text-align:center;word-wrap:break-word;overflow-wrap:break-word}th{background:#1e3a5f !important;color:#fff !important;font-size:9pt}td:first-child,th:first-child{text-align:left;padding-left:6pt;white-space:nowrap}tfoot td{background:#333 !important;color:#fff !important;font-weight:700}</style></head><body><h1>ESTADÍSTICAS TRÁFICO · ${year}</h1><table><thead><tr><th>MES</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS DGT</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL ${year}</td><td>${_pdfDisplayCount || agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table>${detailPdf}</body></html>`;
+      html=`<html><head><title>Estadísticas Tráfico ${year}</title><style>@page{size:A4 landscape;margin:8mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}html,body{margin:0;padding:0;width:100%;overflow-x:hidden}body{font-family:Arial,sans-serif;color:#000;font-size:11px}h1{text-align:center;margin:0 0 12pt 0;font-size:15pt}h2{margin-top:14pt;font-size:12pt;text-align:left;color:#1e3a5f;page-break-before:auto;page-break-after:avoid}table{width:100%;border-collapse:collapse;font-size:9pt;page-break-inside:auto;table-layout:auto;margin-bottom:6pt}thead{display:table-header-group}tr{page-break-inside:avoid;orphans:3;widows:3}tfoot,tfoot tr{page-break-inside:avoid !important;break-inside:avoid !important}thead+tbody tr:first-child{page-break-before:avoid !important}h1+*,h2+*,h3+*,h4+*{page-break-before:avoid !important;break-before:avoid !important}th,td{border:1px solid #333;padding:3pt 4pt;text-align:center;word-wrap:break-word;overflow-wrap:break-word}th{background:#1e3a5f !important;color:#fff !important;font-size:9pt}td:first-child,th:first-child{text-align:left;padding-left:6pt;white-space:nowrap}tfoot td{background:#333 !important;color:#fff !important;font-weight:700}</style></head><body><h1>ESTADÍSTICAS TRÁFICO · ${year}</h1><table><thead><tr><th>MES</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS DGT</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>TOTAL ${year}</td><td>${_pdfDisplayCount || agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table>${detailPdf}</body></html>`;
     }else{
       const agg = _trafAggregate(year, monthSel);
       const daysInMonth = new Date(year, monthSel, 0).getDate();
@@ -3684,7 +3698,7 @@ function openStats(initialSection){
       // Desglose profesional del mes en el PDF
       const detailRowsMonth = _trafBuildDetail(year, monthSel);
       const detailPdfMonth = _trafDetailBlockPdfHtml(detailRowsMonth, year, MESOS[monthSel-1]);
-      html=`<html><head><title>Tráfico ${MESOS[monthSel-1]} ${year}</title><style>@page{size:A4 landscape;margin:10mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:0;color:#000;font-size:12px;margin:0}h1{text-align:center;margin:0 0 14px 0;font-size:16pt}h2{margin-top:16px;font-size:13pt;text-align:left;color:#1e3a5f;page-break-before:auto;page-break-after:avoid}table{width:100%;border-collapse:collapse;font-size:10.5pt;page-break-inside:auto;table-layout:auto;margin-bottom:8pt}thead{display:table-header-group}tr{page-break-inside:avoid}th,td{border:1px solid #333;padding:4pt 5pt;text-align:center;word-wrap:break-word;overflow-wrap:break-word}th{background:#1e3a5f !important;color:#fff !important}td:first-child,th:first-child{text-align:left;padding-left:8pt}tfoot td{background:#333 !important;color:#fff !important;font-weight:700}</style></head><body><h1>TRÁFICO · ${MESOS[monthSel-1].toUpperCase()} ${year}</h1><table><thead><tr><th>DÍA</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS</th></tr></thead><tbody>${rows.length ? rows.join('') : `<tr><td colspan="${3 + TRAF_CATS.length}" style="text-align:center;font-style:italic;color:#666">Sin entradas en este mes</td></tr>`}</tbody><tfoot><tr><td>TOTAL</td><td>${agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table>${detailPdfMonth}</body></html>`;
+      html=`<html><head><title>Tráfico ${MESOS[monthSel-1]} ${year}</title><style>@page{size:A4 landscape;margin:10mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:0;color:#000;font-size:12px;margin:0}h1{text-align:center;margin:0 0 14px 0;font-size:16pt}h2{margin-top:16px;font-size:13pt;text-align:left;color:#1e3a5f;page-break-before:auto;page-break-after:avoid}table{width:100%;border-collapse:collapse;font-size:10.5pt;page-break-inside:auto;table-layout:auto;margin-bottom:8pt}thead{display:table-header-group}tr{page-break-inside:avoid;orphans:3;widows:3}tfoot,tfoot tr{page-break-inside:avoid !important;break-inside:avoid !important}thead+tbody tr:first-child{page-break-before:avoid !important}h1+*,h2+*,h3+*,h4+*{page-break-before:avoid !important;break-before:avoid !important}th,td{border:1px solid #333;padding:4pt 5pt;text-align:center;word-wrap:break-word;overflow-wrap:break-word}th{background:#1e3a5f !important;color:#fff !important}td:first-child,th:first-child{text-align:left;padding-left:8pt}tfoot td{background:#333 !important;color:#fff !important;font-weight:700}</style></head><body><h1>TRÁFICO · ${MESOS[monthSel-1].toUpperCase()} ${year}</h1><table><thead><tr><th>DÍA</th><th>TOTAL</th>${TRAF_CATS.map(c => `<th>${c.toUpperCase()}</th>`).join('')}<th>IMPORTE</th><th>TASAS</th></tr></thead><tbody>${rows.length ? rows.join('') : `<tr><td colspan="${3 + TRAF_CATS.length}" style="text-align:center;font-style:italic;color:#666">Sin entradas en este mes</td></tr>`}</tbody><tfoot><tr><td>TOTAL</td><td>${agg.count || ''}</td>${totCells}<td style="text-align:right">${_fmtEur(agg.importe)}</td><td style="text-align:right">${_fmtEur(agg.tasas)}</td></tr></tfoot></table>${detailPdfMonth}</body></html>`;
     }
     printHtml(html);
   }
@@ -5612,7 +5626,11 @@ function openGastosPanel(){
         .gs-modal{ max-width:none !important; width:100% !important; padding:0 !important; border:none !important }
         h3{ color:#000 !important; font-size:14pt !important; margin:0 0 6pt 0 !important }
         table{ border-collapse:collapse !important; width:100% !important; font-size:9pt !important; page-break-inside:auto }
-        thead{ display:table-header-group } tr{ page-break-inside:avoid }
+        thead{ display:table-header-group } tr{ page-break-inside:avoid; orphans:3; widows:3 }
+        tfoot, tfoot tr{ page-break-inside:avoid !important; break-inside:avoid !important }
+        thead+tbody tr:first-child{ page-break-before:avoid !important }
+        h1+*, h2+*, h3+*, h4+*, h5+*{ page-break-before:avoid !important; break-before:avoid !important }
+        .pdf-section-sm, .pdf-keep{ page-break-inside:avoid !important; break-inside:avoid !important }
         th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:8pt !important }
         td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 5pt !important; font-size:9pt !important; word-wrap:break-word }`
     });
@@ -6052,7 +6070,11 @@ function openHonorariosPanel(){
         h3, h4{ color:#000 !important; margin:0 0 6pt 0 !important }
         h3{ font-size:14pt !important } h4{ font-size:11pt !important; margin-top:8pt !important }
         table{ border-collapse:collapse !important; width:100% !important; font-size:9pt !important; margin-bottom:6pt !important; page-break-inside:auto }
-        thead{ display:table-header-group } tr{ page-break-inside:avoid }
+        thead{ display:table-header-group } tr{ page-break-inside:avoid; orphans:3; widows:3 }
+        tfoot, tfoot tr{ page-break-inside:avoid !important; break-inside:avoid !important }
+        thead+tbody tr:first-child{ page-break-before:avoid !important }
+        h1+*, h2+*, h3+*, h4+*, h5+*{ page-break-before:avoid !important; break-before:avoid !important }
+        .pdf-section-sm, .pdf-keep{ page-break-inside:avoid !important; break-inside:avoid !important }
         th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:8pt !important }
         td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 5pt !important; font-size:9pt !important }
       `
@@ -6375,6 +6397,11 @@ function openStatsEmpresa2(){
         .kpi .lbl { font-size: 9px; letter-spacing: 1.3px; color: #831843; font-weight: 700; }
         .kpi .val { font-size: 18px; font-weight: 800; color: #831843; font-family: 'Segoe UI', Arial, sans-serif; margin-top: 3px; }
         table { width: 100%; border-collapse: collapse; font-size: 10.5px; page-break-inside: avoid; }
+        thead { display: table-header-group }
+        tr { page-break-inside: avoid; orphans:3; widows:3 }
+        tfoot, tfoot tr { page-break-inside: avoid !important; break-inside: avoid !important }
+        thead+tbody tr:first-child { page-break-before: avoid !important }
+        h1+*, h2+*, h3+*, h4+* { page-break-before: avoid !important; break-before: avoid !important }
         thead th { background: #831843; color: #fff; padding: 6px 4px; font-weight: 700; letter-spacing: .3px; border: 1px solid #4a0e29; }
         tbody td.cell { border: 1px solid #cbd5e1; padding: 5px 4px; }
         tbody td.nom { text-align: left; padding-left: 8px; background:#fdf2f8; }
@@ -6853,7 +6880,11 @@ function openLedger(){
         .modal{ padding:4mm !important; max-width:none !important; width:100% !important; border:none !important }
         h3{ color:#000 !important; font-size:13pt !important; margin:0 0 6pt 0 !important }
         table{ border-collapse:collapse !important; width:100% !important; font-size:8pt !important; page-break-inside:auto }
-        thead{ display:table-header-group } tr{ page-break-inside:avoid }
+        thead{ display:table-header-group } tr{ page-break-inside:avoid; orphans:3; widows:3 }
+        tfoot, tfoot tr{ page-break-inside:avoid !important; break-inside:avoid !important }
+        thead+tbody tr:first-child{ page-break-before:avoid !important }
+        h1+*, h2+*, h3+*, h4+*, h5+*{ page-break-before:avoid !important; break-before:avoid !important }
+        .pdf-section-sm, .pdf-keep{ page-break-inside:avoid !important; break-inside:avoid !important }
         th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:8pt !important }
         td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 4pt !important; font-size:8pt !important; word-wrap:break-word }
       `
@@ -7507,6 +7538,12 @@ function openCuadreCaja(){
         .col{border:1px solid #cbd5e1;border-radius:6px;padding:10px}
         .col h2{margin:0 0 8px;font-family:Georgia,serif;font-size:13px;text-align:center;border-bottom:1px dashed #cbd5e1;padding-bottom:5px;color:#0369a1}
         table{width:100%;border-collapse:collapse}
+        thead{display:table-header-group}
+        tr{page-break-inside:avoid;orphans:3;widows:3}
+        tfoot,tfoot tr{page-break-inside:avoid !important;break-inside:avoid !important}
+        thead+tbody tr:first-child{page-break-before:avoid !important}
+        h1+*,h2+*,h3+*,h4+*{page-break-before:avoid !important;break-before:avoid !important}
+        .cols,.col{page-break-inside:avoid !important;break-inside:avoid !important}
         td{padding:5px 4px;border-bottom:1px solid #e5e7eb;font-size:11.5px}
         .num{text-align:right;font-family:'Courier New',monospace;font-weight:700}
         .final{background:#0f766e;color:#fff;font-weight:800;font-size:13px}
@@ -7997,6 +8034,9 @@ function openIRPF(){
         table { border-collapse:collapse !important; width:100% !important; font-size:8pt !important; page-break-inside:auto }
         thead{ display:table-header-group } tr { page-break-inside:avoid; page-break-after:auto }
         table thead tr { background:#78350f !important; color:#fff !important }
+        tfoot,tfoot tr{page-break-inside:avoid !important;break-inside:avoid !important}
+        thead+tbody tr:first-child{page-break-before:avoid !important}
+        h1+*,h2+*,h3+*,h4+*{page-break-before:avoid !important;break-before:avoid !important}
         th{ border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:8pt !important }
         td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 4pt !important; font-size:8pt !important; word-wrap:break-word }
       `
@@ -8085,12 +8125,34 @@ function openAnnualReport(){
   [style*="color:#22c55e"], [style*="color:#16a34a"], [style*="color:#16a34a"]{color:#059669 !important}
   [style*="color:#ef4444"], [style*="color:#dc2626"]{color:#dc2626 !important}
   .footer{margin-top:6mm;padding-top:3mm;border-top:1px dashed #cbd5e1;color:#64748b;font-size:8pt;text-align:center}
+  /* 🖨️ Oct 2026 · Anti-corte de secciones por cambio de página */
+  h1+*, h2+*, h3+*, h4+*, h5+*{page-break-before:avoid !important; break-before:avoid !important}
+  tfoot, tfoot tr{page-break-inside:avoid !important; break-inside:avoid !important}
+  thead+tbody tr:first-child{page-break-before:avoid !important}
+  p, li, tr{orphans:3; widows:3}
+  .pdf-section{page-break-inside:avoid !important; break-inside:avoid !important; display:block}
+  /* 🖨️ Oct 2026 · Si un bloque tiene marca .pdf-section-sm (pocas filas) nunca se parte */
+  .pdf-section-sm{page-break-inside:avoid !important; break-inside:avoid !important}
 </style></head><body>
   <div class="header">
     <h1>📊 ${title}</h1>
     <div class="sub">Generado ${new Date().toLocaleString('es-ES')}</div>
   </div>
-  ${bodyClone}
+  ${(function wrapSections(src){
+    // 🖨️ Oct 2026 · Envuelve cada "h4 + contenido hasta el próximo h4" en una <section>.
+    //   Las secciones cortas (<= 15 <tr>) llevan .pdf-section-sm → NUNCA se parten.
+    //   Las largas se dejan abiertas pero con tfoot/thead protegidos por el CSS global.
+    try{
+      const parts = src.split(/(?=<h4\b)/i);
+      if(parts.length <= 1) return src;
+      return parts.map(p => {
+        if(!/^<h4\b/i.test(p)) return p; // prolog antes del primer h4
+        const trCount = (p.match(/<tr\b/gi) || []).length;
+        const cls = trCount <= 15 ? 'pdf-section-sm' : 'pdf-section-lg';
+        return `<section class="${cls}" style="display:block;margin-bottom:4mm">${p}</section>`;
+      }).join('');
+    }catch(_){ return src; }
+  })(bodyClone)}
   <div class="footer">MediCar Plus · ${new Date().toLocaleString('es-ES')}</div>
 </body></html>`;
     if(typeof printHtml === 'function'){
@@ -9109,11 +9171,28 @@ function openYearComparison(){
   /* Ocultar elementos residuales de la UI */
   button, select, input, .no-print, [data-testid="yc-goto-chart"], #ycGoChart{display:none !important}
   .footer{margin-top:6mm;padding-top:3mm;border-top:1px dashed #cbd5e1;color:#64748b;font-size:8pt;text-align:center}
+  /* 🖨️ Oct 2026 · Anti-corte de secciones por cambio de página */
+  h1+*, h2+*, h3+*, h4+*, h5+*{page-break-before:avoid !important; break-before:avoid !important}
+  tfoot, tfoot tr{page-break-inside:avoid !important; break-inside:avoid !important}
+  thead+tbody tr:first-child{page-break-before:avoid !important}
+  p, li, tr{orphans:3; widows:3}
+  .pdf-section-sm{page-break-inside:avoid !important; break-inside:avoid !important}
 </style></head><body>
   <div class="header">
     <h1>📈 ${title}</h1>
   </div>
-  ${bodyClone}
+  ${(function wrapSections(src){
+    try{
+      const parts = src.split(/(?=<h4\b)/i);
+      if(parts.length <= 1) return src;
+      return parts.map(p => {
+        if(!/^<h4\b/i.test(p)) return p;
+        const trCount = (p.match(/<tr\b/gi) || []).length;
+        const cls = trCount <= 15 ? 'pdf-section-sm' : 'pdf-section-lg';
+        return `<section class="${cls}" style="display:block;margin-bottom:4mm">${p}</section>`;
+      }).join('');
+    }catch(_){ return src; }
+  })(bodyClone)}
   <div class="footer">MediCar Plus · ${new Date().toLocaleString('es-ES')}</div>
 </body></html>`;
     if(typeof printHtml === 'function'){
@@ -10042,7 +10121,10 @@ $('#btnPrint').onclick=()=>{
       div, section, article{ background:#fff !important; color:#000 !important; box-shadow:none !important }
       h1, h2, h3, h4{ color:#000 !important }
       table{ border-collapse:collapse !important; width:100% !important; font-size:8pt !important; page-break-inside:auto }
-      thead{ display:table-header-group } tr{ page-break-inside:avoid }
+      thead{ display:table-header-group } tr{ page-break-inside:avoid; orphans:3; widows:3 }
+      tfoot,tfoot tr{page-break-inside:avoid !important;break-inside:avoid !important}
+      thead+tbody tr:first-child{page-break-before:avoid !important}
+      h1+*,h2+*,h3+*,h4+*{page-break-before:avoid !important;break-before:avoid !important}
       th{ background:#eee !important; color:#000 !important; border:1px solid #666 !important; padding:3pt 5pt !important; font-weight:700 !important; font-size:8pt !important }
       td{ border:1px solid #999 !important; color:#000 !important; padding:2pt 4pt !important; font-size:8pt !important; word-wrap:break-word }
       button { background:transparent !important; color:#000 !important; border:none !important }`
