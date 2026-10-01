@@ -1968,6 +1968,41 @@ const MESOS_ES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto
 const MESOS = (typeof isCA!=='undefined' && isCA) ? MESOS_CA : MESOS_ES;
 function loadStats(){try{const s=JSON.parse(localStorage.getItem(STATS_KEY)||'{}');if(!s.autoescoles)s.autoescoles=DEFAULT_AUTOS.slice();if(!s.data)s.data={};return s}catch(e){return{autoescoles:DEFAULT_AUTOS.slice(),data:{}}}}
 function saveStats(s){localStorage.setItem(STATS_KEY,JSON.stringify(s));pushSnapshot('auto');scheduleFileAutoSave()}
+// ──────────────────────────────────────────────────────────────────────────────
+// Feb 2026 · UNDO autoescuelas · guarda hasta 3 snapshots antes de cualquier
+// acción destructiva (vaciar todo, borrar mes, eliminar autoescuela, import CSV,
+// backfill Excel, edición manual). Caducan a las 24 h para no acumular basura.
+// ──────────────────────────────────────────────────────────────────────────────
+const STATS_UNDO_KEY='caja.stats.undo.v1';
+const STATS_UNDO_MAX=3;
+const STATS_UNDO_TTL_MS=24*60*60*1000;
+function _loadStatsUndoStack(){
+  try{
+    const arr=JSON.parse(localStorage.getItem(STATS_UNDO_KEY)||'[]');
+    if(!Array.isArray(arr))return [];
+    const now=Date.now();
+    const alive=arr.filter(s=>s&&s.ts&&(now-s.ts)<STATS_UNDO_TTL_MS);
+    if(alive.length!==arr.length)localStorage.setItem(STATS_UNDO_KEY,JSON.stringify(alive));
+    return alive;
+  }catch(_){return []}
+}
+function _saveStatsUndoStack(stack){try{localStorage.setItem(STATS_UNDO_KEY,JSON.stringify(stack.slice(-STATS_UNDO_MAX)))}catch(_){}}
+function snapshotStatsForUndo(reason){
+  try{
+    const raw=localStorage.getItem(STATS_KEY)||'{"autoescoles":[],"data":{}}';
+    const stack=_loadStatsUndoStack();
+    stack.push({ts:Date.now(),reason:String(reason||''),snapshot:raw});
+    _saveStatsUndoStack(stack);
+  }catch(_){}
+}
+function getLastStatsUndo(){const s=_loadStatsUndoStack();return s.length?s[s.length-1]:null}
+function popStatsUndo(){
+  const s=_loadStatsUndoStack();
+  if(!s.length)return null;
+  const last=s.pop();
+  _saveStatsUndoStack(s);
+  return last;
+}
 // ============================================================================
 // LIBRO DE REGISTRO · Llegeix les entrades del CSV DGT ja importades a Tráfico
 // Agrupa per Tipo · Grupo + secció especial Profesionales/Normales
@@ -2176,6 +2211,8 @@ function openStats(initialSection){
       <button class="btn st-autos-only" id="stBackfillHist" data-testid="st-backfill-hist" title="${isCA?'Puja el teu Excel històric (multi-any) i el classifica automàticament':'Sube tu Excel histórico (multi-año) y lo clasifica automáticamente'}" style="background:#1e2f3e;border-color:#22d3ee;color:#22d3ee;font-weight:600;display:${localStorage.getItem('caja.stats.backfill.loaded.v1')?'none':'inline-flex'}">📥 ${isCA?'Pujar històric':'Subir histórico'}</button>
       <button class="btn st-autos-only" id="stAdd">+ ${isCA?'Autoescola':'Autoescuela'}</button>
       <button class="btn st-autos-only" id="stClearAll" style="background:#7f1d1d;color:#fecaca;border-color:#b91c1c" title="${isCA?'Elimina totes les autoescoles i les seves dades':'Elimina todas las autoescuelas y sus datos'}">🗑 ${isCA?'Buidar tot':'Vaciar todo'}</button>
+      <button class="btn st-autos-only" id="stDeleteMonth" data-testid="st-delete-month" style="background:#78350f;color:#fed7aa;border-color:#c2410c" title="${isCA?'Esborra només un mes concret':'Borra solo un mes concreto'}">🗓 ${isCA?'Esborrar mes':'Borrar mes'}</button>
+      <button class="btn st-autos-only" id="stUndo" data-testid="st-undo" style="background:#1e293b;color:#fde68a;border-color:#f59e0b;display:none" title="${isCA?'Desfer últim canvi':'Deshacer último cambio'}">↶ ${isCA?'Desfer':'Deshacer'}</button>
       <button class="btn st-autos-only" id="stChart" data-testid="st-chart" style="background:#1e293b;border-color:#22d3ee;color:#22d3ee" title="${isCA?'Gràfic d\'evolució mensual':'Gráfico de evolución mensual'}">📈 ${isCA?'Gràfic':'Gráfico'}</button>
       <button class="btn btn-primary" id="stPrint">📥 ${isCA?'Descarregar PDF':'Descargar PDF'}</button>
       <button class="btn" data-no>✕ ${isCA?'Tancar':'Cerrar'}</button>
@@ -2301,7 +2338,7 @@ function openStats(initialSection){
         }
       };
     }});
-    body.querySelectorAll('[data-del]').forEach(b=>{b.onclick=(ev)=>{ev.stopPropagation();const ri=+b.dataset.del;const name=st.autoescoles[ri];confirmModal(isCA?'Eliminar autoescola':'Eliminar autoescuela',isCA?`Vols eliminar <b>${name}</b> i totes les seves dades?`:`¿Eliminar <b>${name}</b> y todos sus datos?`,()=>{st.autoescoles.splice(ri,1);for(const k in st.data)delete st.data[k][name];saveStats(st);renderTable()},isCA?'Eliminar':'Eliminar')}});
+    body.querySelectorAll('[data-del]').forEach(b=>{b.onclick=(ev)=>{ev.stopPropagation();const ri=+b.dataset.del;const name=st.autoescoles[ri];confirmModal(isCA?'Eliminar autoescola':'Eliminar autoescuela',isCA?`Vols eliminar <b>${name}</b> i totes les seves dades?`:`¿Eliminar <b>${name}</b> y todos sus datos?`,()=>{snapshotStatsForUndo((isCA?'Eliminada autoescola ':'Eliminada autoescuela ')+name);st.autoescoles.splice(ri,1);for(const k in st.data)delete st.data[k][name];saveStats(st);renderTable();if(typeof refreshUndoBtn==='function')refreshUndoBtn()},isCA?'Eliminar':'Eliminar')}});
   };
   back.querySelector('#stYear').onchange=renderTable;
   back.querySelector('#stMode').onchange=renderTable;
@@ -2352,8 +2389,96 @@ function openStats(initialSection){
     inp.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();doAdd()}else if(ev.key==='Escape'){m.remove()}};
   };
   back.querySelector('#stClearAll').onclick=()=>{
-    confirmModal(isCA?'⚠️ Buidar totes les autoescoles':'⚠️ Vaciar todas las autoescuelas', isCA?'Vols esborrar <b>TOTES</b> les autoescoles i les seves dades?<br><br>Aquesta acció <b>NO es pot desfer</b>. Es recomana només al primer arrencament o si vols començar de zero.':'¿Borrar <b>TODAS</b> las autoescuelas y sus datos?<br><br>Esta acción <b>NO se puede deshacer</b>. Recomendado solo en la primera puesta en marcha o si quieres empezar de cero.', ()=>{saveStats({autoescoles:[],data:{}});renderTable();toast(isCA?'🗑 Autoescoles esborrades':'🗑 Autoescuelas borradas')}, isCA?'Sí, esborrar tot':'Sí, borrar todo', true);
+    confirmModal(isCA?'⚠️ Buidar totes les autoescoles':'⚠️ Vaciar todas las autoescuelas', isCA?'Vols esborrar <b>TOTES</b> les autoescoles i les seves dades?<br><br>Aquesta acció es pot <b>desfer</b> amb el botó ↶ Desfer (24 h).':'¿Borrar <b>TODAS</b> las autoescuelas y sus datos?<br><br>Esta acción se puede <b>deshacer</b> con el botón ↶ Deshacer (24 h).', ()=>{snapshotStatsForUndo(isCA?'Buidar tot':'Vaciar todo');saveStats({autoescoles:[],data:{}});renderTable();refreshUndoBtn();toast(isCA?'🗑 Autoescoles esborrades':'🗑 Autoescuelas borradas')}, isCA?'Sí, esborrar tot':'Sí, borrar todo', true);
   };
+  // 🗓 Feb 2026 · Borrar sólo un mes concreto (ej. Septiembre 2024 importado mal)
+  const refreshUndoBtn=()=>{
+    const b=back.querySelector('#stUndo');
+    if(!b)return;
+    const u=getLastStatsUndo();
+    if(u){
+      b.style.display='';
+      const dt=new Date(u.ts);
+      const hh=String(dt.getHours()).padStart(2,'0'),mm=String(dt.getMinutes()).padStart(2,'0');
+      b.title=(isCA?'Desfer: ':'Deshacer: ')+u.reason+'  ('+hh+':'+mm+')';
+    }else{
+      b.style.display='none';
+    }
+  };
+  back.querySelector('#stDeleteMonth').onclick=()=>{
+    const st=loadStats();
+    const keys=Object.keys(st.data||{}).sort();
+    if(!keys.length){ toast(isCA?'No hi ha dades a esborrar':'No hay datos que borrar'); return; }
+    const yearsSet=new Set(keys.map(k=>k.slice(0,4)));
+    const years=[...yearsSet].sort((a,b)=>+b-+a);
+    const curY=String($('#stYear').value||new Date().getFullYear());
+    const curM=String(+($('#stMonth').value||new Date().getMonth()+1)).padStart(2,'0');
+    const m=document.createElement('div');m.className='modal-back';m.style.zIndex='650';
+    m.innerHTML=`<div class="modal" style="max-width:460px">
+      <h3>🗓 ${isCA?'Esborrar un mes concret':'Borrar un mes concreto'}</h3>
+      <p class="small" style="color:#94a3b8;margin:4px 0 10px">${isCA?'Selecciona l\'any i el mes que vols esborrar. La resta de dades no es tocarà.':'Selecciona el año y el mes que quieres borrar. El resto de datos no se tocará.'}</p>
+      <div style="display:flex;gap:10px;margin-bottom:10px">
+        <select id="dmYear" style="flex:1;background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px">${years.map(y=>`<option value="${y}" ${y===curY?'selected':''}>${y}</option>`).join('')}</select>
+        <select id="dmMonth" style="flex:1;background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px">${MESOS.map((n,i)=>`<option value="${String(i+1).padStart(2,'0')}" ${String(i+1).padStart(2,'0')===curM?'selected':''}>${n}</option>`).join('')}</select>
+      </div>
+      <div id="dmPreview" class="small" style="background:#0e1117;border:1px solid #2a3040;border-radius:8px;padding:10px;margin-bottom:12px;color:#cbd5e1"></div>
+      <div class="row"><button class="btn" data-no>${isCA?'Cancel·lar':'Cancelar'}</button><button class="btn btn-danger" data-yes>${isCA?'Sí, esborrar aquest mes':'Sí, borrar ese mes'}</button></div>
+    </div>`;
+    document.body.appendChild(m);
+    const updPreview=()=>{
+      const y=m.querySelector('#dmYear').value, mo=m.querySelector('#dmMonth').value;
+      const k=`${y}-${mo}`;
+      const obj=(st.data||{})[k]||{};
+      const names=Object.keys(obj);
+      const tot=names.reduce((a,n)=>a+(+obj[n]||0),0);
+      const nm=MESOS[+mo-1];
+      m.querySelector('#dmPreview').innerHTML = names.length
+        ? (isCA?`S'esborraran <b>${names.length}</b> autoescoles amb <b>${tot}</b> certificats de <b>${nm} ${y}</b>.`:`Se borrarán <b>${names.length}</b> autoescuelas con <b>${tot}</b> certificados de <b>${nm} ${y}</b>.`)
+        : (isCA?`<span style="color:#f59e0b">No hi ha dades a ${nm} ${y}.</span>`:`<span style="color:#f59e0b">No hay datos en ${nm} ${y}.</span>`);
+    };
+    m.querySelector('#dmYear').onchange=updPreview;
+    m.querySelector('#dmMonth').onchange=updPreview;
+    updPreview();
+    m.querySelector('[data-no]').onclick=()=>m.remove();
+    m.addEventListener('click',ev=>{if(ev.target===m)m.remove()});
+    m.querySelector('[data-yes]').onclick=()=>{
+      const y=m.querySelector('#dmYear').value, mo=m.querySelector('#dmMonth').value;
+      const k=`${y}-${mo}`;
+      const cur=loadStats();
+      if(!(cur.data||{})[k]){ toast(isCA?'No hi ha dades a esborrar':'No hay datos que borrar'); m.remove(); return; }
+      snapshotStatsForUndo((isCA?'Esborrat mes ':'Borrado mes ')+MESOS[+mo-1]+' '+y);
+      delete cur.data[k];
+      saveStats(cur);
+      m.remove();
+      renderTable();
+      refreshUndoBtn();
+      toast((isCA?'🗑 Esborrat ':'🗑 Borrado ')+MESOS[+mo-1]+' '+y);
+    };
+  };
+  back.querySelector('#stUndo').onclick=()=>{
+    const u=getLastStatsUndo();
+    if(!u){ toast(isCA?'Res a desfer':'Nada que deshacer'); refreshUndoBtn(); return; }
+    const dt=new Date(u.ts);
+    const hhmm=String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');
+    confirmModal(
+      isCA?'↶ Desfer últim canvi':'↶ Deshacer último cambio',
+      (isCA?'Es restaurarà l\'estat anterior a:<br><br><b>':'Se restaurará el estado anterior a:<br><br><b>')+u.reason+'</b><br><span class="small" style="color:#94a3b8">'+hhmm+'</span>',
+      ()=>{
+        const popped=popStatsUndo();
+        if(!popped){ toast(isCA?'Res a desfer':'Nada que deshacer'); refreshUndoBtn(); return; }
+        try{
+          localStorage.setItem(STATS_KEY,popped.snapshot);
+          pushSnapshot('auto');scheduleFileAutoSave();
+        }catch(_){}
+        renderTable();
+        refreshUndoBtn();
+        toast(isCA?'↶ Canvi desfet':'↶ Cambio deshecho');
+      },
+      isCA?'Sí, desfer':'Sí, deshacer',
+      false
+    );
+  };
+  refreshUndoBtn();
   // 📥 Cargar histórico DESDE EL EXCEL DEL CLIENTE (feb 2026)
   // Cada cliente sube su propio archivo .xls/.xlsx con varias hojas (una por año).
   // El parser detecta automáticamente:
@@ -2471,11 +2596,13 @@ function openStats(initialSection){
           addedMonths++;
         }
       }
+      snapshotStatsForUndo(isCA?'Pujada Excel històric':'Subida Excel histórico');
       saveStats(cur);
       try{ localStorage.setItem('caja.stats.backfill.loaded.v1', String(Date.now())); }catch(_){}
       const btn = back.querySelector('#stBackfillHist');
       if(btn) btn.style.display = 'none';
       renderTable();
+      if(typeof refreshUndoBtn==='function')refreshUndoBtn();
       const summary = isCA
         ? `✅ Històric pujat · ${sheetsProcessed} fulls processats · ${Object.keys(groups).length} autoescoles úniques · ${addedMonths} mesos afegits${skippedMonths?' · '+skippedMonths+' respectats':''}`
         : `✅ Histórico subido · ${sheetsProcessed} hojas procesadas · ${Object.keys(groups).length} autoescuelas únicas · ${addedMonths} meses añadidos${skippedMonths?' · '+skippedMonths+' respetados':''}`;
@@ -2663,7 +2790,7 @@ function openStats(initialSection){
       const existing=st.data[key];const hasExisting=existing&&Object.keys(existing).length>0;
       const total=Object.values(sums).reduce((a,b)=>a+b,0);
       const detail=Object.entries(sums).sort((a,b)=>b[1]-a[1]).slice(0,15).map(([k,v])=>`${k}: ${v}`).join(' · ');
-      const doApply=()=>{st.data[key]=sums;saveStats(st);renderTable();toast(isCA?`✅ Importat ${MESOS[mi-1]} ${year}: ${total} certificats`:`✅ Importado ${MESOS[mi-1]} ${year}: ${total} certificados`,3500)};
+      const doApply=()=>{snapshotStatsForUndo((isCA?'Import CSV ':'Import CSV ')+MESOS[mi-1]+' '+year);st.data[key]=sums;saveStats(st);renderTable();if(typeof refreshUndoBtn==='function')refreshUndoBtn();toast(isCA?`✅ Importat ${MESOS[mi-1]} ${year}: ${total} certificats`:`✅ Importado ${MESOS[mi-1]} ${year}: ${total} certificados`,3500)};
       confirmModal(`📥 ${isCA?'Importar':'Importar'} ${MESOS[mi-1]} ${year}`,isCA?`<b>Total ${total} certificats</b> · ${Object.keys(sums).length} autoescoles<br><br><span class="small">${detail}</span>${hasExisting?'<br><br>⚠️ <b>Ja hi ha dades per aquest mes.</b> Es sobreescriuran.':''}`:`<b>Total ${total} certificados</b> · ${Object.keys(sums).length} autoescuelas<br><br><span class="small">${detail}</span>${hasExisting?'<br><br>⚠️ <b>Ya hay datos para este mes.</b> Se sobrescribirán.':''}`,doApply,'Importar',false);
     };
     if(newRaws.length===0){applyImport();return}
@@ -3206,7 +3333,7 @@ function openStats(initialSection){
       margins:'6mm',
       extraCss:`
         @page { size: A4 landscape; margin: 6mm }
-        button, select, input, [data-no], #stSectionSwitch, .icon-btn, [data-del], #stFooterHint, #stImport, #stAdd, #stClearAll, #stChart { display:none !important }
+        button, select, input, [data-no], #stSectionSwitch, .icon-btn, [data-del], #stFooterHint, #stImport, #stAdd, #stClearAll, #stDeleteMonth, #stUndo, #stChart { display:none !important }
         body{ background:#fff !important; color:#000 !important; font-family:Arial,sans-serif !important }
         .modal, .modal *{ background:#fff !important; color:#000 !important; box-shadow:none !important }
         .modal{ padding:4mm !important; max-width:none !important; width:100% !important }

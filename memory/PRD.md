@@ -1,4 +1,26 @@
 # MediCar Plus · PRD (Product Requirements Document)
+## 2026-10-01 · FEATURE · Borrar mes concreto + Deshacer último cambio (Autoescuelas)
+
+**Petición del usuario:**
+> "AQUI QUERIA BORRAR SOLO EL SEPTIEMBRE QUE SE HA IMPORTADO MAL, TENDRIA QUE HABER ALGUNA OPCION DE BORRAR LOS DATOS DE UN MES CONCRETO, Y SI POR ERROR SE BORRARA TODO TENER UN BOTON DE DESHACER ULTIMO CAMBIO"
+
+**Implementación en `/app/frontend/public/v2.html` (modal Estadísticas → Autoescuelas):**
+1. Nuevo botón **🗓 Borrar mes** (`#stDeleteMonth`) → modal con selector Año/Mes + preview "Se borrarán X autoescuelas con Y certificados". Elimina solo `st.data["YYYY-MM"]`.
+2. Nuevo botón **↶ Deshacer** (`#stUndo`) → oculto si no hay snapshots; muestra razón + timestamp del último cambio y restaura al pulsar.
+3. Helpers nuevos: `snapshotStatsForUndo(reason)`, `getLastStatsUndo()`, `popStatsUndo()`.
+4. Stack **FIFO máx 3 snapshots** en `caja.stats.undo.v1` con caducidad **24 h**.
+5. Snapshot automático antes de: Vaciar todo · Borrar mes · Eliminar autoescuela individual · Import CSV `doApply` · Subir Excel histórico (backfill).
+6. Ambos botones nuevos ocultos en `@media print` para no aparecer en PDF.
+
+**Tests:**
+- `/app/frontend/public/tests/undo_borrar_mes.js` **(nuevo)**: 5 tests · 100% pass (FIFO máx 3, borrar YYYY-MM aislado, undo restaura byte-exact, caducidad 24 h, 3 undos consecutivos).
+- Validación browser real: todas las aserciones pasan (helpers, borrado selectivo, restauración exacta, FIFO).
+
+**Nota operativa:** usuario debe hacer `Ctrl+Shift+R` o reiniciar Electron tras deploy.
+
+---
+
+
 ## 2026-10-01 · FIX CRÍTICO · Fusión de caja.stats.v1 en copia diaria entre PCs
 
 **Escenario reportado por el usuario:**
