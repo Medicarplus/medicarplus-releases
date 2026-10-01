@@ -11120,12 +11120,26 @@ $('#jsonInput').onchange=async ev=>{
         const _cec = _keysApplied.includes('caja.cempla.v1') ? _countByDate(localStorage.getItem('caja.cempla.v1')) : 0;
         if(_v1c) parts.push(isCA?`Tràfic: ${_v1c} apunts`:`Tráfico: ${_v1c} apuntes`);
         if(_cec) parts.push(`${(window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2'}: ${_cec}`);
+        // 🎯 Oct 2026 · Validación crítica: lo que decía la copia vs lo que acabó en localStorage
+        //   Si el archivo trae autoescuelas pero el merge no las añadió → ERROR VISIBLE.
+        let _validationFail = null;
         if(_keysApplied.includes('caja.stats.v1')){
           try{
             const s = JSON.parse(localStorage.getItem('caja.stats.v1')||'{}');
             const nM = Object.keys(s.data||{}).length;
             const nA = (s.autoescoles||[]).length;
             if(nM) parts.push(isCA?`Autoescoles: ${nA} · ${nM} mesos`:`Autoescuelas: ${nA} · ${nM} meses`);
+            // Validar contra lo que decía el archivo
+            try{
+              const srcStats = (obj.data && obj.data['caja.stats.v1']) || obj.stats || {};
+              const expectedA = (srcStats.autoescoles||[]).length;
+              const expectedM = Object.keys(srcStats.data||{}).length;
+              if(expectedA > 0 && nA < expectedA){
+                _validationFail = isCA
+                  ? `⚠️ L'arxiu portava ${expectedA} autoescoles i ${expectedM} mesos però només s'han afegit ${nA} i ${nM}. Reinicia MediCar Plus (tanca i torna a obrir) i torna-ho a provar.`
+                  : `⚠️ El archivo traía ${expectedA} autoescuelas y ${expectedM} meses pero sólo se añadieron ${nA} y ${nM}. Reinicia MediCar Plus (cierra y vuelve a abrir) y vuélvelo a intentar.`;
+              }
+            }catch(_){}
           }catch(_){}
         }
         if(_keysApplied.includes('caja.irpf.v1')){
@@ -11141,6 +11155,22 @@ $('#jsonInput').onchange=async ev=>{
         if(_keysApplied.includes('caja.tarifas.rules.v1')) parts.push(isCA?'Tarifes':'Tarifas');
         const summary = parts.length ? parts.join(' · ') : `${_keysApplied.length} ${isCA?'claus':'claves'}`;
         log.push(isCA?`Còpia completa (${summary})`:`Copia completa (${summary})`);
+        // 🚨 Si falló validación, mostrar modal rojo bloqueante
+        if(_validationFail){
+          try{
+            const errBack = document.createElement('div');
+            errBack.className = 'modal-back';
+            errBack.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:100099;padding:20px';
+            errBack.innerHTML = `<div class="modal" style="max-width:560px;padding:24px;border:2px solid #ef4444" data-testid="restore-validation-fail">
+              <div style="text-align:center;margin-bottom:12px"><div style="font-size:44px">⚠️</div>
+              <h3 style="margin:8px 0 6px;color:#ef4444;font-family:Georgia,serif">${isCA?'Restauració incompleta':'Restauración incompleta'}</h3></div>
+              <div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.4);border-radius:8px;padding:14px;color:#fecaca;font-size:13px;line-height:1.65">${_validationFail}</div>
+              <button id="reloadNow" style="width:100%;margin-top:14px;padding:12px;background:linear-gradient(135deg,#22c55e,#15803d);color:#fff;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">🔄 ${isCA?'Reiniciar MediCar Plus ara':'Reiniciar MediCar Plus ahora'}</button>
+            </div>`;
+            document.body.appendChild(errBack);
+            errBack.querySelector('#reloadNow').onclick = () => location.reload();
+          }catch(_){}
+        }
       }
       // Refresca CFG en memoria para que la UI recoja el cambio de nombres/socios sin recargar
       try{ window.CFG = JSON.parse(localStorage.getItem('caja.config.v1'))||{}; }catch(_){}
