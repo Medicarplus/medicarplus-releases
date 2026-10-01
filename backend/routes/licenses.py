@@ -1294,6 +1294,30 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         if not patch:
             raise HTTPException(status_code=400, detail="no_fields_to_update")
         patch["contact_updated_at"] = _now().isoformat()
+        # 👑 Oct 2026 · MASTER (owner) no está en `licenses`, se guarda en `master_profile`
+        try:
+            import hashlib as _hl
+            MASTER_KEY_LITERAL = "MB-MASTER-BRUGULAT-2026-OWNER"
+            master_lkh = _hl.sha256(MASTER_KEY_LITERAL.encode()).hexdigest()
+            is_master = False
+            if install_id.startswith("__OWNER_"):
+                is_master = True
+            else:
+                dev = await db["sync_devices"].find_one(
+                    {"install_id": install_id, "license_key_hash": master_lkh}, {"_id": 0}
+                )
+                if dev: is_master = True
+            if is_master:
+                mp = db["master_profile"]
+                await mp.update_one(
+                    {"install_id": install_id},
+                    {"$set": {**patch, "install_id": install_id, "updated_at": _now().isoformat()}},
+                    upsert=True,
+                )
+                await _audit(request, "master.contact_update", install_id, extra={"fields": list(patch.keys())})
+                return {"ok": True, "modified": 1, "master": True, "install_id": install_id, "patch": patch}
+        except Exception:  # noqa: BLE001
+            logger.exception("master contact update failed; falling back to normal flow")
         result = await coll.update_one({"install_id": install_id}, {"$set": patch})
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="license_not_found")
@@ -1472,24 +1496,52 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
             master_lkh = _hashlib.sha256(MASTER_KEY_LITERAL.encode()).hexdigest()
             master_devices = await db["sync_devices"].find(
                 {"license_key_hash": master_lkh},
-                {"install_id": 1, "created_at": 1, "last_seen": 1, "_id": 0},
+                {"install_id": 1, "created_at": 1, "last_seen": 1, "hostname": 1, "app_version": 1, "_id": 0},
             ).sort("last_seen", -1).to_list(length=20)
+            # 👑 Oct 2026 · Perfil editado del MASTER (viene de master_profile por install_id)
+            master_profiles_by_iid: dict[str, dict] = {}
+            try:
+                async for mp in db["master_profile"].find({}, {"_id": 0}):
+                    iid_ = mp.get("install_id")
+                    if iid_: master_profiles_by_iid[iid_] = mp
+            except Exception:  # noqa: BLE001
+                pass
+            # 👑 Oct 2026 · Primera actividad del MASTER para fallback de "created_at"
+            earliest_master = None
+            try:
+                first_bk = await db["sync_cloud_backups"].find(
+                    {"license_key_hash": master_lkh}, {"created_at": 1, "_id": 0}
+                ).sort("created_at", 1).limit(1).to_list(1)
+                if first_bk and first_bk[0].get("created_at"):
+                    earliest_master = first_bk[0]["created_at"]
+            except Exception:  # noqa: BLE001
+                pass
             if master_devices:
                 # Un row por cada instalación real del owner
                 for md in master_devices:
                     iid = md.get("install_id")
                     if not iid: continue
                     if any(d.get("install_id") == iid for d in docs): continue
+                    hostname = (md.get("hostname") or "").strip()
+                    short_iid = iid[:12] + "…" if len(iid) > 15 else iid
+                    display_name = f"👑 MediCar Plus (owner · {hostname})" if hostname else f"👑 MediCar Plus (owner · {short_iid})"
+                    # Aplicar overrides del master_profile si existen
+                    mp = master_profiles_by_iid.get(iid) or {}
+                    client_name_final = mp.get("client_name") or display_name
+                    client_email_final = mp.get("client_email") or "marc@medicarplus.es"
                     synthetic = {
                         "install_id": iid,
-                        "client_name": "👑 MediCar Plus (owner)",
-                        "client_email": "marc@medicarplus.es",
+                        "client_name": client_name_final,
+                        "client_email": client_email_final,
+                        "phone": mp.get("phone"),
+                        "tax_id": mp.get("tax_id"),
+                        "contact_name": mp.get("contact_name") or hostname or None,
                         "plan": "MASTER",
                         "status": "active",
-                        "created_at": md.get("created_at") or _now(),
+                        "created_at": md.get("created_at") or earliest_master or _now(),
                         "expires_at": None,
                         "duration_days": None,
-                        "notes": "Cuenta propia del proveedor (MASTER key).",
+                        "notes": mp.get("notes") or ("Cuenta propia del proveedor (MASTER key)." + (f" · PC: {hostname}" if hostname else "")),
                         "last_verified_at": md.get("last_seen"),
                         "verify_count": 0,
                         "_synthetic_master": True,
