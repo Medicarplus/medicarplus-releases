@@ -1,4 +1,44 @@
 # MediCar Plus · PRD (Product Requirements Document)
+## 2026-10-01 · FIX CRÍTICO · Fusión de caja.stats.v1 en copia diaria entre PCs
+
+**Escenario reportado por el usuario:**
+> "Importo CSVs y meto datos de autoescuelas (secretario, PC master). Paso copia diaria al gerente (PC Victoria). En Victoria NO se le pasan los datos de autoescuelas ni se rellenan las Estadísticas Tráfico."
+
+**Diagnóstico forense (2 archivos JSON del usuario):**
+- PC Secretario (master): `caja.stats.v1` tenía **101 autoescuelas** × **343 meses** desde 1998-01 hasta 2026-08 (108KB)
+- PC Victoria (receptor): `caja.stats.v1 = {autoescoles:[], data:{}}` (vacío)
+
+**Causa raíz:**
+`_mergeSnapshots()` (función de fusión de copias diarias entre PCs vinculados en modo `linked`) NO tenía caso específico para `caja.stats.v1`. Caía en el fallback por `_mtime` y, como esa clave no tiene `_mtime`, el ternario `rts > lts` daba `0 > 0 = false` → **ganaba el valor local aunque estuviera vacío**. Resultado: 28 años de histórico se descartaban silenciosamente en cada sync.
+
+**Fix aplicado (`/app/frontend/public/v2.html`):**
+1. Añadidos mergers específicos en `_mergeSnapshots`:
+   - `caja.stats.v1` → `_mergeStatsV1(lv, rv)` une autoescoles y fusiona `data` por mes
+   - `caja.irpf.v1` → merge de `months` + `quarters`
+   - `caja.calendar.urls.v1` → array dedup por `url`
+   - `caja.tarifas.rules.v1` → array dedup por `id`
+   - `caja.stats.aliases.v1`, `caja.stats.traffic.overrides.v1`, `caja.cuadre.overrides.v1` → merge superficial (local gana, remoto rellena huecos)
+2. Añadido guardia general: si `lv` está vacío (`{}` o `[]`) y `rv` tiene datos → gana `rv`
+3. Añadido fallback para objetos planos sin `_mtime`: deep-merge superficial (preserva campos de ambos)
+4. Eliminado el botón "🩺 Diagnóstico completo" de la UI y su handler (ya no es necesario)
+
+**Tests:**
+- `/app/frontend/public/tests/sync_merge_stats.js` **(nuevo)**: 9 tests · 100% pass
+  - Receptor vacío + emisor con 343 meses de 1998-2026
+  - Merge real con autoescuelas superpuestas y mes compartido con autoescuelas distintas
+  - Fusión de IRPF, calendar.urls, tarifas.rules, aliases
+  - caja.v1 byDate sigue funcionando (regresión)
+- `backup_roundtrip.js`: **19 OK / 0 FAIL** (regresión)
+- `full_backup_coverage.js`: **29 OK / 0 FAIL** (regresión)
+- `tariff_rules.js`: **59 OK / 0 FAIL** (regresión)
+
+**Impacto:**
+Cuando el gerente aplique la próxima copia diaria del secretario, verá **todos los años de autoescuelas** fusionados correctamente en Estadísticas → Tráfico, sin perder los suyos del PC receptor.
+
+---
+
+
+# MediCar Plus · PRD (Product Requirements Document)
 ## 2026-09-30 · MIGRACIÓN DE PC + SMS EN COPIAS · 84 tests PASADOS
 
 **Escenario del usuario:** "si mi cliente cambia de ordenador (voluntario o avería), no debe perder ni un dato. La copia debe llevar TODO — SMS, citas, contabilidad — y restaurar exactamente igual."
