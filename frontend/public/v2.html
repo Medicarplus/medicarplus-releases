@@ -7372,7 +7372,18 @@ function loadIrpf(){
     return out;
   }catch(e){return {trafic:{months:{},quarters:{}},cempla:{months:{},quarters:{}}}}
 }
-function saveIrpf(o){localStorage.setItem('caja.irpf.v1',JSON.stringify(o));pushSnapshot('auto');scheduleFileAutoSave()}
+// ⚡ Oct 2026 · OPTIMIZACIÓN LAG · El pushSnapshot escanea las 17 claves de
+//   localStorage (caja.v1 completo con histórico, stats de 343 meses, etc.) y las
+//   serializa para firmar cambios. En IRPF cada keystroke llamaba saveIrpf → pushSnapshot
+//   provocando 50-500ms de lag por tecla con BDs grandes. Debounce 800ms: el guardado
+//   a localStorage sigue instantáneo (dato persistido), pero el snapshot solo se
+//   dispara una vez cuando el usuario deja de teclear.
+let _irpfSnapTimer=null;
+function saveIrpf(o){
+  localStorage.setItem('caja.irpf.v1',JSON.stringify(o));
+  clearTimeout(_irpfSnapTimer);
+  _irpfSnapTimer=setTimeout(()=>{try{pushSnapshot('auto');scheduleFileAutoSave()}catch(_){}}, 800);
+}
 function seedIrpfMonth(comp){return {totalCertificats:0,totalCertfBombers:0,entries:IRPF_DEFAULTS[comp].map(n=>({nom:n,cert:0,brut:0,ss:0,netSS:0}))}}
 // Retorna el % IRPF actual d'una empresa (per defecte 15%). Configurable per usuari.
 function irpfPct(comp){const all=loadIrpf();const p=all&&all[comp]&&all[comp].pct;const n=Number(p);return (isFinite(n)&&n>=0&&n<=100)?n:15}
@@ -8115,7 +8126,16 @@ function openIRPF(){
     //    · El badge 🔔 muestra los pagos netos como referencia informativa.
     //    · El campo BRUT es 100% manual (no auto-sync). La sección IRPF es la única
     //      fuente de verdad para el cálculo IRPF Modelo 111.
+    // ⚡ Oct 2026 · OPTIMIZACIÓN LAG: _getHonorariosWorkersOfMonth escanea TODO el mes.
+    //   Antes se llamaba 1 + N veces (1 global + 1 por fila para _getLinkedHonorariosForWorker).
+    //   Ahora: 1 sola llamada y se construye un mapa workerKey→entries reutilizado por filas.
     const honoWorkers = _getHonorariosWorkersOfMonth(m, irpfComp);
+    const _linkedCache = new Map();
+    honoWorkers.forEach((info, nk) => { _linkedCache.set(nk, info.entries || []); });
+    const _getLinkedFast = (workerName) => {
+      const nk = _normalizeWorkerKey(workerName);
+      return nk ? (_linkedCache.get(nk) || []) : [];
+    };
     let mdChanged = false;
     honoWorkers.forEach((info, nk) => {
       const exists = md.entries.some(e => _normalizeWorkerKey(e.nom||'') === nk);
@@ -8130,6 +8150,24 @@ function openIRPF(){
       if(typeof e.active !== 'boolean') e.active = true;
       if(e.mode !== 'cert' && e.mode !== 'direct') e.mode = 'cert';
     });
+    // ✅ Oct 2026 · Valida envíos previos a DH: si el usuario borró la línea DEBE
+    //    directamente desde la hoja del día, el check debe limpiarse automáticamente
+    //    para permitir reenviar. Se consulta UNA sola vez por render el byDate del
+    //    almacén activo (irpfComp) y se purgan referencias huérfanas.
+    const _dhStorageKey = irpfComp === 'cempla' ? 'caja.cempla.v1' : 'caja.v1';
+    const _dhBdCache = (function(){
+      try{ return (JSON.parse(localStorage.getItem(_dhStorageKey)||'{"byDate":{}}').byDate) || {}; }
+      catch(_){ return {}; }
+    })();
+    let _dhPurged = false;
+    md.entries.forEach(e => {
+      if(e._dhSent && e._dhSent.dhId && e._dhSent.dhDate){
+        const list = _dhBdCache[e._dhSent.dhDate] || [];
+        const stillExists = list.some(x => x && x.id === e._dhSent.dhId);
+        if(!stillExists){ delete e._dhSent; _dhPurged = true; }
+      }
+    });
+    if(_dhPurged) saveIrpf(data);
     if(mdChanged) saveIrpf(data);
     // % IRPF configurable per empresa (default 15%)
     const pct=irpfPct(irpfComp);
@@ -8167,8 +8205,8 @@ function openIRPF(){
       // Modo DIRECTO: campos cert/€cert grisados; BRUT siempre editable manual.
       const certDisabledAttr = (!isActive || modeDirect) ? 'disabled' : '';
       const brutReadonly = (modeDirect ? false : (autoBrut || !isActive));
-      // Pagos netos del mes para este trabajador (badge informativo)
-      const linked = _getLinkedHonorariosForWorker(e.nom||'', m, irpfComp);
+      // Pagos netos del mes para este trabajador (badge informativo) · usa cache
+      const linked = _getLinkedFast(e.nom||'');
       const linkedTotal = linked.reduce((s,x)=>s+(x.importe||0),0);
       const linkedBadge = linked.length
         ? `<button class="btn" data-linkinfo="${i}" title="Ver los ${linked.length} pagos netos (Nómina/Honoraris/Faena) de ${escapeHtml(e.nom||'')} en ${monthLabel(m)}" style="padding:2px 8px;background:#0369a1;color:#fff;border:none;border-radius:10px;font-size:10px;font-weight:700;cursor:pointer;margin-left:4px;white-space:nowrap">🔔 ${linked.length} pago${linked.length===1?'':'s'} neto · ${fmt(linkedTotal)}</button>`
@@ -8199,7 +8237,20 @@ function openIRPF(){
         <td style="padding:4px 6px;border:1px solid #b45309;text-align:right;background:#f5f5dc;font-family:'Courier New',monospace;font-weight:700;color:#1a1a1a">${isActive&&c.hasSs?fmt(c.total):'—'}</td>
         <td style="padding:4px 6px;border:1px solid #b45309;text-align:right;background:${isActive?'#fef3c7':'#f0e6d2'};font-family:'Courier New',monospace;font-weight:700;color:#78350f">${isActive?fmt(c.irpf):'—'}</td>
         <td style="padding:4px 6px;border:1px solid #b45309;text-align:right;background:#f5f5dc;font-family:'Courier New',monospace;font-weight:700;color:#1a1a1a">${isActive?fmt(c.net):'—'}</td>
-        <td style="padding:4px 6px;border:1px solid #b45309;text-align:center"><button class="btn" data-del="${i}" title="${L('Eliminar aquesta persona','Eliminar esta persona')}" style="padding:4px 10px;background:#b91c1c;color:#fff;border:none;border-radius:4px;font-size:14px;cursor:pointer">🗑</button></td>
+        <td style="padding:4px 6px;border:1px solid #b45309;text-align:center;white-space:nowrap">
+          ${(function(){
+            if(!isActive) return '';
+            if(e._dhSent && e._dhSent.dhId){
+              const dateStr = (e._dhSent.dhDate||'').split('-').reverse().join('/');
+              return `<button class="btn" data-sent-info="${i}" title="${L(`Ja enviat a Debe/Haver el ${dateStr} (${fmt(e._dhSent.dhAmount||0)}). Clic per veure o anul·lar.`,`Ya enviado a Debe/Haber el ${dateStr} (${fmt(e._dhSent.dhAmount||0)}). Clic para ver o anular.`)}" style="padding:4px 8px;background:#166534;color:#fff;border:none;border-radius:4px;font-size:14px;cursor:pointer;margin-right:3px" data-testid="irpf-sent-${i}">✅</button>`;
+            }
+            if(c.irpf>0){
+              return `<button class="btn" data-send-dh="${i}" title="${L('Enviar IRPF al dia actual com a Despesa a Debe/Haver','Enviar IRPF al día actual como Gasto a Debe/Haber')}" style="padding:4px 8px;background:#0369a1;color:#fff;border:none;border-radius:4px;font-size:14px;cursor:pointer;margin-right:3px" data-testid="irpf-send-dh-${i}">💸</button>`;
+            }
+            return '';
+          })()}
+          <button class="btn" data-del="${i}" title="${L('Eliminar aquesta persona','Eliminar esta persona')}" style="padding:4px 10px;background:#b91c1c;color:#fff;border:none;border-radius:4px;font-size:14px;cursor:pointer">🗑</button>
+        </td>
       </tr>`;
     }).join('');
     // Totals mes: SOLO filas activas
@@ -8407,12 +8458,161 @@ function openIRPF(){
       saveIrpf(d2);
       render();
     });
+    // 💸 Enviar IRPF al día actual como Gasto en Debe/Haber
+    back.querySelectorAll('[data-send-dh]').forEach(b => b.onclick = () => {
+      const i = parseInt(b.dataset.sendDh);
+      const d2 = loadIrpf();
+      const ent = d2[irpfComp].months[m].entries[i];
+      if(!ent) return;
+      const irpfAmount = +irpfCalc(ent, pct).irpf.toFixed(2);
+      if(irpfAmount <= 0){ toast(L('Aquesta persona no té IRPF a enviar','Esta persona no tiene IRPF que enviar')); return; }
+      const todayISO = new Date().toISOString().slice(0,10);
+      const defConcept = `IRPF ${ent.nom||''} · ${monthLabel(m)}`.trim();
+      const cb = document.createElement('div');
+      cb.className = 'modal-back';
+      cb.style.zIndex = '100060';
+      cb.innerHTML = `<div class="modal" style="max-width:500px;background:#faf6e8;color:#1a1a1a">
+        <h3 style="color:#78350f;margin-top:0;font-family:Georgia,serif">💸 ${L('Enviar IRPF a Debe/Haber','Enviar IRPF a Debe/Haber')}</h3>
+        <p style="font-size:13px;color:#78350f;line-height:1.5">${L(`S'afegirà una línia <b>DEBE</b> (despesa) a <b>${compName(irpfComp)}</b>. Pots ajustar la data, el concepte o l'import abans de confirmar.`,`Se añadirá una línea <b>DEBE</b> (gasto) a <b>${compName(irpfComp)}</b>. Puedes ajustar la fecha, el concepto o el importe antes de confirmar.`)}</p>
+        <div style="display:grid;grid-template-columns:110px 1fr;gap:10px;margin:14px 0;align-items:center">
+          <label style="color:#78350f;font-weight:700">${L('Data','Fecha')}:</label>
+          <input type="date" id="_sdhDate" value="${todayISO}" style="padding:8px;border:1px solid #b45309;border-radius:5px;background:#fff;color:#1a1a1a"/>
+          <label style="color:#78350f;font-weight:700">${L('Concepte','Concepto')}:</label>
+          <input type="text" id="_sdhConcept" value="${escapeHtml(defConcept)}" style="padding:8px;border:1px solid #b45309;border-radius:5px;background:#fff;color:#1a1a1a"/>
+          <label style="color:#78350f;font-weight:700">${L('Import','Importe')}:</label>
+          <input type="text" id="_sdhAmount" value="${String(irpfAmount).replace('.',',')}" style="padding:8px;border:1px solid #b45309;border-radius:5px;background:#fff;color:#1a1a1a;font-weight:700"/>
+          <label style="color:#78350f;font-weight:700">${L('Mètode','Método')}:</label>
+          <select id="_sdhFp" style="padding:8px;border:1px solid #b45309;border-radius:5px;background:#fff;color:#1a1a1a">
+            <option value="E">💵 ${L('Efectiu','Efectivo')}</option>
+            <option value="X">🏦 ${L('Transferència','Transferencia')}</option>
+            <option value="T">💳 ${L('Targeta','Tarjeta')}</option>
+            <option value="B">📱 Bizum</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn" data-cancel style="background:#f0e6d2;color:#78350f;border-color:#b45309">${L('Cancel·lar','Cancelar')}</button>
+          <button class="btn btn-primary" data-ok style="background:#166534;color:#fff;border-color:#166534" data-testid="irpf-send-dh-confirm">✓ ${L('Enviar','Enviar')}</button>
+        </div>
+      </div>`;
+      document.body.appendChild(cb);
+      cb.querySelector('[data-cancel]').onclick = () => cb.remove();
+      cb.addEventListener('click', ev => { if(ev.target===cb) cb.remove(); });
+      cb.querySelector('[data-ok]').onclick = () => {
+        const dateVal = cb.querySelector('#_sdhDate').value;
+        const concept = (cb.querySelector('#_sdhConcept').value||'').trim();
+        const amount = num(cb.querySelector('#_sdhAmount').value);
+        const fp = cb.querySelector('#_sdhFp').value;
+        if(!dateVal || amount <= 0 || !concept){ toast(L('Falten dades','Faltan datos')); return; }
+        const storageKey = irpfComp === 'cempla' ? 'caja.cempla.v1' : 'caja.v1';
+        try{
+          const raw = JSON.parse(localStorage.getItem(storageKey) || '{"byDate":{}}');
+          raw.byDate = raw.byDate || {};
+          raw.byDate[dateVal] = raw.byDate[dateVal] || [];
+          const dhId = uid();
+          raw.byDate[dateVal].push({
+            id: dhId, kind: 'DH', tipo: 'DEBE', grupo: '-',
+            nombre: concept, importe: amount, descuento: 0, tasa: 0,
+            fp: fp, fpTasa: '', retorno: false,
+            _irpfSentFrom: { comp: irpfComp, ym: m, entryIdx: i }
+          });
+          localStorage.setItem(storageKey, JSON.stringify(raw));
+          // Guardar referencia en la entry IRPF para marcarla como "enviada"
+          const d3 = loadIrpf();
+          if(d3[irpfComp] && d3[irpfComp].months[m] && d3[irpfComp].months[m].entries[i]){
+            d3[irpfComp].months[m].entries[i]._dhSent = {
+              dhId, dhDate: dateVal, dhAmount: amount, concept, fp, ts: Date.now()
+            };
+            saveIrpf(d3);
+          }
+          if(typeof pushSnapshot === 'function') pushSnapshot('irpf2dh');
+          if(typeof currentCompany !== 'undefined' && currentCompany === irpfComp && typeof state !== 'undefined'){
+            state.byDate = raw.byDate;
+            if(typeof render === 'function' && typeof currentDate !== 'undefined' && currentDate === dateVal){
+              try{ render(); }catch(_){}
+            }
+          }
+          cb.remove();
+          render();
+          toast(`✅ ${fmt(amount)} ${L('afegit com a Despesa IRPF','añadido como Gasto IRPF')} · ${dateVal.split('-').reverse().join('/')}`, 3500);
+        }catch(err){
+          console.error('[IRPF→DH]', err);
+          toast(L('Error en enviar','Error al enviar'), 3000);
+        }
+      };
+    });
+    // ✅ Info / Anular envío (si ya se envió a DH)
+    back.querySelectorAll('[data-sent-info]').forEach(b => b.onclick = () => {
+      const i = parseInt(b.dataset.sentInfo);
+      const d2 = loadIrpf();
+      const ent = d2[irpfComp].months[m].entries[i];
+      if(!ent || !ent._dhSent){ render(); return; }
+      const info = ent._dhSent;
+      const dateStr = (info.dhDate||'').split('-').reverse().join('/');
+      confirmModal(
+        L('✅ Ja enviat a Debe/Haver','✅ Ya enviado a Debe/Haber'),
+        L(
+          `Aquest IRPF ja es va enviar a <b>${compName(irpfComp)}</b>:<br><br>📅 Data: <b>${dateStr}</b><br>💰 Import: <b>${fmt(info.dhAmount||0)}</b><br>📝 Concepte: <b>${escapeHtml(info.concept||'')}</b><br><br>Si vols <b>reenviar-lo</b>, has d'anul·lar primer aquest envio.`,
+          `Este IRPF ya se envió a <b>${compName(irpfComp)}</b>:<br><br>📅 Fecha: <b>${dateStr}</b><br>💰 Importe: <b>${fmt(info.dhAmount||0)}</b><br>📝 Concepto: <b>${escapeHtml(info.concept||'')}</b><br><br>Si quieres <b>reenviarlo</b>, debes anular primero este envío.`
+        ),
+        () => {
+          // Anular: borra la línea DEBE y limpia el check
+          const storageKey = irpfComp === 'cempla' ? 'caja.cempla.v1' : 'caja.v1';
+          try{
+            const raw = JSON.parse(localStorage.getItem(storageKey)||'{"byDate":{}}');
+            raw.byDate = raw.byDate || {};
+            const list = raw.byDate[info.dhDate] || [];
+            raw.byDate[info.dhDate] = list.filter(x => x && x.id !== info.dhId);
+            if(!raw.byDate[info.dhDate].length) delete raw.byDate[info.dhDate];
+            localStorage.setItem(storageKey, JSON.stringify(raw));
+            const d3 = loadIrpf();
+            if(d3[irpfComp] && d3[irpfComp].months[m] && d3[irpfComp].months[m].entries[i]){
+              delete d3[irpfComp].months[m].entries[i]._dhSent;
+              saveIrpf(d3);
+            }
+            if(typeof pushSnapshot === 'function') pushSnapshot('irpf2dh-undo');
+            if(typeof currentCompany !== 'undefined' && currentCompany === irpfComp && typeof state !== 'undefined'){
+              state.byDate = raw.byDate;
+              if(typeof render === 'function' && typeof currentDate !== 'undefined' && currentDate === info.dhDate){
+                try{ render(); }catch(_){}
+              }
+            }
+            render();
+            toast(L('↶ Enviament anul·lat · ja pots reenviar','↶ Envío anulado · ya puedes reenviar'), 3000);
+          }catch(err){ console.error('[IRPF→DH anular]', err); toast(L('Error en anul·lar','Error al anular'), 3000); }
+        },
+        L('Anul·lar envio','Anular envío'),
+        true
+      );
+    });
     back.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
       const i=parseInt(b.dataset.del);
       const d2=loadIrpf();
-      const nom=(d2[irpfComp].months[m]&&d2[irpfComp].months[m].entries[i]&&d2[irpfComp].months[m].entries[i].nom)||L('(sense nom)','(sin nombre)');
-      confirmModal(L('Eliminar persona','Eliminar persona'),L(`Segur que vols eliminar <b>${escapeHtml(nom)}</b> del mes actual?<br><br>Aquesta acció no afecta els altres mesos.`,`¿Seguro que quieres eliminar <b>${escapeHtml(nom)}</b> del mes actual?<br><br>Esta acción no afecta a los otros meses.`),()=>{
-        const d3=loadIrpf();d3[irpfComp].months[m].entries.splice(i,1);saveIrpf(d3);render();
+      const entPre=(d2[irpfComp].months[m]&&d2[irpfComp].months[m].entries[i])||{};
+      const nom=entPre.nom||L('(sense nom)','(sin nombre)');
+      const hasSent = entPre._dhSent && entPre._dhSent.dhId;
+      const extraMsg = hasSent ? L(
+        `<br><br>⚠️ També s'eliminarà la línia <b>DEBE</b> enviada a Debe/Haver el ${(entPre._dhSent.dhDate||'').split('-').reverse().join('/')} (${fmt(entPre._dhSent.dhAmount||0)}).`,
+        `<br><br>⚠️ También se eliminará la línea <b>DEBE</b> enviada a Debe/Haber el ${(entPre._dhSent.dhDate||'').split('-').reverse().join('/')} (${fmt(entPre._dhSent.dhAmount||0)}).`
+      ) : '';
+      confirmModal(L('Eliminar persona','Eliminar persona'),L(`Segur que vols eliminar <b>${escapeHtml(nom)}</b> del mes actual?<br><br>Aquesta acció no afecta els altres mesos.${extraMsg}`,`¿Seguro que quieres eliminar <b>${escapeHtml(nom)}</b> del mes actual?<br><br>Esta acción no afecta a los otros meses.${extraMsg}`),()=>{
+        const d3=loadIrpf();
+        const ent3=(d3[irpfComp]&&d3[irpfComp].months[m]&&d3[irpfComp].months[m].entries[i])||null;
+        // Cascada: si estaba enviada a DH, borra también la línea DEBE
+        if(ent3 && ent3._dhSent && ent3._dhSent.dhId){
+          const storageKey = irpfComp === 'cempla' ? 'caja.cempla.v1' : 'caja.v1';
+          try{
+            const raw = JSON.parse(localStorage.getItem(storageKey)||'{"byDate":{}}');
+            raw.byDate = raw.byDate || {};
+            const list = raw.byDate[ent3._dhSent.dhDate] || [];
+            raw.byDate[ent3._dhSent.dhDate] = list.filter(x => x && x.id !== ent3._dhSent.dhId);
+            if(!raw.byDate[ent3._dhSent.dhDate].length) delete raw.byDate[ent3._dhSent.dhDate];
+            localStorage.setItem(storageKey, JSON.stringify(raw));
+            if(typeof currentCompany !== 'undefined' && currentCompany === irpfComp && typeof state !== 'undefined'){
+              state.byDate = raw.byDate;
+            }
+          }catch(err){ console.error('[IRPF del cascade]', err); }
+        }
+        d3[irpfComp].months[m].entries.splice(i,1);saveIrpf(d3);render();
       },L('Sí, eliminar','Sí, eliminar'));
     });
     // 🔔 Ver honorarios enlazados de un trabajador del mes
