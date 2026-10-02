@@ -5925,9 +5925,17 @@ const _GS_KEYWORDS = {
   OTROS:        ['factura','recibo','gasto','despesa','despeses','pago proveedor','proveedor','compra ','compras ']
 };
 function _gsMatchKeyword(text){
+  // 🎯 Oct 2026 · Word-boundary match para evitar que "gas" matche "gasto",
+  //   "sou" matche "mansouri", etc. Antes era substring plano y daba
+  //   falsos positivos muy confusos (todo salía como "Gas").
   const bag = String(text||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   for(const [cat, kws] of Object.entries(_GS_KEYWORDS)){
-    for(const k of kws){ if(bag.includes(k.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''))) return {cat, kw:k}; }
+    for(const k of kws){
+      const kNorm = k.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      // Escape regex specials y uso \b (word boundary)
+      const re = new RegExp('\\b'+kNorm.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i');
+      if(re.test(bag)) return {cat, kw:k};
+    }
   }
   return null;
 }
@@ -5950,7 +5958,7 @@ function _isGastoEntry(e){
   return true;
 }
 function _gsCategoryLabel(cat){
-  return {LUZ:'Luz', AGUA:'Agua', GAS:'Gas', ALQUILER:'Alquiler', TELEFONO:'Teléfono', INTERNET:'Internet', GESTORIA:'Gestoría', SEGURO:'Seguros', MATERIAL:'Material', IRPF:'IRPF', IVA:'IVA', TASAS:'Tasas', MANTENIMIENTO:'Mantenim.', COMBUSTIBLE:'Combustible', BANCO_COM:'Comisiones', HONORARIS:'Honoraris/Nómina', OTROS:'Otros'}[cat] || cat;
+  return {LUZ:'Luz', AGUA:'Agua', GAS:'Gas natural', ALQUILER:'Alquiler', TELEFONO:'Teléfono', INTERNET:'Internet', GESTORIA:'Gestoría', SEGURO:'Seguros', MATERIAL:'Material', IRPF:'IRPF', IVA:'IVA', TASAS:'Tasas', MANTENIMIENTO:'Mantenim.', COMBUSTIBLE:'Combustible', BANCO_COM:'Comisiones', HONORARIS:'Honoraris/Nómina', OTROS:'Otros'}[cat] || cat;
 }
 function _gsCategoryColor(cat){
   return {LUZ:'#fbbf24', AGUA:'#22d3ee', GAS:'#f97316', ALQUILER:'#c084fc', TELEFONO:'#3ddc97', INTERNET:'#7ec8ff', GESTORIA:'#a3e635', SEGURO:'#f472b6', MATERIAL:'#fca5a5', IRPF:'#ef4444', IVA:'#f59e0b', TASAS:'#94a3b8', MANTENIMIENTO:'#60a5fa', COMBUSTIBLE:'#e879f9', BANCO_COM:'#818cf8', HONORARIS:'#f9a8d4', OTROS:'#e2e8f0'}[cat] || '#94a3b8';
@@ -5999,7 +6007,7 @@ function openGastosPanel(){
   back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto';
   back.innerHTML = `<div class="gs-modal" style="background:#111827;border:1px solid #334155;border-radius:12px;padding:22px;max-width:960px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);font-family:Arial,Helvetica,sans-serif" data-testid="gastos-modal">
     <div class="no-print" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px">
-      <div><h3 style="margin:0;color:#f472b6;font-family:Georgia,serif">🧾 Gastos · Facturas y recibos operativos</h3><div id="_gs_subtitle" style="font-size:11px;color:#94a3b8;margin-top:3px"></div></div>
+      <div><h3 style="margin:0;color:#f472b6;font-family:Georgia,serif">🧾 Gastos <span id="_gs_compBadge" style="background:#f472b6;color:#111;padding:3px 10px;border-radius:14px;font-size:13px;margin-left:8px;font-weight:800">—</span></h3><div id="_gs_subtitle" style="font-size:11px;color:#94a3b8;margin-top:3px"></div></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <label style="font-size:10px;color:#94a3b8;font-weight:700">EMPRESA</label>
         <select id="_gs_comp" data-testid="gastos-company-select" style="background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;padding:6px 10px;font-size:13px">
@@ -6053,9 +6061,15 @@ function openGastosPanel(){
     const months = Object.keys(byMonth).sort().reverse();
     const categories = Object.keys(byCategory).sort((a,b)=>byCategory[b].total - byCategory[a].total);
     const subt = document.getElementById('_gs_subtitle');
+    const badge = document.getElementById('_gs_compBadge');
+    if(badge){
+      if(compFilter === '__BOTH__'){ badge.textContent = '⚠️ AMBAS'; badge.style.background = '#f59e0b'; badge.style.color = '#111'; }
+      else { badge.textContent = typeof _companyName === 'function' ? _companyName(compFilter) : compFilter; badge.style.background = '#f472b6'; badge.style.color = '#111'; }
+    }
     if(subt){
       const scope = monthNum === '__ALL__' ? `Todo ${year}` : `${MONTH_NAMES[+monthNum-1]} ${year}`;
-      subt.innerHTML = `${filtered.length} gastos · Total: <b style="color:#ef4444" data-testid="gastos-total">${fmtEUR(totalGlobal)}</b> · <span style="color:#f472b6">${scope}</span>`;
+      const warnBoth = compFilter === '__BOTH__' ? '<span style="background:#78350f;color:#fef3c7;padding:2px 8px;border-radius:10px;font-weight:700;margin-right:6px">⚠️ Mostrando AMBAS empresas combinadas · usa el selector EMPRESA de arriba para separar</span>' : '';
+      subt.innerHTML = `${warnBoth}${filtered.length} gastos · Total: <b style="color:#ef4444" data-testid="gastos-total">${fmtEUR(totalGlobal)}</b> · <span style="color:#f472b6">${scope}</span>`;
     }
     const catsHtml = categories.length ? categories.map(c => `<span style="background:#1e293b;padding:4px 10px;border-radius:20px;font-size:11px;margin-right:6px;border-left:3px solid ${_gsCategoryColor(c)}"><b style="color:${_gsCategoryColor(c)}">${_gsCategoryLabel(c)}</b> · ${byCategory[c].count} · <b>${fmtEUR(byCategory[c].total)}</b></span>`).join('') : '';
     const monthsHtml = months.length ? months.map(ym => {
