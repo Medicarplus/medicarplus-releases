@@ -5947,17 +5947,14 @@ function _hasExplicitGastoMarker(e){
 function _isGastoEntry(e){
   if(!e || e.kind !== 'DH' || (e.importe||0) <= 0) return false;
   if(e.tipo !== 'DEBE') return false;
-  // 🎯 Oct 2026 · EXCLUIR entradas que NO son gastos reales aunque estén en DEBE:
-  //   · retorno=true          → es una reversión (devuelve un ingreso previo)
-  //   · _internal=true        → traspaso interno entre cuentas (no sale dinero)
-  //   · _tasaRefund=true      → devolución de tasa al cliente (es un refund)
-  //   · _hnBruto=true         → referencia de bruto para IRPF (no sale dinero)
-  if(e.retorno) return false;
+  // 🎯 Oct 2026 · REGLA ESTRICTA DEL USUARIO:
+  //   "Toda salida de dinero es un gasto". Punto.
+  //   Únicas excepciones (NO son salidas reales de dinero):
+  //   · _internal : traspaso interno caja↔banco (dinero NO sale de la empresa)
+  //   · _hnBruto  : referencia técnica virtual para IRPF (ni siquiera es un movimiento)
+  //   Honoraris: se filtran en el panel con el toggle "Incluir honoraris".
   if(e._internal) return false;
-  if(e._tasaRefund) return false;
   if(e._hnBruto) return false;
-  // 🎯 TODO lo que queda en DEBE con importe>0 ES un gasto real,
-  //   excepto honorarios (que viajan a su propia categoría).
   if(typeof _isHonorarioLikeEntry === 'function' && _isHonorarioLikeEntry(e)) return false;
   return true;
 }
@@ -5976,9 +5973,10 @@ function openGastosPanel(){
       const bd = raw.byDate || {};
       for(const iso of Object.keys(bd)){
         for(const e of (bd[iso]||[])){
-          // 🔒 Oct 2026 · Excluye traspasos internos, retornos y referencias técnicas
-          //   para evitar inflar el total con entradas que no son gastos reales.
-          if(e && (e.retorno || e._internal || e._tasaRefund || e._hnBruto)) continue;
+          // 🔒 Excluir SOLO las entradas que NO son salida real de dinero del bolsillo:
+          //   · _internal: traspaso interno caja↔banco (va de un sitio a otro de la empresa)
+          //   · _hnBruto : referencia técnica virtual para IRPF (ni es movimiento)
+          if(e && (e._internal || e._hnBruto)) continue;
           const isGasto = _isGastoEntry(e);
           const isHono  = e && e.kind==='DH' && e.tipo==='DEBE' && (e.importe||0)>0 && typeof _isHonorarioLikeEntry === 'function' && _isHonorarioLikeEntry(e);
           if(!isGasto && !isHono) continue;
