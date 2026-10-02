@@ -5947,13 +5947,17 @@ function _hasExplicitGastoMarker(e){
 function _isGastoEntry(e){
   if(!e || e.kind !== 'DH' || (e.importe||0) <= 0) return false;
   if(e.tipo !== 'DEBE') return false;
-  // 🎯 Oct 2026 · REGLA SIMPLE Y CORRECTA:
-  //   TODO lo que está en DEBE (dinero saliendo de la empresa) ES un gasto,
-  //   EXCEPTO lo que ya es un honorario (nómina/faena/colaborador autónomo).
-  //   Así cuadra siempre con el Excel del contable: factura, recibo, cuota,
-  //   impuesto, SS, bancos, material, nombres propios de proveedor (F/PULIT,
-  //   BOGADERIA, ASSOCIACIÓ ASCREME, F/OFIOSONA, F/COPY PRATS…), TODO cuenta.
-  //   Honoraris aparte: aparecen en la categoría HONORARIS con su toggle propio.
+  // 🎯 Oct 2026 · EXCLUIR entradas que NO son gastos reales aunque estén en DEBE:
+  //   · retorno=true          → es una reversión (devuelve un ingreso previo)
+  //   · _internal=true        → traspaso interno entre cuentas (no sale dinero)
+  //   · _tasaRefund=true      → devolución de tasa al cliente (es un refund)
+  //   · _hnBruto=true         → referencia de bruto para IRPF (no sale dinero)
+  if(e.retorno) return false;
+  if(e._internal) return false;
+  if(e._tasaRefund) return false;
+  if(e._hnBruto) return false;
+  // 🎯 TODO lo que queda en DEBE con importe>0 ES un gasto real,
+  //   excepto honorarios (que viajan a su propia categoría).
   if(typeof _isHonorarioLikeEntry === 'function' && _isHonorarioLikeEntry(e)) return false;
   return true;
 }
@@ -5972,6 +5976,9 @@ function openGastosPanel(){
       const bd = raw.byDate || {};
       for(const iso of Object.keys(bd)){
         for(const e of (bd[iso]||[])){
+          // 🔒 Oct 2026 · Excluye traspasos internos, retornos y referencias técnicas
+          //   para evitar inflar el total con entradas que no son gastos reales.
+          if(e && (e.retorno || e._internal || e._tasaRefund || e._hnBruto)) continue;
           const isGasto = _isGastoEntry(e);
           const isHono  = e && e.kind==='DH' && e.tipo==='DEBE' && (e.importe||0)>0 && typeof _isHonorarioLikeEntry === 'function' && _isHonorarioLikeEntry(e);
           if(!isGasto && !isHono) continue;
