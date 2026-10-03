@@ -5948,13 +5948,16 @@ function _isGastoEntry(e){
   if(!e || e.kind !== 'DH' || (e.importe||0) <= 0) return false;
   if(e.tipo !== 'DEBE') return false;
   // 🎯 Oct 2026 · REGLA ESTRICTA DEL USUARIO:
-  //   "Toda salida de dinero es un gasto". Punto.
-  //   Únicas excepciones (NO son salidas reales de dinero):
-  //   · _internal : traspaso interno caja↔banco (dinero NO sale de la empresa)
-  //   · _hnBruto  : referencia técnica virtual para IRPF (ni siquiera es un movimiento)
-  //   Honoraris: se filtran en el panel con el toggle "Incluir honoraris".
+  //   "Toda salida de dinero del BOLSILLO de la empresa es un gasto".
+  //   Excepciones (NO salen del bolsillo propio):
+  //   · _internal   : traspaso interno caja↔banco (sigue en la empresa)
+  //   · _hnBruto    : referencia técnica virtual IRPF (ni siquiera es movimiento)
+  //   · _tasaRefund : devolución de tasa al cliente — es dinero QUE EL CLIENTE
+  //                   HABÍA PAGADO antes (pass-through), NO del bolsillo propio.
+  //   Honoraris: filtrados por el toggle "Incluir honoraris".
   if(e._internal) return false;
   if(e._hnBruto) return false;
+  if(e._tasaRefund) return false;
   if(typeof _isHonorarioLikeEntry === 'function' && _isHonorarioLikeEntry(e)) return false;
   return true;
 }
@@ -5973,10 +5976,12 @@ function openGastosPanel(){
       const bd = raw.byDate || {};
       for(const iso of Object.keys(bd)){
         for(const e of (bd[iso]||[])){
-          // 🔒 Excluir SOLO las entradas que NO son salida real de dinero del bolsillo:
-          //   · _internal: traspaso interno caja↔banco (va de un sitio a otro de la empresa)
-          //   · _hnBruto : referencia técnica virtual para IRPF (ni es movimiento)
-          if(e && (e._internal || e._hnBruto)) continue;
+          // 🔒 Excluir SOLO entradas que NO son salida real de dinero del bolsillo:
+          //   · _internal   : traspaso interno caja↔banco (sigue en la empresa)
+          //   · _hnBruto    : referencia técnica virtual IRPF
+          //   · _tasaRefund : devolución de tasa al cliente (dinero del cliente,
+          //                   simplemente se aplica una tasa más baja de lo cobrado)
+          if(e && (e._internal || e._hnBruto || e._tasaRefund)) continue;
           const isGasto = _isGastoEntry(e);
           const isHono  = e && e.kind==='DH' && e.tipo==='DEBE' && (e.importe||0)>0 && typeof _isHonorarioLikeEntry === 'function' && _isHonorarioLikeEntry(e);
           if(!isGasto && !isHono) continue;
