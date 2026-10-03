@@ -17614,7 +17614,13 @@ document.addEventListener('keydown', function(ev){
         sp.dataset.custom = '1';
         sp.dataset.c = cc.c || cc.label || '';
         if(cc.preu) sp.dataset.preu = String(cc.preu);
-        if(cc.tipo) sp.dataset.tipo = cc.tipo; // Only for #chips-dh
+        if(cc.tipo){
+          sp.dataset.tipo = cc.tipo; // our own click handler
+          // Oct 2026 · Compatibilidad con el handler global de #chips-dh (línea 4648)
+          // que lee chip.dataset.t para rellenar #dh-tipo. Si no lo seteamos aquí,
+          // el handler global sobrescribe nuestro valor con `undefined`.
+          if(row === 'dh') sp.dataset.t = cc.tipo;
+        }
         sp.textContent = cc.label || cc.c || '(sin etiqueta)';
         if(cc.color){ sp.style.background = cc.color; sp.style.borderColor = cc.color; sp.style.color = '#fff'; }
         // Click: emula el chip de sistema (usa data-c)

@@ -1,4 +1,28 @@
 # MediCar Plus · PRD (Product Requirements Document)
+
+## 2026-10-03 · FIX · Chips custom DH · `data-t` para compat handler global
+
+**Problema detectado al probar la configuración de chips rápidos (⚙️):**
+- Al añadir un chip custom en la fila `#chips-dh` marcado como **GASTO (DEBE)**, el selector `#dh-tipo` quedaba vacío tras pulsar el chip (concepto e importe sí se rellenaban).
+- Causa: handler delegado global en `document` (línea 4648) lee `chip.dataset.t`; los chips custom solo tenían `data-tipo`, por lo que el global sobrescribía nuestro valor con `undefined`.
+
+**Fix (`/app/frontend/public/v2.html` · `applyChipCustomizations`):**
+- Para `row === 'dh'`, además de `data-tipo` también se setea `data-t = cc.tipo` en el chip custom.
+- Resultado: handler propio del chip + handler global quedan sincronizados; GASTO e INGRESO se rellenan correctamente.
+
+**Verificación E2E (Playwright):**
+- Chip "💡 Factura Luz" (DEBE 85€) → TIPO=GASTO, concepto="Luz Endesa", importe=85 ✅
+- Chip "🎁 Donativo" (HABER 20€) → TIPO=INGRESO, concepto="Donativo", importe=20 ✅
+
+**Tests regresión:**
+- `/app/frontend/public/tests/chips_config.js` (**nuevo**, 7 tests): override sistema, idempotencia tras 3 applies, orden chip↔⚙️, eliminación clean, chips sistema intactos, round-trip LS, `data-t`+`data-tipo` en DH.
+- 13 suites JS pre-existentes siguen 100% pass (accounting_audit, backup_roundtrip, migration, sync_merge, informe_anual, tariff_rules, full_backup, anti_duplicacion, e2e_sync, undo_borrar_mes, fuzzy_cluster, fuzzy_matching).
+
+**Nota:** usuario debe hacer `Ctrl+Shift+R` o reiniciar Electron tras deploy para evitar caché.
+
+---
+
+
 ## 2026-10-01 · FEATURE · Borrar mes concreto + Deshacer último cambio (Autoescuelas)
 
 **Petición del usuario:**
