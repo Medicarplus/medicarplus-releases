@@ -1003,6 +1003,7 @@
             <span class="chip" data-c="Informe">Informe</span>
             <span class="chip" data-c="Psicotécnico">Psicotécnico</span>
             <span class="chip" data-c="Otro">Otro</span>
+            <button class="chip-config-btn" data-chips-row="priv" title="Configurar chips" style="background:#1e293b;border:1px solid #475569;color:#94a3b8;border-radius:50%;width:24px;height:24px;cursor:pointer;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:12px;margin-left:4px" data-testid="chips-config-priv">⚙️</button>
           </div>
           <div class="chip-row" id="chips-priv-cempla" style="display:none">
             <span class="chip active" data-c="Recon. C/Dte" data-preu="40.00" data-split="45-45-10" data-label-ca="Recon. C/Dte (40€)" data-label-es="Recon. C/Dto (40€)">Recon. C/Dto (40€)</span>
@@ -1023,6 +1024,7 @@
             <span class="chip" data-c="Patinatge" data-preu="40.00" data-split="45-45-10" data-label-ca="Patinatge (40€)" data-label-es="Patinaje (40€)">Patinaje (40€)</span>
             <span class="chip" data-c="Hockey" data-preu="40.00" data-split="45-45-10" data-label-ca="Hockey (40€)" data-label-es="Hockey (40€)">Hockey (40€)</span>
             <span class="chip" data-c="" data-preu="" data-split="45-45-10" data-label-ca="✏️ Escriure a mà" data-label-es="✏️ Escribir a mano">✏️ Escribir a mano</span>
+            <button class="chip-config-btn" data-chips-row="priv-cempla" title="Configurar chips" style="background:#1e293b;border:1px solid #475569;color:#94a3b8;border-radius:50%;width:24px;height:24px;cursor:pointer;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:12px;margin-left:4px" data-testid="chips-config-priv-cempla">⚙️</button>
           </div>
           <div class="form-row" id="cemplaCustom" style="display:none;grid-template-columns:1.5fr 1fr 0.7fr 0.7fr 0.7fr 1.3fr 1fr;margin-top:8px;padding:10px;background:#141821;border-radius:8px;border:1px solid #2a3040">
             <div><label>Esport / Tipus</label><input type="text" id="p-tipo-custom" placeholder="Escriu el tipus..." /></div>
@@ -1059,6 +1061,7 @@
               <span class="chip" data-role="tasa-refund" style="background:linear-gradient(135deg,#b45309,#d97706);border-color:#fbbf24;color:#ffffff;font-weight:800;box-shadow:0 2px 8px rgba(180,83,9,.5)" title="Devuelve parte de una tasa DGT cobrada anteriormente (ej: tasa quedó en menos por menos años del carnet)"><span data-refund-label>↩ Devolución tasa DGT</span></span>
               <span class="chip" data-role="transfer-caja-banco" style="background:linear-gradient(135deg,#ea580c,#f97316);border-color:#fdba74;color:#ffffff;font-weight:800;box-shadow:0 2px 8px rgba(234,88,12,.5)" title="Ingreso en metálico: pasas dinero de tu CAJA FÍSICA al BANCO. NO cuenta como facturación (es dinero tuyo interno)">🔁 Ingreso en metálico (Caja→Banco)</span>
               <span class="chip" data-role="transfer-banco-caja" style="background:linear-gradient(135deg,#0369a1,#0284c7);border-color:#7dd3fc;color:#ffffff;font-weight:700;box-shadow:0 2px 8px rgba(3,105,161,.5)" title="Retirada en metálico: sacas dinero del BANCO y lo pones en tu CAJA FÍSICA. NO cuenta como facturación">🏦 Retirada del banco (Banco→Caja)</span>
+              <button class="chip-config-btn" data-chips-row="dh" title="Configurar chips" style="background:#1e293b;border:1px solid #475569;color:#94a3b8;border-radius:50%;width:24px;height:24px;cursor:pointer;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:12px;margin-left:4px" data-testid="chips-config-dh">⚙️</button>
             </div>
           </div>
           <button class="btn btn-primary" id="btnAddDH">+ Añadir Ingreso/Gasto</button>
@@ -17563,6 +17566,189 @@ document.addEventListener('keydown', function(ev){
   }
   if(document.readyState==='complete') initSyncRobust();
   else window.addEventListener('load', initSyncRobust);
+})();
+</script>
+
+<!-- =============================================================================
+     Oct 2026 · Personalización de CHIPS rápidos (⚙️)
+     3 filas configurables por el usuario (SIN borrar los del sistema):
+       · #chips-priv        → TRÀFIC ingresos (C.Oficial, Fotos, Duplicado…)
+       · #chips-priv-cempla → CEMPLA ingresos (Deportes, Ciclista…)
+       · #chips-dh          → Ingresos/Gastos manuales compartidos
+     Guardado por fila en localStorage: caja.chips.{row}.v1
+       { overrides: {idx: {label, preu}}, custom: [{c, preu, label, tipo}] }
+     Los chips de sistema (con data-role) se pueden editar en label/precio
+     pero NO se pueden borrar porque disparan automatismos (IRPF, transfers…).
+============================================================================= -->
+<script>
+(function(){
+  const ROWS = {
+    'priv':        { title: 'TRÀFIC · Ingresos', typeFixed: 'HABER' },
+    'priv-cempla': { title: 'CEMPLA · Ingresos', typeFixed: 'HABER' },
+    'dh':          { title: 'Ingresos / Gastos manuales', typeFixed: null }  // user chooses per chip
+  };
+  const STORAGE_KEY = (row) => `caja.chips.${row}.v1`;
+  function loadCfg(row){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY(row))||'{"overrides":{},"custom":[]}'); }catch(_){ return {overrides:{},custom:[]}; } }
+  function saveCfg(row, cfg){ try{ localStorage.setItem(STORAGE_KEY(row), JSON.stringify(cfg)); }catch(_){} }
+  function escapeHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+  // Aplicar overrides a chips del sistema + añadir custom. Idempotente.
+  function applyChipCustomizations(){
+    for(const row of Object.keys(ROWS)){
+      const container = document.querySelector('#chips-'+row);
+      if(!container) continue;
+      const cfg = loadCfg(row);
+      // Chips existentes (no custom, no botón de rosca)
+      const systemChips = container.querySelectorAll('.chip:not([data-custom]):not(.chip-config-btn)');
+      systemChips.forEach((c, i) => {
+        const ov = cfg.overrides[i];
+        if(!ov) return;
+        if(ov.label!=null && ov.label!=='') c.textContent = ov.label;
+        if(ov.preu!=null && ov.preu!=='') c.dataset.preu = String(ov.preu);
+      });
+      // Eliminar custom chips viejos y re-render
+      container.querySelectorAll('.chip[data-custom="1"]').forEach(c => c.remove());
+      const gearBtn = container.querySelector('.chip-config-btn');
+      (cfg.custom||[]).forEach(cc => {
+        const sp = document.createElement('span');
+        sp.className = 'chip';
+        sp.dataset.custom = '1';
+        sp.dataset.c = cc.c || cc.label || '';
+        if(cc.preu) sp.dataset.preu = String(cc.preu);
+        if(cc.tipo) sp.dataset.tipo = cc.tipo; // Only for #chips-dh
+        sp.textContent = cc.label || cc.c || '(sin etiqueta)';
+        if(cc.color){ sp.style.background = cc.color; sp.style.borderColor = cc.color; sp.style.color = '#fff'; }
+        // Click: emula el chip de sistema (usa data-c)
+        sp.onclick = () => {
+          if(row === 'priv' || row === 'priv-cempla'){
+            // Mimic the system click: set active, fill fields
+            container.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
+            sp.classList.add('active');
+            if(row === 'priv'){
+              try{ window.privConcept = sp.dataset.c; const imp=document.querySelector('#p-importe'); if(sp.dataset.preu && imp){ imp.value = sp.dataset.preu; } document.querySelector('#p-nombre')?.focus(); }catch(_){}
+            } else {
+              try{
+                window.privConcept = sp.dataset.c || '';
+                window.currentPreu = sp.dataset.preu || '';
+                const tc = document.querySelector('#p-tipo-custom'); if(tc) tc.value = window.privConcept;
+                const pc = document.querySelector('#p-preu-custom'); if(pc) pc.value = window.currentPreu;
+                document.querySelector('#p-nombre-cempla')?.focus();
+              }catch(_){}
+            }
+          } else if(row === 'dh'){
+            // DH: rellena concepto + importe + tipo
+            try{
+              const con = document.querySelector('#dh-concepto'); if(con){ con.value = sp.dataset.c || ''; con.dispatchEvent(new Event('input',{bubbles:true})); }
+              const imp = document.querySelector('#dh-importe'); if(imp && sp.dataset.preu){ imp.value = sp.dataset.preu; imp.dispatchEvent(new Event('input',{bubbles:true})); }
+              const tp = document.querySelector('#dh-tipo'); if(tp && sp.dataset.tipo){ tp.value = sp.dataset.tipo; tp.dispatchEvent(new Event('change',{bubbles:true})); }
+            }catch(_){}
+          }
+        };
+        if(gearBtn) container.insertBefore(sp, gearBtn);
+        else container.appendChild(sp);
+      });
+    }
+  }
+  // Modal de edición
+  function openConfigModal(row){
+    const meta = ROWS[row];
+    const container = document.querySelector('#chips-'+row);
+    if(!container) return;
+    const cfg = loadCfg(row);
+    const systemChips = [...container.querySelectorAll('.chip:not([data-custom]):not(.chip-config-btn)')];
+    const back = document.createElement('div');
+    back.className = 'modal-back';
+    back.style.zIndex = '100060';
+    const sysRows = systemChips.map((c, i) => {
+      const ov = cfg.overrides[i] || {};
+      const curLabel = ov.label!=null && ov.label!=='' ? ov.label : (c.textContent||'').trim();
+      const curPreu = ov.preu!=null && ov.preu!=='' ? ov.preu : (c.dataset.preu||'');
+      const roleBadge = c.dataset.role ? `<span style="font-size:9px;background:#065f46;color:#a7f3d0;padding:2px 6px;border-radius:8px;margin-left:5px" title="Chip del sistema · dispara automatismos">SISTEMA</span>` : '';
+      return `<tr style="border-bottom:1px solid #1e293b">
+        <td style="padding:7px;font-size:11px;color:#94a3b8">#${i+1}${roleBadge}</td>
+        <td style="padding:7px"><input type="text" data-sys-i="${i}" data-sys-f="label" value="${escapeHtml(curLabel)}" style="width:100%;background:#141821 !important;color:#e2e8f0 !important;border:1px solid #334155;border-radius:4px;padding:5px 7px;font-size:12px"/></td>
+        <td style="padding:7px;width:80px"><input type="text" data-sys-i="${i}" data-sys-f="preu" value="${escapeHtml(curPreu)}" placeholder="—" style="width:100%;background:#141821 !important;color:#fbbf24 !important;border:1px solid #334155;border-radius:4px;padding:5px 7px;font-size:12px;font-weight:700;text-align:right"/></td>
+        <td style="padding:7px;text-align:center;font-size:11px;color:#64748b">—</td>
+      </tr>`;
+    }).join('');
+    const customRows = (cfg.custom||[]).map((cc, i) => {
+      const tipoCell = meta.typeFixed === null ? `<select data-cust-i="${i}" data-cust-f="tipo" style="background:#141821;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:4px;font-size:11px">
+        <option value="HABER" ${cc.tipo==='HABER'?'selected':''}>💰 INGRESO</option>
+        <option value="DEBE" ${cc.tipo==='DEBE'?'selected':''}>🧾 GASTO</option>
+      </select>` : '';
+      return `<tr style="border-bottom:1px solid #1e293b;background:#0b1420">
+        <td style="padding:7px;font-size:11px;color:#a78bfa">✨${tipoCell}</td>
+        <td style="padding:7px"><input type="text" data-cust-i="${i}" data-cust-f="label" value="${escapeHtml(cc.label||'')}" placeholder="Etiqueta" style="width:100%;background:#141821 !important;color:#e2e8f0 !important;border:1px solid #334155;border-radius:4px;padding:5px 7px;font-size:12px"/><input type="text" data-cust-i="${i}" data-cust-f="c" value="${escapeHtml(cc.c||'')}" placeholder="Concepto que rellena" style="width:100%;background:#141821 !important;color:#94a3b8 !important;border:1px solid #1e293b;border-radius:4px;padding:4px 7px;font-size:10px;margin-top:3px"/></td>
+        <td style="padding:7px;width:80px"><input type="text" data-cust-i="${i}" data-cust-f="preu" value="${escapeHtml(cc.preu||'')}" placeholder="—" style="width:100%;background:#141821 !important;color:#fbbf24 !important;border:1px solid #334155;border-radius:4px;padding:5px 7px;font-size:12px;font-weight:700;text-align:right"/></td>
+        <td style="padding:7px;text-align:center"><button data-cust-del="${i}" style="background:#991b1b;color:#fff;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px">🗑</button></td>
+      </tr>`;
+    }).join('');
+    back.innerHTML = `<div class="modal" style="max-width:780px;width:calc(100vw - 40px);max-height:88vh;overflow:auto">
+      <h3 style="color:#e2e8f0;margin-top:0;font-family:Georgia,serif">⚙️ Configurar chips · ${escapeHtml(meta.title)}</h3>
+      <p class="small" style="color:#94a3b8;line-height:1.5">Edita <b>etiqueta</b> y <b>precio</b> de los chips existentes. Los <span style="color:#a7f3d0">[SISTEMA]</span> no se pueden borrar porque disparan automatismos. Puedes <b>añadir</b> tus propios chips abajo.</p>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin:12px 0;background:#0e1117;border-radius:8px;overflow:hidden">
+        <thead><tr style="background:#1a1e26;color:#94a3b8">
+          <th style="padding:8px;text-align:left;font-size:10px">#</th>
+          <th style="padding:8px;text-align:left;font-size:10px">ETIQUETA / CONCEPTO</th>
+          <th style="padding:8px;text-align:right;font-size:10px">PRECIO €</th>
+          <th style="padding:8px;text-align:center;font-size:10px;width:50px"></th>
+        </tr></thead>
+        <tbody>${sysRows}${customRows}</tbody>
+      </table>
+      <button data-add-chip style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px">➕ Añadir nuevo chip</button>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+        <button data-cancel style="background:#334155;color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer">Cancelar</button>
+        <button data-save style="background:#2563eb;color:#fff;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:700" data-testid="chips-cfg-save">💾 Guardar</button>
+      </div>
+    </div>`;
+    document.body.appendChild(back);
+    back.querySelector('[data-cancel]').onclick = () => back.remove();
+    back.addEventListener('click', ev => { if(ev.target === back) back.remove(); });
+    back.querySelector('[data-add-chip]').onclick = () => {
+      cfg.custom = cfg.custom || [];
+      cfg.custom.push({ label: 'Nuevo chip', c: '', preu: '', tipo: meta.typeFixed || 'HABER' });
+      back.remove();
+      saveCfg(row, cfg);
+      openConfigModal(row);
+    };
+    back.querySelectorAll('[data-cust-del]').forEach(b => b.onclick = () => {
+      const i = +b.dataset.custDel;
+      cfg.custom.splice(i, 1);
+      back.remove();
+      saveCfg(row, cfg);
+      openConfigModal(row);
+    });
+    back.querySelector('[data-save]').onclick = () => {
+      // Recoger overrides sistema
+      cfg.overrides = cfg.overrides || {};
+      back.querySelectorAll('[data-sys-i]').forEach(inp => {
+        const i = inp.dataset.sysI, f = inp.dataset.sysF;
+        cfg.overrides[i] = cfg.overrides[i] || {};
+        cfg.overrides[i][f] = inp.value;
+      });
+      // Recoger custom chips
+      cfg.custom = cfg.custom || [];
+      back.querySelectorAll('[data-cust-i]').forEach(inp => {
+        const i = +inp.dataset.custI, f = inp.dataset.custF;
+        cfg.custom[i] = cfg.custom[i] || {};
+        cfg.custom[i][f] = inp.value;
+      });
+      saveCfg(row, cfg);
+      back.remove();
+      applyChipCustomizations();
+      try{ if(typeof toast === 'function') toast('✅ Chips guardados · recarga si no ves cambios'); }catch(_){}
+    };
+  }
+  // Wire ⚙️ clicks
+  function wireGearButtons(){
+    document.querySelectorAll('.chip-config-btn[data-chips-row]').forEach(btn => {
+      if(btn.__wired) return;
+      btn.__wired = true;
+      btn.onclick = (ev) => { ev.stopPropagation(); openConfigModal(btn.dataset.chipsRow); };
+    });
+  }
+  function init(){ try{ applyChipCustomizations(); wireGearButtons(); }catch(e){ console.error('[chips-config]', e); } }
+  if(document.readyState==='complete' || document.readyState==='interactive') setTimeout(init, 100);
+  else window.addEventListener('DOMContentLoaded', init);
 })();
 </script>
 
