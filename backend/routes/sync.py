@@ -436,6 +436,7 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
             out.append({
                 "backup_id": d["backup_id"],
                 "from_install_id": d["from_install_id"],
+                "from_admin": bool(d.get("from_admin", False)),
                 "label": d.get("label"),
                 "created_at": _iso(d["created_at"]),
                 "keys_count": len(d.get("data") or {}),
@@ -790,7 +791,15 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
         target_lk = (body.get("target_license_key") or "").strip()
         target_iid = (body.get("target_install_id") or "").strip()
         backup_id = (body.get("backup_id") or "").strip()
-        if not target_lk or not target_iid or not backup_id:
+        # Oct 2026 · Si falta target_license_key pero tenemos install_id, resolver desde DB
+        if not target_lk and target_iid:
+            try:
+                lic_doc = await db.licenses.find_one({"install_id": target_iid})
+                if lic_doc and lic_doc.get("license_key"):
+                    target_lk = str(lic_doc["license_key"]).strip()
+            except Exception:
+                pass
+        if not target_iid or not backup_id or not target_lk:
             raise HTTPException(status_code=400, detail="missing_required_fields")
         target = await _find_license(target_lk)
         if not target:
@@ -802,6 +811,21 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
         })
         if not cb:
             raise HTTPException(status_code=404, detail="cloudbackup_not_found")
+        # 🔧 Feb 2026 · FIX CRÍTICO · Si el cloud backup está comprimido (data_gz_b64)
+        #   su campo `data` será {} (así se guarda para ahorrar espacio). Debemos
+        #   descomprimir on-the-fly antes de depositarlo en el buzón del cliente,
+        #   porque el frontend lee `data` directamente desde /sync/backup/pending.
+        #   Sin este fix, el cliente recibía un buzón VACÍO y perdía la restauración.
+        payload_data = cb.get("data") or {}
+        if not payload_data and cb.get("data_gz_b64"):
+            try:
+                import json as _json, base64 as _b64, gzip as _gzip
+                payload_data = _json.loads(
+                    _gzip.decompress(_b64.b64decode(cb["data_gz_b64"])).decode('utf-8')
+                )
+            except Exception as _e:
+                logger.exception("admin_cloudbackup_push decompress failed %s: %s", backup_id, _e)
+                raise HTTPException(status_code=500, detail="cloudbackup_decompression_failed")
         # Depositarla en el buzón pending del cliente (upsert admin sender)
         target_lkh = _key_hash(target_lk)
         now = _now()
@@ -821,7 +845,7 @@ def build_sync_router(db: AsyncIOMotorDatabase) -> APIRouter:
             "target_client_email": target.get("client_email"),
             "target_client_name": target.get("client_name"),
             "label": label,
-            "data": cb.get("data") or {},
+            "data": payload_data,
             "created_at": now,
             "consumed_by": [],
         }

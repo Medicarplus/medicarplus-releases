@@ -1,5 +1,43 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-02-20 · FIX CRÍTICO · Admin → Cliente · Restauración COMPLETA byte a byte
+
+**Petición del usuario:**
+> "DIME QUE FUNCIONA TODO BIEN LO DE LAS COPIAS, HAZ TEST I PRUEBAS DE ENVIAR A CLIENTE I QUE RESTAURA TODO (ABSOLUTAMENTE TODO) COMO ESTAVA EL DIA DE LA COPIA TODO EL PROGRAMA I TODAS LAS EMPRESAS"
+
+**Dos bugs ocultos detectados y corregidos (nunca reportados por un usuario antes porque solo saltaban en condiciones específicas):**
+
+### 🔴 Bug #1 · Admin push de copia histórica llegaba VACÍA al cliente
+- **Dónde:** `/app/backend/routes/sync.py` → `admin_cloudbackup_push`.
+- **Causa:** desde Feb 2026 los cloud backups se almacenan comprimidos en `data_gz_b64` (ratio 5-10x) y el campo `data` queda `{}`. El endpoint `admin_cloudbackup_push` copiaba `cb.get("data") or {}` sin descomprimir → el buzón del cliente recibía `data: {}` y perdía TODO el snapshot.
+- **Fix:** descompresión on-the-fly del `data_gz_b64` antes de depositar en el buzón.
+
+### 🔴 Bug #2 · Al restaurar una copia del admin, el cliente perdía IRPF + saldoInicial + ajustes cuadre
+- **Dónde:** `/app/frontend/public/v2.html` → `applyBackup()` y banner `#bkApply`.
+- **Causa:** `applyBackup` filtra con `_isSyncable`, que excluye por diseño `caja.irpf.v1`, `caja.saldoInicial.*`, `caja.cuadre.*` (correcto para sync PC↔PC, pero NO para una copia de rescate del admin).
+- **Fix:** nuevo parámetro `opts.fullRestore`. Cuando la copia viene del admin (`from_admin:true` o `from_install_id:"admin:..."` o label contiene "soporte/admin/rescate"), bypassea el filtro `_isSyncable` y restaura absolutamente TODO. Install_id, license, apibase y sync.* siguen filtrados siempre (son específicos del hardware).
+- **Backend:** `/sync/backup/pending` ahora devuelve `from_admin` para que el cliente lo detecte.
+
+**Verificación E2E (49 asserts · 0 fails):**
+`/app/frontend/public/tests/e2e_envio_cliente_restaura_todo.js` corre contra el backend REAL:
+1. Admin crea snapshot rico (24 claves · 7 años × 5 autoescuelas × 96 meses · TRÀFIC + CEMPLA · IRPF · tarifas · chips · blacklist · calendarios · saldos · cuadre).
+2. Admin sube con gzip (ratio 4.47x) a `/sync/cloudbackup/send`.
+3. Admin descarga y verifica round-trip SHA-256 idéntico.
+4. Admin hace push a cliente destino con `/sync/admin/cloudbackup/push`.
+5. Cliente ve en `/sync/backup/pending` la copia con `from_admin:true`.
+6. Cliente simula `applyBackup(data, {fullRestore:true})` sobre localStorage VACÍO.
+7. **Verificación byte a byte:** SHA-256 del restaurado = SHA-256 del original. Cuadre TRÀFIC (2430€), CEMPLA (805€), 480 celdas autoescuelas y 20 claves críticas idénticas (incluidas IRPF, saldoInicial, cuadre.overrides).
+8. Cliente marca `/sync/backup/consume` → ya no aparece en pending.
+9. **BONUS:** merge con datos nuevos del cliente del mismo día → los datos nuevos se PRESERVAN además del snapshot del admin (cuadre esperado 2529.99€ = 2430 + 99.99).
+
+**Tests regresión:**
+- `/app/frontend/public/tests/e2e_sync_full_cycle.js` → 16/16 pass (sync PC↔PC normal sigue filtrando correctamente).
+
+**Nota operacional:** el usuario debe hacer `Ctrl+Shift+R` o reiniciar Electron tras deploy para que el bundle v2.html se refresque.
+
+---
+
+
 ## 2026-10-03 · FIX · Chips custom DH · `data-t` para compat handler global
 
 **Problema detectado al probar la configuración de chips rápidos (⚙️):**

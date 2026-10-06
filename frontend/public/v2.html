@@ -558,11 +558,28 @@
   async function getPendingBackup(){
     return await _get(`/api/sync/backup/pending?license_key=${encodeURIComponent(cfg.licenseKey)}&install_id=${encodeURIComponent(cfg.installId)}`);
   }
-  async function applyBackup(backupData){
+  async function applyBackup(backupData, opts){
+    // 🔑 Feb 2026 · opts.fullRestore=true → NO filtra claves locales (saldoInicial, irpf,
+    //   cuadre.overrides). Se usa cuando la copia viene del ADMIN como rescate completo
+    //   (from_admin:true o from_support:true). Para sync PC↔PC entre dos PCs del mismo
+    //   cliente seguimos filtrando porque esas claves son específicas del hardware.
+    const fullRestore = !!(opts && opts.fullRestore);
     const localSnap = _snapshotLocalStorage();
-    // Filtra lo ENTRANTE: nunca aplicar claves locales del otro PC (saldoInicial, etc.)
+    // Filtra lo ENTRANTE según el tipo de restauración
     const incoming = {};
-    Object.keys(backupData || {}).forEach(k => { if(_isSyncable(k)) incoming[k] = backupData[k]; });
+    Object.keys(backupData || {}).forEach(k => {
+      // Nunca cruza: install_id, license, apibase, plan.preview, __sync, caja.sync.*
+      // Estas SIEMPRE son específicas del PC/instalación aunque sea rescate del admin.
+      if (!k || typeof k !== 'string') return;
+      if (k.startsWith('__')) return;  // meta claves (__origin__, __preview__, __server_sms__)
+      if (k.startsWith('caja.install.') || k.startsWith('caja.license.') ||
+          k.startsWith('caja.apibase.') || k.startsWith('caja.plan.preview.') ||
+          k.startsWith('caja.sync.') || k.startsWith('caja.__sync')) return;
+      // Modo rescate: deja pasar irpf, saldoInicial, cuadre.overrides (son del cliente)
+      if (fullRestore){ incoming[k] = backupData[k]; return; }
+      // Modo sync normal: filtro clásico (deja fuera saldoInicial/cuadre/irpf local)
+      if (_isSyncable(k)) incoming[k] = backupData[k];
+    });
     // 🛡️ Oct 2026 · Deep-clone de entrada y salida · evita que el merge pueda mutar
     //   accidentalmente referencias compartidas y corromper el estado local.
     const localClone = JSON.parse(JSON.stringify(localSnap));
@@ -1532,7 +1549,20 @@ function applyCompanyUI(){const hasC2=!!(window.CFG&&CFG.company2&&CFG.company2.
   $('#btnImport').style.display=isC?'none':'';
   $('#chips-priv').style.display=isC?'none':'';
   $('#chips-priv-cempla').style.display=isC?'':'none';
-  $('#tabPrivBtn').textContent=isC?'Revisions esportives':'Revisiones / Certificados / Otros';
+  // Oct 2026 · Título del tab de Empresa 2 configurable desde ⚙️
+  //   caja.chips.priv-cempla.v1.tabTitle (fallback bilingüe).
+  //   Quitamos data-i18n para que applyLang no sobrescriba nuestro título custom.
+  { const _btn = $('#tabPrivBtn');
+    if(isC){
+      let _cemTitle = (currentLang==='ca' ? 'Revisions / Esport' : 'Revisiones / Deporte');
+      try{ const _cfg = JSON.parse(localStorage.getItem('caja.chips.priv-cempla.v1')||'{}'); if(_cfg && _cfg.tabTitle) _cemTitle = _cfg.tabTitle; }catch(_){ }
+      _btn.removeAttribute('data-i18n'); // evitar que applyLang machaque el texto
+      _btn.textContent = _cemTitle;
+    } else {
+      _btn.setAttribute('data-i18n','tab_reviews');
+      _btn.textContent = (currentLang==='ca' ? 'Revisions / Certificats / Altres' : 'Revisiones / Certificados / Otros');
+    }
+  }
   $('#cemplaSplitPanel').style.display=isC?'':'none';
   $('#cemplaCustom').style.display=isC?'grid':'none';
   $('#privRow2').style.display=isC?'none':'';
@@ -2510,6 +2540,12 @@ function openStats(initialSection){
       }
     }
     const pairs=[];
+    // Oct 2026 · Blacklist persistente de pares que el usuario ha marcado como "nunca fusionar"
+    const _BL_KEY = 'caja.dedup.blacklist.v1';
+    const _blNorm = (a,b) => [a,b].map(x => String(x||'').trim().toUpperCase()).sort().join('|');
+    const _blLoad = () => { try{ return new Set(JSON.parse(localStorage.getItem(_BL_KEY)||'[]')); }catch(_){ return new Set(); } };
+    const _blSave = (set) => { try{ localStorage.setItem(_BL_KEY, JSON.stringify(Array.from(set))); }catch(_){} };
+    const _blacklist = _blLoad();
     // Union-Find: agrupa todas las variantes y cada no-canónica apunta al root.
     //   Ganador = quien tenga MÁS MESES con datos (prioridad) → MÁS certs → nombre más largo.
     //   Así el histórico A.E.MABEL (8 meses) gana sobre MABEL (1 mes) aunque empaten certs.
@@ -2524,6 +2560,8 @@ function openStats(initialSection){
     for(let i=0;i<list.length;i++){
       for(let j=i+1;j<list.length;j++){
         if(_similarity(list[i], list[j])<0.80)continue;
+        // Oct 2026 · Si el par está en la blacklist "no fusionar nunca", saltarlo
+        if(_blacklist.has(_blNorm(list[i], list[j]))) continue;
         const ra=find(list[i]), rb=find(list[j]);
         if(ra===rb)continue;
         const winner=_betterRoot(ra,rb);
@@ -2550,6 +2588,7 @@ function openStats(initialSection){
         <td style="padding:8px;text-align:center;color:#22d3ee;font-size:18px">→</td>
         <td style="padding:8px;font-family:'Consolas',monospace;color:#a7f3d0"><b>${escapeHtml(p.target)}</b><br><span class="small" style="color:#94a3b8">${tCert} certs · ${tMon} ${mesTxt(tMon)}</span></td>
         <td style="padding:8px;text-align:center;color:${pct>=95?'#22c55e':pct>=90?'#84cc16':'#f59e0b'};font-weight:700">${pct}%</td>
+        <td style="padding:8px;text-align:center"><button data-dedup-never data-src="${escapeHtml(p.source)}" data-tgt="${escapeHtml(p.target)}" title="${isCA?'Mai suggereixis fusionar aquesta parella':'Nunca sugieras fusionar esta pareja'}" style="background:#7c2d12;color:#fed7aa;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700">🚫 ${isCA?'Mai':'Nunca'}</button></td>
       </tr>`;
     }).join('');
     const m=document.createElement('div');m.className='modal-back';m.style.zIndex='650';
@@ -2564,6 +2603,7 @@ function openStats(initialSection){
             <th style="padding:10px"></th>
             <th style="padding:10px;text-align:left;color:#94a3b8">${isCA?'Es queda':'Se queda'}</th>
             <th style="padding:10px;text-align:center;color:#94a3b8;width:80px">${isCA?'Similitud':'Similitud'}</th>
+            <th style="padding:10px;text-align:center;color:#94a3b8;width:90px">${isCA?'Ignorar':'Ignorar'}</th>
           </tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
@@ -2579,6 +2619,16 @@ function openStats(initialSection){
     document.body.appendChild(m);
     m.querySelector('[data-no]').onclick=()=>m.remove();
     m.addEventListener('click',ev=>{if(ev.target===m)m.remove()});
+    // Oct 2026 · Handler "🚫 Nunca fusionar" — guarda el par en blacklist y recarga
+    m.querySelectorAll('[data-dedup-never]').forEach(b => b.onclick = () => {
+      const src = b.dataset.src, tgt = b.dataset.tgt;
+      _blacklist.add(_blNorm(src, tgt));
+      _blSave(_blacklist);
+      try{ toast(isCA?`✅ No es tornarà a suggerir fusionar «${src}» amb «${tgt}»`:`✅ No se volverá a sugerir fusionar "${src}" con "${tgt}"`, 3800); }catch(_){}
+      m.remove();
+      // Reabrir con la blacklist actualizada
+      setTimeout(() => { try{ back.querySelector('#stDedup')?.click(); }catch(_){} }, 150);
+    });
     m.querySelector('[data-yes]').onclick=()=>{
       const checked=[...m.querySelectorAll('[data-dedup-check]:checked')].map(cb=>+cb.dataset.idx);
       if(!checked.length){ toast(isCA?'No has seleccionat cap':'No has seleccionado ninguno'); return; }
@@ -2620,11 +2670,16 @@ function openStats(initialSection){
     const stX=loadStats();
     const list=(stX.autoescoles||[]).slice();
     if(list.length<2)return 0;
+    // Oct 2026 · Respetar blacklist "nunca fusionar"
+    let _bl2 = new Set();
+    try{ _bl2 = new Set(JSON.parse(localStorage.getItem('caja.dedup.blacklist.v1')||'[]')); }catch(_){}
+    const _nk = (a,b) => [a,b].map(x => String(x||'').trim().toUpperCase()).sort().join('|');
     const uf={}; list.forEach(n=>uf[n]=n);
     const find=(x)=>{ while(uf[x]!==x){ uf[x]=uf[uf[x]]; x=uf[x]; } return x; };
     for(let i=0;i<list.length;i++){
       for(let j=i+1;j<list.length;j++){
         if(_similarity(list[i], list[j])<0.80)continue;
+        if(_bl2.has(_nk(list[i], list[j]))) continue;
         const ra=find(list[i]), rb=find(list[j]);
         if(ra!==rb) uf[list[j]]=ra;
       }
@@ -5994,6 +6049,7 @@ function _gsCategoryColor(cat){
 }
 function openGastosPanel(){
   const allEntries = [];
+  const excludedEntries = []; // Oct 2026 · entradas DEBE excluidas (para diagnóstico)
   const stores = {trafic:'caja.v1', cempla:'caja.cempla.v1'};
   for(const [comp, key] of Object.entries(stores)){
     try{
@@ -6006,7 +6062,15 @@ function openGastosPanel(){
           //   · _hnBruto    : referencia técnica virtual IRPF
           //   · _tasaRefund : devolución de tasa al cliente (dinero del cliente,
           //                   simplemente se aplica una tasa más baja de lo cobrado)
-          if(e && (e._internal || e._hnBruto || e._tasaRefund)) continue;
+          if(e && (e._internal || e._hnBruto || e._tasaRefund)){
+            // Las guardamos para el modo diagnóstico — sólo si son DEBE con importe>0
+            if(e.kind==='DH' && e.tipo==='DEBE' && (e.importe||0)>0){
+              const reason = e._internal ? 'TRASPASO INTERNO' : (e._hnBruto ? 'BRUTO IRPF' : 'DEVOLUCIÓN TASA');
+              const displayName = String(e.nombre||'(sin concepto)').replace(/^\s*gasto\s*[:\-·]\s*/i,'').trim() || '(sin concepto)';
+              excludedEntries.push({date: iso, name: displayName, amount: +e.importe||0, company: comp, fp: e.fp||'', reason, entryId: e.id, store: key});
+            }
+            continue;
+          }
           const isGasto = _isGastoEntry(e);
           const isHono  = e && e.kind==='DH' && e.tipo==='DEBE' && (e.importe||0)>0 && typeof _isHonorarioLikeEntry === 'function' && _isHonorarioLikeEntry(e);
           if(!isGasto && !isHono) continue;
@@ -6040,7 +6104,7 @@ function openGastosPanel(){
 
   const back = document.createElement('div');
   back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto';
-  back.innerHTML = `<div class="gs-modal" style="background:#111827;border:1px solid #334155;border-radius:12px;padding:22px;max-width:960px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);font-family:Arial,Helvetica,sans-serif" data-testid="gastos-modal">
+  back.innerHTML = `<div class="gs-modal" style="background:#111827;border:1px solid #334155;border-radius:12px;padding:22px;max-width:960px;width:100%;max-height:calc(100vh - 40px);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5);font-family:Arial,Helvetica,sans-serif" data-testid="gastos-modal">
     <div class="no-print" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px">
       <div><h3 style="margin:0;color:#f472b6;font-family:Georgia,serif">🧾 Gastos <span id="_gs_compBadge" style="background:#f472b6;color:#111;padding:3px 10px;border-radius:14px;font-size:13px;margin-left:8px;font-weight:800">—</span></h3><div id="_gs_subtitle" style="font-size:11px;color:#94a3b8;margin-top:3px"></div></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -6067,7 +6131,8 @@ function openGastosPanel(){
       </div>
     </div>
     <div class="no-print" style="background:#0b1121;border:1px solid #831843;border-radius:8px;padding:12px;margin-bottom:14px;font-size:11px;color:#f9a8d4">💡 Marca gastos con el chip <b style="background:#4c0519;color:#fecaca;padding:2px 8px;border-radius:20px;border:1px solid #dc2626">🧾 GASTO</b> en Debe/Haber — así el programa <b>siempre</b> los clasifica como gasto y nunca como honorario. También reconoce por keywords: <b>Factura Endesa</b>, <b>Recibo agua</b>, <b>Alquiler</b>, <b>Seguro Mapfre</b>, <b>Movistar</b>, <b>Gestoría</b>, <b>Gasolina</b>, <b>Bata</b>, <b>Papelería</b>…</div>
-    <div id="_gs_body"></div>
+    <div class="no-print" style="margin-bottom:10px"><label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#fbbf24;background:#1f1a0b;padding:6px 10px;border-radius:6px;border:1px solid #78350f;cursor:pointer" title="Muestra entradas DEBE que están siendo EXCLUIDAS del total (traspasos internos, bruto IRPF, devoluciones)"><input type="checkbox" id="_gs_showExcluded" data-testid="gastos-show-excluded" style="width:14px;height:14px;cursor:pointer"/> 🔍 Mostrar entradas EXCLUIDAS (diagnóstico)</label></div>
+    <div id="_gs_body" style="flex:1;min-height:0;overflow-y:auto;padding-right:6px"></div>
   </div>`;
   document.body.appendChild(back);
 
@@ -6117,7 +6182,33 @@ function openGastosPanel(){
       }).join('');
       return `<div style="margin-bottom:16px;background:#0f172a;border:1px solid #334155;border-radius:8px;overflow:hidden"><div style="background:#1e293b;padding:8px 14px;display:flex;justify-content:space-between;align-items:center"><b style="color:#f472b6">📅 ${fmtMonth(ym)}</b><span style="color:#ef4444;font-weight:700">-${fmtEUR(monthTotal)}</span></div><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#111827"><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Fecha</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Categoría</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Concepto</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Empresa</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Pago</th><th style="padding:5px 10px;text-align:right;font-size:10px;color:#94a3b8">Importe</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }).join('') : '<div style="padding:20px;text-align:center;color:#64748b;font-style:italic">Sin gastos en este período. Añade una entrada Debe/Haber con concepto como "Factura Endesa", "Recibo agua", "Alquiler local", "Seguro Mapfre"…</div>';
-    document.getElementById('_gs_body').innerHTML = `${catsHtml ? `<div style="margin-bottom:16px">${catsHtml}</div>` : ''}<div>${monthsHtml}</div>`;
+    // Oct 2026 · Diagnóstico: entradas EXCLUIDAS (si el toggle está marcado)
+    let excludedHtml = '';
+    try{
+      const showExcl = back.querySelector('#_gs_showExcluded')?.checked;
+      if(showExcl){
+        const exclFiltered = excludedEntries.filter(e => {
+          if(e.date.substring(0,4) !== year) return false;
+          if(monthNum !== '__ALL__' && e.date.substring(5,7) !== monthNum) return false;
+          if(compFilter !== '__BOTH__' && e.company !== compFilter) return false;
+          return true;
+        });
+        if(exclFiltered.length){
+          const sumExcl = exclFiltered.reduce((a,e)=>a+e.amount,0);
+          const byReason = {};
+          for(const e of exclFiltered){ (byReason[e.reason]=byReason[e.reason]||[]).push(e); }
+          const reasonBlocks = Object.entries(byReason).map(([reason, arr]) => {
+            const subTotal = arr.reduce((a,e)=>a+e.amount,0);
+            const rows = arr.map(e => `<tr data-force-id="${e.entryId}" data-force-store="${e.store}" style="border-top:1px solid #292524"><td style="padding:5px 10px;color:#fde68a">${fmtDate(e.date)}</td><td style="padding:5px 10px;color:#e2e8f0">${escapeHtml(e.name)}</td><td style="padding:5px 10px;color:#78350f;font-size:10px;text-transform:uppercase;letter-spacing:.5px">${reason}</td><td style="padding:5px 10px;color:#94a3b8;font-size:11px">${(e.company||'').toUpperCase()}</td><td style="padding:5px 10px;color:#78350f;text-align:right;font-weight:700">${fmtEUR(e.amount)}</td><td style="padding:5px 10px;text-align:center"><button data-force-gasto="${e.entryId}" data-force-store="${e.store}" style="background:#78350f;color:#fde68a;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700" title="Convertir en gasto normal (quita la etiqueta de exclusión)">✅ Es gasto</button></td></tr>`).join('');
+            return `<div style="margin-bottom:10px"><div style="background:#78350f;color:#fde68a;padding:6px 10px;font-weight:700;font-size:11px;border-radius:6px 6px 0 0">${reason} · ${arr.length} · ${fmtEUR(subTotal)}</div><table style="width:100%;background:#1c1917;border-collapse:collapse;font-size:12px">${rows}</table></div>`;
+          }).join('');
+          excludedHtml = `<div style="margin-bottom:16px;background:#1a0f05;border:2px solid #78350f;border-radius:8px;padding:14px"><div style="color:#fbbf24;font-weight:800;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center"><span>🔍 DIAGNÓSTICO · Entradas EXCLUIDAS del total (${exclFiltered.length})</span><span style="color:#fde68a">${fmtEUR(sumExcl)}</span></div><div style="font-size:11px;color:#fcd34d;margin-bottom:10px;line-height:1.5">Estas entradas se EXCLUYEN automáticamente porque están marcadas como traspasos internos, bruto IRPF o devoluciones. Si alguna debería contar como gasto real, pulsa <b>✅ Es gasto</b>.</div>${reasonBlocks}</div>`;
+        } else {
+          excludedHtml = '<div style="margin-bottom:16px;background:#0b1121;border:1px dashed #334155;border-radius:8px;padding:10px;color:#94a3b8;font-size:12px;text-align:center">🔍 No hay entradas excluidas en este período.</div>';
+        }
+      }
+    }catch(_){}
+    document.getElementById('_gs_body').innerHTML = `${catsHtml ? `<div style="margin-bottom:16px">${catsHtml}</div>` : ''}${excludedHtml}<div>${monthsHtml}</div>`;
     // Filas clicables → cerrar modal + navegar al día
     document.getElementById('_gs_body').querySelectorAll('tr[data-goto-date]').forEach(tr => {
       tr.addEventListener('mouseenter', () => tr.style.background = 'rgba(244,114,182,.08)');
@@ -6140,6 +6231,7 @@ function openGastosPanel(){
   const monthSel = back.querySelector('#_gs_month');
   const compSel = back.querySelector('#_gs_comp');
   const honoChk = back.querySelector('#_gs_hono');
+  const exclChk = back.querySelector('#_gs_showExcluded');
   // Empresa inicial: la actual del app si existe, si no 'trafic'
   try{ if(typeof currentCompany !== 'undefined' && (currentCompany==='trafic'||currentCompany==='cempla')) compSel.value = currentCompany; }catch(_){}
   const rerender = () => renderBody(yearSel.value, monthSel.value, compSel.value, honoChk.checked);
@@ -6147,6 +6239,38 @@ function openGastosPanel(){
   monthSel.addEventListener('change', rerender);
   compSel.addEventListener('change', rerender);
   honoChk.addEventListener('change', rerender);
+  if(exclChk) exclChk.addEventListener('change', rerender);
+  // Handler "✅ Es gasto" · quita _internal/_hnBruto/_tasaRefund del entry
+  document.getElementById('_gs_body').addEventListener('click', (ev) => {
+    const btn = ev.target.closest('[data-force-gasto]');
+    if(!btn) return;
+    const id = btn.dataset.forceGasto;
+    const store = btn.dataset.forceStore;
+    if(!id || !store) return;
+    try{
+      const raw = JSON.parse(localStorage.getItem(store)||'{"byDate":{}}');
+      const bd = raw.byDate || {};
+      let found = false;
+      for(const iso of Object.keys(bd)){
+        for(const e of (bd[iso]||[])){
+          if(e && e.id === id){
+            delete e._internal; delete e._hnBruto; delete e._tasaRefund; delete e._transferDir; delete e._origFp;
+            found = true; break;
+          }
+        }
+        if(found) break;
+      }
+      if(found){
+        localStorage.setItem(store, JSON.stringify(raw));
+        try{ if(typeof toast === 'function') toast('✅ Entrada convertida en gasto normal · ya cuenta en el total'); }catch(_){}
+        // Reconstruir el panel entero (recargar entries desde LS)
+        back.remove();
+        setTimeout(() => { try{ openGastosPanel(); }catch(_){} }, 100);
+      } else {
+        try{ if(typeof toast === 'function') toast('⚠️ No se encontró la entrada'); }catch(_){}
+      }
+    }catch(err){ console.error('[force-gasto]', err); }
+  });
   back.querySelector('#_gs_close').onclick = () => back.remove();
   back.querySelector('#_gs_print').onclick = () => {
     const modal = back.querySelector('.gs-modal');
@@ -17209,7 +17333,16 @@ document.addEventListener('keydown', function(ev){
         })();
         const beforeAutos = new Set(beforeStats.autoescoles||[]);
         const beforeMonths = new Set(Object.keys(beforeStats.data||{}));
-        const merged = await window.mcSync.applyBackup(backup.data);
+        const merged = await window.mcSync.applyBackup(backup.data, {
+          // 🔑 Feb 2026 · Si la copia viene del ADMIN (soporte/MediCar Plus) o fue
+          //   explícitamente marcada como "rescate completo", restauramos TODAS las
+          //   claves incluidas IRPF, saldoInicial y cuadre.overrides. Para sync normal
+          //   entre dos PCs del mismo cliente, filtramos (comportamiento clásico).
+          fullRestore: !!(backup.from_admin
+            || backup.from_support
+            || (backup.from_install_id && String(backup.from_install_id).startsWith('admin:'))
+            || (backup.label && /soporte|admin|rescate|medicar/i.test(backup.label))),
+        });
         Object.entries(merged).forEach(([k,v]) => window.mcSync.safeWrite(k, v));
         try{ await window.mcSync.consumeBackup(backup.backup_id); }catch(e){ console.warn('consume falló (se continúa):', e); }
         _bkBannerId = null;
@@ -17717,9 +17850,15 @@ document.addEventListener('keydown', function(ev){
         <td style="padding:7px;text-align:center"><button data-cust-del="${i}" style="background:#991b1b;color:#fff;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px">🗑</button></td>
       </tr>`;
     }).join('');
+    const tabTitleBlock = meta.canDeleteSys ? `<div style="background:#0b1420;border:1px solid #1e293b;border-radius:8px;padding:12px;margin:10px 0 16px">
+      <label style="display:block;color:#f5b301;font-weight:700;font-size:11px;letter-spacing:1px;margin-bottom:6px">🏷️ TÍTULO DE LA PESTAÑA (empresa 2)</label>
+      <input type="text" data-cfg-tabtitle value="${escapeHtml(cfg.tabTitle||'')}" placeholder="Ej: Revisiones Deportivas · Pediatría · Fisio…" style="width:100%;background:#141821 !important;color:#e2e8f0 !important;border:1px solid #334155;border-radius:4px;padding:8px 10px;font-size:13px" />
+      <div class="small" style="color:#64748b;margin-top:4px;font-size:10px">Deja vacío para usar el título por defecto ("Revisions / Esport").</div>
+    </div>` : '';
     back.innerHTML = `<div class="modal" style="max-width:780px;width:calc(100vw - 40px);max-height:88vh;overflow:auto">
       <h3 style="color:#e2e8f0;margin-top:0;font-family:Georgia,serif">⚙️ Configurar chips · ${escapeHtml(meta.title)}</h3>
       <p class="small" style="color:#94a3b8;line-height:1.5">Edita <b>etiqueta</b> y <b>precio</b> de los chips existentes.${meta.canDeleteSys ? ' En esta fila puedes <b style="color:#fed7aa">ocultar</b> los chips de serie con 🗑 (se pueden recuperar con ↻ más tarde).' : ' Los <span style="color:#a7f3d0">[SISTEMA]</span> no se pueden borrar porque disparan automatismos.'} Puedes <b>añadir</b> tus propios chips abajo.</p>
+      ${tabTitleBlock}
       <table style="width:100%;border-collapse:collapse;font-size:12px;margin:12px 0;background:#0e1117;border-radius:8px;overflow:hidden">
         <thead><tr style="background:#1a1e26;color:#94a3b8">
           <th style="padding:8px;text-align:left;font-size:10px">#</th>
@@ -17798,9 +17937,20 @@ document.addEventListener('keydown', function(ev){
         cfg.custom[i] = cfg.custom[i] || {};
         cfg.custom[i][f] = inp.value;
       });
+      // Oct 2026 · Título de la pestaña CEMPLA (solo si canDeleteSys)
+      if(meta.canDeleteSys){
+        const tt = back.querySelector('[data-cfg-tabtitle]');
+        if(tt){ cfg.tabTitle = (tt.value||'').trim(); }
+      }
       saveCfg(row, cfg);
       back.remove();
       applyChipCustomizations();
+      // Si estamos en la empresa CEMPLA activa y es su fila, refrescar el título del tab
+      try{
+        if(row === 'priv-cempla' && typeof applyCompanyUI === 'function' && (localStorage.getItem('caja.company')||'trafic') === 'cempla'){
+          applyCompanyUI();
+        }
+      }catch(_){}
       try{ if(typeof toast === 'function') toast('✅ Chips guardados · recarga si no ves cambios'); }catch(_){}
     };
   }
