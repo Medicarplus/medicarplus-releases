@@ -6038,6 +6038,7 @@ function _isGastoEntry(e){
   if(e._internal) return false;
   if(e._hnBruto) return false;
   if(e._tasaRefund) return false;
+  if(e._gastoExcluded) return false;  // 🔴 Feb 2026 · exclusión manual del usuario
   if(typeof _isHonorarioLikeEntry === 'function' && _isHonorarioLikeEntry(e)) return false;
   return true;
 }
@@ -6062,10 +6063,12 @@ function openGastosPanel(){
           //   · _hnBruto    : referencia técnica virtual IRPF
           //   · _tasaRefund : devolución de tasa al cliente (dinero del cliente,
           //                   simplemente se aplica una tasa más baja de lo cobrado)
-          if(e && (e._internal || e._hnBruto || e._tasaRefund)){
+          if(e && (e._internal || e._hnBruto || e._tasaRefund || e._gastoExcluded)){
             // Las guardamos para el modo diagnóstico — sólo si son DEBE con importe>0
             if(e.kind==='DH' && e.tipo==='DEBE' && (e.importe||0)>0){
-              const reason = e._internal ? 'TRASPASO INTERNO' : (e._hnBruto ? 'BRUTO IRPF' : 'DEVOLUCIÓN TASA');
+              const reason = e._gastoExcluded ? 'EXCLUIDO MANUAL'
+                : (e._internal ? 'TRASPASO INTERNO'
+                  : (e._hnBruto ? 'BRUTO IRPF' : 'DEVOLUCIÓN TASA'));
               const displayName = String(e.nombre||'(sin concepto)').replace(/^\s*gasto\s*[:\-·]\s*/i,'').trim() || '(sin concepto)';
               excludedEntries.push({date: iso, name: displayName, amount: +e.importe||0, company: comp, fp: e.fp||'', reason, entryId: e.id, store: key});
             }
@@ -6078,7 +6081,7 @@ function openGastosPanel(){
           const match = _gsMatchKeyword(bag2);
           const cat = isHono ? 'HONORARIS' : (match ? match.cat : (_hasExplicitGastoMarker(e) ? 'OTROS' : 'MATERIAL'));
           const displayName = String(e.nombre||'(sin concepto)').replace(/^\s*gasto\s*[:\-·]\s*/i,'').trim() || '(sin concepto)';
-          allEntries.push({date: iso, name: displayName, amount: +e.importe||0, company: comp, fp: e.fp||'', cat, explicit: _hasExplicitGastoMarker(e), isHono});
+          allEntries.push({date: iso, name: displayName, amount: +e.importe||0, company: comp, fp: e.fp||'', cat, explicit: _hasExplicitGastoMarker(e), isHono, entryId: e.id, store: key});
         }
       }
     }catch(_){}
@@ -6178,9 +6181,13 @@ function openGastosPanel(){
       const rows = list.map(e => {
         const fpFull = ({E:'Efectivo',T:'Banco',B:'Bizum',X:'Otros'})[e.fp] || e.fp || '—';
         const cn = (typeof _companyName === 'function' ? _companyName(e.company) : e.company);
-        return `<tr data-goto-date="${e.date}" data-goto-company="${e.company}" style="cursor:pointer" title="Clic para ir al día ${fmtDate(e.date)}"><td style="padding:5px 10px;font-size:12px">${fmtDate(e.date)}</td><td style="padding:5px 10px"><span style="background:${_gsCategoryColor(e.cat)}22;color:${_gsCategoryColor(e.cat)};padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700">${_gsCategoryLabel(e.cat)}</span></td><td style="padding:5px 10px;font-size:12px;font-weight:600">${e.name.replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:11px;color:#64748b">${cn}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${fpFull}</td><td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700;color:#ef4444">-${fmtEUR(e.amount)}</td></tr>`;
+        // 🔴 Feb 2026 · botón "🚫 Excluir" por fila · mueve el gasto al pool de EXCLUIDOS MANUALES
+        const excludeBtn = (e.entryId && e.store)
+          ? `<button data-exclude-id="${e.entryId}" data-exclude-store="${e.store}" title="No contarlo como gasto · irá a 'Excluidos' y podrás revertirlo cuando quieras" style="background:#1f2937;color:#fca5a5;border:1px solid #7f1d1d;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700" onclick="event.stopPropagation()">🚫 Excluir</button>`
+          : '';
+        return `<tr data-goto-date="${e.date}" data-goto-company="${e.company}" style="cursor:pointer" title="Clic para ir al día ${fmtDate(e.date)}"><td style="padding:5px 10px;font-size:12px">${fmtDate(e.date)}</td><td style="padding:5px 10px"><span style="background:${_gsCategoryColor(e.cat)}22;color:${_gsCategoryColor(e.cat)};padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700">${_gsCategoryLabel(e.cat)}</span></td><td style="padding:5px 10px;font-size:12px;font-weight:600">${e.name.replace(/</g,'&lt;')}</td><td style="padding:5px 10px;font-size:11px;color:#64748b">${cn}</td><td style="padding:5px 10px;font-size:11px;color:#94a3b8">${fpFull}</td><td style="padding:5px 10px;text-align:right;font-family:monospace;font-weight:700;color:#ef4444">-${fmtEUR(e.amount)}</td><td style="padding:5px 10px;text-align:center" class="no-print">${excludeBtn}</td></tr>`;
       }).join('');
-      return `<div style="margin-bottom:16px;background:#0f172a;border:1px solid #334155;border-radius:8px;overflow:hidden"><div style="background:#1e293b;padding:8px 14px;display:flex;justify-content:space-between;align-items:center"><b style="color:#f472b6">📅 ${fmtMonth(ym)}</b><span style="color:#ef4444;font-weight:700">-${fmtEUR(monthTotal)}</span></div><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#111827"><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Fecha</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Categoría</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Concepto</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Empresa</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Pago</th><th style="padding:5px 10px;text-align:right;font-size:10px;color:#94a3b8">Importe</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      return `<div style="margin-bottom:16px;background:#0f172a;border:1px solid #334155;border-radius:8px;overflow:hidden"><div style="background:#1e293b;padding:8px 14px;display:flex;justify-content:space-between;align-items:center"><b style="color:#f472b6">📅 ${fmtMonth(ym)}</b><span style="color:#ef4444;font-weight:700">-${fmtEUR(monthTotal)}</span></div><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#111827"><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Fecha</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Categoría</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Concepto</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Empresa</th><th style="padding:5px 10px;text-align:left;font-size:10px;color:#94a3b8">Pago</th><th style="padding:5px 10px;text-align:right;font-size:10px;color:#94a3b8">Importe</th><th style="padding:5px 10px;text-align:center;font-size:10px;color:#94a3b8" class="no-print">Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }).join('') : '<div style="padding:20px;text-align:center;color:#64748b;font-style:italic">Sin gastos en este período. Añade una entrada Debe/Haber con concepto como "Factura Endesa", "Recibo agua", "Alquiler local", "Seguro Mapfre"…</div>';
     // Oct 2026 · Diagnóstico: entradas EXCLUIDAS (si el toggle está marcado)
     let excludedHtml = '';
@@ -6202,7 +6209,7 @@ function openGastosPanel(){
             const rows = arr.map(e => `<tr data-force-id="${e.entryId}" data-force-store="${e.store}" style="border-top:1px solid #292524"><td style="padding:5px 10px;color:#fde68a">${fmtDate(e.date)}</td><td style="padding:5px 10px;color:#e2e8f0">${escapeHtml(e.name)}</td><td style="padding:5px 10px;color:#78350f;font-size:10px;text-transform:uppercase;letter-spacing:.5px">${reason}</td><td style="padding:5px 10px;color:#94a3b8;font-size:11px">${(e.company||'').toUpperCase()}</td><td style="padding:5px 10px;color:#78350f;text-align:right;font-weight:700">${fmtEUR(e.amount)}</td><td style="padding:5px 10px;text-align:center"><button data-force-gasto="${e.entryId}" data-force-store="${e.store}" style="background:#78350f;color:#fde68a;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700" title="Convertir en gasto normal (quita la etiqueta de exclusión)">✅ Es gasto</button></td></tr>`).join('');
             return `<div style="margin-bottom:10px"><div style="background:#78350f;color:#fde68a;padding:6px 10px;font-weight:700;font-size:11px;border-radius:6px 6px 0 0">${reason} · ${arr.length} · ${fmtEUR(subTotal)}</div><table style="width:100%;background:#1c1917;border-collapse:collapse;font-size:12px">${rows}</table></div>`;
           }).join('');
-          excludedHtml = `<div style="margin-bottom:16px;background:#1a0f05;border:2px solid #78350f;border-radius:8px;padding:14px"><div style="color:#fbbf24;font-weight:800;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center"><span>🔍 DIAGNÓSTICO · Entradas EXCLUIDAS del total (${exclFiltered.length})</span><span style="color:#fde68a">${fmtEUR(sumExcl)}</span></div><div style="font-size:11px;color:#fcd34d;margin-bottom:10px;line-height:1.5">Estas entradas se EXCLUYEN automáticamente porque están marcadas como traspasos internos, bruto IRPF o devoluciones. Si alguna debería contar como gasto real, pulsa <b>✅ Es gasto</b>.</div>${reasonBlocks}</div>`;
+          excludedHtml = `<div style="margin-bottom:16px;background:#1a0f05;border:2px solid #78350f;border-radius:8px;padding:14px"><div style="color:#fbbf24;font-weight:800;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center"><span>🔍 DIAGNÓSTICO · Entradas EXCLUIDAS del total (${exclFiltered.length})</span><span style="color:#fde68a">${fmtEUR(sumExcl)}</span></div><div style="font-size:11px;color:#fcd34d;margin-bottom:10px;line-height:1.5">Estas entradas se EXCLUYEN del total: automáticamente (traspasos internos, bruto IRPF, devoluciones) o <b style="color:#fecaca">manualmente por ti con el botón 🚫 Excluir</b>. Si alguna debería volver a contar como gasto real, pulsa <b>✅ Es gasto</b>.</div>${reasonBlocks}</div>`;
         } else {
           excludedHtml = '<div style="margin-bottom:16px;background:#0b1121;border:1px dashed #334155;border-radius:8px;padding:10px;color:#94a3b8;font-size:12px;text-align:center">🔍 No hay entradas excluidas en este período.</div>';
         }
@@ -6240,12 +6247,16 @@ function openGastosPanel(){
   compSel.addEventListener('change', rerender);
   honoChk.addEventListener('change', rerender);
   if(exclChk) exclChk.addEventListener('change', rerender);
-  // Handler "✅ Es gasto" · quita _internal/_hnBruto/_tasaRefund del entry
+  // Handler "✅ Es gasto" · quita _internal/_hnBruto/_tasaRefund/_gastoExcluded del entry
+  // Handler "🚫 Excluir" · marca _gastoExcluded=true · mueve el gasto a excluidos (reversible)
   document.getElementById('_gs_body').addEventListener('click', (ev) => {
-    const btn = ev.target.closest('[data-force-gasto]');
-    if(!btn) return;
-    const id = btn.dataset.forceGasto;
-    const store = btn.dataset.forceStore;
+    const forceBtn = ev.target.closest('[data-force-gasto]');
+    const excludeBtn = ev.target.closest('[data-exclude-id]');
+    if(!forceBtn && !excludeBtn) return;
+    ev.stopPropagation();
+    const isExclude = !!excludeBtn;
+    const id = isExclude ? excludeBtn.dataset.excludeId : forceBtn.dataset.forceGasto;
+    const store = isExclude ? excludeBtn.dataset.excludeStore : forceBtn.dataset.forceStore;
     if(!id || !store) return;
     try{
       const raw = JSON.parse(localStorage.getItem(store)||'{"byDate":{}}');
@@ -6254,7 +6265,14 @@ function openGastosPanel(){
       for(const iso of Object.keys(bd)){
         for(const e of (bd[iso]||[])){
           if(e && e.id === id){
-            delete e._internal; delete e._hnBruto; delete e._tasaRefund; delete e._transferDir; delete e._origFp;
+            if(isExclude){
+              e._gastoExcluded = true;  // 🔴 marca manual · reversible
+            } else {
+              // ✅ Es gasto · revierte TODAS las etiquetas de exclusión conocidas
+              delete e._internal; delete e._hnBruto; delete e._tasaRefund;
+              delete e._transferDir; delete e._origFp;
+              delete e._gastoExcluded;  // 🔴 también revierte exclusión manual
+            }
             found = true; break;
           }
         }
@@ -6262,14 +6280,22 @@ function openGastosPanel(){
       }
       if(found){
         localStorage.setItem(store, JSON.stringify(raw));
-        try{ if(typeof toast === 'function') toast('✅ Entrada convertida en gasto normal · ya cuenta en el total'); }catch(_){}
+        try{
+          if(typeof toast === 'function'){
+            toast(isExclude
+              ? '🚫 Gasto excluido · pulsa "Es gasto" en diagnóstico para revertirlo'
+              : '✅ Entrada convertida en gasto normal · ya cuenta en el total');
+          }
+        }catch(_){}
+        // 🔄 Refresca TODO el programa (informe anual, cuadres, estadísticas…)
+        try{ if(typeof render === 'function') render(); }catch(_){}
         // Reconstruir el panel entero (recargar entries desde LS)
         back.remove();
         setTimeout(() => { try{ openGastosPanel(); }catch(_){} }, 100);
       } else {
         try{ if(typeof toast === 'function') toast('⚠️ No se encontró la entrada'); }catch(_){}
       }
-    }catch(err){ console.error('[force-gasto]', err); }
+    }catch(err){ console.error('[gasto-toggle]', err); }
   });
   back.querySelector('#_gs_close').onclick = () => back.remove();
   back.querySelector('#_gs_print').onclick = () => {
@@ -9251,6 +9277,10 @@ function _buildAnnualReport(year, monthFilterIdx){
         // ─────────────────────────────────────────────────────────
         // DEBE (gasto) → NO suma en facturación · secció separada
         if(e.kind==='DH' && e.tipo==='DEBE'){
+          // 🔴 Feb 2026 · gasto excluido manualmente por el usuario · no cuenta como gasto
+          //   (sigue en el histórico diario y afecta a la caja/banco real, pero no sale
+          //    en el Informe Anual "Gastos Totales" ni en el panel 🧾 Gastos)
+          if(e._gastoExcluded) return;
           grandTotals.gastos = grandTotals.gastos || {};
           const gCat = (e.nombre || 'Gasto').trim();
           const gc = grandTotals.gastos[gCat] = grandTotals.gastos[gCat] || {count:0, total:0, entries:[]};
