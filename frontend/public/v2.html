@@ -1043,7 +1043,7 @@
             <span class="chip" data-c="" data-preu="" data-split="45-45-10" data-label-ca="✏️ Escriure a mà" data-label-es="✏️ Escribir a mano">✏️ Escribir a mano</span>
             <button class="chip-config-btn" data-chips-row="priv-cempla" title="Configurar chips" style="background:#1e293b;border:1px solid #475569;color:#94a3b8;border-radius:50%;width:24px;height:24px;cursor:pointer;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:12px;margin-left:4px" data-testid="chips-config-priv-cempla">⚙️</button>
           </div>
-          <div class="form-row" id="cemplaCustom" style="display:none;grid-template-columns:1.3fr 0.8fr 0.6fr 0.6fr 0.6fr minmax(220px, 2.6fr) 1fr;margin-top:8px;padding:10px;background:#141821;border-radius:8px;border:1px solid #2a3040">
+          <div class="form-row" id="cemplaCustom" style="display:none;grid-template-columns:1.1fr 0.7fr 2.4fr 1.1fr;margin-top:8px;padding:10px;background:#141821;border-radius:8px;border:1px solid #2a3040">
             <div><label>Esport / Tipus</label><input type="text" id="p-tipo-custom" placeholder="Escriu el tipus..." /></div>
             <div><label>Preu (€)</label><input type="number" step="0.01" id="p-preu-custom" placeholder="40.00" /></div>
             <div class="partner-input" data-partner-idx="1" style="display:none"><label data-partner-lbl="1">Soci 1 %</label><input type="number" step="1" id="p-pct-b" value="45" /></div>
@@ -1541,6 +1541,15 @@ function applyCompanyUI(){const hasC2=!!(window.CFG&&CFG.company2&&CFG.company2.
     if(parts[i]){el.style.display='';const lbl=el.querySelector('[data-partner-lbl]');if(lbl)lbl.textContent=parts[i].name+' %';const inp=el.querySelector('input');if(inp&&parts[i].pct!=null)inp.value=parts[i].pct;}
     else{el.style.display='none';}
   });
+  // Feb 2026 · ajusta grid-template-columns de #cemplaCustom según nº de socios visibles
+  //   Sin esto, los slots ocultos de socios seguían robando ancho a Nombre y F.Pago.
+  { const _cc = document.getElementById('cemplaCustom');
+    if (_cc){
+      const _np = Math.min(3, parts.length|0);
+      const _socisCols = _np>0 ? ('0.6fr '.repeat(_np)) : '';
+      _cc.style.gridTemplateColumns = `1.1fr 0.7fr ${_socisCols}2.4fr 1.1fr`;
+    }
+  }
   // Panell "Repartiment mes actual" només si hi ha socis configurats
   const splitPanel=document.getElementById('cemplaSplitPanel');
   if(splitPanel)splitPanel.dataset.hasPartners=parts.length>0?'1':'0';
