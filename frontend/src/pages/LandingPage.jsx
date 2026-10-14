@@ -764,21 +764,41 @@ export default function LandingPage() {
           </p>
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
             <a
+              href="/api/download/latest-installer"
+              data-testid="hero-cta-download"
+              style={{
+                background: `linear-gradient(135deg, ${C.gold} 0%, #f08c00 100%)`,
+                color: "#0f172a",
+                padding: "16px 30px",
+                borderRadius: 10,
+                textDecoration: "none",
+                fontWeight: 800,
+                fontSize: 15,
+                letterSpacing: 0.5,
+                boxShadow: "0 12px 40px rgba(245,179,1,.45)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              ⬇️ DESCARGAR MEDICAR PLUS <span style={{ opacity: 0.7, fontSize: 12, fontWeight: 600 }}>· Windows</span>
+            </a>
+            <a
               href="#pricing"
               data-testid="hero-cta-trial"
               style={{
-                background: C.gold,
-                color: "#0f172a",
+                background: "transparent",
+                color: C.text,
                 padding: "16px 30px",
                 borderRadius: 10,
                 textDecoration: "none",
                 fontWeight: 700,
                 fontSize: 15,
                 letterSpacing: 0.5,
-                boxShadow: "0 12px 40px rgba(245,179,1,.35)",
+                border: `2px solid ${C.gold}`,
               }}
             >
-              🚀 PROBAR GRATIS 30 DÍAS
+              🚀 Probar gratis 60 días
             </a>
             <a
               href="#features"
@@ -807,6 +827,56 @@ export default function LandingPage() {
           >
             ✓ Sin tarjeta · ✓ Sin compromiso · ✓ Cancela cuando quieras
           </p>
+          {/* ────── Instalación en 3 pasos · Feb 2026 ────── */}
+          <div
+            data-testid="hero-install-steps"
+            style={{
+              marginTop: 48,
+              background: "rgba(245,179,1,.06)",
+              border: `1px solid ${C.gold}40`,
+              borderRadius: 14,
+              padding: "22px 20px",
+              maxWidth: 820,
+              marginInline: "auto",
+            }}
+          >
+            <div style={{ fontSize: 13, color: C.gold, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", marginBottom: 14 }}>
+              ⚡ Instalación en 3 pasos · 5 minutos · sin conocimientos técnicos
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, textAlign: "left" }}>
+              <div style={{ background: "rgba(0,0,0,.25)", padding: "14px 16px", borderRadius: 10, borderLeft: `3px solid ${C.gold}` }}>
+                <div style={{ fontSize: 24, marginBottom: 6 }}>1️⃣</div>
+                <div style={{ fontWeight: 700, color: C.text, fontSize: 14, marginBottom: 4 }}>Descarga</div>
+                <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5 }}>
+                  Pulsa <b style={{ color: C.gold }}>⬇️ Descargar MediCar Plus</b> arriba. Guarda el archivo <code style={{ background: "#0b1121", padding: "1px 5px", borderRadius: 3, fontSize: 11 }}>MediCar-Plus-Setup.exe</code>.
+                </div>
+              </div>
+              <div style={{ background: "rgba(0,0,0,.25)", padding: "14px 16px", borderRadius: 10, borderLeft: `3px solid ${C.gold}` }}>
+                <div style={{ fontSize: 24, marginBottom: 6 }}>2️⃣</div>
+                <div style={{ fontWeight: 700, color: C.text, fontSize: 14, marginBottom: 4 }}>Instala</div>
+                <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5 }}>
+                  Doble clic al archivo. Si sale <i>"Windows protegió su equipo"</i> → <b style={{ color: C.gold }}>Más información → Ejecutar de todos modos</b>. Siguiente → Instalar.
+                </div>
+              </div>
+              <div style={{ background: "rgba(0,0,0,.25)", padding: "14px 16px", borderRadius: 10, borderLeft: `3px solid ${C.gold}` }}>
+                <div style={{ fontSize: 24, marginBottom: 6 }}>3️⃣</div>
+                <div style={{ fontWeight: 700, color: C.text, fontSize: 14, marginBottom: 4 }}>Activa</div>
+                <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5 }}>
+                  Pega la clave de licencia que recibiste por email y pulsa <b style={{ color: C.gold }}>✓ Activar licencia</b>. ¡Listo!
+                </div>
+              </div>
+            </div>
+            <div style={{ textAlign: "center", marginTop: 14, fontSize: 12, color: C.textDim }}>
+              ¿Dudas? Mira la{" "}
+              <a href="/guia-client-installacio.html" target="_blank" style={{ color: C.gold, textDecoration: "underline", fontWeight: 700 }}>
+                guía completa paso a paso (con capturas)
+              </a>{" "}
+              · ¿Aún no tienes licencia?{" "}
+              <a href="/request-license?plan=TRIAL" style={{ color: C.gold, textDecoration: "underline", fontWeight: 700 }}>
+                Pídela gratis aquí
+              </a>
+            </div>
+          </div>
         </div>
 
         {/* Hero visual: mockup del programa */}
