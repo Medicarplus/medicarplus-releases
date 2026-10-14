@@ -64,15 +64,17 @@ class SmsCampaignCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     template: str = Field(..., min_length=10, max_length=1600)
     contacts: List[dict]  # llista de contacts que passin
-    # ─── Twilio billing mode ────────────────────────────────────────────
-    # BYOA: credencials Twilio del client (mode 'byoa')
+    # ─── SMS provider & billing mode ────────────────────────────────────────
+    # provider: 'twilio' (default, inclou byoa/medicar) o 'labsmobile'
+    provider: Optional[str] = "twilio"
+    # BYOA Twilio: credencials del client
     twilio_creds: Optional[dict] = None  # {"sid": "...", "token": "...", "from": "+34..."}
-    # Mode 'medicar': usa el compte central de MediCar Plus (només Premium).
-    # El client no envia creds; només decideix el remitent (Alphanumeric Sender)
-    # perquè els pacients rebin els SMS amb el nom del CENTRE, no de MediCar.
+    # Mode 'medicar': compte central MediCar + sender custom (Premium)
     use_medicar: bool = False
-    medicar_sender: Optional[str] = None   # Alphanumeric Sender (1-11 chars, sense espais)
-    # Identifica al client centre per tracking de consum a MongoDB
+    medicar_sender: Optional[str] = None
+    # 🇪🇸 Feb 2026 · LabsMobile (BYOA alternatiu, més fàcil per clients espanyols)
+    labsmobile_creds: Optional[dict] = None  # {"username": "...", "token": "...", "sender": "CEMPLA"}
+    # Tracking
     install_id: Optional[str] = None
     client_name: Optional[str] = None
 
@@ -166,22 +168,101 @@ def _sanitize_alpha_sender(s: str) -> str:
     return cleaned[:11]
 
 
+def _normalize_msisdn_e164(mobile: str, default_cc: str = "34") -> str:
+    """🔧 Feb 2026 · Normaliza un móvil al formato internacional con "+".
+    Acepta: "612345678" / "+34612345678" / "34 612 345 678" / "612-345-678" /
+    "0034612345678". Si ya tiene "+" o otro código internacional, lo respeta."""
+    raw = (mobile or "").strip()
+    if raw.startswith("+"):
+        return "+" + "".join(ch for ch in raw[1:] if ch.isdigit())
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if digits.startswith("00"): digits = digits[2:]
+    if digits.startswith(default_cc) and len(digits) >= 11:
+        return "+" + digits
+    return "+" + default_cc + digits
+
+
+def _send_sms_labsmobile(
+    mobile: str,
+    message: str,
+    username: str,
+    api_token: str,
+    sender: str,
+) -> tuple[bool, str, str]:
+    """🇪🇸 Feb 2026 · Envia SMS via LabsMobile (proveïdor espanyol).
+    API: POST https://api.labsmobile.com/json/send  ·  HTTP Basic Auth.
+    Doc: https://www.labsmobile.com/en/sms-api/api-versions/http-rest-post-json
+    """
+    import httpx, base64
+    to_full = _normalize_msisdn_e164(mobile)
+    # LabsMobile vol el número SENSE "+"  (format MSISDN)
+    msisdn = to_full.lstrip("+")
+    auth_b64 = base64.b64encode(f"{username}:{api_token}".encode("utf-8")).decode("ascii")
+    payload = {
+        "message": message,
+        "tpoa": _sanitize_alpha_sender(sender) or "Info",  # Alphanumeric sender
+        "recipient": [{"msisdn": msisdn}],
+    }
+    try:
+        with httpx.Client(timeout=15) as cli:
+            resp = cli.post(
+                "https://api.labsmobile.com/json/send",
+                headers={
+                    "Authorization": f"Basic {auth_b64}",
+                    "Content-Type": "application/json",
+                    "Cache-Control": "no-cache",
+                },
+                json=payload,
+            )
+        try:
+            data = resp.json()
+        except Exception:
+            data = {"message": resp.text[:200]}
+        # LabsMobile retorna code "0" en èxit · altres = error
+        code = str(data.get("code", data.get("Code", "")))
+        if resp.status_code == 200 and code == "0":
+            sub_id = data.get("subid") or data.get("messageid") or data.get("id") or "ok"
+            return True, f"labsmobile:{sub_id}", "labsmobile"
+        # Error
+        msg = data.get("message") or data.get("Message") or f"HTTP {resp.status_code}"
+        return False, f"error:LabsMobile · code={code} · {msg}"[:300], "labsmobile"
+    except Exception as e:
+        return False, f"error:LabsMobile · {str(e)[:280]}", "labsmobile"
+
+
 def _send_sms(
     mobile: str,
     message: str,
     creds: Optional[dict] = None,
     use_medicar: bool = False,
     medicar_sender: Optional[str] = None,
+    provider: Optional[str] = None,
+    lab_creds: Optional[dict] = None,
 ) -> tuple[bool, str, str]:
-    """Envia SMS via Twilio. Retorna (ok, detail, source).
+    """Envia SMS. Retorna (ok, detail, source).
 
     Modes (per prioritat):
-    1) use_medicar=True + env creds configurades → compte MediCar Plus + sender custom.
+    0) provider=='labsmobile' + lab_creds complets → LabsMobile. source='labsmobile'
+    1) use_medicar=True + env creds configurades → compte MediCar + sender custom.
        source='medicar'
-    2) creds válides al payload → BYOA (compte del client). source='byoa'
-    3) Env creds configurades → fallback per master/admin. source='env'
+    2) creds (Twilio) válides al payload → BYOA. source='byoa'
+    3) Env Twilio configurades → fallback. source='env'
     4) Res configurat → MOCK. source='mock'
     """
+    # 🇪🇸 Mode LabsMobile (proveïdor espanyol)
+    if (provider or "").lower() == "labsmobile":
+        if not lab_creds or not isinstance(lab_creds, dict):
+            return False, "error:LabsMobile credenciales no enviadas", "labsmobile_incomplete"
+        user = (lab_creds.get("username") or "").strip()
+        tok = (lab_creds.get("token") or lab_creds.get("api_token") or "").strip()
+        snd = (lab_creds.get("sender") or lab_creds.get("from") or "").strip()
+        miss = []
+        if not user: miss.append("Usuario (email)")
+        if not tok: miss.append("API Token")
+        if not snd: miss.append("Remitente (nombre centro)")
+        if miss:
+            return False, "error:LabsMobile · falta: " + ", ".join(miss), "labsmobile_incomplete"
+        return _send_sms_labsmobile(mobile, message, user, tok, snd)
     # Mode MediCar centralitzat
     if use_medicar:
         if not _has_twilio():
@@ -497,6 +578,8 @@ def build_router(db):
                 creds=body.twilio_creds,
                 use_medicar=body.use_medicar,
                 medicar_sender=body.medicar_sender,
+                provider=body.provider,
+                lab_creds=body.labsmobile_creds,
             )
             source_final = source  # es queda amb l'últim
             if ok:
