@@ -510,6 +510,133 @@
   </table>
 
   <div class="tip">Puedes tener los <b>dos proveedores configurados a la vez</b> en el programa y cambiar entre ellos desde el selector "Proveedor activo" según lo que necesites cada día.</div>
+
+  <!-- ============ GUÍA TWILIO ALPHA SENDER ============ -->
+  <h2 id="twilio-alpha-guia" style="background:linear-gradient(90deg,#fef3c7,transparent);border-left-color:#f5b301;color:#78350f">📨 Guía rápida Twilio Alpha Sender · Que llegue "MediCar" en vez de un número</h2>
+  <p>Si ya has puesto saldo en Twilio y <b>no quieres que al cliente le aparezca un número largo</b> como remitente, hay que registrar un <b>Alphanumeric Sender ID</b> (ej. <code>MediCar</code>). Twilio pide bastantes datos en inglés — <b>aquí tienes exactamente qué poner en cada campo</b>, con ejemplos listos para copiar.</p>
+
+  <div class="callout callout-blue"><b>⏱️ Tiempo total:</b> ~15 min · <b>Aprobación en España:</b> normalmente automática en pocos minutos · <b>Coste:</b> gratis (los Alpha Sender no cuestan extra, solo pagas por SMS enviado).</div>
+
+  <h3>PASO 1 · Entrar al panel correcto</h3>
+  <div class="step">
+    <ol>
+      <li>Entra a <a href="https://console.twilio.com/" target="_blank" rel="noopener">console.twilio.com</a> con tu email y contraseña.</li>
+      <li>En el menú lateral izquierdo busca: <b>Messaging ▸ Senders ▸ Sender Pool</b> (o directamente <a href="https://console.twilio.com/us1/develop/sms/senders/alphanumeric-sender-ids" target="_blank" rel="noopener">este enlace directo</a>).</li>
+      <li>Pestaña <b>"Alphanumeric Sender IDs"</b> (al lado de "Phone Numbers" y "Short Codes").</li>
+      <li>Botón azul arriba a la derecha: <b>"Create new Alphanumeric Sender ID"</b> o <b>"+ Alphanumeric Sender ID"</b>.</li>
+    </ol>
+    <div class="tip">Si no ves esta opción, puede que tu cuenta esté en modo <i>Trial</i>. Añade al menos 20€ de saldo (como ya hiciste con 50€ 👍) y volverá a aparecer.</div>
+  </div>
+
+  <h3>PASO 2 · Rellenar los campos del formulario (lo "en inglés" explicado)</h3>
+  <div class="step">
+    <p>Twilio te mostrará un formulario largo. Aquí tienes <b>campo por campo qué significa y qué poner</b>:</p>
+
+    <table>
+      <tr><th>Campo en inglés</th><th>Qué significa</th><th>Qué poner (ejemplo)</th></tr>
+
+      <tr><td><b>Alphanumeric Sender ID</b></td><td>El nombre que verá el cliente en el SMS (máx 11 caracteres, sin espacios, sin ñ ni acentos, empezando por letra).</td><td><code>MediCar</code></td></tr>
+
+      <tr><td><b>Friendly name</b></td><td>Etiqueta interna solo para que tú lo encuentres en tu panel. No se envía a nadie.</td><td><code>MediCar - Avisos renovación</code></td></tr>
+
+      <tr><td><b>ISO country code / Countries</b></td><td>Países donde vas a enviar SMS con este remitente.</td><td>Marca <b>ES (Spain)</b>. Si envías también a Portugal/Andorra, márcalos.</td></tr>
+
+      <tr><td><b>Use Case</b> (desplegable)</td><td>Para qué vas a usar los SMS.</td><td>Elige <b>"Account Notification"</b> o <b>"Appointment Reminders"</b>.</td></tr>
+
+      <tr><td><b>Use Case Description</b></td><td>Descripción breve en inglés de para qué envías.</td><td><code>We send renewal reminders and appointment notifications to our medical center customers who booked a driving-license medical exam.</code></td></tr>
+
+      <tr><td><b>Business name / Company name</b></td><td>Nombre fiscal/comercial de tu empresa.</td><td>El nombre real de tu empresa (ej. <i>Centro Médico MediCar S.L.</i>).</td></tr>
+
+      <tr><td><b>Business website</b></td><td>Tu página web.</td><td>Tu web real (ej. <code>https://medicar.es</code>). Si no tienes, pon una ficha Google Business o tu perfil de Doctoralia.</td></tr>
+
+      <tr><td><b>Business address</b></td><td>Dirección fiscal.</td><td>Calle, número, código postal, ciudad, país.</td></tr>
+
+      <tr><td><b>Opt-in flow / Consent</b></td><td>Cómo obtienes el permiso del cliente para enviarle SMS.</td><td><code>Customers provide their mobile number and give written consent on the medical-exam form during their in-person visit to our clinic. GDPR compliant.</code></td></tr>
+
+      <tr><td><b>Opt-out instructions / STOP</b></td><td>Cómo pueden darse de baja. <b>Obligatorio</b> en EU.</td><td><code>Customers can reply STOP or call us at +34 972 XX XX XX to be removed from future SMS communications.</code></td></tr>
+
+      <tr><td><b>Sample message 1 / 2 / 3</b></td><td>Ejemplos reales del SMS que vas a enviar (pide 1-3 ejemplos).</td><td>Ver abajo ⬇️</td></tr>
+
+      <tr><td><b>Message volume</b></td><td>Cuántos SMS al mes aprox.</td><td>Pon una estimación realista (ej. <code>500 per month</code>).</td></tr>
+    </table>
+
+    <div class="callout callout-green">
+      <b>📝 Mensajes de ejemplo que puedes copiar literalmente:</b>
+      <ul style="margin:8px 0 0;font-family:'Courier New',monospace;font-size:12.5px">
+        <li>Hola Juan, soy MediCar. Te toca renovar el carnet antes del 15/06/2026. Pide cita 972 XX XX XX. STOP para baja.</li>
+        <li>Recordatorio MediCar: cita confirmada mañana 10:30. Trae DNI y gafas si usas. STOP para baja.</li>
+        <li>MediCar: tu certificado está listo para recoger en recepción. Horario L-V 9-14h / 16-20h. STOP para baja.</li>
+      </ul>
+    </div>
+
+    <div class="callout callout-red"><b>⚠️ CSCS / Compliance:</b> si ves un apartado con siglas raras como "CSCS" (Carrier Sender Compliance Standards), "10DLC", "A2P" o similares — <b>eso es para EE.UU., NO afecta a España</b>. Déjalo por defecto o salta esos campos. En España solo necesitas rellenar los campos marcados como obligatorios con <i>*</i>.</div>
+  </div>
+
+  <h3>PASO 3 · Enviar formulario y esperar aprobación</h3>
+  <div class="step">
+    <ol>
+      <li>Repasa que todo esté bien escrito (sin faltas en inglés — Twilio es muy quisquilloso).</li>
+      <li>Clic en <b>"Submit"</b> o <b>"Create"</b> al final.</li>
+      <li>Verás un estado:
+        <ul>
+          <li><b>"Approved"</b> ✅ → ya puedes usarlo. En España suele tardar de <b>minutos a 24h</b>.</li>
+          <li><b>"Pending Review"</b> ⏳ → en revisión manual, espera 1-3 días laborables.</li>
+          <li><b>"Rejected"</b> ❌ → Twilio pone el motivo. Normalmente es por "falta de opt-in claro" o "sample messages genéricos" — corrige y vuelve a enviar.</li>
+        </ul>
+      </li>
+      <li>Cuando esté <b>Approved</b>, Twilio te enviará un email de confirmación.</li>
+    </ol>
+    <div class="tip">Mientras esperas la aprobación, <b>puedes seguir enviando SMS desde el número comprado</b> (al cliente le saldrá el número, no "MediCar"). No pierdes tiempo.</div>
+  </div>
+
+  <h3>PASO 4 · Configurar en MediCar Plus</h3>
+  <div class="step">
+    <ol>
+      <li>Abre MediCar Plus → <span class="btn-icon">📱 Avisos</span> → <b>⚙️ Configuración SMS</b>.</li>
+      <li>Pestaña <b>"Twilio"</b>.</li>
+      <li>Pulsa el botón <b>🔍 Detectar mis remitentes</b> — se conectará a tu cuenta y traerá:
+        <ul>
+          <li>El número que compraste (con prefijo <code>+34…</code>)</li>
+          <li>El Alpha Sender aprobado (<code>MediCar</code>)</li>
+        </ul>
+      </li>
+      <li>En el desplegable <b>"Remitente"</b> selecciona <code>MediCar</code> (el alfanumérico) en lugar del número.</li>
+      <li>Clic en <b>💾 Guardar</b>.</li>
+    </ol>
+    <div class="callout callout-green">A partir de ahora, los SMS enviados vía Twilio llegarán al móvil del cliente con el nombre <b>MediCar</b> y no con un número largo. 🎯</div>
+  </div>
+
+  <h3>PASO 5 · Primera prueba real</h3>
+  <div class="step">
+    <ol>
+      <li>Dentro del modal SMS, confirma que el selector <b>"Proveedor activo"</b> está en <b>Twilio</b>.</li>
+      <li>➕ Nueva campaña → nombre "Prueba Twilio Alpha".</li>
+      <li>Añade <b>solo tu móvil</b> como único contacto.</li>
+      <li>Enviar → en 10-30 segundos te llega el SMS con remitente <b>MediCar</b>. ✅</li>
+    </ol>
+  </div>
+
+  <h3>🚨 Problemas típicos con Twilio Alpha Sender</h3>
+  <table>
+    <tr><th>Problema</th><th>Qué hacer</th></tr>
+    <tr><td>❌ "Rejected: insufficient opt-in evidence"</td><td>Reescribe el campo "Opt-in flow" explicando con más detalle (ej. "firma en formulario físico durante la visita presencial"). Vuelve a enviar.</td></tr>
+    <tr><td>❌ "Rejected: sample messages too generic"</td><td>Pon ejemplos con <b>nombre de empresa + motivo específico + opción STOP</b>. Usa los 3 de arriba.</td></tr>
+    <tr><td>❌ "Alphanumeric Sender ID already in use"</td><td>Alguien ya usa ese nombre a nivel global. Prueba con una variante: <code>MediCarES</code>, <code>MediCarCM</code>, <code>CMMediCar</code>.</td></tr>
+    <tr><td>❌ No encuentro el menú "Alphanumeric Sender IDs"</td><td>Puede que estés en una sub-cuenta sin permisos. Vuelve a la cuenta principal (icono arriba a la derecha → "Primary Account").</td></tr>
+    <tr><td>⚠️ Me pide verificar el negocio (business verification)</td><td>Si tu volumen es alto Twilio puede pedir verificación extra. Tendrás que subir una foto del DNI del admin + justificante CIF/alta en Hacienda. Es gratis.</td></tr>
+    <tr><td>❓ ¿Y si no quiero el jaleo de Twilio?</td><td>Pásate a LabsMobile (ver guía justo arriba ⬆️). Para España es la opción más fácil: sin formularios, sin aprobación, mismo resultado.</td></tr>
+  </table>
+
+  <h3>💡 Resumen rápido · Twilio vs LabsMobile para enviar como "MediCar"</h3>
+  <table>
+    <tr><th></th><th>Twilio Alpha Sender</th><th>LabsMobile</th></tr>
+    <tr><td><b>Formulario inicial</b></td><td>Sí (en inglés, ~15 min)</td><td>No</td></tr>
+    <tr><td><b>Aprobación necesaria</b></td><td>Sí (minutos-24h en España)</td><td>No</td></tr>
+    <tr><td><b>Precio SMS España</b></td><td>≈ 0,075 €</td><td>≈ 0,045 €</td></tr>
+    <tr><td><b>Panel en español</b></td><td>❌ Inglés</td><td>✅ Español</td></tr>
+    <tr><td><b>Soporte internacional</b></td><td>✅ Mejor (más países)</td><td>⚠️ Bueno pero menos</td></tr>
+  </table>
+  <div class="tip">Si solo envías a España, <b>LabsMobile te ahorra tiempo y dinero</b>. Twilio tiene sentido si envías también a países fuera UE o quieres que los clientes puedan <b>responder</b> al SMS (necesitas número comprado, no funciona con Alpha Sender).</div>
 </div>
 
 <!-- ============ TAB: CITAS ============ -->
