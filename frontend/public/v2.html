@@ -13833,23 +13833,37 @@ function openSmsModal(){
       const body = (tpl.value||'').trim();
       if(!body){ try{toast(isCA?'El missatge és buit':'El mensaje está vacío');}catch(_){} return; }
       const defName = (isCA?'Plantilla ':'Plantilla ') + new Date().toLocaleDateString(isCA?'ca-ES':'es-ES');
-      const name = (prompt(isCA?'Nom de la plantilla:':'Nombre de la plantilla:', defName) || '').trim();
-      if(!name) return;
-      const list = getTpls();
-      // Si ya existe una con ese nombre, sobreescribir
-      const exist = list.find(x => (x.name||'').toLowerCase() === name.toLowerCase());
-      if(exist){
-        if(!confirm(isCA?`Ja existeix "${name}". Sobreescriure?`:`Ya existe "${name}". ¿Sobrescribir?`)) return;
-        exist.body = body; exist.updated_at = new Date().toISOString();
-      } else {
-        list.unshift({ id:'tpl_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), name, body, created_at:new Date().toISOString() });
-      }
-      setTpls(list);
-      refreshPicker();
-      // Seleccionar la recién guardada
-      const saved = getTpls().find(x => x.name === name);
-      if(saved){ picker.value = saved.id; btnDel.style.display='inline-block'; }
-      try{toast(isCA?'📌 Plantilla fixada':'📌 Plantilla fijada');}catch(_){}
+      // 🔧 Feb 2026 · prompt() no funciona en Electron. Usamos modal custom inline.
+      const back = document.createElement('div');
+      back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:10050;backdrop-filter:blur(6px)';
+      back.innerHTML = `<div style="background:#0f172a;border:1px solid #22c55e;border-radius:12px;padding:22px 24px;max-width:460px;width:90%;color:#e2e8f0;font-family:system-ui,sans-serif;box-shadow:0 20px 50px rgba(0,0,0,.6)"><h3 style="margin:0 0 6px;color:#22c55e;font-size:16px">📌 ${isCA?'Fixar plantilla':'Fijar plantilla'}</h3><div style="font-size:12px;color:#94a3b8;margin-bottom:14px">${isCA?'Posa-li un nom per localitzar-la fàcilment després.':'Ponle un nombre para localizarla fácilmente después.'}</div><input type="text" id="_tplNameInp" value="${defName.replace(/"/g,'&quot;')}" style="width:100%;background:#0e1a2e;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-size:14px;box-sizing:border-box" autofocus /><div id="_tplNameErr" style="font-size:11px;color:#fca5a5;margin-top:6px;min-height:14px"></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button id="_tplNameCancel" style="background:#1e293b;color:#cbd5e1;border:1px solid #475569;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">${isCA?'Cancel·lar':'Cancelar'}</button><button id="_tplNameOK" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800">💾 ${isCA?'Desar':'Guardar'}</button></div></div>`;
+      document.body.appendChild(back);
+      const inp = back.querySelector('#_tplNameInp');
+      const err = back.querySelector('#_tplNameErr');
+      inp.focus(); inp.select();
+      const close = () => back.remove();
+      back.querySelector('#_tplNameCancel').onclick = close;
+      back.addEventListener('click', ev => { if(ev.target === back) close(); });
+      const doSave = () => {
+        const name = (inp.value||'').trim();
+        if(!name){ err.textContent = isCA?'El nom no pot estar buit':'El nombre no puede estar vacío'; return; }
+        const list = getTpls();
+        const exist = list.find(x => (x.name||'').toLowerCase() === name.toLowerCase());
+        if(exist){
+          if(!confirm(isCA?`Ja existeix "${name}". Sobreescriure?`:`Ya existe "${name}". ¿Sobrescribir?`)) return;
+          exist.body = body; exist.updated_at = new Date().toISOString();
+        } else {
+          list.unshift({ id:'tpl_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), name, body, created_at:new Date().toISOString() });
+        }
+        setTpls(list);
+        refreshPicker();
+        const saved = getTpls().find(x => x.name === name);
+        if(saved){ picker.value = saved.id; btnDel.style.display='inline-block'; }
+        try{toast(isCA?'📌 Plantilla fixada':'📌 Plantilla fijada');}catch(_){}
+        close();
+      };
+      back.querySelector('#_tplNameOK').onclick = doSave;
+      inp.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); doSave(); } if(e.key==='Escape'){ close(); } });
     });
     btnDel.addEventListener('click', () => {
       const id = picker.value; if(!id) return;
