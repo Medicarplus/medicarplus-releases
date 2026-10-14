@@ -68,6 +68,31 @@
 🎯 <b>Estrategia recomendada</b> — hacer las <b>2 pistas en paralelo</b>: compras un número español (listo en 2 min · 1,15 €/mes) para empezar a mandar SMS HOY, y mientras tramitas el <b>Alphanumeric Sender gratis</b> (el nombre del centro). Cuando Twilio apruebe (3-7 días), cambias en MediCar el número por el nombre y liberas el número.
 </div>
 
+<!-- ═══════════ ELEGIR PROVEEDOR · Feb 2026 ═══════════ -->
+<h2 id="proveedor">🥊 Primero: elige proveedor (Twilio vs LabsMobile)</h2>
+
+<p>MediCar Plus está integrado con <b>dos proveedores de SMS</b>. Ambos funcionan 100% automático desde el programa (pestañas en <b>⚙️ Configurar SMS</b>). Cada uno con sus pros/contras:</p>
+
+<table style="margin:16px 0">
+  <tr><th style="width:30%">Criterio</th><th style="width:35%;background:#1e40af">🇺🇸 Twilio</th><th style="width:35%;background:#1e40af">🇪🇸 LabsMobile <span style="font-size:11px;color:#86efac">(recomendado ES)</span></th></tr>
+  <tr><td><b>Alphanumeric Sender</b></td><td>3-7 días (papeleo exhaustivo)</td><td style="background:#dcfce7"><b>Mismo día / 24h</b> (empresa ES con NIF)</td></tr>
+  <tr><td><b>Coste SMS España</b></td><td>~0,04 €/SMS</td><td>~0,045 €/SMS <span style="color:#64748b">(+10%)</span></td></tr>
+  <tr><td><b>Panel y soporte</b></td><td>Inglés</td><td style="background:#dcfce7"><b>Español</b> · teléfono 900 814 500</td></tr>
+  <tr><td><b>Crédito de regalo</b></td><td>~15 $</td><td>10 SMS gratis al registro</td></tr>
+  <tr><td><b>Compra de número</b></td><td>Sí (1,15 €/mes)</td><td>No necesario (va directo a Alphanumeric)</td></tr>
+  <tr><td><b>En MediCar Plus</b></td><td>Pestaña 🔧 Twilio</td><td>Pestaña 🇪🇸 LabsMobile</td></tr>
+</table>
+
+<div class="callout callout-green">
+💡 <b>Nuestra recomendación cuando vendes en España:</b> empezar con <b>LabsMobile</b>. Es más fácil para el cliente (todo español), más rápido en aprobación del nombre y los 0,005 € extra por SMS no se notan. Twilio tiene sentido si el cliente opera fuera de España o si tienes algún motivo técnico concreto.
+</div>
+
+<p><b>Qué sigue:</b></p>
+<ul>
+  <li>Si eliges <b>LabsMobile</b> → ve a la <a href="#labsmobile">sección LabsMobile</a> (más abajo). Puedes saltar las partes Twilio.</li>
+  <li>Si eliges <b>Twilio</b> → sigue leyendo con las dos partes de abajo (número + alphanumeric).</li>
+</ul>
+
 <h2>🔎 Entender las 2 opciones antes de empezar</h2>
 
 <div class="track">
@@ -271,6 +296,98 @@ Si ya no necesitas el número temporal:
 </div>
 
 <!-- ───────── RESUMEN ───────── -->
+<!-- ═══════════ LABSMOBILE · Feb 2026 ═══════════ -->
+<h2 id="labsmobile">🇪🇸 Alternativa: LabsMobile (proveedor español · recomendado)</h2>
+
+<div class="callout callout-green" style="font-size:14px">
+✅ <b>Ventaja clave vs Twilio:</b> aprobación del <b>Alphanumeric Sender el mismo día</b> (o en 24h) para empresas españolas con NIF. Panel y soporte en español. Sin tener que comprar número intermedio.
+</div>
+
+<p><b>Qué necesitas antes de empezar:</b> tu NIF/CIF a mano y 10 minutos.</p>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#1e40af"><span class="step-num" style="background:#1e40af">L1</span>Crear cuenta en LabsMobile (gratis · 2 min)</h2>
+<ol>
+  <li>Ve a <a href="https://www.labsmobile.com/es/registro" target="_blank"><b>labsmobile.com/es/registro</b></a></li>
+  <li>Rellena email + contraseña + datos básicos de empresa (NIF, nombre comercial)</li>
+  <li>Verifica el email y el móvil</li>
+  <li>Al entrar al panel verás 10 SMS gratis de regalo</li>
+</ol>
+<div class="callout callout-blue">💡 Si eres <b>autónomo médico</b>, pon tus datos personales + NIF como "empresa". No necesitas tener SL.</div>
+</div>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#1e40af"><span class="step-num" style="background:#1e40af">L2</span>Generar el API Token (lo pegarás en MediCar)</h2>
+<ol>
+  <li>En el panel LabsMobile → menú <b>Configuración</b> → <b>API</b></li>
+  <li>Pulsa <b>"Generar nuevo token"</b> (o similar · botón visible en la cabecera)</li>
+  <li>Copia:
+    <ul>
+      <li><b>Tu usuario</b> (es tu email de registro)</li>
+      <li><b>El API Token</b> generado</li>
+    </ul>
+  </li>
+  <li>Guárdalos en el bloc de notas · los pegarás en MediCar</li>
+</ol>
+<div class="callout">🔑 El token funciona como contraseña técnica. Puedes regenerarlo cuando quieras si crees que alguien lo ha visto.</div>
+</div>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#1e40af"><span class="step-num" style="background:#1e40af">L3</span>Pedir el Alphanumeric Sender ("CEMPLA")</h2>
+<ol>
+  <li>En el panel → busca <b>"Remitentes"</b> o <b>"Alfanuméricos"</b> en el menú lateral</li>
+  <li>Pulsa <b>"Añadir remitente"</b> o <b>"Solicitar sender"</b></li>
+  <li>Rellena:
+    <ul>
+      <li><b>Nombre del remitente:</b> <code>CEMPLA</code> (o el que quieras · <b>máx 11 caracteres · sin acentos ni símbolos</b>)</li>
+      <li><b>País:</b> España</li>
+      <li><b>Uso:</b> Transaccional · Recordatorios de cita médica</li>
+      <li><b>Mensaje ejemplo:</b> <i>Hola Juan, le recordamos que su revisión médica caduca el 15/11/2026. Reserve cita al 93 XXX XX XX</i></li>
+    </ul>
+  </li>
+  <li>Si piden <b>justificante de empresa</b>, sube: certificado de alta autónomo, NIF, o escritura SL</li>
+  <li>Enviar solicitud</li>
+</ol>
+<div class="callout callout-green">⚡ <b>Tiempo típico:</b> aprobación <b>mismo día en horario laboral</b> para empresas españolas con NIF. Si no responden en 24h, llama al <b>900 814 500</b> (gratis).</div>
+</div>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#1e40af"><span class="step-num" style="background:#1e40af">L4</span>Configurar en MediCar Plus (1 min)</h2>
+<ol>
+  <li>Abre MediCar Plus → <b>📱 Avisos SMS</b> → <b>⚙️ Configurar SMS</b></li>
+  <li>Arriba verás 3 pestañas. Pulsa <b>🇪🇸 LabsMobile</b></li>
+  <li>Rellena:
+    <ul>
+      <li><b>Usuario (email):</b> tu email de LabsMobile</li>
+      <li><b>API Token:</b> el que copiaste en el paso L2</li>
+      <li><b>Remitente (nombre centro):</b> <code>CEMPLA</code> · o pulsa <b>⚡ Usar nombre del centro</b> para que lo rellene automáticamente</li>
+    </ul>
+  </li>
+  <li>Verás abajo <b>"✅ Guardado automáticamente"</b></li>
+  <li>Cierra el panel. <b>Listo.</b></li>
+</ol>
+</div>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#1e40af"><span class="step-num" style="background:#1e40af">L5</span>Primer envío de prueba</h2>
+<ol>
+  <li><b>📱 Avisos SMS</b> → <b>➕ Nueva campaña</b></li>
+  <li>Nombre: <code>Prueba</code> · Contactos: solo tu móvil</li>
+  <li>Mensaje: <i>"Hola prueba desde CEMPLA"</i></li>
+  <li>Pulsa <b>Enviar</b> → te llega al móvil con <b>CEMPLA</b> como remitente</li>
+  <li>Si falla, el popup te dice el motivo exacto (ej: "Sender ID no aprobado todavía").</li>
+</ol>
+<div class="callout callout-green">✅ <b>¡Ya tienes SMS funcionando con el nombre del centro desde el primer día!</b></div>
+</div>
+
+<h3>💰 Añadir saldo a LabsMobile cuando los 10 SMS de regalo se agoten</h3>
+<ol>
+  <li>Panel LabsMobile → <b>Facturación</b> → <b>Recargar saldo</b></li>
+  <li>Mínimo típico: 10 € · pago con tarjeta o transferencia</li>
+  <li>10 € ≈ 220 SMS a España (0,045 €/SMS aprox.)</li>
+</ol>
+
+<!-- ═══════════ RESUMEN · fin ═══════════ -->
 <h2>📋 Resumen rápido (chuleta para visitas comerciales)</h2>
 <table>
   <tr><th>#</th><th>Qué</th><th>Dónde</th><th>Tiempo</th></tr>
@@ -281,6 +398,12 @@ Si ya no necesitas el número temporal:
   <tr><td>5</td><td>Primer SMS de prueba</td><td>Avisos SMS → Nueva campaña</td><td>1 min</td></tr>
   <tr style="background:#f0fdf4"><td>A</td><td>Tramitar Alphanumeric</td><td>Phone Numbers → Alphanumeric senders IDs</td><td>15 min + 3-7 días</td></tr>
   <tr style="background:#f0fdf4"><td>A7</td><td>Cambiar número por nombre en MediCar</td><td>Avisos SMS → ⚙️ Twilio → ⚡ Usar nombre del centro</td><td>10 s</td></tr>
+  <tr style="background:#eff6ff"><td colspan="4" style="font-weight:800;color:#1e40af;text-align:center">🇪🇸 LabsMobile · ruta recomendada para España</td></tr>
+  <tr style="background:#eff6ff"><td>L1</td><td>Registrar en LabsMobile</td><td>labsmobile.com/es/registro</td><td>2 min</td></tr>
+  <tr style="background:#eff6ff"><td>L2</td><td>Generar API Token</td><td>Panel LabsMobile → Configuración → API</td><td>30 s</td></tr>
+  <tr style="background:#eff6ff"><td>L3</td><td>Pedir Alphanumeric "CEMPLA"</td><td>Panel → Remitentes → Añadir</td><td>5 min + 24h aprobación</td></tr>
+  <tr style="background:#eff6ff"><td>L4</td><td>Configurar en MediCar</td><td>Avisos SMS → ⚙️ → pestaña 🇪🇸 LabsMobile</td><td>1 min</td></tr>
+  <tr style="background:#eff6ff"><td>L5</td><td>Primer SMS de prueba</td><td>Avisos SMS → Nueva campaña</td><td>1 min</td></tr>
 </table>
 
 <h2>❓ Problemas típicos y soluciones</h2>
@@ -291,6 +414,11 @@ Si ya no necesitas el número temporal:
   <tr><td>"The 'From' phone number: AUTOESCOLACB is not a valid phone number"</td><td>Alphanumeric aún no aprobado por Twilio o nombre con más de 11 caracteres. Usa el número español mientras.</td></tr>
   <tr><td>SMS no llega al paciente (Twilio dice OK)</td><td>Móvil con operadora virtual o DND activo. Es raro pero puede pasar. Prueba con otro móvil.</td></tr>
   <tr><td>Saldo Twilio en 0</td><td>Entra en Twilio → Billing → Add funds. Carga 20 € y tienes para ~500 SMS más.</td></tr>
+  <tr style="background:#eff6ff"><td colspan="2" style="font-weight:800;color:#1e40af">🇪🇸 Errores específicos LabsMobile</td></tr>
+  <tr><td>"LabsMobile · falta: Remitente"</td><td>No has rellenado el campo "Remitente" en la pestaña 🇪🇸 LabsMobile de MediCar. Abre ⚙️ Configurar SMS y rellénalo.</td></tr>
+  <tr><td>"code=20 · Sender ID not approved"</td><td>LabsMobile no ha aprobado todavía el nombre. Entra en su panel y mira el estado · si lleva >24h llama al 900 814 500.</td></tr>
+  <tr><td>"code=14 · Insufficient balance"</td><td>Saldo LabsMobile agotado. Panel → Facturación → Recargar (mínimo 10 €).</td></tr>
+  <tr><td>"code=1 · Authentication failed"</td><td>API Token mal copiado o caducado. Panel LabsMobile → Configuración → API → genera uno nuevo.</td></tr>
 </table>
 
 <div class="contact">
