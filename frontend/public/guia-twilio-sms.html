@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guía Twilio SMS · MediCar Plus · ADMIN</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Guía interna admin para configurar Twilio SMS. Uso restringido.">
+<style>
+  body{font-family:'Segoe UI',Calibri,Arial,sans-serif;max-width:820px;margin:30px auto;padding:0 20px;color:#1a1a1a;line-height:1.65;background:#f8fafc}
+  h1{color:#0f172a;border-bottom:3px solid #10b981;padding-bottom:10px;font-size:26px;text-align:center}
+  h2{color:#065f46;font-size:19px;margin-top:30px;background:linear-gradient(90deg,#dcfce7,transparent);padding:6px 12px;border-left:4px solid #10b981}
+  h3{color:#065f46;font-size:15px;margin-top:20px}
+  .step{background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:18px;margin:16px 0;box-shadow:0 2px 6px rgba(0,0,0,.06)}
+  .step-num{display:inline-block;background:#10b981;color:#fff;width:32px;height:32px;border-radius:50%;text-align:center;line-height:32px;font-weight:700;margin-right:10px;font-size:16px}
+  .callout{background:#fef3c7;border-left:5px solid #f59e0b;padding:12px 16px;margin:14px 0;border-radius:4px;font-size:14px}
+  .callout-red{background:#fee2e2;border-left:5px solid #dc2626}
+  .callout-blue{background:#dbeafe;border-left:5px solid #2563eb}
+  .callout-green{background:#dcfce7;border-left:5px solid #16a34a}
+  code{background:#0f172a;color:#f5b301;padding:3px 8px;border-radius:5px;font-family:'Courier New',monospace;font-size:13px;word-break:break-all}
+  b,strong{color:#0f172a}
+  a{color:#2563eb;font-weight:600}
+  .contact{background:#0f172a;color:#e2e8f0;padding:20px;border-radius:12px;text-align:center;margin-top:30px}
+  .contact a{color:#f5b301}
+  ul,ol{padding-left:22px}
+  li{margin-bottom:6px}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+  th{background:#065f46;color:#fff;padding:8px;text-align:left}
+  td{padding:8px 10px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+  tr:nth-child(even) td{background:#f8fafc}
+  .track{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0}
+  .track-card{background:#fff;border:2px solid;border-radius:12px;padding:18px}
+  .track-a{border-color:#10b981}
+  .track-b{border-color:#3b82f6}
+  .track-title{font-weight:800;font-size:16px;margin-bottom:4px}
+  .track-tagline{color:#64748b;font-size:12px;margin-bottom:10px}
+  .pdf-download-btn{display:block;width:fit-content;margin:20px auto 0;padding:14px 28px;background:linear-gradient(135deg,#10b981,#065f46);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:15px;font-weight:800;text-decoration:none;box-shadow:0 6px 20px rgba(16,185,129,.35);text-align:center}
+  .pdf-download-btn:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(16,185,129,.5)}
+  @media print{
+    body{background:#fff;max-width:none;margin:0;padding:15px;font-size:11.5pt}
+    h1,h2,h3{page-break-after:avoid}
+    .step,.callout,table,.track-card{page-break-inside:avoid}
+    .pdf-download-btn,.no-print{display:none !important}
+    a{color:#0f172a;text-decoration:underline}
+    a[href^="http"]::after{content:" (" attr(href) ")";font-size:9pt;color:#64748b}
+    .track{grid-template-columns:1fr}
+  }
+  @media (max-width:640px){.track{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="no-print" style="text-align:right;margin-bottom:8px;font-size:12px">
+  <a href="/manual-usuari.html" style="background:#fff;border:1px solid #cbd5e1;color:#334155;padding:3px 10px;border-radius:14px;text-decoration:none;font-weight:600">← Manual completo</a>
+</div>
+
+<h1>📱 Guía Twilio SMS · configurar los avisos a pacientes</h1>
+<p style="text-align:center;color:#64748b">Cómo activar el envío de SMS reales desde MediCar Plus · 10 min · solo una vez</p>
+
+<button onclick="downloadAsPDF()" class="pdf-download-btn" data-testid="download-pdf-btn">
+  📄 Descargar esta guía como PDF
+</button>
+<div class="no-print" style="text-align:center;font-size:12px;color:#94a3b8;margin-top:6px">
+  Guarda una copia offline en tu ordenador · Se abrirá el diálogo de "Guardar como PDF"
+</div>
+
+<div class="callout callout-green" style="text-align:center;font-size:14px">
+🎯 <b>Estrategia recomendada</b> — hacer las <b>2 pistas en paralelo</b>: compras un número español (listo en 2 min · 1,15 €/mes) para empezar a mandar SMS HOY, y mientras tramitas el <b>Alphanumeric Sender gratis</b> (el nombre del centro). Cuando Twilio apruebe (3-7 días), cambias en MediCar el número por el nombre y liberas el número.
+</div>
+
+<h2>🔎 Entender las 2 opciones antes de empezar</h2>
+
+<div class="track">
+  <div class="track-card track-a">
+    <div class="track-title" style="color:#065f46">🅰️ Alphanumeric Sender</div>
+    <div class="track-tagline">El SMS llega firmado como <code style="font-size:11px">CEMPLA</code> (texto)</div>
+    <table>
+      <tr><td><b>Qué ve el paciente</b></td><td>El nombre del centro</td></tr>
+      <tr><td><b>Coste</b></td><td style="color:#059669"><b>Gratis</b></td></tr>
+      <tr><td><b>Tiempo</b></td><td>⏳ 3-7 días (Twilio aprueba)</td></tr>
+      <tr><td><b>Requisitos</b></td><td>Documentación oficial (NIF, alta autónomo o escritura SL, dirección)</td></tr>
+      <tr><td><b>Imagen de marca</b></td><td>✅ Profesional</td></tr>
+    </table>
+  </div>
+  <div class="track-card track-b">
+    <div class="track-title" style="color:#1e40af">🅱️ Número español</div>
+    <div class="track-tagline">El SMS llega desde <code style="font-size:11px">+34 6XX XXX XXX</code></div>
+    <table>
+      <tr><td><b>Qué ve el paciente</b></td><td>Un número de móvil español</td></tr>
+      <tr><td><b>Coste</b></td><td>~1,15 €/mes del saldo Twilio</td></tr>
+      <tr><td><b>Tiempo</b></td><td>⚡ 2 minutos (inmediato)</td></tr>
+      <tr><td><b>Requisitos</b></td><td>Nada · se compra con la cuenta Twilio ya creada</td></tr>
+      <tr><td><b>Imagen de marca</b></td><td>⚠️ Menos profesional (número desconocido)</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="callout callout-blue">
+⚠️ <b>Importante:</b> no se pueden "mezclar". Cuando Twilio envía un SMS, va asociado a <b>un único remitente</b>: o un número o un texto. No se puede "disfrazar" un número con un texto. Por eso la estrategia es usar el número temporalmente mientras el nombre está en trámite.
+</div>
+
+<!-- ───────── PARTE 1: NÚMERO ESPAÑOL ───────── -->
+<h2>🅱️ Parte 1 · Comprar un número español (lo rápido · empezar HOY)</h2>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#065f46"><span class="step-num">1</span>Crear cuenta Twilio (si todavía no la tienes)</h2>
+<ol>
+  <li>Ve a <a href="https://www.twilio.com/try-twilio" target="_blank">twilio.com/try-twilio</a></li>
+  <li>Rellena email + contraseña · verifica el móvil (SMS de validación)</li>
+  <li>Twilio te regala <b>~15 $ de saldo</b> para pruebas (suficientes para ~300 SMS a España)</li>
+  <li>Cuando acabes el registro aterrizas en el <b>Console</b> (panel principal)</li>
+</ol>
+<div class="callout callout-blue">💡 <b>Idioma</b>: la web de Twilio es en inglés. Clic derecho sobre la página → <i>"Traducir al español"</i> (Chrome, Edge, Opera lo hacen bien). O usa el icono 🌐 de la barra de direcciones.</div>
+</div>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#065f46"><span class="step-num">2</span>Copiar SID + Auth Token (lo necesitarás después)</h2>
+<ol>
+  <li>En el <b>Console</b> busca la caja central <b>"Account Info"</b></li>
+  <li>Verás 2 valores grandes:
+    <ul>
+      <li><b>Account SID</b> — empieza por <code>AC...</code></li>
+      <li><b>Auth Token</b> — pulsa el icono del ojo 👁 para desvelarlo</li>
+    </ul>
+  </li>
+  <li>Guárdalos en el bloc de notas · los pegarás más adelante en MediCar Plus</li>
+</ol>
+<div class="callout">🔑 Son como el <b>"usuario y contraseña"</b> de tu cuenta Twilio. Nunca los compartas con nadie.</div>
+</div>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#065f46"><span class="step-num">3</span>Comprar el número español</h2>
+<ol>
+  <li>Menú izquierdo → <b>Phone Numbers</b> → <b>Manage</b> → <b>Buy a number</b></li>
+  <li>Filtros arriba:
+    <ul>
+      <li><b>Country:</b> Spain 🇪🇸</li>
+      <li><b>Capabilities:</b> marca <b>SOLO ✅ SMS</b> · desmarca Voice y MMS (así te sale más barato)</li>
+    </ul>
+  </li>
+  <li>Pulsa <b>Search</b> → te saldrá una lista de números disponibles</li>
+  <li>Elige cualquiera que te guste y pulsa <b>Buy</b></li>
+  <li>Confirma la compra · te cobra <b>~1,15 € del saldo gratis</b> de 15 $ que te dieron</li>
+  <li>Copia el número completo que te asigna (ej: <code>+34612345678</code>)</li>
+</ol>
+<div class="callout callout-blue">💰 Mientras tengas el número activo pagas ~1,15 €/mes. Cuando se te apruebe el Alphanumeric Sender puedes liberar el número desde Twilio y dejar de pagar.</div>
+</div>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#065f46"><span class="step-num">4</span>Configurar en MediCar Plus</h2>
+<ol>
+  <li>Abre MediCar Plus → <b>📱 Avisos SMS</b> → <b>⚙️ Twilio</b></li>
+  <li>Pestaña <b>"Mi cuenta Twilio"</b></li>
+  <li>Rellena:
+    <ul>
+      <li><b>Account SID:</b> pega el que copiaste en el paso 2</li>
+      <li><b>Auth Token:</b> pega el que copiaste en el paso 2</li>
+      <li><b>Remitente (From):</b> pega el número con <code>+34</code> delante (ej: <code>+34612345678</code>)</li>
+    </ul>
+  </li>
+  <li>Verás abajo <b>"✅ Guardado automáticamente"</b></li>
+  <li>Cierra el panel. <b>¡Ya puedes mandar SMS!</b></li>
+</ol>
+</div>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#065f46"><span class="step-num">5</span>Primer envío de prueba</h2>
+<ol>
+  <li><b>📱 Avisos SMS</b> → <b>➕ Nueva campaña</b></li>
+  <li>Nombre: <code>Prueba</code> · Contactos: solo tu móvil</li>
+  <li>Mensaje: <i>"Hola prueba desde MediCar Plus"</i></li>
+  <li>Pulsa <b>Enviar</b> → te llega al móvil con el número español como remitente</li>
+</ol>
+<div class="callout callout-green">✅ <b>¡Ya tienes SMS funcionando!</b> A partir de ahora puedes mandar campañas a tus pacientes para recordatorios de renovación. Mientras, sigue con la <b>Parte 2</b> para tramitar el Alphanumeric Sender gratis.</div>
+</div>
+
+<!-- ───────── PARTE 2: ALPHANUMERIC ───────── -->
+<h2>🅰️ Parte 2 · Tramitar el Alphanumeric Sender (el nombre del centro · gratis)</h2>
+
+<div class="callout">⏳ <b>Tramitar esto NO bloquea</b> el envío de SMS que ya tienes con el número comprado. Son dos cosas en paralelo. Cuando Twilio apruebe el nombre, lo cambias en MediCar y punto.</div>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#065f46"><span class="step-num">A1</span>Preparar los documentos (10 min)</h2>
+Antes de empezar el formulario, ten listos estos documentos digitalizados (PDF o JPG):
+<ul>
+  <li><b>DNI/NIE</b> del titular del centro (si eres autónomo)</li>
+  <li><b>CIF/Escritura SL</b> (si es sociedad)</li>
+  <li><b>Alta en el régimen de autónomos</b> o <b>certificado del colegio médico</b></li>
+  <li>Captura de la <b>web del centro</b> o cualquier material que acredite tu actividad</li>
+</ul>
+</div>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#065f46"><span class="step-num">A2</span>Entrar al formulario Alphanumeric</h2>
+<ol>
+  <li>Menú izquierdo de Twilio → <b>Phone Numbers</b> → <b>Numbers & senders</b> → <b>Alphanumeric senders IDs (legacy)</b></li>
+  <li>Pulsa <b>"Create Alphanumeric Sender"</b> (botón arriba a la derecha)</li>
+  <li>Si pide crear una <b>Address</b> primero, pulsa el link <b>"create an address"</b> y pasa al siguiente paso.</li>
+</ol>
+</div>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#065f46"><span class="step-num">A3</span>Crear la Address (dirección fiscal)</h2>
+<ol>
+  <li><b>Business name:</b> el nombre fiscal exacto del centro (ej: <code>CEMPLA</code> o <code>Juan Pérez García</code> si eres autónomo)</li>
+  <li><b>Address line 1:</b> calle y número (ej: <code>Carrer Major 25, 1r</code>)</li>
+  <li><b>City:</b> población · <b>Postal code:</b> CP · <b>Country:</b> <b>Spain</b></li>
+  <li><b>Phone:</b> teléfono fijo o móvil del centro</li>
+  <li>Guardar</li>
+</ol>
+</div>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#065f46"><span class="step-num">A4</span>Rellenar el formulario Sender ID</h2>
+Cada campo con el valor exacto que debes poner:
+<table>
+  <tr><th style="width:40%">Campo</th><th>Qué poner</th></tr>
+  <tr><td><b>Country of use</b></td><td><b>Spain</b> (solo marca España)</td></tr>
+  <tr><td><b>Business type</b></td><td><i>Healthcare / Medical services</i></td></tr>
+  <tr><td><b>Business legal name</b></td><td>El nombre fiscal (igual que la Address)</td></tr>
+  <tr><td><b>Business website</b></td><td>Web del centro (ej: medicarplus.es) o la tuya</td></tr>
+  <tr><td><b>Tax ID</b></td><td>Tu NIF/CIF (ej: 12345678A)</td></tr>
+  <tr><td><b>Sender ID</b></td><td><b>El texto que verá el paciente</b> · ej: <code>CEMPLA</code>, <code>CENTREMED</code> · Max 11 caracteres · solo letras y números · <b>sin acentos</b></td></tr>
+  <tr><td><b>Use case</b></td><td><i>Transactional / Appointment reminders</i></td></tr>
+  <tr><td><b>Opt-in method</b></td><td><i>Clients explicitly opt in when they visit our clinic and provide their mobile number for appointment reminders.</i></td></tr>
+  <tr><td><b>Opt-out method</b></td><td><i>Patients can call the clinic to be removed from the SMS list.</i></td></tr>
+  <tr><td><b>Message sample</b></td><td><i>Hola Juan, le recordamos que su revisión médica caduca el 15/11/2026. Reserve cita al 93 XXX XX XX. Info: medicarplus.es</i></td></tr>
+</table>
+</div>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#065f46"><span class="step-num">A5</span>Subir la documentación</h2>
+<ol>
+  <li>Sube el <b>certificado de alta autónomo o escritura SL</b></li>
+  <li>Sube el <b>NIF/CIF</b></li>
+  <li>Si piden más documentos (certificado colegio médico, captura web…), súbelos también</li>
+  <li>Pulsa <b>Submit for review</b></li>
+</ol>
+</div>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#065f46"><span class="step-num">A6</span>Esperar aprobación (3-7 días hábiles)</h2>
+<ol>
+  <li>Twilio te mandará un email a la dirección con la que te registraste</li>
+  <li>Si piden algo más → responde al email con lo que soliciten</li>
+  <li>Cuando llegue el email <b>"Approved"</b> → pasa al siguiente paso</li>
+</ol>
+<div class="callout">⏳ Durante estos días sigues mandando SMS <b>con el número español</b> (configurado en la Parte 1). Nada se bloquea.</div>
+</div>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#065f46"><span class="step-num">A7</span>Activarlo en MediCar Plus (10 segundos)</h2>
+<ol>
+  <li>Abre MediCar Plus → <b>📱 Avisos SMS</b> → <b>⚙️ Twilio</b></li>
+  <li>En el campo <b>Remitente (From)</b> borra el número <code>+34612…</code></li>
+  <li>Pulsa el botón <b>⚡ Usar nombre del centro</b> → te pone <code>CEMPLA</code> automáticamente</li>
+  <li>Verás <b>"✅ Guardado automáticamente"</b></li>
+  <li>A partir de ahora los SMS saldrán con el nombre del centro</li>
+</ol>
+</div>
+
+<div class="step">
+<h2 style="margin-top:0;background:none;border:none;padding:0;color:#065f46"><span class="step-num">A8</span>Liberar el número español (opcional · ahorro 1,15 €/mes)</h2>
+Si ya no necesitas el número temporal:
+<ol>
+  <li>Twilio → <b>Phone Numbers</b> → <b>Active numbers</b></li>
+  <li>Clic sobre el número → <b>Release</b> (botón rojo abajo del todo)</li>
+  <li>Confirma → dejas de pagar el 1,15 €/mes</li>
+</ol>
+<div class="callout callout-blue">💡 Alternativa: déjalo activo como "número de respaldo" por si Twilio alguna vez te suspende el Alphanumeric. Son 14 €/año — depende de ti.</div>
+</div>
+
+<!-- ───────── RESUMEN ───────── -->
+<h2>📋 Resumen rápido (chuleta para visitas comerciales)</h2>
+<table>
+  <tr><th>#</th><th>Qué</th><th>Dónde</th><th>Tiempo</th></tr>
+  <tr><td>1</td><td>Cuenta Twilio</td><td>twilio.com/try-twilio</td><td>2 min</td></tr>
+  <tr><td>2</td><td>Copiar SID + Token</td><td>Twilio Console → Account Info</td><td>30 s</td></tr>
+  <tr><td>3</td><td>Comprar número España</td><td>Phone Numbers → Buy a number</td><td>2 min</td></tr>
+  <tr><td>4</td><td>Configurar en MediCar</td><td>Avisos SMS → ⚙️ Twilio</td><td>1 min</td></tr>
+  <tr><td>5</td><td>Primer SMS de prueba</td><td>Avisos SMS → Nueva campaña</td><td>1 min</td></tr>
+  <tr style="background:#f0fdf4"><td>A</td><td>Tramitar Alphanumeric</td><td>Phone Numbers → Alphanumeric senders IDs</td><td>15 min + 3-7 días</td></tr>
+  <tr style="background:#f0fdf4"><td>A7</td><td>Cambiar número por nombre en MediCar</td><td>Avisos SMS → ⚙️ Twilio → ⚡ Usar nombre del centro</td><td>10 s</td></tr>
+</table>
+
+<h2>❓ Problemas típicos y soluciones</h2>
+<table>
+  <tr><th>Error / Síntoma</th><th>Causa · Solución</th></tr>
+  <tr><td>"A From phone number is required"</td><td>En MediCar el campo <b>From</b> está vacío. Rellena con número o Alphanumeric.</td></tr>
+  <tr><td>"The 'To' number is not a valid phone"</td><td>El móvil del paciente tiene formato raro. MediCar normaliza automático, pero puede haber uno con letras/símbolos. Edita el contacto.</td></tr>
+  <tr><td>"The 'From' phone number: AUTOESCOLACB is not a valid phone number"</td><td>Alphanumeric aún no aprobado por Twilio o nombre con más de 11 caracteres. Usa el número español mientras.</td></tr>
+  <tr><td>SMS no llega al paciente (Twilio dice OK)</td><td>Móvil con operadora virtual o DND activo. Es raro pero puede pasar. Prueba con otro móvil.</td></tr>
+  <tr><td>Saldo Twilio en 0</td><td>Entra en Twilio → Billing → Add funds. Carga 20 € y tienes para ~500 SMS más.</td></tr>
+</table>
+
+<div class="contact">
+  <b>¿Necesitas ayuda?</b><br>
+  Contacta con soporte MediCar Plus:<br>
+  📧 <a href="mailto:suport@medicarplus.es">suport@medicarplus.es</a><br><br>
+  Respuesta habitual en menos de 24 horas laborables.<br><br>
+  <span style="color:#94a3b8;font-size:12px">MediCar Plus · M.Brugulat Lopez · Actualizada 02/2026</span>
+</div>
+
+<script>
+function downloadAsPDF(){
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  if(isMobile){
+    alert('📱 En móvil:\n\n1. Toca el botón menú (⋮ o compartir) del navegador\n2. Elige "Imprimir" o "Guardar como PDF"\n3. Guarda el fichero\n\nAhora abrimos el diálogo de impresión...');
+  } else {
+    const btn = document.querySelector('.pdf-download-btn');
+    const original = btn.textContent;
+    btn.textContent = '📄 En la ventana que se abra, elige "Guardar como PDF"';
+    setTimeout(()=>{ btn.textContent = original; }, 4000);
+  }
+  setTimeout(()=>window.print(), 500);
+}
+</script>
+</body>
+</html>
