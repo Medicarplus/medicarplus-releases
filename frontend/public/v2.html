@@ -13257,22 +13257,30 @@ async function openTwilioCfgModal(){
     }
   }
   // Botón "Usar nombre del centro" → autocompleta el From con el nombre sanitizado
+  //   de la empresa ACTIVA (si estás en E1 → CFG.company1.name; si en E2 → company2.name).
+  //   La licencia (lic.client_name = "MediCar Plus" para el owner) es último recurso.
   const useCentreBtn = document.getElementById('twFromUseCentre');
   if(useCentreBtn){
     useCentreBtn.onclick = () => {
       let centre = '';
       try{
-        const lic = JSON.parse(localStorage.getItem('caja.license.v1')||'{}');
-        centre = String(lic.centre || lic.client_name || '').trim();
+        const cfg = JSON.parse(localStorage.getItem('caja.config.v1')||'{}');
+        const isC2 = (typeof currentCompany !== 'undefined' && currentCompany === 'cempla');
+        const c1 = (cfg.company1 && cfg.company1.name) || cfg.empresa || '';
+        const c2 = (cfg.company2 && cfg.company2.name) || cfg.empresa2 || '';
+        centre = String(isC2 ? (c2 || c1) : (c1 || c2)).trim();
       }catch(_){}
       if(!centre){
-        try{ const cfg = JSON.parse(localStorage.getItem('caja.config.v1')||'{}'); centre = String(cfg.empresa||cfg.centre||'').trim(); }catch(_){}
+        try{
+          const lic = JSON.parse(localStorage.getItem('caja.license.v1')||'{}');
+          centre = String(lic.centre || lic.client_name || '').trim();
+        }catch(_){}
       }
       // Sanitiza: quita acentos, símbolos, espacios dobles; corta a 11
       const san = centre.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
         .replace(/[^A-Za-z0-9 ]/g,'').replace(/\s+/g,'').slice(0,11).toUpperCase();
       const fromInp = document.getElementById('twFrom');
-      if(fromInp){ fromInp.value = san || 'MIENTRE'; fromInp.dispatchEvent(new Event('input',{bubbles:true})); fromInp.focus(); }
+      if(fromInp){ fromInp.value = san || 'CENTRE'; fromInp.dispatchEvent(new Event('input',{bubbles:true})); fromInp.focus(); }
     };
   }
   // Autosave con debounce 800 ms: cuando los 3 campos están rellenos, guarda solo
