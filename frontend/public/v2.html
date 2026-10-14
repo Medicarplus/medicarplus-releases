@@ -13788,6 +13788,14 @@ function openSmsModal(){
         <label style="display:block;font-size:11px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase">${isCA?'Nom de la campanya':'Nombre de la campaña'}</label>
         <input type="text" id="smsCampName" value="${isCA?'Campanya':'Campaña'} ${new Date().toLocaleDateString(isCA?'ca-ES':'es-ES')}" style="width:100%;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:13px;margin-bottom:10px" data-testid="sms-camp-name">
         <label style="display:block;font-size:11px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase">${isCA?'Missatge (màx 160 caràcters recomanat)':'Mensaje (máx 160 caracteres recomendado)'}</label>
+        <!-- 📌 Plantillas guardadas · Feb 2026 -->
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+          <select id="smsTplPicker" style="flex:1;min-width:200px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 8px;font-size:12px" data-testid="sms-tpl-picker">
+            <option value="">📂 ${isCA?'Carregar plantilla guardada…':'Cargar plantilla guardada…'}</option>
+          </select>
+          <button type="button" id="smsTplSave" style="background:#1e40af;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;white-space:nowrap" data-testid="sms-tpl-save">📌 ${isCA?'Fixar plantilla':'Fijar plantilla'}</button>
+          <button type="button" id="smsTplDel" style="background:#7f1d1d;color:#fecaca;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;display:none" data-testid="sms-tpl-del">🗑</button>
+        </div>
         <textarea id="smsTemplate" rows="4" style="width:100%;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box" data-testid="sms-template">Hola {{nom}}, le recordamos que su revisión médica caduca el {{data_caducitat}}. Reserve cita al 93 XXX XX XX. Info: medicarplus.es</textarea>
         <div id="smsCharCount" style="text-align:right;font-size:11px;color:#94a3b8;margin-top:4px"></div>
       </div>
@@ -13800,6 +13808,58 @@ function openSmsModal(){
     const cnt=document.getElementById('smsCharCount');
     function updCount(){const l=tpl.value.length;cnt.innerHTML='<span style="color:'+(l>160?'#ef4444':'#22c55e')+';font-weight:700">'+l+' / 160</span> '+(l>160?'· '+(isCA?'excedeix, es dividirà en múltiples SMS':'excede, se dividirá en múltiples SMS'):'');}
     updCount();tpl.oninput=updCount;
+    // 📌 Plantillas guardadas (localStorage) · Feb 2026
+    const TPL_KEY = 'caja.sms.templates.v1';
+    const getTpls = () => { try{ return JSON.parse(localStorage.getItem(TPL_KEY)||'[]'); }catch(_){ return []; } };
+    const setTpls = (arr) => { try{ localStorage.setItem(TPL_KEY, JSON.stringify(arr)); }catch(_){} };
+    const picker = document.getElementById('smsTplPicker');
+    const btnSave = document.getElementById('smsTplSave');
+    const btnDel = document.getElementById('smsTplDel');
+    function refreshPicker(){
+      const list = getTpls();
+      // Vaciar y re-rellenar
+      picker.innerHTML = '<option value="">📂 '+(isCA?'Carregar plantilla guardada…':'Cargar plantilla guardada…')+'</option>' +
+        list.map(t => `<option value="${t.id}">${(t.name||'').replace(/</g,'&lt;').slice(0,50)}</option>`).join('');
+      btnDel.style.display = 'none';
+    }
+    refreshPicker();
+    picker.addEventListener('change', () => {
+      const id = picker.value;
+      if(!id){ btnDel.style.display='none'; return; }
+      const t = getTpls().find(x => x.id === id);
+      if(t){ tpl.value = t.body || ''; updCount(); btnDel.style.display='inline-block'; }
+    });
+    btnSave.addEventListener('click', () => {
+      const body = (tpl.value||'').trim();
+      if(!body){ try{toast(isCA?'El missatge és buit':'El mensaje está vacío');}catch(_){} return; }
+      const defName = (isCA?'Plantilla ':'Plantilla ') + new Date().toLocaleDateString(isCA?'ca-ES':'es-ES');
+      const name = (prompt(isCA?'Nom de la plantilla:':'Nombre de la plantilla:', defName) || '').trim();
+      if(!name) return;
+      const list = getTpls();
+      // Si ya existe una con ese nombre, sobreescribir
+      const exist = list.find(x => (x.name||'').toLowerCase() === name.toLowerCase());
+      if(exist){
+        if(!confirm(isCA?`Ja existeix "${name}". Sobreescriure?`:`Ya existe "${name}". ¿Sobrescribir?`)) return;
+        exist.body = body; exist.updated_at = new Date().toISOString();
+      } else {
+        list.unshift({ id:'tpl_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), name, body, created_at:new Date().toISOString() });
+      }
+      setTpls(list);
+      refreshPicker();
+      // Seleccionar la recién guardada
+      const saved = getTpls().find(x => x.name === name);
+      if(saved){ picker.value = saved.id; btnDel.style.display='inline-block'; }
+      try{toast(isCA?'📌 Plantilla fixada':'📌 Plantilla fijada');}catch(_){}
+    });
+    btnDel.addEventListener('click', () => {
+      const id = picker.value; if(!id) return;
+      const t = getTpls().find(x => x.id === id);
+      if(!t) return;
+      if(!confirm(isCA?`Eliminar "${t.name}"?`:`¿Eliminar "${t.name}"?`)) return;
+      setTpls(getTpls().filter(x => x.id !== id));
+      refreshPicker();
+      try{toast(isCA?'🗑 Plantilla eliminada':'🗑 Plantilla eliminada');}catch(_){}
+    });
     // 🔎 Buscador local sobre la tabla de contactos válidos (filtro por nombre/móvil)
     const prevSearch=document.getElementById('smsPreviewSearch');
     const prevCount=document.getElementById('smsPreviewCount');
