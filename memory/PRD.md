@@ -1,5 +1,48 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-10-14 · HOTFIX CRÍTICO + 🔍 Auto-detector de remitentes Twilio
+
+### 🔴 HOTFIX · Error sintáctico JS que rompía toda la app
+- **Síntoma reportado por usuario:** "me he instalado el programa i no sale nada ni funciona, no se puede clicar nada". UI cargaba estática sin JS activo.
+- **Causa raíz:** en el commit `480c99a` (rename "Plataforma SMS") se introdujo `title="${isCA?'Configurar la plataforma d\\'enviament SMS':...}"` con doble backslash en el string. El parser JS interpretaba `\\'` como `\` seguido de cierre de string → `SyntaxError` → el bloque `<script>` entero no cargaba → ningún `onclick` ni dato de localStorage se activaba.
+- **Fix:** `/app/frontend/public/v2.html` línea 13552 → `d\'enviament` (un solo backslash) · validado con `node --check` sobre los 9 bloques `<script>` extraídos.
+- **Rebuild Electron:** `node commercial/build/obfuscate.js` ejecutado sin errores → `commercial/electron/index.html` actualizado.
+
+### 🔍 Nueva feature · Auto-detector de números/remitentes Twilio
+Petición del usuario: *"debe estar todo automatizado para no salir del programa"*.
+
+**Backend** (`/app/backend/routes/sms_campaigns.py`):
+- Nuevo modelo `TwilioSendersReq {sid, token}`.
+- Nuevo endpoint `POST /api/sms/twilio/senders` (admin token requerido):
+  - Valida credenciales fetching `accounts(sid).fetch()`.
+  - Lista `incoming_phone_numbers` (filtrados por `capabilities.sms`).
+  - Lista `messaging.v1.services` + `alpha_senders` de cada servicio.
+  - Devuelve `{ok, account_name, phone_numbers:[...], messaging_services:[{sid, friendly_name, alpha_senders:[...]}]}`.
+  - Mapea errores comunes: `credentials_invalid` (incluye match de "authenticate" + "authentication" + "401" + "20003"), `twilio_sdk_missing`, `fetch_account_failed`.
+
+**Frontend** (`v2.html` panel Twilio BYOA):
+- Botón "🔍 Detectar mis remitentes" junto al campo From.
+- Al pulsar: llama al endpoint con el SID+Token actuales.
+- Muestra desplegable con dos `<optgroup>`:
+  - 📞 Mis números Twilio (con `friendly_name` si es distinto)
+  - 🏷️ Nombres alfanuméricos aprobados (indica el messaging service de origen)
+- Al elegir → rellena automáticamente el campo From + dispara autosave.
+- Estados visuales: ⏳ consultando / ✅ N remitentes / ⚠ cuenta sin números/nombres / ❌ credenciales inválidas.
+
+### 🧪 Tests de regresión ejecutados (0 fails)
+- `accounting_audit.js` — invariantes contables 2024-2026 (~14k entradas) · CUADRA al céntimo.
+- `backup_roundtrip.js` — 19/19 claves idénticas tras restore.
+- `sync_merge_stats.js` — 9/9 escenarios OK.
+- `node --check /tmp/_v2.js` — 9 bloques `<script>` parsean sin error.
+- `curl /api/sms/twilio/senders` con creds falsas → `{"ok":false,"reason":"credentials_invalid"}` (comportamiento esperado).
+
+### 📂 Archivos modificados
+- `/app/frontend/public/v2.html` (línea 13552 + bloque detector unos 90 líneas)
+- `/app/backend/routes/sms_campaigns.py` (modelo + endpoint ~70 líneas)
+- `/app/commercial/electron/index.html` (regenerado por obfuscate)
+
+
+
 ## 2026-02-20 · FIX CRÍTICO · Admin → Cliente · Restauración COMPLETA byte a byte
 
 **Petición del usuario:**

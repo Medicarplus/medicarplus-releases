@@ -85,6 +85,11 @@ class TwilioTestReq(BaseModel):
     from_number: str = Field(..., min_length=6)
 
 
+class TwilioSendersReq(BaseModel):
+    sid: str = Field(..., min_length=10)
+    token: str = Field(..., min_length=10)
+
+
 class Campaign(BaseModel):
     id: str
     name: str
@@ -384,6 +389,83 @@ def build_router(db):
                 "reason": reason,
                 "detail": emsg[:250],
             }
+
+    @router.post("/twilio/senders")
+    async def twilio_senders(
+        body: TwilioSendersReq,
+        x_admin_token: Optional[str] = Header(None),
+    ):
+        """
+        Devuelve los remitentes disponibles en la cuenta Twilio del cliente:
+          - phone_numbers: números de teléfono comprados (lista {number, friendly_name, sms_enabled})
+          - messaging_services: Messaging Services con sus Alpha Senders (lista {sid, friendly_name, alpha_senders:[...]})
+        Pensado para rellenar un desplegable "Mis remitentes" en el modal de configuración SMS.
+        """
+        _admin(x_admin_token)
+        sid = body.sid.strip()
+        token = body.token.strip()
+        try:
+            from twilio.rest import Client  # type: ignore
+            client = Client(sid, token)
+            # 1️⃣ Valida credenciales (fetch account) — si falla, da error claro
+            try:
+                acc = client.api.accounts(sid).fetch()
+            except Exception as e:
+                emsg = str(e).lower()
+                if "authenticate" in emsg or "authentication" in emsg or "20003" in emsg or "401" in emsg:
+                    return {"ok": False, "reason": "credentials_invalid", "detail": str(e)[:250]}
+                return {"ok": False, "reason": "fetch_account_failed", "detail": str(e)[:250]}
+
+            # 2️⃣ Números comprados — con SMS habilitado (filtramos los que solo son de voz)
+            phone_numbers = []
+            try:
+                for n in client.incoming_phone_numbers.list(limit=50):
+                    caps = getattr(n, "capabilities", None) or {}
+                    sms_ok = bool(caps.get("sms") or caps.get("SMS") or caps.get("mms"))
+                    phone_numbers.append({
+                        "number": getattr(n, "phone_number", ""),
+                        "friendly_name": getattr(n, "friendly_name", "") or "",
+                        "sms_enabled": sms_ok,
+                    })
+            except Exception as e:
+                # No es crítico — devolvemos lo que tengamos
+                phone_numbers = []
+
+            # 3️⃣ Messaging Services + sus Alpha Senders
+            messaging_services = []
+            try:
+                services = client.messaging.v1.services.list(limit=20)
+                for svc in services:
+                    svc_sid = getattr(svc, "sid", "")
+                    svc_name = getattr(svc, "friendly_name", "") or svc_sid
+                    alpha = []
+                    try:
+                        for a in client.messaging.v1.services(svc_sid).alpha_senders.list(limit=20):
+                            alpha.append({
+                                "sid": getattr(a, "sid", ""),
+                                "alphanumeric_name": getattr(a, "alphanumeric_name", "") or "",
+                                "capabilities": list(getattr(a, "capabilities", []) or []),
+                            })
+                    except Exception:
+                        alpha = []
+                    messaging_services.append({
+                        "sid": svc_sid,
+                        "friendly_name": svc_name,
+                        "alpha_senders": alpha,
+                    })
+            except Exception:
+                messaging_services = []
+
+            return {
+                "ok": True,
+                "account_name": getattr(acc, "friendly_name", None) or sid,
+                "phone_numbers": phone_numbers,
+                "messaging_services": messaging_services,
+            }
+        except ImportError:
+            return {"ok": False, "reason": "twilio_sdk_missing", "detail": "Twilio SDK not installed on server"}
+        except Exception as e:
+            return {"ok": False, "reason": "unknown_error", "detail": str(e)[:250]}
 
     @router.post("/preview")
     async def preview_csv(

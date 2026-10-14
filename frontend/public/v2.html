@@ -13135,6 +13135,12 @@ async function openTwilioCfgModal(){
             </div>
             <input id="twFrom" data-testid="twilio-from" type="text" value="${(cur.from||'').replace(/"/g,'&quot;')}" placeholder="AUTOESCOLA o +34612345678" style="width:100%;padding:11px 12px;background:#0e1a2e;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:14px;font-weight:700;letter-spacing:1px;box-sizing:border-box" maxlength="15">
             <div id="twFromHelp" style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.5">${isCA?'Pots posar <b style="color:#86efac">el nom del centre</b> (recomanat · gratis) o un <b>número</b> que hagis comprat a Twilio.':'Puedes poner <b style="color:#86efac">el nombre del centro</b> (recomendado · gratis) o un <b>número</b> que hayas comprado en Twilio.'}</div>
+            <!-- 🔍 Auto-detector de remitentes de la cuenta Twilio (Feb 2026) -->
+            <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <button type="button" id="twDetectSenders" data-testid="twilio-detect-senders" style="background:#1e3a5f;color:#86b6ff;border:1px solid #3b82f6;padding:6px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700">🔍 ${isCA?'Detectar els meus remitents':'Detectar mis remitentes'}</button>
+              <span id="twDetectStatus" style="font-size:11px;color:#94a3b8"></span>
+            </div>
+            <select id="twSendersSelect" data-testid="twilio-senders-select" style="display:none;width:100%;margin-top:8px;padding:9px 12px;background:#0e1a2e;border:1px solid #3b82f6;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:12px;box-sizing:border-box"></select>
             <!-- 🔭 Preview en vivo de cómo el paciente verá el SMS -->
             <div id="twFromPreview" style="margin-top:10px;padding:10px 12px;background:#0b1121;border:1px dashed #334155;border-radius:8px;display:none">
               <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${isCA?'Com ho veurà el pacient':'Cómo lo verá el paciente'} 📱</div>
@@ -13371,6 +13377,95 @@ async function openTwilioCfgModal(){
   });
   // UI inicial del From si ya hay valor
   refreshFromUI();
+
+  // ══════ 🔍 Detector automático de remitentes Twilio (Feb 2026) ══════
+  const detectBtn = document.getElementById('twDetectSenders');
+  if(detectBtn){
+    detectBtn.onclick = async () => {
+      const sidEl = document.getElementById('twSid');
+      const tokEl = document.getElementById('twToken');
+      const sid = (sidEl && sidEl.value || '').trim();
+      const tok = (tokEl && tokEl.value || '').trim();
+      const statusEl = document.getElementById('twDetectStatus');
+      const selectEl = document.getElementById('twSendersSelect');
+      if(!sid || !tok){
+        if(statusEl) statusEl.innerHTML = '<span style="color:#fca5a5">⚠ '+(isCA?'Primer omple SID i Token':'Primero rellena SID y Token')+'</span>';
+        return;
+      }
+      detectBtn.disabled = true;
+      const oldTxt = detectBtn.textContent;
+      detectBtn.textContent = isCA?'⏳ Consultant Twilio…':'⏳ Consultando Twilio…';
+      if(statusEl) statusEl.textContent = '';
+      if(selectEl){ selectEl.style.display='none'; selectEl.innerHTML=''; }
+      try{
+        const r = await apiSms('/twilio/senders', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({sid, token: tok})
+        });
+        if(!r.ok){
+          const reasonMap = {
+            credentials_invalid: isCA?'❌ SID o Token incorrectes':'❌ SID o Token incorrectos',
+            twilio_sdk_missing: isCA?'❌ SDK Twilio no instal·lat al servidor':'❌ SDK Twilio no instalado en el servidor',
+            fetch_account_failed: isCA?'❌ No s\'ha pogut connectar amb Twilio':'❌ No se pudo conectar con Twilio',
+          };
+          if(statusEl) statusEl.innerHTML = '<span style="color:#fca5a5">'+(reasonMap[r.reason] || ('❌ '+(r.detail||'Error')))+'</span>';
+          return;
+        }
+        // Construye el desplegable con todas las opciones encontradas
+        const opts = [];
+        const nums = Array.isArray(r.phone_numbers) ? r.phone_numbers : [];
+        const svcs = Array.isArray(r.messaging_services) ? r.messaging_services : [];
+        // Grupo 1: números comprados con SMS habilitado
+        const smsNums = nums.filter(n => n.sms_enabled);
+        if(smsNums.length){
+          opts.push('<optgroup label="'+(isCA?'📞 Els meus números Twilio':'📞 Mis números Twilio')+'">');
+          smsNums.forEach(n => {
+            const label = n.number + (n.friendly_name && n.friendly_name !== n.number ? ' · '+n.friendly_name : '');
+            opts.push('<option value="'+n.number.replace(/"/g,'&quot;')+'">'+label.replace(/</g,'&lt;')+'</option>');
+          });
+          opts.push('</optgroup>');
+        }
+        // Grupo 2: Alpha Senders dentro de Messaging Services
+        const allAlpha = [];
+        svcs.forEach(s => {
+          (s.alpha_senders||[]).forEach(a => {
+            if(a.alphanumeric_name) allAlpha.push({name:a.alphanumeric_name, svc:s.friendly_name});
+          });
+        });
+        if(allAlpha.length){
+          opts.push('<optgroup label="'+(isCA?'🏷️ Noms alfanumèrics aprovats':'🏷️ Nombres alfanuméricos aprobados')+'">');
+          allAlpha.forEach(a => {
+            opts.push('<option value="'+a.name.replace(/"/g,'&quot;')+'">'+a.name.replace(/</g,'&lt;')+' · <em>'+a.svc.replace(/</g,'&lt;')+'</em></option>');
+          });
+          opts.push('</optgroup>');
+        }
+        if(!opts.length){
+          if(statusEl) statusEl.innerHTML = '<span style="color:#fbbf24">⚠ '+(isCA?'Compte vàlid però sense números SMS ni noms aprovats. Compra un número o demana un remitent alfanumèric a Twilio.':'Cuenta válida pero sin números SMS ni nombres aprobados. Compra un número o pide un remitente alfanumérico en Twilio.')+'</span>';
+          return;
+        }
+        if(selectEl){
+          selectEl.innerHTML = '<option value="">'+(isCA?'— Tria un remitent —':'— Elige un remitente —')+'</option>' + opts.join('');
+          selectEl.style.display = 'block';
+          selectEl.onchange = () => {
+            if(!selectEl.value) return;
+            const fromEl = document.getElementById('twFrom');
+            if(fromEl){
+              fromEl.value = selectEl.value;
+              fromEl.dispatchEvent(new Event('input',{bubbles:true}));
+            }
+          };
+          const total = smsNums.length + allAlpha.length;
+          if(statusEl) statusEl.innerHTML = '<span style="color:#86efac">✅ '+total+' '+(isCA?'remitents trobats':'remitentes encontrados')+'</span>';
+        }
+      }catch(err){
+        if(statusEl) statusEl.innerHTML = '<span style="color:#fca5a5">❌ '+(err.message||'Error').slice(0,120)+'</span>';
+      }finally{
+        detectBtn.disabled = false;
+        detectBtn.textContent = oldTxt;
+      }
+    };
+  }
 
   // ══════ LabsMobile handlers (análogo a BYOA Twilio) · Feb 2026 ══════
   function refreshLabSenderUI(){
