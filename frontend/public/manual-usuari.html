@@ -404,6 +404,112 @@
     <li>Campañas recientes con todos sus datos</li>
   </ul>
   <div class="tip">También accesible desde <i>Contabilidad ▸ 📊 Estadísticas ▸ pestaña 🔔 Avisos SMS</i>.</div>
+
+  <!-- ============ GUÍA LABSMOBILE ============ -->
+  <h2 id="labsmobile-guia" style="background:linear-gradient(90deg,#dbeafe,transparent);border-left-color:#2563eb;color:#1e3a8a">📨 Guía rápida LabsMobile · Enviar SMS reales en 10 minutos</h2>
+  <p><b>LabsMobile</b> es el proveedor SMS <b>recomendado para España</b>: más barato que Twilio (≈ 0,045 €/SMS vs 0,075 €), sin papeleo de aprobación, y permite usar un <b>nombre de remitente</b> (ej. <code>MediCar</code>) directamente sin pre-registro.</p>
+
+  <div class="callout callout-green"><b>⏱️ Tiempo total:</b> ~10 min · <b>Papeleo:</b> ninguno para enviar a España · <b>Coste inicial:</b> desde 10€ de recarga (≈ 220 SMS).</div>
+
+  <h3>PASO 1 · Crear cuenta en LabsMobile</h3>
+  <div class="step">
+    <ol>
+      <li>Entra en <a href="https://www.labsmobile.com/es/registro" target="_blank" rel="noopener">labsmobile.com/es/registro</a></li>
+      <li>Rellena: email, contraseña, nombre, empresa, teléfono y país (España).</li>
+      <li>Confirma el email que te envían (revisa la bandeja de spam si tarda).</li>
+      <li>Entra a <a href="https://www.labsmobile.com/es/login" target="_blank" rel="noopener">tu panel</a> con tu email y contraseña.</li>
+    </ol>
+    <div class="tip">Te regalan <b>SMS de prueba gratis</b> al registrarte (unos 10) para que compruebes que llega bien antes de recargar.</div>
+  </div>
+
+  <h3>PASO 2 · Obtener el Token API (credencial del programa)</h3>
+  <div class="step">
+    <ol>
+      <li>Dentro del panel LabsMobile → menú <b>"Configuración" ▸ "API"</b> (o <b>"Credenciales API"</b>).</li>
+      <li>Verás tu <b>Usuario API</b> (suele ser tu email) y un botón <b>"Generar Token"</b> o <b>"Mostrar Token"</b>.</li>
+      <li>Copia los dos valores:
+        <ul>
+          <li><b>Usuario API</b> → suele ser tu email de registro</li>
+          <li><b>Token API</b> → cadena larga tipo <code>a1b2c3d4e5f6…</code></li>
+        </ul>
+      </li>
+    </ol>
+    <div class="callout callout-red"><b>⚠️ Importante:</b> el Token es como una contraseña. No lo compartas por WhatsApp ni email con nadie. Solo se pega en el programa MediCar Plus (que lo guarda cifrado en tu PC).</div>
+  </div>
+
+  <h3>PASO 3 · Recargar saldo (opcional, para enviar real)</h3>
+  <div class="step">
+    <ol>
+      <li>Panel LabsMobile → <b>"Comprar créditos"</b>.</li>
+      <li>Elige la cantidad: <b>10€ ≈ 220 SMS</b> · <b>25€ ≈ 555 SMS</b> · <b>50€ ≈ 1.111 SMS</b>.</li>
+      <li>Paga con tarjeta o PayPal. El saldo aparece en tu cuenta <b>al instante</b>.</li>
+    </ol>
+    <div class="tip">El saldo <b>no caduca</b>. Si envías ~100 SMS al mes, con 25€ te sobra para medio año.</div>
+  </div>
+
+  <h3>PASO 4 · Configurar LabsMobile dentro de MediCar Plus</h3>
+  <div class="step">
+    <ol>
+      <li>Abre MediCar Plus → <span class="btn-icon">📱 Avisos</span> arriba a la derecha.</li>
+      <li>Clic en <b>⚙️ Configuración SMS</b> (icono engranaje dentro del modal).</li>
+      <li>Selecciona la pestaña <b>"LabsMobile"</b> (al lado de la pestaña Twilio).</li>
+      <li>Rellena los campos:
+        <ul>
+          <li><b>Usuario API</b> → tu email de LabsMobile</li>
+          <li><b>Token API</b> → el que copiaste en el PASO 2</li>
+          <li><b>Remitente</b> → ej. <code>MediCar</code> (máx 11 caracteres, sin espacios, sin ñ ni acentos, empezando por letra)</li>
+        </ul>
+      </li>
+      <li>Clic en <b>🔍 Validar credenciales</b> → debe salir ✅ y mostrar tu <b>saldo disponible</b>.</li>
+      <li>Clic en <b>💾 Guardar</b>.</li>
+    </ol>
+    <div class="callout callout-blue"><b>¿Qué nombre de remitente poner?</b> En España puedes poner el que quieras (que cumpla las reglas): <code>MediCar</code>, <code>CEMPLA</code>, <code>TRAFIC</code>, etc. <b>No hace falta registrarlo</b> en LabsMobile — llegará tal cual al móvil del cliente. Al <b>no</b> ser un número, los clientes <b>no pueden responder</b> al SMS (es solo informativo).</div>
+  </div>
+
+  <h3>PASO 5 · Marcar LabsMobile como proveedor activo</h3>
+  <div class="step">
+    <ol>
+      <li>Dentro del modal SMS → arriba del todo verás un selector <b>"Proveedor activo"</b>.</li>
+      <li>Elige <b>"LabsMobile"</b> (en lugar de Twilio o Mock/Prueba).</li>
+      <li>El programa recordará esta elección para futuras campañas.</li>
+    </ol>
+  </div>
+
+  <h3>PASO 6 · Enviar la primera campaña real</h3>
+  <div class="step">
+    <ol>
+      <li>Clic en <b>➕ Nueva campaña</b>.</li>
+      <li><b>Nombre</b> → "Prueba LabsMobile" (para empezar).</li>
+      <li><b>Mensaje</b> → "Hola {{nom}}, soy MediCar. Te toca renovar antes del {{data_caducitat}}. Pide cita en 972 XX XX XX."</li>
+      <li><b>Contactos</b> → añade <b>solo tu propio móvil</b> primero (nombre, apellidos, móvil, fecha).</li>
+      <li>Clic en <b>Enviar</b> → debe salir ✅ y en <b>5-30 segundos</b> te llega el SMS al móvil con remitente <b>MediCar</b>.</li>
+      <li>Si todo OK → repite con la lista real de clientes (CSV del GIC o pegado desde Excel).</li>
+    </ol>
+    <div class="callout callout-green"><b>✅ Enviado correctamente:</b> ya está. Las próximas campañas solo son 3 pasos: Nueva campaña → pegar contactos → Enviar. Las credenciales ya están guardadas.</div>
+  </div>
+
+  <h3>🚨 Problemas típicos y solución</h3>
+  <table>
+    <tr><th>Problema</th><th>Qué hacer</th></tr>
+    <tr><td>❌ "Credenciales inválidas" al validar</td><td>Revisa que copiaste el Token completo (sin espacios al principio/final). Si sigue fallando, regenera el Token en el panel LabsMobile.</td></tr>
+    <tr><td>❌ "Sin saldo" al enviar</td><td>Entra a labsmobile.com → Comprar créditos → recarga mínimo 10€.</td></tr>
+    <tr><td>❌ Remitente rechazado</td><td>El nombre debe tener <b>máx 11 caracteres</b>, sin espacios, sin ñ, sin acentos, empezando por letra. Prueba con <code>MediCar</code> o <code>CEMPLA</code>.</td></tr>
+    <tr><td>❌ No llega el SMS</td><td>Comprueba que el móvil es correcto (sin prefijo +34 ni espacios: solo 9 dígitos). Revisa el histórico de la campaña — si pone "Enviado OK" es que salió del servidor LabsMobile correctamente.</td></tr>
+    <tr><td>❓ ¿Puedo enviar fuera de España?</td><td>Sí, pero en <b>Francia, Alemania, Italia, EE.UU.</b> el remitente alfanumérico (ej. MediCar) requiere pre-registro en el panel LabsMobile → menú "Remitentes". En EE.UU./Canadá no admiten alfanumérico — hay que contratar un número.</td></tr>
+  </table>
+
+  <h3>💰 Comparativa rápida LabsMobile vs Twilio (España)</h3>
+  <table>
+    <tr><th></th><th>LabsMobile</th><th>Twilio</th></tr>
+    <tr><td><b>Precio SMS</b></td><td>≈ 0,045 €</td><td>≈ 0,075 €</td></tr>
+    <tr><td><b>Comprar número</b></td><td>No se usa</td><td>~1€/mes extra (opcional)</td></tr>
+    <tr><td><b>Remitente nombre</b></td><td>✅ Sin registrar (ES)</td><td>⚠️ Formulario Alpha Sender</td></tr>
+    <tr><td><b>Papeleo inicial</b></td><td>Ninguno</td><td>DNI, muestras, uso previsto</td></tr>
+    <tr><td><b>Panel en español</b></td><td>✅ Sí</td><td>⚠️ Inglés</td></tr>
+    <tr><td><b>Mejor para</b></td><td>Envíos masivos a España</td><td>Internacional, envíos técnicos</td></tr>
+  </table>
+
+  <div class="tip">Puedes tener los <b>dos proveedores configurados a la vez</b> en el programa y cambiar entre ellos desde el selector "Proveedor activo" según lo que necesites cada día.</div>
 </div>
 
 <!-- ============ TAB: CITAS ============ -->
