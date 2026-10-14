@@ -409,7 +409,9 @@
   <h2 id="labsmobile-guia" style="background:linear-gradient(90deg,#dbeafe,transparent);border-left-color:#2563eb;color:#1e3a8a">📨 Guía rápida LabsMobile · Enviar SMS reales en 10 minutos</h2>
   <p><b>LabsMobile</b> es el proveedor SMS <b>recomendado para España</b>: más barato que Twilio (≈ 0,045 €/SMS vs 0,075 €), sin papeleo de aprobación, y permite usar un <b>nombre de remitente</b> (ej. <code>MediCar</code>) directamente sin pre-registro.</p>
 
-  <div class="callout callout-green"><b>⏱️ Tiempo total:</b> ~10 min · <b>Papeleo:</b> ninguno para enviar a España · <b>Coste inicial:</b> desde 10€ de recarga (≈ 220 SMS).</div>
+  <div class="callout callout-green"><b>⏱️ Tiempo total:</b> ~10 min · <b>Papeleo:</b> ninguno para enviar a España hoy mismo · <b>Coste inicial:</b> desde 10€ de recarga (≈ 220 SMS).</div>
+
+  <div class="callout callout-red"><b>⚠️ Nueva normativa CNMC España · obligatoria desde 15-Sep-2026:</b> para seguir enviando con un <b>nombre de remitente</b> (ej. <code>MediCar</code>) en España pasado septiembre 2026, hay que registrar ese alias en el <b>Registro CNMC</b>. Afecta a <b>todos los proveedores</b> (LabsMobile, Twilio, etc.). Mientras tanto, LabsMobile sigue siendo la opción más fácil para empezar — y cuando toque, el registro CNMC se gestiona desde el panel LabsMobile (ver guía Twilio más abajo ⬇️ con el detalle del trámite CNMC, que es idéntico aunque uses LabsMobile).</div>
 
   <h3>PASO 1 · Crear cuenta en LabsMobile</h3>
   <div class="step">
@@ -512,131 +514,182 @@
   <div class="tip">Puedes tener los <b>dos proveedores configurados a la vez</b> en el programa y cambiar entre ellos desde el selector "Proveedor activo" según lo que necesites cada día.</div>
 
   <!-- ============ GUÍA TWILIO ALPHA SENDER ============ -->
-  <h2 id="twilio-alpha-guia" style="background:linear-gradient(90deg,#fef3c7,transparent);border-left-color:#f5b301;color:#78350f">📨 Guía rápida Twilio Alpha Sender · Que llegue "MediCar" en vez de un número</h2>
-  <p>Si ya has puesto saldo en Twilio y <b>no quieres que al cliente le aparezca un número largo</b> como remitente, hay que registrar un <b>Alphanumeric Sender ID</b> (ej. <code>MediCar</code>). Twilio pide bastantes datos en inglés — <b>aquí tienes exactamente qué poner en cada campo</b>, con ejemplos listos para copiar.</p>
+  <h2 id="twilio-alpha-guia" style="background:linear-gradient(90deg,#fef3c7,transparent);border-left-color:#f5b301;color:#78350f">📨 Guía Twilio Alpha Sender · Que llegue "MediCar" en vez de un número</h2>
+  <p>Si ya tienes saldo en Twilio y <b>no quieres que al cliente le aparezca un número largo</b> como remitente, hay que registrar un <b>Alphanumeric Sender ID</b> (ej. <code>MediCar</code>). <b>⚠️ Importante:</b> desde que <b>España aplica el Registro de Alias de la CNMC</b> (Orden TDF/149/2025, obligatorio desde <b>15 septiembre 2026</b>), el proceso es más largo y pide bastante documentación. Aquí tienes <b>paso a paso cada campo con ejemplo literal</b>.</p>
 
-  <div class="callout callout-blue"><b>⏱️ Tiempo total:</b> ~15 min · <b>Aprobación en España:</b> normalmente automática en pocos minutos · <b>Coste:</b> gratis (los Alpha Sender no cuestan extra, solo pagas por SMS enviado).</div>
+  <div class="callout callout-red"><b>⚠️ Nueva normativa España (2026):</b> cualquier remitente alfanumérico <b>NO registrado</b> en el Registro CNMC será <b>bloqueado</b> por los operadores móviles españoles (Movistar, Vodafone, Orange, Yoigo…). Esto afecta a <b>todos los proveedores</b> (Twilio, LabsMobile, MessageBird, Infobip…). Si envías SMS a España con nombre, hay que registrarse en la CNMC sí o sí. No es solo cosa de Twilio.</div>
 
-  <h3>PASO 1 · Entrar al panel correcto</h3>
+  <div class="callout callout-blue"><b>⏱️ Tiempo total realista:</b> 2-4 semanas (incluye revisión de Twilio + aprobación CNMC). <b>Coste:</b> gratis el registro, pagas solo por SMS enviado (~0,075€/SMS). <b>Requisito clave:</b> <b>certificado digital español</b> (FNMT, DNIe, Camerfirma o eIDAS UE) a nombre de la empresa o representante legal.</div>
+
+  <h3>✅ Checklist · lo que necesitas tener a mano ANTES de empezar</h3>
   <div class="step">
-    <ol>
-      <li>Entra a <a href="https://console.twilio.com/" target="_blank" rel="noopener">console.twilio.com</a> con tu email y contraseña.</li>
-      <li>En el menú lateral izquierdo busca: <b>Messaging ▸ Senders ▸ Sender Pool</b> (o directamente <a href="https://console.twilio.com/us1/develop/sms/senders/alphanumeric-sender-ids" target="_blank" rel="noopener">este enlace directo</a>).</li>
-      <li>Pestaña <b>"Alphanumeric Sender IDs"</b> (al lado de "Phone Numbers" y "Short Codes").</li>
-      <li>Botón azul arriba a la derecha: <b>"Create new Alphanumeric Sender ID"</b> o <b>"+ Alphanumeric Sender ID"</b>.</li>
-    </ol>
-    <div class="tip">Si no ves esta opción, puede que tu cuenta esté en modo <i>Trial</i>. Añade al menos 20€ de saldo (como ya hiciste con 50€ 👍) y volverá a aparecer.</div>
+    <ul>
+      <li>📄 <b>Datos de empresa</b>: nombre fiscal exacto, NIF/CIF, dirección fiscal completa, teléfono, web.</li>
+      <li>📄 <b>Certificado del Registro Mercantil</b> o escritura de constitución (PDF).</li>
+      <li>📄 <b>Modelo 036/037</b> (alta en Hacienda) o certificado de situación censal.</li>
+      <li>👤 <b>Representante autorizado</b>: nombre completo, DNI/NIE (con foto PDF), email, teléfono móvil, cargo en la empresa.</li>
+      <li>🏷️ <b>Prueba de entitlement</b> (que el nombre es tuyo) — con <b>UNA</b> de estas basta:
+        <ul>
+          <li>Marca registrada OEPM/EUIPO (certificado PDF)</li>
+          <li>Dominio web a nombre de la empresa (ej. <code>medicar.es</code>) — con captura del whois o factura del dominio</li>
+          <li>Denominación social que coincida con el alias (ej. "MediCar Centro Médico S.L." → alias <code>MediCar</code>)</li>
+          <li>Nombre comercial dado de alta en Hacienda</li>
+        </ul>
+      </li>
+      <li>🔐 <b>Certificado digital</b> español (FNMT, DNIe electrónico, Camerfirma, Izenpe…) o eIDAS UE a nombre del representante. <b>Sin esto NO se puede terminar</b> el registro CNMC.</li>
+      <li>✉️ <b>Carta de Autorización CNMC firmada</b> (plantilla que Twilio te dará para descargar y firmar electrónicamente con el certificado).</li>
+    </ul>
+    <div class="callout callout-blue"><b>¿No tienes certificado digital?</b> Pide cita en <a href="https://www.sede.fnmt.gob.es/certificados/persona-fisica" target="_blank" rel="noopener">FNMT (persona física)</a> o <a href="https://www.sede.fnmt.gob.es/certificados/certificado-de-representante" target="_blank" rel="noopener">FNMT representante empresa</a>. Es gratis y tarda ~30 min en una oficina de Hacienda o Seguridad Social.</div>
   </div>
 
-  <h3>PASO 2 · Rellenar los campos del formulario (lo "en inglés" explicado)</h3>
+  <h3>PASO 1 · Crear el Business Profile en Trust Hub (REQUISITO PREVIO)</h3>
   <div class="step">
-    <p>Twilio te mostrará un formulario largo. Aquí tienes <b>campo por campo qué significa y qué poner</b>:</p>
+    <p>Antes de crear el Alpha Sender hay que tener aprobado un <b>Business Primary Compliance Profile</b>. Twilio valida la empresa primero (~48h).</p>
+    <ol>
+      <li>Entra a <a href="https://console.twilio.com/" target="_blank" rel="noopener">console.twilio.com</a>.</li>
+      <li>Menú lateral → <b>Communications ▸ Trust Hub ▸ Profiles</b>.</li>
+      <li>Botón <b>"Create a Business Profile"</b> → tipo <b>"Primary Customer Profile"</b>.</li>
+      <li>Rellena:
+        <ul>
+          <li><b>Business Legal Name</b> → nombre fiscal exacto (ej. <i>MediCar Centro Médico S.L.</i>)</li>
+          <li><b>Business Type</b> → <b>Private Company</b> (o Public/Non-profit según sea)</li>
+          <li><b>Business Registration Number</b> → tu <b>CIF</b> (ej. B12345678)</li>
+          <li><b>Business Registration Identifier</b> → selecciona <b>"EU VAT Number"</b> o <b>"Other"</b></li>
+          <li><b>Business Industry</b> → <i>Healthcare</i> (centro médico) o <i>Automotive</i> (autoescuela)</li>
+          <li><b>Website URL</b> → tu web real (<code>https://medicar.es</code>)</li>
+          <li><b>Business Regions of Operation</b> → <b>Europe</b></li>
+        </ul>
+      </li>
+      <li><b>Business Address</b> → dirección fiscal completa (calle, número, CP, ciudad, provincia, España).</li>
+      <li><b>Authorized Representative #1</b> → la persona que firma todo:
+        <ul>
+          <li>Nombre completo</li>
+          <li>Cargo (ej. <i>Administrator</i> o <i>CEO</i>)</li>
+          <li>Email corporativo</li>
+          <li>Teléfono móvil (con prefijo +34)</li>
+          <li>Fecha de nacimiento</li>
+          <li>Subir foto PDF del DNI/NIE (anverso y reverso)</li>
+        </ul>
+      </li>
+      <li>Sube los documentos pedidos: <b>certificado Registro Mercantil</b> o <b>escritura de constitución</b> + <b>modelo 036/037</b> (en PDF).</li>
+      <li>Clic en <b>Submit for review</b>. Twilio revisa en <b>24-72h</b> y te envía un email cuando esté <b>Approved</b> ✅.</li>
+    </ol>
+    <div class="callout callout-red"><b>⚠️ No continúes al PASO 2 hasta que Trust Hub esté "Approved"</b>. Si lo intentas antes, el botón de crear Alpha Sender aparecerá bloqueado.</div>
+  </div>
+
+  <h3>PASO 2 · Crear la Registration del Alphanumeric Sender ID</h3>
+  <div class="step">
+    <ol>
+      <li>Con Trust Hub ya aprobado → menú <b>Communications ▸ Trust Hub ▸ Registrations</b>.</li>
+      <li>Botón <b>"Create a new registration"</b> → <b>Regulatory Bundle for Spain</b> → <b>Alphanumeric Sender ID</b>.</li>
+      <li>Asocia el <b>Business Profile</b> aprobado en el paso 1.</li>
+      <li>Rellena los campos (aquí es donde pide "cosas raras en inglés" — te lo traduzco todo):</li>
+    </ol>
 
     <table>
       <tr><th>Campo en inglés</th><th>Qué significa</th><th>Qué poner (ejemplo)</th></tr>
 
-      <tr><td><b>Alphanumeric Sender ID</b></td><td>El nombre que verá el cliente en el SMS (máx 11 caracteres, sin espacios, sin ñ ni acentos, empezando por letra).</td><td><code>MediCar</code></td></tr>
+      <tr><td><b>Alphanumeric Sender ID</b></td><td>El nombre que verá el cliente (3-11 chars, letras/números, sin espacios al inicio/final).</td><td><code>MediCar</code></td></tr>
 
-      <tr><td><b>Friendly name</b></td><td>Etiqueta interna solo para que tú lo encuentres en tu panel. No se envía a nadie.</td><td><code>MediCar - Avisos renovación</code></td></tr>
+      <tr><td><b>Friendly Name</b></td><td>Etiqueta interna. No se envía.</td><td><code>MediCar - Avisos España</code></td></tr>
 
-      <tr><td><b>ISO country code / Countries</b></td><td>Países donde vas a enviar SMS con este remitente.</td><td>Marca <b>ES (Spain)</b>. Si envías también a Portugal/Andorra, márcalos.</td></tr>
+      <tr><td><b>Country</b></td><td>País de los destinatarios.</td><td><b>Spain (ES)</b></td></tr>
 
-      <tr><td><b>Use Case</b> (desplegable)</td><td>Para qué vas a usar los SMS.</td><td>Elige <b>"Account Notification"</b> o <b>"Appointment Reminders"</b>.</td></tr>
+      <tr><td><b>Use Case</b></td><td>Para qué envías.</td><td><b>"Mixed"</b> (transactional + promotional) o <b>"Account Notification"</b></td></tr>
 
-      <tr><td><b>Use Case Description</b></td><td>Descripción breve en inglés de para qué envías.</td><td><code>We send renewal reminders and appointment notifications to our medical center customers who booked a driving-license medical exam.</code></td></tr>
+      <tr><td><b>Use Case Description</b></td><td>Descripción detallada en inglés (mínimo ~100 caracteres).</td><td><code>Appointment reminders and renewal notifications for medical driving-license exam customers who booked an in-person visit at our clinic.</code></td></tr>
 
-      <tr><td><b>Business name / Company name</b></td><td>Nombre fiscal/comercial de tu empresa.</td><td>El nombre real de tu empresa (ej. <i>Centro Médico MediCar S.L.</i>).</td></tr>
+      <tr><td><b>Entitlement proof type</b></td><td>Qué prueba legal tienes para usar ese alias.</td><td><b>"Domain"</b> si tienes <code>medicar.es</code>, o <b>"Trademark"</b> si tienes marca registrada, o <b>"Trade/Business Name"</b> si el alias coincide con tu razón social.</td></tr>
 
-      <tr><td><b>Business website</b></td><td>Tu página web.</td><td>Tu web real (ej. <code>https://medicar.es</code>). Si no tienes, pon una ficha Google Business o tu perfil de Doctoralia.</td></tr>
+      <tr><td><b>Entitlement proof document</b></td><td>Documento PDF que prueba lo anterior.</td><td>Captura del WHOIS del dominio, certificado OEPM, o certificado Registro Mercantil.</td></tr>
 
-      <tr><td><b>Business address</b></td><td>Dirección fiscal.</td><td>Calle, número, código postal, ciudad, país.</td></tr>
+      <tr><td><b>Message Volume (per month)</b></td><td>SMS/mes estimados.</td><td><code>500</code></td></tr>
 
-      <tr><td><b>Opt-in flow / Consent</b></td><td>Cómo obtienes el permiso del cliente para enviarle SMS.</td><td><code>Customers provide their mobile number and give written consent on the medical-exam form during their in-person visit to our clinic. GDPR compliant.</code></td></tr>
+      <tr><td><b>Sample Messages (1-3)</b></td><td>Ejemplos reales en el idioma que vas a enviar.</td><td>Ver abajo ⬇️</td></tr>
 
-      <tr><td><b>Opt-out instructions / STOP</b></td><td>Cómo pueden darse de baja. <b>Obligatorio</b> en EU.</td><td><code>Customers can reply STOP or call us at +34 972 XX XX XX to be removed from future SMS communications.</code></td></tr>
+      <tr><td><b>Opt-in Type</b></td><td>Cómo obtienes el consentimiento.</td><td><b>"Verbal"</b> o <b>"Paper form"</b></td></tr>
 
-      <tr><td><b>Sample message 1 / 2 / 3</b></td><td>Ejemplos reales del SMS que vas a enviar (pide 1-3 ejemplos).</td><td>Ver abajo ⬇️</td></tr>
+      <tr><td><b>Opt-in Description</b></td><td>Explica el flujo de consentimiento.</td><td><code>Patients provide their mobile number and sign a GDPR-compliant written consent form during their in-person medical exam visit. Only patients who explicitly tick the "SMS reminders" box receive messages.</code></td></tr>
 
-      <tr><td><b>Message volume</b></td><td>Cuántos SMS al mes aprox.</td><td>Pon una estimación realista (ej. <code>500 per month</code>).</td></tr>
+      <tr><td><b>Opt-out Instructions</b></td><td>Cómo se dan de baja. OBLIGATORIO.</td><td><code>Users can reply STOP to unsubscribe or call us at +34 972 XX XX XX. We process opt-outs within 24h.</code></td></tr>
+
+      <tr><td><b>Help Message</b></td><td>Qué responder si el usuario escribe HELP.</td><td><code>MediCar: for support call +34 972 XX XX XX or email info@medicar.es. Reply STOP to unsubscribe.</code></td></tr>
     </table>
 
     <div class="callout callout-green">
-      <b>📝 Mensajes de ejemplo que puedes copiar literalmente:</b>
+      <b>📝 Mensajes de ejemplo (copia literal):</b>
       <ul style="margin:8px 0 0;font-family:'Courier New',monospace;font-size:12.5px">
-        <li>Hola Juan, soy MediCar. Te toca renovar el carnet antes del 15/06/2026. Pide cita 972 XX XX XX. STOP para baja.</li>
-        <li>Recordatorio MediCar: cita confirmada mañana 10:30. Trae DNI y gafas si usas. STOP para baja.</li>
-        <li>MediCar: tu certificado está listo para recoger en recepción. Horario L-V 9-14h / 16-20h. STOP para baja.</li>
+        <li>Hola Juan, soy MediCar. Te toca renovar el carnet antes del 15/06/2026. Pide cita en 972 XX XX XX. STOP baja.</li>
+        <li>MediCar: tu cita está confirmada mañana a las 10:30. Trae DNI y gafas si usas. STOP baja.</li>
+        <li>MediCar: tu certificado está listo para recoger en recepción. Horario L-V 9-14 / 16-20. STOP baja.</li>
       </ul>
     </div>
 
-    <div class="callout callout-red"><b>⚠️ CSCS / Compliance:</b> si ves un apartado con siglas raras como "CSCS" (Carrier Sender Compliance Standards), "10DLC", "A2P" o similares — <b>eso es para EE.UU., NO afecta a España</b>. Déjalo por defecto o salta esos campos. En España solo necesitas rellenar los campos marcados como obligatorios con <i>*</i>.</div>
+    <div class="callout callout-red"><b>⚠️ Si ves siglas raras:</b>
+      <ul style="margin:6px 0 0">
+        <li><b>CSCS / 10DLC / A2P 10DLC</b> → es solo para EE.UU. En España se ignora. Si aparece como campo opcional, déjalo vacío.</li>
+        <li><b>CNMC Letter of Authorization</b> → aquí sí es obligatorio para España. Twilio te ofrece un PDF plantilla. Descárgalo, imprime, firma a mano O (mejor) <b>firma electrónicamente con tu certificado digital</b> (usa <a href="https://valide.redsara.es/valide/firmar/ejecutar.html" target="_blank" rel="noopener">VALIDe</a> gratis). Luego súbelo escaneado.</li>
+      </ul>
+    </div>
   </div>
 
-  <h3>PASO 3 · Enviar formulario y esperar aprobación</h3>
+  <h3>PASO 3 · Firmar la Carta de Autorización CNMC y enviarla</h3>
   <div class="step">
     <ol>
-      <li>Repasa que todo esté bien escrito (sin faltas en inglés — Twilio es muy quisquilloso).</li>
-      <li>Clic en <b>"Submit"</b> o <b>"Create"</b> al final.</li>
-      <li>Verás un estado:
-        <ul>
-          <li><b>"Approved"</b> ✅ → ya puedes usarlo. En España suele tardar de <b>minutos a 24h</b>.</li>
-          <li><b>"Pending Review"</b> ⏳ → en revisión manual, espera 1-3 días laborables.</li>
-          <li><b>"Rejected"</b> ❌ → Twilio pone el motivo. Normalmente es por "falta de opt-in claro" o "sample messages genéricos" — corrige y vuelve a enviar.</li>
-        </ul>
-      </li>
-      <li>Cuando esté <b>Approved</b>, Twilio te enviará un email de confirmación.</li>
+      <li>Twilio te da un botón <b>"Download CNMC Letter of Authorization"</b> → PDF pre-rellenado con tus datos.</li>
+      <li>Firma el PDF con tu certificado digital (herramientas gratis: <b>VALIDe</b>, <b>AutoFirma</b> del Gobierno, Adobe Reader).</li>
+      <li>Súbelo de vuelta a Twilio en el mismo formulario.</li>
+      <li>Clic en <b>Submit for review</b>.</li>
     </ol>
-    <div class="tip">Mientras esperas la aprobación, <b>puedes seguir enviando SMS desde el número comprado</b> (al cliente le saldrá el número, no "MediCar"). No pierdes tiempo.</div>
+    <div class="tip">Si no puedes firmar electrónicamente, imprime, firma a bolígrafo azul, escanea a color (300 dpi mínimo) y sube el PDF escaneado. Twilio lo acepta pero tarda más en aprobarlo.</div>
   </div>
 
-  <h3>PASO 4 · Configurar en MediCar Plus</h3>
+  <h3>PASO 4 · Confirmación en el portal de la CNMC (crítico)</h3>
   <div class="step">
     <ol>
-      <li>Abre MediCar Plus → <span class="btn-icon">📱 Avisos</span> → <b>⚙️ Configuración SMS</b>.</li>
-      <li>Pestaña <b>"Twilio"</b>.</li>
-      <li>Pulsa el botón <b>🔍 Detectar mis remitentes</b> — se conectará a tu cuenta y traerá:
-        <ul>
-          <li>El número que compraste (con prefijo <code>+34…</code>)</li>
-          <li>El Alpha Sender aprobado (<code>MediCar</code>)</li>
-        </ul>
-      </li>
-      <li>En el desplegable <b>"Remitente"</b> selecciona <code>MediCar</code> (el alfanumérico) en lugar del número.</li>
-      <li>Clic en <b>💾 Guardar</b>.</li>
+      <li>Twilio envía tu solicitud a la <b>CNMC</b> (regulador español).</li>
+      <li>La CNMC envía un <b>email al representante autorizado</b> con un enlace de confirmación.</li>
+      <li>El representante debe entrar al <a href="https://sede.cnmc.gob.es/" target="_blank" rel="noopener">portal de la Sede Electrónica CNMC</a> <b>con el certificado digital instalado en el navegador</b> y aprobar la solicitud.</li>
+      <li>Plazo máximo para confirmar: <b>10 días hábiles</b> desde que te llega el email. Si no se confirma, se cancela y hay que empezar de nuevo.</li>
+      <li>Una vez confirmado, la CNMC inscribe el alias en el <b>Registro de Alias</b> y Twilio recibe el OK automáticamente.</li>
     </ol>
-    <div class="callout callout-green">A partir de ahora, los SMS enviados vía Twilio llegarán al móvil del cliente con el nombre <b>MediCar</b> y no con un número largo. 🎯</div>
+    <div class="callout callout-red"><b>Sin certificado digital no se puede completar este paso.</b> Si no lo tienes, nombra como representante a tu gestor/asesor que sí lo tenga y adjunta un <b>poder notarial apostillado</b> en el formulario.</div>
   </div>
 
-  <h3>PASO 5 · Primera prueba real</h3>
+  <h3>PASO 5 · Configurar en MediCar Plus (cuando ya está aprobado)</h3>
   <div class="step">
     <ol>
-      <li>Dentro del modal SMS, confirma que el selector <b>"Proveedor activo"</b> está en <b>Twilio</b>.</li>
-      <li>➕ Nueva campaña → nombre "Prueba Twilio Alpha".</li>
-      <li>Añade <b>solo tu móvil</b> como único contacto.</li>
-      <li>Enviar → en 10-30 segundos te llega el SMS con remitente <b>MediCar</b>. ✅</li>
+      <li>Cuando el estado en Twilio Console sea <b>"Approved"</b> ✅ (puede tardar 2-4 semanas en total).</li>
+      <li>Abre MediCar Plus → <span class="btn-icon">📱 Avisos</span> → <b>⚙️ Configuración SMS</b> → pestaña <b>Twilio</b>.</li>
+      <li>Pulsa <b>🔍 Detectar mis remitentes</b> → aparecerá <code>MediCar</code> en el desplegable.</li>
+      <li>Selecciónalo como remitente → <b>💾 Guardar</b>.</li>
+      <li>Haz una prueba con tu propio móvil antes de lanzar campaña grande.</li>
     </ol>
+    <div class="callout callout-green">A partir de aquí, los SMS enviados vía Twilio llegarán con remitente <b>MediCar</b> y pasarán todos los filtros de los operadores españoles. 🎯</div>
   </div>
 
-  <h3>🚨 Problemas típicos con Twilio Alpha Sender</h3>
+  <h3>🚨 Problemas típicos con Twilio Alpha Sender (España)</h3>
   <table>
     <tr><th>Problema</th><th>Qué hacer</th></tr>
-    <tr><td>❌ "Rejected: insufficient opt-in evidence"</td><td>Reescribe el campo "Opt-in flow" explicando con más detalle (ej. "firma en formulario físico durante la visita presencial"). Vuelve a enviar.</td></tr>
-    <tr><td>❌ "Rejected: sample messages too generic"</td><td>Pon ejemplos con <b>nombre de empresa + motivo específico + opción STOP</b>. Usa los 3 de arriba.</td></tr>
-    <tr><td>❌ "Alphanumeric Sender ID already in use"</td><td>Alguien ya usa ese nombre a nivel global. Prueba con una variante: <code>MediCarES</code>, <code>MediCarCM</code>, <code>CMMediCar</code>.</td></tr>
-    <tr><td>❌ No encuentro el menú "Alphanumeric Sender IDs"</td><td>Puede que estés en una sub-cuenta sin permisos. Vuelve a la cuenta principal (icono arriba a la derecha → "Primary Account").</td></tr>
-    <tr><td>⚠️ Me pide verificar el negocio (business verification)</td><td>Si tu volumen es alto Twilio puede pedir verificación extra. Tendrás que subir una foto del DNI del admin + justificante CIF/alta en Hacienda. Es gratis.</td></tr>
-    <tr><td>❓ ¿Y si no quiero el jaleo de Twilio?</td><td>Pásate a LabsMobile (ver guía justo arriba ⬆️). Para España es la opción más fácil: sin formularios, sin aprobación, mismo resultado.</td></tr>
+    <tr><td>❌ "Business Profile rejected: insufficient documentation"</td><td>Sube el certificado del Registro Mercantil <b>oficial</b> (no una copia del BOE). Pídelo online en <a href="https://www.registradores.org/" target="_blank" rel="noopener">registradores.org</a> (~15€, PDF al momento).</td></tr>
+    <tr><td>❌ "Entitlement proof not valid"</td><td>Si usas prueba por dominio, sube captura del WHOIS <b>mostrando la empresa como registrante</b> (si usas privacy-shield, desactívalo temporalmente). Alternativamente, usa la marca registrada OEPM.</td></tr>
+    <tr><td>❌ "CNMC verification pending" durante &gt;10 días</td><td>Revisa el spam del representante. Si no llegó el email de la CNMC, pide a Twilio Support que re-lance la solicitud desde el panel.</td></tr>
+    <tr><td>❌ No tengo certificado digital</td><td>Opción A: pídelo tú gratis en FNMT (30 min). Opción B: nombra como representante autorizado a tu <b>asesor fiscal</b> y adjunta carta de poder.</td></tr>
+    <tr><td>⚠️ El proceso es un rollo, ¿atajos?</td><td>No hay atajos legales. Pero si envías <b>pocos SMS/mes y solo a España</b>, puedes usar un <b>número comprado</b> (sin registro CNMC) y aceptar que al cliente le aparezca un número en vez de "MediCar". Es menos profesional pero funciona hoy mismo.</td></tr>
   </table>
 
-  <h3>💡 Resumen rápido · Twilio vs LabsMobile para enviar como "MediCar"</h3>
+  <h3>💡 Resumen · opciones reales para enviar como "MediCar" en España</h3>
   <table>
-    <tr><th></th><th>Twilio Alpha Sender</th><th>LabsMobile</th></tr>
-    <tr><td><b>Formulario inicial</b></td><td>Sí (en inglés, ~15 min)</td><td>No</td></tr>
-    <tr><td><b>Aprobación necesaria</b></td><td>Sí (minutos-24h en España)</td><td>No</td></tr>
-    <tr><td><b>Precio SMS España</b></td><td>≈ 0,075 €</td><td>≈ 0,045 €</td></tr>
-    <tr><td><b>Panel en español</b></td><td>❌ Inglés</td><td>✅ Español</td></tr>
-    <tr><td><b>Soporte internacional</b></td><td>✅ Mejor (más países)</td><td>⚠️ Bueno pero menos</td></tr>
+    <tr><th></th><th>Twilio Alpha</th><th>LabsMobile Alpha</th><th>Número comprado (sin alias)</th></tr>
+    <tr><td><b>Papeleo</b></td><td>🔴 Alto (Trust Hub + CNMC)</td><td>🟡 Medio (CNMC igual, pero LabsMobile ayuda más)</td><td>🟢 Ninguno</td></tr>
+    <tr><td><b>Certificado digital</b></td><td>Obligatorio</td><td>Obligatorio</td><td>No necesario</td></tr>
+    <tr><td><b>Tiempo setup</b></td><td>2-4 semanas</td><td>1-3 semanas</td><td>5 minutos</td></tr>
+    <tr><td><b>Precio SMS</b></td><td>~0,075 €</td><td>~0,045 €</td><td>~0,045-0,075 €</td></tr>
+    <tr><td><b>Remitente visible</b></td><td><code>MediCar</code></td><td><code>MediCar</code></td><td>+34 611 XX XX XX</td></tr>
+    <tr><td><b>Panel español</b></td><td>❌</td><td>✅</td><td>Según proveedor</td></tr>
   </table>
-  <div class="tip">Si solo envías a España, <b>LabsMobile te ahorra tiempo y dinero</b>. Twilio tiene sentido si envías también a países fuera UE o quieres que los clientes puedan <b>responder</b> al SMS (necesitas número comprado, no funciona con Alpha Sender).</div>
+
+  <div class="callout callout-blue"><b>💡 Mi recomendación práctica:</b> si tienes poco tiempo o no tienes certificado digital, <b>usa número comprado</b> y envía ya (que llegue el SMS con el número es mejor que no enviar nada). En paralelo, pide el certificado digital en FNMT (30 min gratis) y arranca el registro CNMC con LabsMobile en vez de Twilio — mismo trámite, pero LabsMobile tiene soporte en español y es más barato.</div>
 </div>
 
 <!-- ============ TAB: CITAS ============ -->
