@@ -123,6 +123,23 @@ def _extract_creds(creds: Optional[dict]) -> Optional[tuple]:
     return None
 
 
+def _creds_incomplete(creds: Optional[dict]) -> Optional[str]:
+    """Si el client ha enviat sid/token però falta un camp (típicament 'from'),
+    retorna un missatge concret per fer-ho visible al UI. None si tot OK o buit."""
+    if not creds or not isinstance(creds, dict):
+        return None
+    sid = (creds.get("sid") or "").strip()
+    token = (creds.get("token") or "").strip()
+    from_num = (creds.get("from") or "").strip()
+    if (sid or token) and not (sid and token and from_num):
+        miss = []
+        if not sid: miss.append("Account SID")
+        if not token: miss.append("Auth Token")
+        if not from_num: miss.append("Remitente (From)")
+        return "Credenciales Twilio incompletas · falta: " + ", ".join(miss)
+    return None
+
+
 def _get_sms_price_eur() -> float:
     """Preu per SMS a facturar al client = cost Twilio + marge.
     Vars: MEDICAR_SMS_TWILIO_COST_EUR + MEDICAR_SMS_MARGIN_EUR (fallback: MEDICAR_SMS_PRICE_EUR)"""
@@ -180,14 +197,20 @@ def _send_sms(
         if user_creds:
             sid, token, from_num = user_creds
             source = "byoa"
-        elif _has_twilio():
-            sid = os.environ["TWILIO_ACCOUNT_SID"]
-            token = os.environ["TWILIO_AUTH_TOKEN"]
-            from_num = os.environ["TWILIO_FROM_NUMBER"]
-            source = "env"
         else:
-            # MODE PROVA — no envia res, marca com si s'hagués enviat
-            return True, "mock:no-twilio", "mock"
+            # 🚦 Feb 2026 · Si venen creds però incompletes (típic: falta From),
+            #   fallem RÀPID amb el missatge concret en lloc d'anar al fallback env.
+            inc = _creds_incomplete(creds)
+            if inc:
+                return False, f"error:{inc}", "byoa_incomplete"
+            if _has_twilio():
+                sid = os.environ["TWILIO_ACCOUNT_SID"]
+                token = os.environ["TWILIO_AUTH_TOKEN"]
+                from_num = os.environ["TWILIO_FROM_NUMBER"]
+                source = "env"
+            else:
+                # MODE PROVA — no envia res, marca com si s'hagués enviat
+                return True, "mock:no-twilio", "mock"
     try:
         from twilio.rest import Client  # type: ignore
         client = Client(sid, token)

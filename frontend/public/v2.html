@@ -13894,13 +13894,32 @@ function openSmsModal(){
     }
     document.getElementById('smsBtnSend').onclick=async(ev)=>{
       const btn=ev.target;
+      // 🚦 Feb 2026 · Pre-flight check · bloquea envío si Twilio BYOA no está completo
+      const mode = getTwilioMode();
+      if(mode !== 'medicar'){
+        const creds = getTwilioCreds() || {};
+        const miss = [];
+        if(!(creds.sid||'').trim()) miss.push('Account SID');
+        if(!(creds.token||'').trim()) miss.push('Auth Token');
+        if(!(creds.from||'').trim()) miss.push(isCA?'Remitent (From)':'Remitente (From)');
+        if(miss.length){
+          alert((isCA
+            ? '⚠️ Falten dades al teu Twilio\n\nFalta configurar:\n• '
+            : '⚠️ Faltan datos de tu Twilio\n\nFalta configurar:\n• ')
+            + miss.join('\n• ')
+            + (isCA
+              ? '\n\nObre "⚙️ Twilio" i omple els 3 camps. El "Remitent" és el nom del teu centre (ex: CEMPLA). Sense això, Twilio rebutja tots els SMS amb l\'error "A From phone number is required".'
+              : '\n\nAbre "⚙️ Twilio" y rellena los 3 campos. El "Remitente" es el nombre de tu centro (ej: CEMPLA). Sin eso, Twilio rechaza todos los SMS con el error "A From phone number is required".'));
+          try{ const tw = document.querySelector('[data-testid="sms-twilio-btn"], #btnTwilioCfg'); if(tw) tw.click(); }catch(_){}
+          return;
+        }
+      }
       if(!confirm(isCA?`Enviar la campanya a ${d.valid_count} contactes?`:`¿Enviar la campaña a ${d.valid_count} contactos?`))return;
       btn.disabled=true;btn.textContent=isCA?'Enviant...':'Enviando...';
       try{
         const name=document.getElementById('smsCampName').value.trim();
         const template=tpl.value.trim();
-        // Modes: 'byoa' (creds del client) o 'medicar' (compte central + sender custom)
-        const mode = getTwilioMode();
+        // (mode ya calculado en el pre-flight de arriba · byoa o medicar)
         const payload = { name, template, contacts:d.contacts };
         let liInstallId='', liClientName='';
         try{
