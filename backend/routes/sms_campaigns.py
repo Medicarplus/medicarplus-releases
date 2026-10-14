@@ -90,6 +90,11 @@ class TwilioSendersReq(BaseModel):
     token: str = Field(..., min_length=10)
 
 
+class LabsMobileValidateReq(BaseModel):
+    username: str = Field(..., min_length=3)
+    token: str = Field(..., min_length=6)
+
+
 class Campaign(BaseModel):
     id: str
     name: str
@@ -466,6 +471,61 @@ def build_router(db):
             return {"ok": False, "reason": "twilio_sdk_missing", "detail": "Twilio SDK not installed on server"}
         except Exception as e:
             return {"ok": False, "reason": "unknown_error", "detail": str(e)[:250]}
+
+    @router.post("/labsmobile/validate")
+    async def labsmobile_validate(
+        body: LabsMobileValidateReq,
+        x_admin_token: Optional[str] = Header(None),
+    ):
+        """
+        🇪🇸 Valida credenciales de LabsMobile consultando su endpoint de saldo.
+        LabsMobile NO expone un endpoint para listar remitentes aprobados por API
+        (confirmado en docs: están gestionados solo desde el panel labsmobile.com).
+        Devuelve:
+          - ok: credenciales válidas
+          - credits: saldo SMS restante (string, ej "10.00")
+          - detail: mensaje legible
+          - senders_hint: aviso de que los remitentes solo son visibles en el panel web
+        """
+        _admin(x_admin_token)
+        username = body.username.strip()
+        token = body.token.strip()
+        try:
+            import httpx, base64
+            auth_b64 = base64.b64encode(f"{username}:{token}".encode("utf-8")).decode("ascii")
+            with httpx.Client(timeout=12) as cli:
+                resp = cli.get(
+                    "https://api.labsmobile.com/json/balance",
+                    headers={
+                        "Authorization": f"Basic {auth_b64}",
+                        "Content-Type": "application/json",
+                        "Cache-Control": "no-cache",
+                    },
+                )
+            try:
+                data = resp.json()
+            except Exception:
+                data = {"message": resp.text[:200]}
+            code = str(data.get("code", data.get("Code", "")))
+            if resp.status_code == 200 and code == "0":
+                credits = data.get("credits") or data.get("Credits") or "0"
+                return {
+                    "ok": True,
+                    "credits": str(credits),
+                    "detail": f"Cuenta válida · {credits} SMS disponibles",
+                    "senders_hint": "LabsMobile no permite listar remitentes por API. Entra en labsmobile.com → Mi cuenta → Remitentes para ver los aprobados.",
+                    "panel_url": "https://www.labsmobile.com/es/panel/senders",
+                }
+            # Error — credenciales inválidas o cuenta bloqueada
+            msg = data.get("message") or data.get("Message") or f"HTTP {resp.status_code}"
+            reason = "credentials_invalid" if resp.status_code in (401, 403) or code in ("25", "26", "35") else "api_error"
+            return {
+                "ok": False,
+                "reason": reason,
+                "detail": f"LabsMobile · code={code} · {msg}"[:280],
+            }
+        except Exception as e:
+            return {"ok": False, "reason": "network_error", "detail": str(e)[:280]}
 
     @router.post("/preview")
     async def preview_csv(

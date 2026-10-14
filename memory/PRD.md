@@ -1,5 +1,43 @@
 # MediCar Plus · PRD (Product Requirements Document)
 
+## 2026-10-14 · 🔍 Validador de cuenta LabsMobile (+ saldo SMS)
+
+### Contexto
+Petición del usuario: *"Alpha Senders LabsMobile: haz lo mismo del auto-detector pero para LabsMobile"*.
+
+### Limitación técnica detectada
+LabsMobile **NO expone endpoint API** para listar remitentes aprobados (verificado en su documentación oficial). La gestión de senders solo es accesible desde el panel web `labsmobile.com → Mi cuenta → Remitentes`.
+
+### Solución implementada
+Como alternativa útil se construye un **validador de cuenta** que:
+- Confirma que las credenciales (usuario + token) son correctas.
+- Muestra el **saldo SMS restante** (`GET /json/balance`).
+- Enlaza directo al panel LabsMobile para consultar los remitentes aprobados.
+
+### Backend (`/app/backend/routes/sms_campaigns.py`)
+- Nuevo modelo `LabsMobileValidateReq {username, token}`.
+- Nuevo endpoint `POST /api/sms/labsmobile/validate`:
+  - Llama a `GET https://api.labsmobile.com/json/balance` con HTTP Basic Auth.
+  - Devuelve `{ok, credits, detail, senders_hint, panel_url}` si todo OK.
+  - Mapea errores: `credentials_invalid` (401/403/code 25/26/35), `api_error`, `network_error`.
+
+### Frontend (panel LabsMobile en `v2.html`)
+- Botón "🔍 Validar cuenta y ver saldo" debajo del campo remitente.
+- Al pulsar: llama al endpoint con las credenciales actuales.
+- Muestra tarjeta azul con:
+  - ✅ Confirmación visual de credenciales correctas.
+  - 💰 Saldo en € + estimación de SMS disponibles.
+  - 🌐 Link directo al panel labsmobile.com (abre en pestaña nueva).
+  - 💡 Nota aclaratoria sobre la limitación de la API para listar remitentes.
+
+### Tests
+- `node --check /tmp/_v2.js` ✅
+- `accounting_audit.js` ✅ (regresión contable OK)
+- `curl` endpoint con creds falsas → `credentials_invalid` ✅
+- Smoke test: botón renderiza + abre pestaña LabsMobile automáticamente si está marcada como provider activo ✅
+
+
+
 ## 2026-10-14 · HOTFIX CRÍTICO + 🔍 Auto-detector de remitentes Twilio
 
 ### 🔴 HOTFIX · Error sintáctico JS que rompía toda la app

@@ -13203,6 +13203,12 @@ async function openTwilioCfgModal(){
               </div>
             </div>
           </label>
+          <!-- 🔍 Validador de cuenta LabsMobile (Feb 2026) · LabsMobile no expone remitentes por API -->
+          <div style="margin-top:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <button type="button" id="labValidateBtn" data-testid="lab-validate-btn" style="background:#1e3a5f;color:#86b6ff;border:1px solid #3b82f6;padding:6px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700">🔍 ${isCA?'Validar compte i veure saldo':'Validar cuenta y ver saldo'}</button>
+            <span id="labValidateStatus" style="font-size:11px;color:#94a3b8"></span>
+          </div>
+          <div id="labValidateResult" style="display:none;margin-top:8px;padding:10px 12px;background:#0b1121;border:1px solid #3b82f6;border-radius:6px;font-size:11px;line-height:1.6"></div>
           <div id="labAutoSave" style="font-size:11px;color:#64748b;text-align:right;min-height:16px"></div>
         </div>
       </div>
@@ -13536,6 +13542,66 @@ async function openTwilioCfgModal(){
     el.addEventListener('input', () => { if(id==='labSender') refreshLabSenderUI(); scheduleLabAutoSave(); });
   });
   refreshLabSenderUI();
+
+  // ══════ 🔍 Validador LabsMobile · Feb 2026 ══════
+  // LabsMobile no permite listar remitentes por API (confirmado en docs).
+  // Lo que SÍ podemos hacer: validar credenciales + mostrar saldo SMS restante.
+  const labValBtn = document.getElementById('labValidateBtn');
+  if(labValBtn){
+    labValBtn.onclick = async () => {
+      const user = (document.getElementById('labUser')||{}).value?.trim() || '';
+      const tok = (document.getElementById('labToken')||{}).value?.trim() || '';
+      const statusEl = document.getElementById('labValidateStatus');
+      const resultEl = document.getElementById('labValidateResult');
+      if(!user || !tok){
+        if(statusEl) statusEl.innerHTML = '<span style="color:#fca5a5">⚠ '+(isCA?'Primer omple usuari i token':'Primero rellena usuario y token')+'</span>';
+        return;
+      }
+      labValBtn.disabled = true;
+      const oldTxt = labValBtn.textContent;
+      labValBtn.textContent = isCA?'⏳ Consultant LabsMobile…':'⏳ Consultando LabsMobile…';
+      if(statusEl) statusEl.textContent = '';
+      if(resultEl){ resultEl.style.display='none'; resultEl.innerHTML=''; }
+      try{
+        const r = await apiSms('/labsmobile/validate', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({username: user, token: tok})
+        });
+        if(!r.ok){
+          const reasonMap = {
+            credentials_invalid: isCA?'❌ Usuari o token incorrectes':'❌ Usuario o token incorrectos',
+            api_error: isCA?'❌ Error de l\'API de LabsMobile':'❌ Error de la API de LabsMobile',
+            network_error: isCA?'❌ No s\'ha pogut connectar amb LabsMobile':'❌ No se pudo conectar con LabsMobile',
+          };
+          if(statusEl) statusEl.innerHTML = '<span style="color:#fca5a5">'+(reasonMap[r.reason] || ('❌ '+(r.detail||'Error')))+'</span>';
+          return;
+        }
+        // ÉXITO · muestra saldo + aviso de que los remitentes solo se ven en panel
+        if(statusEl) statusEl.innerHTML = '<span style="color:#86efac">✅ '+(isCA?'Compte vàlid':'Cuenta válida')+'</span>';
+        if(resultEl){
+          const credits = r.credits || '0';
+          const smsRestantes = Math.floor(parseFloat(credits) || 0);
+          resultEl.innerHTML =
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">' +
+              '<div><div style="color:#86efac;font-weight:700;font-size:13px">✅ '+(isCA?'Credencials correctes':'Credenciales correctas')+'</div>' +
+              '<div style="color:#94a3b8;margin-top:2px">'+(isCA?'Saldo disponible: ':'Saldo disponible: ')+'<b style="color:#fde047">'+credits+' €</b> · ~<b style="color:#fde047">'+smsRestantes+' SMS</b></div></div>' +
+              '<a href="'+(r.panel_url||'https://www.labsmobile.com/es/panel')+'" target="_blank" style="background:#1e3a5f;color:#86b6ff;border:1px solid #3b82f6;padding:5px 10px;border-radius:5px;font-size:11px;font-weight:700;text-decoration:none">🌐 '+(isCA?'Obrir panell':'Abrir panel')+' →</a>' +
+            '</div>' +
+            '<div style="margin-top:10px;padding-top:8px;border-top:1px dashed #334155;color:#fbbf24;font-size:10px;line-height:1.5">' +
+              '💡 <b>'+(isCA?'Nota sobre remitents:':'Nota sobre remitentes:')+'</b> '+(r.senders_hint || (isCA?'LabsMobile no deixa llistar els remitents aprovats per API.':'LabsMobile no permite listar los remitentes aprobados por API.'))+' ' +
+              (isCA?'Entra al panell → <b>El meu compte → Remitents</b> i copia el nom tal qual aquí dalt.':'Entra al panel → <b>Mi cuenta → Remitentes</b> y copia el nombre tal cual arriba.')+
+            '</div>';
+          resultEl.style.display = 'block';
+        }
+      }catch(err){
+        if(statusEl) statusEl.innerHTML = '<span style="color:#fca5a5">❌ '+(err.message||'Error').slice(0,120)+'</span>';
+      }finally{
+        labValBtn.disabled = false;
+        labValBtn.textContent = oldTxt;
+      }
+    };
+  }
   const twDel = document.getElementById('twCfgDel');
   if(twDel){
     twDel.onclick=()=>{
