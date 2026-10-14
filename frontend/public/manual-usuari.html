@@ -351,6 +351,97 @@
 
   <div class="callout callout-blue"><b>Modo actual: PRUEBA (Mock)</b>. Los SMS no se envían de verdad — se guardan en el histórico como si se hubieran enviado. Para envío real, hay que activar Twilio (ver con tu proveedor).</div>
 
+  <!-- ═══════ CONFIGURAR TWILIO · GUÍA COMPLETA · Feb 2026 ═══════ -->
+  <h2 id="setup-twilio">🔧 Configurar Twilio para enviar SMS reales · guía completa</h2>
+  <div class="callout callout-green"><b>⏱ Tiempo:</b> 10 minutos la primera vez · solo se hace UNA vez · después funciona para siempre.</div>
+
+  <h3>1️⃣ Crear la cuenta Twilio (gratis · 2 min)</h3>
+  <div class="step">
+    <ol>
+      <li>Ve a <a href="https://www.twilio.com/try-twilio" target="_blank"><b>twilio.com/try-twilio</b></a></li>
+      <li>Regístrate con tu email y verifica el móvil</li>
+      <li>Twilio te regala <b>~15 $ de crédito</b> de prueba (suficientes para ~300 SMS a España)</li>
+      <li>Cuando acabes el registro, estarás en el <b>Console</b> (dashboard principal)</li>
+    </ol>
+  </div>
+
+  <h3>2️⃣ Copiar SID + Auth Token (30 segundos)</h3>
+  <div class="step">
+    <ol>
+      <li>En el Console, en la caja central <b>"Account Info"</b> verás 2 valores grandes:
+        <ul>
+          <li><b>Account SID</b> — empieza por <code>AC...</code></li>
+          <li><b>Auth Token</b> — pulsa el icono del ojo 👁 para verlo</li>
+        </ul>
+      </li>
+      <li>Copia los dos. Son como el <b>usuario y contraseña</b> de tu cuenta Twilio.</li>
+    </ol>
+  </div>
+
+  <h3>3️⃣ Elegir cómo saldrá el remitente del SMS</h3>
+  <p>Hay <b>2 opciones</b>. Elige una:</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0">
+    <div style="background:#ecfdf5;border:2px solid #10b981;border-radius:10px;padding:14px">
+      <b style="color:#059669;font-size:15px">🅰️ Nombre del centro (gratis)</b>
+      <p style="font-size:12px;margin:6px 0 10px"><b>Alphanumeric Sender</b> · el paciente recibe el SMS firmado por <code>CEMPLA</code> en vez de un número. Es más profesional y <b>gratis</b>, PERO Twilio tarda <b>3-7 días en aprobarlo</b> (hay que presentar papeles).</p>
+      <b>Pasos:</b>
+      <ol style="font-size:12px;margin:6px 0 0">
+        <li>En el menú izquierdo → <b>Phone Numbers → Numbers &amp; senders → Alphanumeric senders IDs (legacy)</b></li>
+        <li>Pulsa <b>"Create Alphanumeric Sender"</b></li>
+        <li><b>Paso 1 · Country &amp; Sender validation:</b> si pide crear una <i>Address</i>, pulsa <b>"create an address"</b> → rellena con nombre fiscal + dirección completa del centro.</li>
+        <li><b>Paso 2 · Company info:</b> business type = <i>Healthcare / Medical services</i>, website = tu web, tax ID = tu NIF.</li>
+        <li><b>Paso 3 · Sender ID:</b> escribe <code>CEMPLA</code> (máx 11 letras · sin acentos ni símbolos), country = <b>Spain</b>, use case = <i>Appointment reminders</i>, mensaje de ejemplo = <i>"Hola Juan, recordatorio de su revisión…"</i></li>
+        <li><b>Paso 4 · Documentación:</b> sube certificado de alta autónomo o escritura SL + NIF.</li>
+        <li>Submit → esperar <b>3-7 días hábiles</b> a que Twilio apruebe.</li>
+      </ol>
+    </div>
+    <div style="background:#eff6ff;border:2px solid #3b82f6;border-radius:10px;padding:14px">
+      <b style="color:#1e40af;font-size:15px">🅱️ Número de teléfono (hoy mismo)</b>
+      <p style="font-size:12px;margin:6px 0 10px"><b>Número español</b> · listo en 2 minutos. El paciente recibe el SMS desde un <code>+34 6XX XXX XXX</code>. Coste: <b>~1,15 €/mes</b> (del saldo Twilio).</p>
+      <b>Pasos:</b>
+      <ol style="font-size:12px;margin:6px 0 0">
+        <li>En el menú izquierdo → <b>Phone Numbers → Manage → Buy a number</b></li>
+        <li><b>Country:</b> Spain</li>
+        <li><b>Capabilities:</b> marca <b>solo SMS</b> (no Voice · no MMS → más barato)</li>
+        <li>Elige cualquier número español que te guste</li>
+        <li>Pulsa <b>"Buy"</b> → te cobra ~1,15 € del saldo gratis</li>
+        <li>Copia el número que te ha asignado con <code>+34</code> delante → listo</li>
+      </ol>
+      <div style="margin-top:10px;padding:8px;background:#dbeafe;border-radius:6px;font-size:11px;color:#1e40af"><b>💡 Recomendado al vender</b>: instala primero esta opción para que el cliente empiece ya con SMS. Mientras, le tramitas en paralelo el Alphanumeric. Cuando Twilio lo apruebe (3-7 días) sustituyes el número por el nombre del centro desde MediCar Plus en 10 segundos.</div>
+    </div>
+  </div>
+
+  <h3>4️⃣ Pegar los datos en MediCar Plus (1 minuto)</h3>
+  <div class="step">
+    <ol>
+      <li>Abre MediCar Plus → <b>📱 Avisos SMS → ⚙️ Twilio</b></li>
+      <li>Pestaña <b>"Mi cuenta Twilio"</b></li>
+      <li><b>Account SID:</b> pega lo que copiaste en el paso 2</li>
+      <li><b>Auth Token:</b> pega lo que copiaste en el paso 2</li>
+      <li><b>Remitente (From):</b>
+        <ul>
+          <li>Si fuiste por 🅰️ Alphanumeric → escribe <code>CEMPLA</code> (lo que te aprobó Twilio) o pulsa <b>"⚡ Usar nombre del centro"</b></li>
+          <li>Si fuiste por 🅱️ Número → pega el número con <code>+34</code> delante (ej: <code>+34612345678</code>)</li>
+        </ul>
+      </li>
+      <li>Verás abajo <b>"✅ Guardado automáticamente"</b> → cierra el panel. Fin.</li>
+    </ol>
+  </div>
+
+  <h3>5️⃣ Primer envío de prueba</h3>
+  <div class="step">
+    <ol>
+      <li><b>📱 Avisos SMS → ➕ Nueva campaña</b></li>
+      <li>Nombre: <code>Prueba</code> · Contactos: solo tu móvil</li>
+      <li>Mensaje: <i>"Hola prueba desde MediCar Plus"</i></li>
+      <li>Pulsa <b>Enviar</b> → te llega al móvil con "CEMPLA" o el número que configuraste como remitente</li>
+      <li>Si falla, el popup te dice el motivo exacto (ej: "A From phone number is required" = falta rellenar el From en MediCar).</li>
+    </ol>
+  </div>
+
+  <div class="callout callout-blue"><b>💡 Lo que NUNCA tendrás que volver a hacer:</b> ni crear cuenta Twilio otra vez, ni volver al dashboard de twilio.com. Todas las campañas, plantillas y estadísticas se gestionan desde dentro de MediCar Plus para siempre.</div>
+
   <h2>🖨️ Exportar el listado desde el programa GIC</h2>
   <div class="step">
     <p>Para generar el CSV con los clientes que les toca renovar, hay que aplicar una <b>plantilla especial</b> en el GIC (Clientes a Revisar):</p>
