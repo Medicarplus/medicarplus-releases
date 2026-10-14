@@ -657,6 +657,53 @@ def build_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
     @_rate("60/minute")
     async def verify_license(request: Request, body: LicenseVerify) -> LicenseVerifyResponse:
         """Valida una llicència. Pública: la crida el client v2.html."""
+        # 👑 Feb 2026 · FIX · La MASTER key (owner) no es un JWT, es una clave fija.
+        #   Antes se intentaba decodificar como JWT → "Not enough segments" → el botón
+        #   "Guardar datos" de facturación fallaba con ese error. Ahora se detecta y se
+        #   guarda el client_meta en master_profile (campo-aliased igual que licencias).
+        MASTER_KEY_LITERAL = "MB-MASTER-BRUGULAT-2026-OWNER"
+        if (body.key or "").strip() == MASTER_KEY_LITERAL:
+            try:
+                mp_coll = db["master_profile"]
+                _MP_MAP = {
+                    "client_name": "client_name",
+                    "company_name": "client_name",
+                    "empresa": "client_name",
+                    "centre": "client_name",
+                    "contact_name": "contact_name",
+                    "persona_contacto": "contact_name",
+                    "phone": "phone",
+                    "telefono": "phone",
+                    "teléfono": "phone",
+                    "tax_id": "tax_id",
+                    "nif": "tax_id",
+                    "cif": "tax_id",
+                    "email": "email",
+                    "client_email": "email",
+                }
+                upd: dict = {}
+                for k, v in (body.client_meta or {}).items():
+                    if not isinstance(v, (str, int, float)) or v is None: continue
+                    sv = str(v).strip()
+                    if not sv: continue
+                    key = _MP_MAP.get(str(k).lower().strip())
+                    if key: upd[key] = sv[:500]
+                if upd:
+                    upd["updated_at"] = _now().isoformat()
+                    await mp_coll.update_one(
+                        {"install_id": (body.install_id or "owner").strip() or "owner"},
+                        {"$set": upd, "$setOnInsert": {"created_at": _now().isoformat()}},
+                        upsert=True,
+                    )
+            except Exception:
+                pass  # no bloquear nunca el "Guardar datos" del owner
+            return LicenseVerifyResponse(
+                ok=True,
+                install_id=body.install_id,
+                client_name=(body.client_meta or {}).get("company_name") or (body.client_meta or {}).get("empresa"),
+                plan="MASTER",
+                status="active",
+            )
         # 1) Decode JWT (sub és opcional per suportar claus portables: trials i Stripe)
         try:
             payload = jwt.decode(

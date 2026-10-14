@@ -4860,7 +4860,19 @@ function _entryKey(e){
   const t = String(e.tipo||'').trim() || '?';
   // ↩ Devoluciones de tasa: se agrupan bajo su propio chip "DEVOLUCIÓN E/T/etc"
   if(e.kind==='DH' && e._tasaRefund){ return 'DEVOLUCIÓN ' + (e.fp||'E'); }
-  if(e.kind==='DH' && e._internal){ return e._transferDir==='caja2banco' ? '🔁 INGRESO METÁLICO' : '🏦 RETIRADA BANCO'; }
+  if(e.kind==='DH' && e._internal){
+    // 🏷️ Feb 2026 · Chips de filtro desglosados por tipo de traspaso interno.
+    //   Antes "banco→caja" y los traspasos a/de la Reserva de cambio se mostraban
+    //   todos como "🏦 RETIRADA BANCO", creando confusión. Ahora cada movimiento
+    //   tiene su propia etiqueta descriptiva (sin perder el flag _internal).
+    const td = e._transferDir || '';
+    if(td === 'caja2banco')       return '🔁 INGRESO METÁLICO';
+    if(td === 'banco2caja')       return '🏦 RETIRADA BANCO';
+    if(td === 'caja_to_reserva')  return '💰 CAJA → CAMBIO';
+    if(td === 'banco_to_reserva') return '💰 BANCO → CAMBIO';
+    if(td === 'reserva_to_caja')  return '💰 CAMBIO → CAJA';
+    return '🔁 TRASPASO INTERNO';
+  }
   const g = (window._normalizeGrupo?window._normalizeGrupo(e.grupo):String(e.grupo||'').trim());
   return g && g!=='-' ? `${t} · ${g}` : t;
 }
@@ -13089,12 +13101,15 @@ async function openTwilioCfgModal(){
 
       <!-- Tab BYOA -->
       <div id="paneByoa" style="display:${initialTab==='byoa'?'block':'none'}">
-        <div style="background:#0e1a2e;border:1px solid #1e293b;border-radius:8px;padding:14px;margin-bottom:16px;font-size:12px;color:#cbd5e1;line-height:1.6">
-          <div style="font-weight:800;color:#7ec8ff;margin-bottom:6px">📖 ${isCA?'Com obtenir aquestes dades':'Cómo obtener estos datos'}</div>
-          1. ${isCA?'Crea un compte a':'Crea una cuenta en'} <a href="https://www.twilio.com/try-twilio" target="_blank" style="color:#f5b301;text-decoration:underline">twilio.com</a> ${isCA?'(t\'obsequien ~15 $ de crèdit).':'(regalan ~15 $ de crédito).'}<br>
-          2. ${isCA?'Al Dashboard trobaràs':'En el Dashboard encontrarás'}: <b>Account SID</b> ${isCA?'i':'y'} <b>Auth Token</b>.<br>
-          3. ${isCA?'A "Phone Numbers ▸ Buy a Number" compra un número espanyol (~1 €/mes) o usa Alphanumeric Sender.':'En "Phone Numbers ▸ Buy a Number" compra un número español (~1 €/mes) o usa Alphanumeric Sender.'}<br>
-          <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #334155;color:#94a3b8;font-size:11px">🔒 ${isCA?'Les credencials es guarden ÚNICAMENT al teu navegador. No es persisteixen al servidor.':'Las credenciales se guardan ÚNICAMENTE en tu navegador. No se persisten en el servidor.'}</div>
+        <!-- 🎯 Guía paso a paso, lenguaje simple -->
+        <div style="background:linear-gradient(135deg,#052e16 0%,#064e3b 100%);border:1px solid #22c55e;border-radius:8px;padding:14px;margin-bottom:14px;font-size:12px;color:#bbf7d0;line-height:1.7">
+          <div style="font-weight:800;color:#86efac;margin-bottom:8px;font-size:13px">✨ ${isCA?'Com funciona':'Cómo funciona'} <span style="color:#94a3b8;font-weight:400;font-size:11px">· ${isCA?'3 passos':'3 pasos'}</span></div>
+          <div style="display:grid;gap:6px">
+            <div><b style="color:#22c55e">1️⃣ </b>${isCA?'Crea un compte gratis a ':'Crea una cuenta gratis en '}<a href="https://www.twilio.com/try-twilio" target="_blank" style="color:#f5b301;text-decoration:underline;font-weight:700">twilio.com</a> ${isCA?'(regalen ~15 $ de crèdit, suficient per 300 SMS a Espanya).':'(regalan ~15 $ de crédito, suficientes para ~300 SMS en España).'}</div>
+            <div><b style="color:#22c55e">2️⃣ </b>${isCA?'Al Dashboard copia':'En el Dashboard copia'}: <b style="color:#f5b301">Account SID</b> ${isCA?'i':'y'} <b style="color:#f5b301">Auth Token</b> ${isCA?'i enganxa\'ls aquí sota.':'y pégalos aquí abajo.'}</div>
+            <div><b style="color:#22c55e">3️⃣ </b>${isCA?'En "From" posa <b>el nom del teu centre</b> (máx. 11 lletres/números). Això és el que veurà el pacient al rebre l\'SMS. <span style="color:#86efac">No necessites comprar cap número.</span>':'En "From" pon <b>el nombre de tu centro</b> (máx. 11 letras/números). Eso es lo que verá el paciente al recibir el SMS. <span style="color:#86efac">No necesitas comprar ningún número.</span>'}</div>
+          </div>
+          <div style="margin-top:10px;padding-top:8px;border-top:1px dashed #166534;color:#86efac;font-size:11px">🔒 ${isCA?'Les credencials es guarden ÚNICAMENT al teu navegador. Mai pugen al núvol.':'Las credenciales se guardan ÚNICAMENTE en tu navegador. Nunca suben a la nube.'}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:12px">
           <label style="display:block">
@@ -13105,11 +13120,28 @@ async function openTwilioCfgModal(){
             <div style="font-size:11px;font-weight:700;color:#f5b301;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Auth Token</div>
             <input id="twToken" data-testid="twilio-token" type="password" value="${(cur.token||'').replace(/"/g,'&quot;')}" placeholder="********************************" style="width:100%;padding:9px 12px;background:#0e1a2e;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:12px;box-sizing:border-box">
           </label>
+          <!-- Campo FROM con detección en vivo + preview + botón "nombre centro" -->
           <label style="display:block">
-            <div style="font-size:11px;font-weight:700;color:#f5b301;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">${isCA?'Número remitent':'Número remitente'} (From)</div>
-            <input id="twFrom" data-testid="twilio-from" type="text" value="${(cur.from||'').replace(/"/g,'&quot;')}" placeholder="+34612345678" style="width:100%;padding:9px 12px;background:#0e1a2e;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:12px;box-sizing:border-box">
-            <div style="font-size:10px;color:#64748b;margin-top:3px">${isCA?'Format internacional (ex: +34612345678) o Alphanumeric Sender (ex: AutoescolaCB, max 11 caràcters).':'Formato internacional (ej: +34612345678) o Alphanumeric Sender (ej: AutoescolaCB, max 11 caracteres).'}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+              <div style="font-size:11px;font-weight:700;color:#f5b301;text-transform:uppercase;letter-spacing:.5px">${isCA?'Remitent':'Remitente'} (From) <span id="twFromBadge" style="margin-left:4px;padding:1px 7px;border-radius:10px;font-size:9px;letter-spacing:.3px;background:#1e293b;color:#94a3b8;text-transform:uppercase;font-weight:700"></span></div>
+              <button type="button" id="twFromUseCentre" style="background:#064e3b;color:#86efac;border:1px solid #22c55e;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700">⚡ ${isCA?'Usar nom del centre':'Usar nombre del centro'}</button>
+            </div>
+            <input id="twFrom" data-testid="twilio-from" type="text" value="${(cur.from||'').replace(/"/g,'&quot;')}" placeholder="AUTOESCOLA o +34612345678" style="width:100%;padding:11px 12px;background:#0e1a2e;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:14px;font-weight:700;letter-spacing:1px;box-sizing:border-box" maxlength="15">
+            <div id="twFromHelp" style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.5">${isCA?'Pots posar <b style="color:#86efac">el nom del centre</b> (recomanat · gratis) o un <b>número</b> que hagis comprat a Twilio.':'Puedes poner <b style="color:#86efac">el nombre del centro</b> (recomendado · gratis) o un <b>número</b> que hayas comprado en Twilio.'}</div>
+            <!-- 🔭 Preview en vivo de cómo el paciente verá el SMS -->
+            <div id="twFromPreview" style="margin-top:10px;padding:10px 12px;background:#0b1121;border:1px dashed #334155;border-radius:8px;display:none">
+              <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${isCA?'Com ho veurà el pacient':'Cómo lo verá el paciente'} 📱</div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="width:28px;height:28px;background:#1e293b;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px">💬</div>
+                <div>
+                  <div style="font-weight:700;color:#e2e8f0;font-size:13px" id="twFromPreviewName">—</div>
+                  <div style="font-size:11px;color:#94a3b8" id="twFromPreviewMsg">${isCA?'Benvolgut/da, recordi la seva cita demà a les 10:00.':'Estimado/a, recuerde su cita mañana a las 10:00.'}</div>
+                </div>
+              </div>
+            </div>
           </label>
+          <!-- 💾 Autosave indicator -->
+          <div id="twAutoSave" style="font-size:11px;color:#64748b;text-align:right;min-height:16px"></div>
         </div>
         <div style="display:flex;gap:8px;justify-content:space-between;margin-top:18px;flex-wrap:wrap">
           <button id="twCfgDel" data-testid="twilio-cfg-del" style="background:#7f1d1d;color:#fecaca;border:1px solid #b91c1c;padding:9px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">🗑 ${isCA?'Eliminar':'Eliminar'}</button>
@@ -13183,6 +13215,95 @@ async function openTwilioCfgModal(){
     token: (document.getElementById('twToken')||{}).value?.trim() || '',
     from: (document.getElementById('twFrom')||{}).value?.trim() || '',
   });
+
+  // 🎯 Feb 2026 · Detección en vivo del tipo de remitente + preview + autosave
+  function detectFromType(v){
+    const s = String(v||'').trim();
+    if(!s) return {type:'empty'};
+    // Número E.164 (+34612345678)
+    if(/^\+\d{8,15}$/.test(s)) return {type:'phone', ok:true};
+    if(/^\d{8,15}$/.test(s)) return {type:'phone_nopl', ok:false, msg:(isCA?'Falta el "+" inicial (ex: +34612345678)':'Falta el "+" inicial (ej: +34612345678)')};
+    // Alphanumeric Sender: hasta 11 chars, letras/números/espacios (sin acentos ni símbolos)
+    if(/^[A-Za-z0-9 ]{1,11}$/.test(s)) return {type:'alpha', ok:true};
+    if(/^[A-Za-z0-9 ]{12,}$/.test(s)) return {type:'alpha_long', ok:false, msg:(isCA?'Massa llarg · màxim 11 caràcters':'Demasiado largo · máximo 11 caracteres')};
+    return {type:'invalid', ok:false, msg:(isCA?'Només lletres, números i espais (sense accents ni símbols)':'Solo letras, números y espacios (sin acentos ni símbolos)')};
+  }
+  function refreshFromUI(){
+    const fromInp = document.getElementById('twFrom'); if(!fromInp) return;
+    const badge = document.getElementById('twFromBadge');
+    const help = document.getElementById('twFromHelp');
+    const prev = document.getElementById('twFromPreview');
+    const prevName = document.getElementById('twFromPreviewName');
+    const info = detectFromType(fromInp.value);
+    if(info.type==='empty'){
+      if(badge){ badge.textContent=''; badge.style.background='#1e293b'; badge.style.color='#94a3b8'; }
+      if(prev) prev.style.display='none';
+      fromInp.style.borderColor = '#334155';
+      return;
+    }
+    if(info.type==='alpha' && info.ok){
+      if(badge){ badge.textContent=(isCA?'✓ Nom del centre':'✓ Nombre del centro'); badge.style.background='#064e3b'; badge.style.color='#86efac'; }
+      fromInp.style.borderColor = '#22c55e';
+      if(prev){ prev.style.display='block'; if(prevName) prevName.textContent = fromInp.value.toUpperCase(); }
+    } else if(info.type==='phone' && info.ok){
+      if(badge){ badge.textContent=(isCA?'✓ Número Twilio':'✓ Número Twilio'); badge.style.background='#1e3a5f'; badge.style.color='#86b6ff'; }
+      fromInp.style.borderColor = '#5aa9ff';
+      if(prev){ prev.style.display='block'; if(prevName) prevName.textContent = fromInp.value; }
+    } else {
+      if(badge){ badge.textContent=(isCA?'⚠ Format incorrecte':'⚠ Formato incorrecto'); badge.style.background='#7f1d1d'; badge.style.color='#fecaca'; }
+      fromInp.style.borderColor = '#ef4444';
+      if(prev) prev.style.display='none';
+      if(help && info.msg) help.innerHTML = '<span style="color:#fca5a5">⚠ '+info.msg+'</span>';
+    }
+  }
+  // Botón "Usar nombre del centro" → autocompleta el From con el nombre sanitizado
+  const useCentreBtn = document.getElementById('twFromUseCentre');
+  if(useCentreBtn){
+    useCentreBtn.onclick = () => {
+      let centre = '';
+      try{
+        const lic = JSON.parse(localStorage.getItem('caja.license.v1')||'{}');
+        centre = String(lic.centre || lic.client_name || '').trim();
+      }catch(_){}
+      if(!centre){
+        try{ const cfg = JSON.parse(localStorage.getItem('caja.config.v1')||'{}'); centre = String(cfg.empresa||cfg.centre||'').trim(); }catch(_){}
+      }
+      // Sanitiza: quita acentos, símbolos, espacios dobles; corta a 11
+      const san = centre.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .replace(/[^A-Za-z0-9 ]/g,'').replace(/\s+/g,'').slice(0,11).toUpperCase();
+      const fromInp = document.getElementById('twFrom');
+      if(fromInp){ fromInp.value = san || 'MIENTRE'; fromInp.dispatchEvent(new Event('input',{bubbles:true})); fromInp.focus(); }
+    };
+  }
+  // Autosave con debounce 800 ms: cuando los 3 campos están rellenos, guarda solo
+  let _autoSaveTimer = null;
+  function scheduleAutoSave(){
+    const ind = document.getElementById('twAutoSave');
+    const {sid, token, from} = getBYOAVals();
+    if(!sid || !token || !from){
+      if(ind) ind.textContent = '';
+      return;
+    }
+    const info = detectFromType(from);
+    if(!(info.ok)){
+      if(ind) ind.innerHTML = '<span style="color:#fca5a5">⚠ ' + (isCA?'Revisa el remitent':'Revisa el remitente') + '</span>';
+      return;
+    }
+    if(ind) ind.innerHTML = '<span style="color:#64748b">⏳ ' + (isCA?'Desant…':'Guardando…') + '</span>';
+    clearTimeout(_autoSaveTimer);
+    _autoSaveTimer = setTimeout(()=>{
+      saveTwilioCreds(sid, token, from);
+      setTwilioMode('byoa');
+      if(ind) ind.innerHTML = '<span style="color:#86efac">✅ ' + (isCA?'Desat automàticament':'Guardado automáticamente') + '</span>';
+    }, 800);
+  }
+  ['twSid','twToken','twFrom'].forEach(id => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('input', () => { if(id==='twFrom') refreshFromUI(); scheduleAutoSave(); });
+  });
+  // UI inicial del From si ya hay valor
+  refreshFromUI();
   const twDel = document.getElementById('twCfgDel');
   if(twDel){
     twDel.onclick=()=>{
