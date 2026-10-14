@@ -13926,7 +13926,11 @@ function openSmsModal(){
                      : (r.twilio_source==='medicar' ? (isCA?'compte MediCar Cloud (facturat amb la subscripció)':'cuenta MediCar Cloud (facturado con la suscripción)')
                      : (r.twilio_source==='env' ? (isCA?'compte administrador':'cuenta administrador')
                      : (isCA?'simulació (mode prova)':'simulación (modo prueba)')));
-        alert((isCA?'✅ Campanya creada\n\nEnviats: ':'✅ Campaña creada\n\nEnviados: ')+r.sent_count+'\n'+(isCA?'Errors: ':'Errores: ')+r.error_count+'\n'+(isCA?'Sense mòbil: ':'Sin móvil: ')+r.filtered_invalid+'\n\nMode: '+r.twilio_mode.toUpperCase()+' · '+srcTxt);
+        alert((isCA?'✅ Campanya creada\n\nEnviats: ':'✅ Campaña creada\n\nEnviados: ')+r.sent_count+'\n'+(isCA?'Errors: ':'Errores: ')+r.error_count+'\n'+(isCA?'Sense mòbil: ':'Sin móvil: ')+r.filtered_invalid+'\n\nMode: '+r.twilio_mode.toUpperCase()+' · '+srcTxt+(
+          (r.errors_sample && r.errors_sample.length)
+            ? '\n\n'+(isCA?'⚠️ Detall dels errors:':'⚠️ Detalle de los errores:')+'\n'+r.errors_sample.map(e=>`• ${e.name} (${e.mobile}): ${e.detail||'desconocido'}`).join('\n')
+            : ''
+        ));
         renderSmsList();
       }catch(e){
         alert('Error: '+e.message);

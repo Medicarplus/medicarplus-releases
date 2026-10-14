@@ -191,14 +191,33 @@ def _send_sms(
     try:
         from twilio.rest import Client  # type: ignore
         client = Client(sid, token)
+        # 🔧 Feb 2026 · Sanitización E.164 robusta
+        #   El móvil puede venir como "612345678" / "+34612345678" / "34 612 345 678" /
+        #   "612-345-678". Normalizamos siempre a "+34XXXXXXXXX" (España) sin que se
+        #   duplique el prefijo. Si el número ya trae otro código internacional (+33,
+        #   +44, +376, +351…) lo respetamos tal cual.
+        raw = (mobile or "").strip()
+        # Deja solo dígitos y '+' inicial
+        if raw.startswith("+"):
+            digits = "+" + "".join(ch for ch in raw[1:] if ch.isdigit())
+            to_number = digits
+        else:
+            digits = "".join(ch for ch in raw if ch.isdigit())
+            # Quita 00 inicial (notación internacional alternativa 0034 → 34)
+            if digits.startswith("00"): digits = digits[2:]
+            # Si ya empieza por 34 y tiene 11 dígitos (ES completo), añade "+"
+            if digits.startswith("34") and len(digits) == 11:
+                to_number = "+" + digits
+            else:
+                to_number = "+34" + digits
         msg = client.messages.create(
-            to=f"+34{mobile}",
+            to=to_number,
             from_=from_num,
             body=message,
         )
         return True, f"sid:{msg.sid}", source
     except Exception as e:
-        return False, f"error:{str(e)[:200]}", source
+        return False, f"error:{str(e)[:300]}", source
 
 
 def build_router(db):
@@ -566,6 +585,18 @@ def build_router(db):
             "status": status,
             "twilio_mode": "real" if used_twilio_real else "mock",
             "twilio_source": source_final,
+            # 🔧 Feb 2026 · Muestra de errores para que el usuario sepa qué pasó
+            #   (antes solo veía "Errores: 1" sin motivo). Enseñamos hasta 5
+            #   contactos con el error real devuelto por Twilio.
+            "errors_sample": [
+                {
+                    "name": f'{c.get("name","")} {c.get("surname1","")}'.strip() or c.get("mobile",""),
+                    "mobile": c.get("mobile",""),
+                    "detail": (c.get("detail") or "").replace("error:", "").strip(),
+                }
+                for c in processed_contacts
+                if c.get("sent") is False and (c.get("detail") or "").startswith("error:")
+            ][:5],
         }
 
     @router.get("/campaigns")
