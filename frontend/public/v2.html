@@ -13093,8 +13093,8 @@ async function openTwilioCfgModal(){
     <div style="background:linear-gradient(135deg,#0f172a,#0a0f1a);border:1px solid #334155;border-radius:14px;max-width:680px;width:100%;max-height:92vh;overflow:auto;padding:26px;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;box-shadow:0 25px 60px rgba(0,0,0,.7)">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
         <div>
-          <h3 style="margin:0;font-size:19px;color:#22c55e;letter-spacing:.3px">⚙️ ${isCA?'Configurar SMS':'Configurar SMS'} (Twilio)</h3>
-          <div style="font-size:12px;color:#94a3b8;margin-top:4px">${isCA?'Tria com vols enviar SMS als teus pacients.':'Elige cómo quieres enviar SMS a tus pacientes.'}</div>
+          <h3 style="margin:0;font-size:19px;color:#22c55e;letter-spacing:.3px">⚙️ ${isCA?'Configurar plataforma SMS':'Configurar plataforma SMS'}</h3>
+          <div style="font-size:12px;color:#94a3b8;margin-top:4px">${isCA?'Tria la plataforma i configura-la per enviar SMS als teus pacients.':'Elige la plataforma y configúrala para enviar SMS a tus pacientes.'}</div>
         </div>
         <button id="twCfgClose" style="background:transparent;border:1px solid #475569;color:#cbd5e1;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:13px">✕</button>
       </div>
@@ -13549,7 +13549,7 @@ function openSmsModal(){
       <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #334155;background:linear-gradient(135deg,#052e16,#0f172a)">
         <h3 style="margin:0;font-size:20px;color:#22c55e;letter-spacing:.5px">${T.title}</h3>
         <div style="display:flex;gap:8px;align-items:center">
-          <button id="smsBtnTwilioCfg" data-testid="btn-sms-twilio-cfg" style="background:#1e293b;border:1px solid #475569;color:#cbd5e1;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600" title="${isCA?'Configurar el teu compte Twilio':'Configurar tu cuenta Twilio'}">⚙️ Twilio</button>
+          <button id="smsBtnTwilioCfg" data-testid="btn-sms-twilio-cfg" style="background:#1e293b;border:1px solid #475569;color:#cbd5e1;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600" title="${isCA?'Configurar la plataforma d\\'enviament SMS':'Configurar la plataforma de envío de SMS'}">⚙️ ${isCA?'Plataforma SMS':'Plataforma SMS'}</button>
           <button id="smsBtnStats" style="background:#1e293b;border:1px solid #475569;color:#cbd5e1;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">${T.stats}</button>
           <button id="smsBtnNew" style="background:linear-gradient(135deg,#059669,#10b981);border:none;color:#fff;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700" data-testid="btn-sms-new">${T.newCamp}</button>
           <button id="smsClose" style="background:transparent;border:1px solid #475569;color:#cbd5e1;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:13px">${T.close} ✕</button>
@@ -14034,7 +14034,7 @@ function openSmsModal(){
         if(!(lab.token||'').trim()) miss.push('API Token');
         if(!(lab.sender||'').trim()) miss.push(isCA?'Remitent':'Remitente');
         if(miss.length){
-          alert((isCA?'⚠️ Falten dades de LabsMobile\n\nFalta configurar:\n• ':'⚠️ Faltan datos de LabsMobile\n\nFalta configurar:\n• ')+miss.join('\n• ')+(isCA?'\n\nObre "⚙️ Twilio" i canvia a la pestanya 🇪🇸 LabsMobile per completar-ho.':'\n\nAbre "⚙️ Twilio" y cambia a la pestaña 🇪🇸 LabsMobile para completarlo.'));
+          alert((isCA?'⚠️ Falten dades de LabsMobile\n\nFalta configurar:\n• ':'⚠️ Faltan datos de LabsMobile\n\nFalta configurar:\n• ')+miss.join('\n• ')+(isCA?'\n\nObre "⚙️ Plataforma SMS" i canvia a la pestanya 🇪🇸 LabsMobile per completar-ho.':'\n\nAbre "⚙️ Plataforma SMS" y cambia a la pestaña 🇪🇸 LabsMobile para completarlo.'));
           try{ const tw = document.querySelector('[data-testid="sms-twilio-btn"], #btnTwilioCfg'); if(tw) tw.click(); }catch(_){}
           return;
         }
@@ -14052,8 +14052,8 @@ function openSmsModal(){
               : '⚠️ Faltan datos de tu Twilio\n\nFalta configurar:\n• ')
               + miss.join('\n• ')
               + (isCA
-                ? '\n\nObre "⚙️ Twilio" i omple els 3 camps. El "Remitent" és el nom del teu centre (ex: CEMPLA). Sense això, Twilio rebutja tots els SMS amb l\'error "A From phone number is required".'
-                : '\n\nAbre "⚙️ Twilio" y rellena los 3 campos. El "Remitente" es el nombre de tu centro (ej: CEMPLA). Sin eso, Twilio rechaza todos los SMS con el error "A From phone number is required".'));
+                ? '\n\nObre "⚙️ Plataforma SMS" i omple els 3 camps. El "Remitent" és el nom del teu centre (ex: CEMPLA). Sense això, Twilio rebutja tots els SMS amb l\'error "A From phone number is required".'
+                : '\n\nAbre "⚙️ Plataforma SMS" y rellena los 3 campos. El "Remitente" es el nombre de tu centro (ej: CEMPLA). Sin eso, Twilio rechaza todos los SMS con el error "A From phone number is required".'));
             try{ const tw = document.querySelector('[data-testid="sms-twilio-btn"], #btnTwilioCfg'); if(tw) tw.click(); }catch(_){}
             return;
           }
@@ -14085,7 +14085,7 @@ function openSmsModal(){
           if(mode === 'medicar' && isTwilioMedicarEligible()){
             const sender = sanitizeAlphaSender(getMedicarSender());
             if(!sender){
-              alert(isCA?'⚠️ Falta configurar el nom del remitent al mode MediCar Cloud. Obre "⚙️ Twilio" i configura\'l.':'⚠️ Falta configurar el nombre del remitente en el modo MediCar Cloud. Abre "⚙️ Twilio" y configúralo.');
+              alert(isCA?'⚠️ Falta configurar el nom del remitent al mode MediCar Cloud. Obre "⚙️ Plataforma SMS" i configura\'l.':'⚠️ Falta configurar el nombre del remitente en el modo MediCar Cloud. Abre "⚙️ Plataforma SMS" y configúralo.');
               return;
             }
             payload.use_medicar = true;
