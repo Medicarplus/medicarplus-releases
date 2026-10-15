@@ -558,6 +558,94 @@
   async function getPendingBackup(){
     return await _get(`/api/sync/backup/pending?license_key=${encodeURIComponent(cfg.licenseKey)}&install_id=${encodeURIComponent(cfg.installId)}`);
   }
+  // 🛡 Feb 2026 · Helpers de reconciliación automática de la Reserva de cambio al RECIBIR copia.
+  //   Garantiza que, si la reserva ha subido/bajado entre el envío del PC emisor y la recepción
+  //   del PC receptor, los asientos de traspaso dated expliquen SIEMPRE la diferencia. Si no la
+  //   explican (p.ej. porque el emisor editó monedas sin crear asiento), se genera un asiento de
+  //   ajuste con fecha de la copia desde Banco (default seguro) para que la fórmula FORWARD cuadre
+  //   día a día SIN tocar ni un céntimo de la contabilidad.
+  function _reserveSum(o){
+    if(!o || typeof o !== 'object') return 0;
+    let s = 0;
+    for(const k of Object.keys(o)){
+      if(k && k.startsWith('_')) continue;
+      const v = Number(o[k]);
+      if(isFinite(v)) s += v;
+    }
+    s += +(o && o._bulk) || 0;
+    return +s.toFixed(2);
+  }
+  function _reserveTotalFromKey(key){
+    try{ return _reserveSum(JSON.parse(localStorage.getItem(key) || '{}')); }catch(e){ return 0; }
+  }
+  function _reserveTotalFromMerged(merged, key){ return _reserveSum((merged||{})[key] || {}); }
+  function _findCopyDay(merged, dataKey){
+    const bd = (merged && merged[dataKey] && merged[dataKey].byDate) || {};
+    const days = Object.keys(bd).sort();
+    return days.length ? days[days.length - 1] : null;
+  }
+  function _netTransferForDay(merged, dataKey, day){
+    const arr = ((merged && merged[dataKey] && merged[dataKey].byDate) || {})[day] || [];
+    let net = 0;
+    for(const e of arr){
+      if(!e || e.kind !== 'DH' || !e._internal) continue;
+      const amt = +e.importe || 0;
+      if(e._transferDir === 'caja_to_reserva') net += amt;
+      else if(e._transferDir === 'banco_to_reserva') net += amt;
+      else if(e._transferDir === 'reserva_to_caja') net -= amt;
+    }
+    return +net.toFixed(2);
+  }
+  function _buildReconcileAsiento(amount, source){
+    const positive = amount > 0;
+    const dir = positive ? (source === 'caja' ? 'caja_to_reserva' : 'banco_to_reserva') : 'reserva_to_caja';
+    const abs = +Math.abs(amount).toFixed(2);
+    return {
+      id: 'rec_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+      kind: 'DH',
+      tipo: positive ? 'DEBE' : 'HABER',
+      grupo: 'Reserva de cambio',
+      nombre: '🔄 Ajuste automático sincronización',
+      importe: abs,
+      fp: source === 'caja' ? 'E' : 'B',
+      _internal: true,
+      _transferDir: dir,
+      _reconcile: true,
+      ts: Date.now()
+    };
+  }
+  function _reconcileReserveTransfers(merged, resBefore){
+    const pairs = [
+      { res: 'caja.reserva.v1', data: 'caja.v1', label: 'trafic' },
+      { res: 'caja.cempla.reserva.v1', data: 'caja.cempla.v1', label: 'cempla' }
+    ];
+    const generated = [];
+    for(const p of pairs){
+      const after = _reserveTotalFromMerged(merged, p.res);
+      const before = +(resBefore[p.res] || 0);
+      const delta = +(after - before).toFixed(2);
+      if(Math.abs(delta) < 0.01) continue;
+      const day = _findCopyDay(merged, p.data);
+      if(!day) continue;
+      // Diferencia de asientos dated del día entre lo que había antes y lo mergeado
+      const localArr = (() => { try{ const d = JSON.parse(localStorage.getItem(p.data) || '{}'); return (d.byDate||{})[day] || []; }catch(e){ return []; } })();
+      const localNet = (() => { let n=0; for(const e of localArr){ if(!e||e.kind!=='DH'||!e._internal) continue; const amt=+e.importe||0; if(e._transferDir==='caja_to_reserva')n+=amt; else if(e._transferDir==='banco_to_reserva')n+=amt; else if(e._transferDir==='reserva_to_caja')n-=amt; } return +n.toFixed(2); })();
+      const mergedNet = _netTransferForDay(merged, p.data, day);
+      const newAsientoDelta = +(mergedNet - localNet).toFixed(2);  // transferencias NUEVAS que entraron por sync
+      const unexplained = +(delta - newAsientoDelta).toFixed(2);
+      if(Math.abs(unexplained) < 0.01) continue;  // ya cuadra solo con los asientos que llegaron
+      const asiento = _buildReconcileAsiento(unexplained, 'banco');
+      if(!merged[p.data]) merged[p.data] = { byDate: {} };
+      if(!merged[p.data].byDate) merged[p.data].byDate = {};
+      if(!merged[p.data].byDate[day]) merged[p.data].byDate[day] = [];
+      merged[p.data].byDate[day].push(asiento);
+      generated.push({ company: p.label, day, amount: unexplained });
+      try{ console.info('[mcSync] 🔄 Ajuste auto reserva ' + p.label + ' día ' + day + ': ' + (unexplained>=0?'+':'') + unexplained + '€ desde Banco'); }catch(e){}
+    }
+    // Expone el resultado para que la UI avise al usuario tras aplicar
+    try{ if(generated.length) localStorage.setItem('caja.sync.lastReconcile.v1', JSON.stringify({ at: Date.now(), items: generated })); }catch(e){}
+    return generated;
+  }
   async function applyBackup(backupData, opts){
     // 🔑 Feb 2026 · opts.fullRestore=true → NO filtra claves locales (saldoInicial, irpf,
     //   cuadre.overrides). Se usa cuando la copia viene del ADMIN como rescate completo
