@@ -5128,8 +5128,25 @@ function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(
   const bbvaC=(autoT_C+delta_C+dfExcess_C)+(t.byFp.B||0)+(t.byFp.X||0)+saCC.banc+(t.internalBanco||0);
   const cajaCB=(efShownCB-delta_CB)+saCC.caja+resCambio+(t.internalCaja||0);
   const bbvaCB=(autoT_CB+delta_CB+dfExcess_CB)+((t.byFp.B||0)+(t.tasasByFp.B||0))+((t.byFp.X||0)+(t.tasasByFp.X||0))+saCC.banc+(t.internalBanco||0);
+  // 🛡 Feb 2026 · VISTA FÍSICA EN TIEMPO REAL (independiente del día que se visualice).
+  //   Las filas "Caja física (sin cajón)", "Reserva de cambio" y "CAJA FÍSICA TOTAL" deben
+  //   reflejar el ESTADO FÍSICO ACTUAL del cajón — no cambian al navegar días pasados/futuros.
+  //   Se recalculan en vivo con cada movimiento del día de HOY (real), igual que la Reserva.
+  //   El "Saldo Anterior" de arriba sigue siendo día-por-día (cálculo histórico).
+  const _todayISO = (()=>{ try{ const d=new Date(); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }catch(_){ return currentDate; } })();
+  const _liveSaCC = saldoAnteriorPorCuenta(_todayISO);
+  const _liveT = computeTotals(entriesOf(_todayISO));
+  const _liveEfDay = isC ? (_liveT.byFp.E||0) : ((_liveT.byFp.E||0)+(_liveT.tasasByFp.E||0));
+  const _liveAutoT = isC ? (_liveT.byFp.T||0) : ((_liveT.byFp.T||0)+(_liveT.tasasByFp.T||0));
+  let _liveDfMap={};try{_liveDfMap=JSON.parse(localStorage.getItem(dfKey())||'{}')}catch(e){}
+  const _liveDf = parseFloat(_liveDfMap[_todayISO]||0);
+  const _liveRawDelta = _liveDf>0 ? (_liveDf - _liveAutoT) : 0;
+  const _liveDelta = _liveRawDelta>0 ? Math.min(_liveRawDelta, _liveEfDay) : _liveRawDelta;
+  const cajaLiveSinCambio = (_liveEfDay - _liveDelta) + _liveSaCC.caja + (_liveT.internalCaja||0);
+  const reservaLive = (typeof reservaCambio==='function') ? reservaCambio() : resCambio;
+  const cajaLiveTotal = cajaLiveSinCambio + reservaLive;
   const datafonoHTML='';
-  $('#sumBox').innerHTML=isC?`${datafonoHTML}<div class="row" data-revisiones-detail="1" style="cursor:pointer" title="${L('Clica per veure el detall de les revisions','Clic para ver el detalle de las revisiones')}"><span style="text-decoration:underline dotted;text-decoration-color:#7a8394">Revisiones <span style="color:#7a8394;font-size:10px">▸ ${L('detall','detalle')}</span></span><b>${t.cnt-t.retornos}${t.retornos?` (${t.retornos} anulada)`:''}</b></div><div class="row"><span>Total revisiones</span><b class="num">${fmt(t.bruto)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row"><span>💵 Efectivo</span><b class="num" data-testid="efectivo-neto-c">${fmt(efIn_C-deltaDisp_C)}</b></div><div class="row"><span>💳 Tarjeta <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><div style="display:flex;gap:4px;align-items:center;justify-content:flex-end"><span data-datafono-info="1" title="Info datáfono manual" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#2a3040;color:#86b6ff;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #86b6ff;user-select:none">?</span><input type="number" step="0.01" id="datafono-inp" value="${df||''}" placeholder="manual" title="Introduce manualmente el total del datáfono (anula el automático)" style="width:70px;background:#0e1117;color:#86b6ff;border:1px solid #2a3040;border-radius:4px;padding:2px 4px;font-size:11px;text-align:right" /><button id="datafono-save" title="Guardar" style="background:#3ddc97;color:#0f1115;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px">✓</button><b class="num" ${df?'style="color:#86b6ff"':''}>${fmt(trTarShown_C)}</b></div></div><div class="row"><span>📱 Bizum <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(bizIn_C)}</b></div><div class="row"><span>🏦 Transferencia <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(trIn_C)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(126,227,170,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97;display:none"><span style="color:#7ee3aa;font-weight:700">↗ TOTAL HABER</span><b class="num big" style="color:#7ee3aa">+${fmt(haberTotalC)}</b></div><div class="row wide" style="background:rgba(255,150,160,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #ff5d6c;display:none"><span style="color:#ff96a0;font-weight:700">↘ TOTAL DEBE</span><b class="num big" style="color:#ff96a0">-${fmt(debeTotalC)}</b></div><div style="grid-column:span 2;margin:10px -16px 10px -16px;padding:16px 18px;background:linear-gradient(90deg,rgba(126,227,170,.18) 0%,rgba(126,227,170,.05) 100%);border-left:4px solid #3ddc97;border-radius:8px;display:flex;justify-content:space-between;align-items:center" data-testid="total-dia-cempla"><span style="color:#7ee3aa;font-weight:800;font-size:15px;letter-spacing:.5px">💰 TOTAL DÍA</span><span class="num" style="color:#7ee3aa;font-weight:800;font-size:22px">${fmt(t.neto)}</span></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(61,220,151,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97"><span style="color:#7ee3aa;font-weight:600">🟢 ${L('CAIXA FÍSICA','CAJA FÍSICA')}</span><b class="num big" style="color:#7ee3aa">${fmt(cajaC)}</b></div><div class="row wide" style="background:rgba(134,182,255,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #5aa9ff"><span style="color:#86b6ff;font-weight:600">🔵 CUENTA BANCO</span><b class="num big" style="color:#86b6ff">${fmt(bbvaC)}</b></div><div class="row total"><span>TOTAL <span style="color:#7a8394;font-size:10px;font-weight:400">(caja física + banco)</span></span><span class="num" data-testid="total-caja-banco-c">${fmt(cajaC+bbvaC)}</span></div>`:`${datafonoHTML}<div class="row"><span>Entradas Tráfico</span><b>${t.cntDGT} ${t.retornos?`(${t.retornos} retorno)`:''}</b></div><div class="row"><span>Total Certificados Tráfico</span><b class="num">${fmt(t.brutoDGT)}</b></div><div class="row"><span>Descuentos</span><b class="num">-${fmt(t.dto)}</b></div><div class="row"><span>Tasas DGT ${(()=>{const bk=t.tasasBreakdown||{};const keys=Object.keys(bk).sort((a,b)=>+b-+a);if(keys.length===0)return '';const parts=keys.map(k=>{const cnt=bk[k];const price=+k;const sub=cnt*price;return `<span style="white-space:nowrap">${cnt}×${price.toFixed(2).replace('.',',')} = <b style="color:#7ee3aa">${sub.toFixed(2).replace('.',',')}</b></span>`});return `<div style="color:#94a3b8;font-size:10px;font-weight:400;margin-top:4px;line-height:1.6;font-family:'Consolas',monospace">${parts.join(' · ')}</div>`;})()}</span><b class="num">${fmt(t.tasasDGT)}</b></div><div style="grid-column:span 2;margin:10px -16px 4px -16px;padding:12px 16px;background:linear-gradient(90deg,rgba(var(--tint),.14) 0%,rgba(var(--tint),.04) 100%);border-left:3px solid rgb(var(--tint));border-radius:6px;display:flex;justify-content:space-between;align-items:center"><span style="color:rgb(var(--tint));font-weight:700;font-size:13px">💰 TOTAL TRÁFICO</span><span class="num" style="color:var(--accent-2);font-weight:700;font-size:17px">${fmt(t.brutoDGT+t.tasasDGT)}</span></div>${t.cntOtros>0||t.haber>0||t.refundsCount>0?`<div class="row" data-otros-detail="1" style="cursor:pointer" title="${L('Clica per veure el detall dels serveis','Clic para ver el detalle de los servicios')}"><span style="text-decoration:underline dotted;text-decoration-color:#7a8394">Otros servicios (${t.cntOtros}) <span style="color:#7a8394;font-size:10px">▸ detall</span></span><b class="num">${fmt(t.brutoOtros)}</b></div>${t.haber>0?`<div class="row"><span>Ingresos manuales</span><b class="num">${fmt(t.haber)}</b></div>`:''}${t.refundsCount>0?`<div class="row" style="background:rgba(217,119,6,.1);padding:6px 10px;border-radius:6px;border-left:3px solid #d97706"><span style="color:#fbbf24;font-weight:700">↩ Devoluciones tasas (${t.refundsCount})</span><b class="num" style="color:#fbbf24">-${fmt(t.refundsTotal)}</b></div>`:''}`:''}<div style="grid-column:span 2;margin:2px -16px 8px -16px;padding:12px 16px;background:linear-gradient(90deg,rgba(126,227,170,.14) 0%,rgba(126,227,170,.04) 100%);border-left:4px solid #3ddc97;border-radius:6px;display:flex;justify-content:space-between;align-items:center"><span style="color:#7ee3aa;font-weight:700;font-size:13px">🧾 TOTAL COBRADO</span><span class="num" style="color:#7ee3aa;font-weight:700;font-size:17px">${fmt(t.bruto+t.tasas+t.haber)}</span></div><div class="row"><span>💵 Efectivo</span><b class="num" data-testid="efectivo-neto-cb">${fmt(efIn_CB-deltaDisp_CB)}</b></div><div class="row"><span>💳 Tarjeta <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><div style="display:flex;gap:4px;align-items:center;justify-content:flex-end"><span data-datafono-info="1" title="Info datáfono manual" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#2a3040;color:#7ee3aa;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #7ee3aa;user-select:none">?</span><input type="number" step="0.01" id="datafono-inp" value="${df||''}" placeholder="manual" title="Introduce manualmente el total del datáfono (anula el automático)" style="width:70px;background:#0e1117;color:#7ee3aa;border:1px solid #2a3040;border-radius:4px;padding:2px 4px;font-size:11px;text-align:right" /><button id="datafono-save" title="Guardar" style="background:#3ddc97;color:#0f1115;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px">✓</button><b class="num" ${df?'style="color:#7ee3aa"':''}>${fmt(trTarShown_CB)}</b></div></div><div class="row"><span>📱 Bizum <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(bizIn_CB)}</b></div><div class="row"><span>🏦 Transferencia <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(trIn_CB)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(126,227,170,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97;display:none"><span style="color:#7ee3aa;font-weight:700">↗ TOTAL HABER</span><b class="num big" style="color:#7ee3aa">+${fmt(haberTotalCB)}</b></div><div class="row wide" style="background:rgba(255,150,160,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #ff5d6c;display:none"><span style="color:#ff96a0;font-weight:700">↘ TOTAL DEBE</span><b class="num big" style="color:#ff96a0">-${fmt(debeTotalCB)}</b></div><div class="row"><span>🟢 Caja física <span style="color:#7a8394;font-size:10px">(sin cajón de cambio)</span> <span class="tt" data-tt="Efectivo en la caja: saldo del día anterior sin incluir el cajón de reserva de cambio.">?</span></span><b class="num" data-testid="saldo-ant-solo-caja">${fmt(saCC.caja)}</b></div><div class="row"><span>💰 Reserva de cambio <span style="color:#7a8394;font-size:10px">(cajón)</span> <span class="tt" data-tt="Dinero físico guardado en el cajón de cambio: billetes y monedas destinados a dar cambio a los clientes.">?</span></span><b class="num" data-testid="reserva-cambio-display">${fmt(resCambio)}</b></div><div style="grid-column:span 2;margin:4px -8px;padding:0;display:none" data-testid="saldo-ant-caja-cambio-wrapper"><b data-testid="saldo-ant-caja-cambio" style="display:none">${fmt(saCC.caja+resCambio)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(61,220,151,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97"><span style="color:#7ee3aa;font-weight:600">🟢 ${L('CAIXA FÍSICA TOTAL','CAJA FÍSICA TOTAL')} <span style="color:#7a8394;font-size:10px;font-weight:400">(caja + cambio)</span></span><b class="num big" style="color:#7ee3aa">${fmt(cajaCB)}</b></div><div class="row wide" style="background:rgba(134,182,255,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #5aa9ff"><span style="color:#86b6ff;font-weight:600">🔵 CUENTA BANCO</span><b class="num big" style="color:#86b6ff">${fmt(bbvaCB)}</b></div><div class="row total"><span>TOTAL <span style="color:#7a8394;font-size:10px;font-weight:400">(caja física con reserva + banco)</span></span><span class="num" data-testid="total-caja-banco">${fmt(cajaCB+bbvaCB)}</span></div>`;
+  $('#sumBox').innerHTML=isC?`${datafonoHTML}<div class="row" data-revisiones-detail="1" style="cursor:pointer" title="${L('Clica per veure el detall de les revisions','Clic para ver el detalle de las revisiones')}"><span style="text-decoration:underline dotted;text-decoration-color:#7a8394">Revisiones <span style="color:#7a8394;font-size:10px">▸ ${L('detall','detalle')}</span></span><b>${t.cnt-t.retornos}${t.retornos?` (${t.retornos} anulada)`:''}</b></div><div class="row"><span>Total revisiones</span><b class="num">${fmt(t.bruto)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row"><span>💵 Efectivo</span><b class="num" data-testid="efectivo-neto-c">${fmt(efIn_C-deltaDisp_C)}</b></div><div class="row"><span>💳 Tarjeta <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><div style="display:flex;gap:4px;align-items:center;justify-content:flex-end"><span data-datafono-info="1" title="Info datáfono manual" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#2a3040;color:#86b6ff;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #86b6ff;user-select:none">?</span><input type="number" step="0.01" id="datafono-inp" value="${df||''}" placeholder="manual" title="Introduce manualmente el total del datáfono (anula el automático)" style="width:70px;background:#0e1117;color:#86b6ff;border:1px solid #2a3040;border-radius:4px;padding:2px 4px;font-size:11px;text-align:right" /><button id="datafono-save" title="Guardar" style="background:#3ddc97;color:#0f1115;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px">✓</button><b class="num" ${df?'style="color:#86b6ff"':''}>${fmt(trTarShown_C)}</b></div></div><div class="row"><span>📱 Bizum <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(bizIn_C)}</b></div><div class="row"><span>🏦 Transferencia <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(trIn_C)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(126,227,170,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97;display:none"><span style="color:#7ee3aa;font-weight:700">↗ TOTAL HABER</span><b class="num big" style="color:#7ee3aa">+${fmt(haberTotalC)}</b></div><div class="row wide" style="background:rgba(255,150,160,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #ff5d6c;display:none"><span style="color:#ff96a0;font-weight:700">↘ TOTAL DEBE</span><b class="num big" style="color:#ff96a0">-${fmt(debeTotalC)}</b></div><div style="grid-column:span 2;margin:10px -16px 10px -16px;padding:16px 18px;background:linear-gradient(90deg,rgba(126,227,170,.18) 0%,rgba(126,227,170,.05) 100%);border-left:4px solid #3ddc97;border-radius:8px;display:flex;justify-content:space-between;align-items:center" data-testid="total-dia-cempla"><span style="color:#7ee3aa;font-weight:800;font-size:15px;letter-spacing:.5px">💰 TOTAL DÍA</span><span class="num" style="color:#7ee3aa;font-weight:800;font-size:22px">${fmt(t.neto)}</span></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(61,220,151,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97"><span style="color:#7ee3aa;font-weight:600">🟢 ${L('CAIXA FÍSICA','CAJA FÍSICA')}</span><b class="num big" style="color:#7ee3aa">${fmt(cajaC)}</b></div><div class="row wide" style="background:rgba(134,182,255,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #5aa9ff"><span style="color:#86b6ff;font-weight:600">🔵 CUENTA BANCO</span><b class="num big" style="color:#86b6ff">${fmt(bbvaC)}</b></div><div class="row total"><span>TOTAL <span style="color:#7a8394;font-size:10px;font-weight:400">(caja física + banco)</span></span><span class="num" data-testid="total-caja-banco-c">${fmt(cajaC+bbvaC)}</span></div>`:`${datafonoHTML}<div class="row"><span>Entradas Tráfico</span><b>${t.cntDGT} ${t.retornos?`(${t.retornos} retorno)`:''}</b></div><div class="row"><span>Total Certificados Tráfico</span><b class="num">${fmt(t.brutoDGT)}</b></div><div class="row"><span>Descuentos</span><b class="num">-${fmt(t.dto)}</b></div><div class="row"><span>Tasas DGT ${(()=>{const bk=t.tasasBreakdown||{};const keys=Object.keys(bk).sort((a,b)=>+b-+a);if(keys.length===0)return '';const parts=keys.map(k=>{const cnt=bk[k];const price=+k;const sub=cnt*price;return `<span style="white-space:nowrap">${cnt}×${price.toFixed(2).replace('.',',')} = <b style="color:#7ee3aa">${sub.toFixed(2).replace('.',',')}</b></span>`});return `<div style="color:#94a3b8;font-size:10px;font-weight:400;margin-top:4px;line-height:1.6;font-family:'Consolas',monospace">${parts.join(' · ')}</div>`;})()}</span><b class="num">${fmt(t.tasasDGT)}</b></div><div style="grid-column:span 2;margin:10px -16px 4px -16px;padding:12px 16px;background:linear-gradient(90deg,rgba(var(--tint),.14) 0%,rgba(var(--tint),.04) 100%);border-left:3px solid rgb(var(--tint));border-radius:6px;display:flex;justify-content:space-between;align-items:center"><span style="color:rgb(var(--tint));font-weight:700;font-size:13px">💰 TOTAL TRÁFICO</span><span class="num" style="color:var(--accent-2);font-weight:700;font-size:17px">${fmt(t.brutoDGT+t.tasasDGT)}</span></div>${t.cntOtros>0||t.haber>0||t.refundsCount>0?`<div class="row" data-otros-detail="1" style="cursor:pointer" title="${L('Clica per veure el detall dels serveis','Clic para ver el detalle de los servicios')}"><span style="text-decoration:underline dotted;text-decoration-color:#7a8394">Otros servicios (${t.cntOtros}) <span style="color:#7a8394;font-size:10px">▸ detall</span></span><b class="num">${fmt(t.brutoOtros)}</b></div>${t.haber>0?`<div class="row"><span>Ingresos manuales</span><b class="num">${fmt(t.haber)}</b></div>`:''}${t.refundsCount>0?`<div class="row" style="background:rgba(217,119,6,.1);padding:6px 10px;border-radius:6px;border-left:3px solid #d97706"><span style="color:#fbbf24;font-weight:700">↩ Devoluciones tasas (${t.refundsCount})</span><b class="num" style="color:#fbbf24">-${fmt(t.refundsTotal)}</b></div>`:''}`:''}<div style="grid-column:span 2;margin:2px -16px 8px -16px;padding:12px 16px;background:linear-gradient(90deg,rgba(126,227,170,.14) 0%,rgba(126,227,170,.04) 100%);border-left:4px solid #3ddc97;border-radius:6px;display:flex;justify-content:space-between;align-items:center"><span style="color:#7ee3aa;font-weight:700;font-size:13px">🧾 TOTAL COBRADO</span><span class="num" style="color:#7ee3aa;font-weight:700;font-size:17px">${fmt(t.bruto+t.tasas+t.haber)}</span></div><div class="row"><span>💵 Efectivo</span><b class="num" data-testid="efectivo-neto-cb">${fmt(efIn_CB-deltaDisp_CB)}</b></div><div class="row"><span>💳 Tarjeta <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><div style="display:flex;gap:4px;align-items:center;justify-content:flex-end"><span data-datafono-info="1" title="Info datáfono manual" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#2a3040;color:#7ee3aa;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #7ee3aa;user-select:none">?</span><input type="number" step="0.01" id="datafono-inp" value="${df||''}" placeholder="manual" title="Introduce manualmente el total del datáfono (anula el automático)" style="width:70px;background:#0e1117;color:#7ee3aa;border:1px solid #2a3040;border-radius:4px;padding:2px 4px;font-size:11px;text-align:right" /><button id="datafono-save" title="Guardar" style="background:#3ddc97;color:#0f1115;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px">✓</button><b class="num" ${df?'style="color:#7ee3aa"':''}>${fmt(trTarShown_CB)}</b></div></div><div class="row"><span>📱 Bizum <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(bizIn_CB)}</b></div><div class="row"><span>🏦 Transferencia <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(trIn_CB)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(126,227,170,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97;display:none"><span style="color:#7ee3aa;font-weight:700">↗ TOTAL HABER</span><b class="num big" style="color:#7ee3aa">+${fmt(haberTotalCB)}</b></div><div class="row wide" style="background:rgba(255,150,160,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #ff5d6c;display:none"><span style="color:#ff96a0;font-weight:700">↘ TOTAL DEBE</span><b class="num big" style="color:#ff96a0">-${fmt(debeTotalCB)}</b></div><div class="row"><span>🟢 Caja física <span style="color:#7a8394;font-size:10px">(sin cajón de cambio)</span> <span class="tt" data-tt="Efectivo real que hay AHORA en la caja (en vivo, no cambia al navegar entre días), sin incluir el cajón de reserva de cambio.">?</span></span><b class="num" data-testid="saldo-ant-solo-caja">${fmt(cajaLiveSinCambio)}</b></div><div class="row"><span>💰 Reserva de cambio <span style="color:#7a8394;font-size:10px">(cajón)</span> <span class="tt" data-tt="Dinero físico que hay AHORA en el cajón de cambio: billetes y monedas destinados a dar cambio a los clientes.">?</span></span><b class="num" data-testid="reserva-cambio-display">${fmt(reservaLive)}</b></div><div style="grid-column:span 2;margin:4px -8px;padding:0;display:none" data-testid="saldo-ant-caja-cambio-wrapper"><b data-testid="saldo-ant-caja-cambio" style="display:none">${fmt(cajaLiveTotal)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(61,220,151,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97"><span style="color:#7ee3aa;font-weight:600">🟢 ${L('CAIXA FÍSICA TOTAL','CAJA FÍSICA TOTAL')} <span style="color:#7a8394;font-size:10px;font-weight:400">(caja + cambio)</span></span><b class="num big" style="color:#7ee3aa">${fmt(cajaLiveTotal)}</b></div><div class="row wide" style="background:rgba(134,182,255,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #5aa9ff"><span style="color:#86b6ff;font-weight:600">🔵 CUENTA BANCO</span><b class="num big" style="color:#86b6ff">${fmt(bbvaCB)}</b></div><div class="row total"><span>TOTAL <span style="color:#7a8394;font-size:10px;font-weight:400">(caja física con reserva + banco)</span></span><span class="num" data-testid="total-caja-banco">${fmt(cajaCB+bbvaCB)}</span></div>`;
   const sv=$('#datafono-save'),inp=$('#datafono-inp'),cl=$('#datafono-clear');if(sv)sv.onclick=()=>{setDatafono(currentDate,num(inp.value));toast(isC?'✓ Datàfon desat':'✓ Datáfono guardado');render()};if(inp)inp.onkeydown=e=>{if(e.key==='Enter'&&sv)sv.click()};if(cl)cl.onclick=()=>{setDatafono(currentDate,0);toast('🗑️ Datáfono borrado');render()}
   // Popup informatiu del datàfon manual
   const infoBtn=document.querySelector('[data-datafono-info]');
@@ -10837,6 +10854,7 @@ function openCambio(){
       <button class="btn" id="cambioAdd" data-testid="cambio-add" style="background:#166534;color:#fff;border-color:#166534;flex:1;min-width:160px;font-weight:700">➕ Añadir cambio</button>
       <button class="btn" id="cambioRemove" data-testid="cambio-remove" style="background:#7c2d12;color:#fff;border-color:#7c2d12;flex:1;min-width:160px;font-weight:700">💵 Sacar cambio (a caja)</button>
       <button class="btn" id="cambioModify" data-testid="cambio-modify" style="background:#854d0e;color:#fff;border-color:#854d0e;flex:1;min-width:160px;font-weight:700">✏️ Modificar</button>
+      <button class="btn" id="cambioDiag" data-testid="cambio-diagnostico" style="background:#1e3a8a;color:#fff;border-color:#1e3a8a;flex:1;min-width:160px;font-weight:700">🔍 Diagnóstico</button>
     </div>
   </div>`;
   document.body.appendChild(back);
@@ -10912,6 +10930,10 @@ function openCambio(){
   };
   // Nota Feb 2026: eliminado el modo 'return' (devolver a reserva desde caja).
   //   Ahora la lógica es simple: para mover dinero DE CAJA A RESERVA se usa "➕ Añadir cambio".
+  // 🔍 Diagnóstico: muestra el desglose día-por-día de la Reserva y la Caja (sin cambio)
+  //   para que el usuario entienda exactamente de dónde viene cada euro y pueda localizar
+  //   asientos sorpresa (p.ej. "Sacar cambio" antiguos). READ-ONLY, no modifica nada.
+  back.querySelector('#cambioDiag').onclick=()=>_openCambioDiagnostico(back);
   // ↶ Deshacer último: revierte el snapshot guardado + borra el asiento DH (solo modo 'add')
   back.querySelector('#cambioUndo').onclick=()=>{
     const HK='caja.cambio.history.v1';
@@ -10947,6 +10969,134 @@ function openCambio(){
     try{ window.render&&window.render(); }catch(_){}
     toast(`↶ Operación deshecha: ${modeLbl} de ${fmt(last.amount||0)}${last.entryId?' · asiento borrado':''}`, 4500);
   };
+}
+
+function _openCambioDiagnostico(parentBack){
+  // 🔍 Modal READ-ONLY que explica día-por-día de dónde viene:
+  //   (a) la Reserva de cambio histórica (chain forward: siCambio + traspasos dated)
+  //   (b) la Caja física (sin cambio) acumulada (si.efectivo + cash E + internalCaja)
+  //   Permite al usuario localizar asientos sorpresa que inflan la caja o la reserva.
+  const back=document.createElement('div');back.className='modal-back';back.style.zIndex='99999';
+  const si = (typeof getSaldoInicial === 'function') ? (getSaldoInicial()||null) : null;
+  const siCaja = si ? (+si.efectivo||0) : 0;
+  const siCambio = si ? (+si.cambio||0) : 0;
+  const siFecha = si && si.fecha ? si.fecha : null;
+  const st = loadState();
+  const byDate = (st && st.byDate) ? st.byDate : {};
+  const dates = Object.keys(byDate).filter(d=>!siFecha || d>=siFecha).sort();
+  const isC = currentCompany==='cempla';
+  let dfMap={};try{dfMap=JSON.parse(localStorage.getItem(dfKey())||'{}')}catch(_){}
+  // Construye las filas día-a-día para Reserva y Caja
+  const rows = []; // {date, cashE, internalCaja, cambioAdd, cambioOut, bancoToReserva, note}
+  let resAcum = siCambio;
+  let cajaAcum = siCaja;
+  dates.forEach(d=>{
+    const arr = byDate[d] || [];
+    const t = computeTotals(arr);
+    const df = parseFloat(dfMap[d]||0);
+    const cajaAutoDay = isC?(t.byFp.E||0):((t.byFp.E||0)+(t.tasasByFp.E||0));
+    const bancTAuto = isC?(t.byFp.T||0):((t.byFp.T||0)+(t.tasasByFp.T||0));
+    const delta = df>0?(df-bancTAuto):0;
+    const cashE = cajaAutoDay - delta;
+    const internalCaja = +(t.internalCaja||0);
+    // Clasifica los traspasos internos del día
+    let cambioAdd=0, cambioOut=0, bancoToReserva=0;
+    arr.forEach(e=>{
+      if(e.kind!=='DH' || !e._internal) return;
+      const amt=+e.importe||0;
+      if(e._transferDir==='caja_to_reserva') cambioAdd += amt;
+      else if(e._transferDir==='banco_to_reserva') bancoToReserva += amt;
+      else if(e._transferDir==='reserva_to_caja') cambioOut += amt;
+    });
+    const resDelta = cambioAdd + bancoToReserva - cambioOut;
+    resAcum += resDelta;
+    cajaAcum += cashE + internalCaja;
+    rows.push({date:d, cashE, internalCaja, cambioAdd, cambioOut, bancoToReserva, resDelta, resAcum, cajaAcum});
+  });
+  const resAtEnd = resCambioAtEndOfDate(currentDate);
+  const resPhysical = reservaCambio();
+  const saCC = saldoAnteriorPorCuenta(currentDate);
+  // Live caja física sin cambio del día actual (igual que la fila del dashboard)
+  const _tToday = computeTotals(entriesOf(currentDate));
+  const _efDay = isC?(_tToday.byFp.E||0):((_tToday.byFp.E||0)+(_tToday.tasasByFp.E||0));
+  const _autoTD = isC?(_tToday.byFp.T||0):((_tToday.byFp.T||0)+(_tToday.tasasByFp.T||0));
+  const _dfD = parseFloat(dfMap[currentDate]||0);
+  const _deltaD = _dfD>0?Math.min(_dfD-_autoTD,_efDay):0;
+  const cajaLiveSinCambio = (_efDay-_deltaD) + saCC.caja + (+_tToday.internalCaja||0);
+  // Diff: diff entre física actual y chain forward hasta HOY
+  const resDiff = +(resPhysical - resAcum).toFixed(2);
+  const dayLabel = d => d.split('-').reverse().join('/');
+  const rowsCambioHtml = rows.filter(r=>r.resDelta!==0).map(r=>{
+    const parts=[];
+    if(r.cambioAdd>0) parts.push(`<span style="color:#22c55e">+${fmt(r.cambioAdd)} Añadir caja→reserva</span>`);
+    if(r.bancoToReserva>0) parts.push(`<span style="color:#22c55e">+${fmt(r.bancoToReserva)} Añadir banco→reserva</span>`);
+    if(r.cambioOut>0) parts.push(`<span style="color:#f97316">−${fmt(r.cambioOut)} Sacar reserva→caja</span>`);
+    return `<tr><td style="padding:4px 8px;color:#94a3b8">${dayLabel(r.date)}</td><td style="padding:4px 8px">${parts.join(' · ')||'—'}</td><td style="padding:4px 8px;text-align:right;color:#7ee3aa;font-family:monospace">${fmt(r.resAcum)}</td></tr>`;
+  }).join('');
+  const rowsCajaHtml = rows.filter(r=>r.cashE!==0 || r.internalCaja!==0).map(r=>{
+    const parts=[];
+    if(r.cashE>0) parts.push(`<span style="color:#22c55e">+${fmt(r.cashE)} Efectivo revisiones</span>`);
+    else if(r.cashE<0) parts.push(`<span style="color:#f87171">${fmt(r.cashE)} Efectivo revisiones</span>`);
+    if(r.internalCaja>0) parts.push(`<span style="color:#22c55e">+${fmt(r.internalCaja)} Internos (sacar cambio / banco→caja)</span>`);
+    else if(r.internalCaja<0) parts.push(`<span style="color:#f87171">${fmt(r.internalCaja)} Internos (añadir cambio / caja→banco)</span>`);
+    return `<tr><td style="padding:4px 8px;color:#94a3b8">${dayLabel(r.date)}</td><td style="padding:4px 8px">${parts.join(' · ')||'—'}</td><td style="padding:4px 8px;text-align:right;color:#7ee3aa;font-family:monospace">${fmt(r.cajaAcum)}</td></tr>`;
+  }).join('');
+  const diffBanner = Math.abs(resDiff) >= 0.01
+    ? `<div style="padding:12px 14px;background:${resDiff>0?'#422006':'#450a0a'};border:1px solid ${resDiff>0?'#854d0e':'#991b1b'};border-radius:8px;margin-bottom:14px">
+        <div style="font-weight:700;color:${resDiff>0?'#fbbf24':'#fca5a5'};font-size:13px;margin-bottom:4px">${resDiff>0?'⚠':'⚠'} Diferencia detectada en la Reserva</div>
+        <div style="font-size:12px;color:#e5e7eb;line-height:1.6">
+          Física actual: <b style="color:#fff;font-family:monospace">${fmt(resPhysical)}</b><br>
+          Calculada por asientos (cadena forward): <b style="color:#fff;font-family:monospace">${fmt(resAcum)}</b><br>
+          Diferencia: <b style="color:${resDiff>0?'#fbbf24':'#fca5a5'};font-family:monospace">${resDiff>0?'+':''}${fmt(resDiff)}</b>
+          <span style="color:#94a3b8"> → ${resDiff>0?'hay más dinero físico que asientos':'hay menos dinero físico que asientos'}</span>
+        </div>
+      </div>`
+    : `<div style="padding:10px 14px;background:#064e3b;border:1px solid #065f46;border-radius:8px;margin-bottom:14px;font-size:12px;color:#a7f3d0">✓ La Reserva física coincide con la cadena de asientos.</div>`;
+  back.innerHTML=`<div class="modal" style="max-width:860px;width:97%;max-height:94vh;overflow:auto">
+    <div style="display:flex;align-items:center;gap:14px;margin:-16px -16px 16px -16px;padding:14px 20px;background:linear-gradient(90deg,#1e3a8a,#0f172a);border-radius:12px 12px 0 0">
+      <h3 style="margin:0;flex:1;color:#93c5fd;font-family:Georgia,serif">🔍 Diagnóstico de Caja y Reserva</h3>
+      <button class="btn" id="diagClose" style="background:#334155;color:#fff;border-color:#334155">✖</button>
+    </div>
+    <p style="color:#94a3b8;font-size:12px;margin:0 0 14px;line-height:1.6">
+      Esta pantalla te enseña <b style="color:#93c5fd">de dónde viene cada euro</b> de la Reserva y la Caja física (sin cambio).
+      Útil cuando ves un número que no esperas: busca el día que causó el salto.
+    </p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="padding:12px;background:#0b1121;border:1px solid #1e293b;border-radius:8px">
+        <div style="font-size:10px;color:#94a3b8;letter-spacing:1px;text-transform:uppercase">Reserva física actual</div>
+        <div style="font-size:22px;color:#7ee3aa;font-family:monospace;font-weight:700">${fmt(resPhysical)}</div>
+      </div>
+      <div style="padding:12px;background:#0b1121;border:1px solid #1e293b;border-radius:8px">
+        <div style="font-size:10px;color:#94a3b8;letter-spacing:1px;text-transform:uppercase">Caja física (sin cambio) HOY</div>
+        <div style="font-size:22px;color:#7ee3aa;font-family:monospace;font-weight:700">${fmt(saCC.caja)}</div>
+      </div>
+    </div>
+    ${diffBanner}
+    <h4 style="margin:18px 0 8px;color:#fbbf24;font-size:14px">💰 Reserva de Cambio · asientos día a día</h4>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:6px">Base: <b style="color:#e5e7eb">Saldo inicial cambio = ${fmt(siCambio)}</b>${siFecha?` (desde ${dayLabel(siFecha)})`:''}</div>
+    <div style="max-height:260px;overflow:auto;border:1px solid #1e293b;border-radius:8px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead style="position:sticky;top:0;background:#0b1121"><tr style="color:#94a3b8;font-size:10px;letter-spacing:1px"><th style="padding:6px 8px;text-align:left">FECHA</th><th style="padding:6px 8px;text-align:left">MOVIMIENTO</th><th style="padding:6px 8px;text-align:right">ACUMULADO</th></tr></thead>
+        <tbody>${rowsCambioHtml||'<tr><td colspan="3" style="padding:12px;text-align:center;color:#64748b">Sin asientos dated de reserva</td></tr>'}</tbody>
+      </table>
+    </div>
+    <h4 style="margin:18px 0 8px;color:#fbbf24;font-size:14px">🟢 Caja Física (sin cambio) · asientos día a día</h4>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:6px">Base: <b style="color:#e5e7eb">Saldo inicial efectivo = ${fmt(siCaja)}</b>${siFecha?` (desde ${dayLabel(siFecha)})`:''}</div>
+    <div style="max-height:320px;overflow:auto;border:1px solid #1e293b;border-radius:8px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead style="position:sticky;top:0;background:#0b1121"><tr style="color:#94a3b8;font-size:10px;letter-spacing:1px"><th style="padding:6px 8px;text-align:left">FECHA</th><th style="padding:6px 8px;text-align:left">MOVIMIENTO</th><th style="padding:6px 8px;text-align:right">ACUMULADO</th></tr></thead>
+        <tbody>${rowsCajaHtml||'<tr><td colspan="3" style="padding:12px;text-align:center;color:#64748b">Sin movimientos de efectivo</td></tr>'}</tbody>
+      </table>
+    </div>
+    <p style="color:#94a3b8;font-size:11px;margin:14px 0 0;line-height:1.5">
+      💡 <b style="color:#fbbf24">Para localizar el salto que te sorprende:</b> busca el día cuyo "ACUMULADO" subió al valor que ves ahora.
+      Si no reconoces el movimiento de ese día, ve a esa fecha desde el histórico y revisa los asientos.
+    </p>
+  </div>`;
+  document.body.appendChild(back);
+  const close=()=>back.remove();
+  back.addEventListener('click',e=>{if(e.target===back)close()});
+  back.querySelector('#diagClose').onclick=close;
 }
 
 function _cambioBulkOp(data,rerender,mode){
