@@ -13606,13 +13606,17 @@ async function openTwilioCfgModal(){
         if(statusEl) statusEl.innerHTML = '<span style="color:#86efac">✅ '+(isCA?'Compte vàlid':'Cuenta válida')+'</span>';
         if(resultEl){
           const credits = r.credits || '0';
-          const smsRestantes = Math.floor(parseFloat(credits) || 0);
+          const creditsNum = parseFloat(credits) || 0;
+          // 🧮 Feb 2026 · LabsMobile `credits` ≈ nº de SMS disponibles para España (1 crédito ≈ 1 SMS).
+          //   NO son euros. El € depende del precio del pack cuando recargaste.
+          const smsRestantes = Math.floor(creditsNum);
           resultEl.innerHTML =
             '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">' +
               '<div><div style="color:#86efac;font-weight:700;font-size:13px">✅ '+(isCA?'Credencials correctes':'Credenciales correctas')+'</div>' +
-              '<div style="color:#94a3b8;margin-top:2px">'+(isCA?'Saldo disponible: ':'Saldo disponible: ')+'<b style="color:#fde047">'+credits+' €</b> · ~<b style="color:#fde047">'+smsRestantes+' SMS</b></div></div>' +
+              '<div style="color:#94a3b8;margin-top:2px">'+(isCA?'Saldo disponible: ':'Saldo disponible: ')+'<b style="color:#fde047">'+smsRestantes+' '+(isCA?'crèdits':'créditos')+'</b> <span style="color:#64748b">· ≈ '+smsRestantes+' SMS '+(isCA?'a Espanya':'a España')+'</span></div></div>' +
               '<a href="'+(r.panel_url||'https://www.labsmobile.com/es/panel')+'" target="_blank" style="background:#1e3a5f;color:#86b6ff;border:1px solid #3b82f6;padding:5px 10px;border-radius:5px;font-size:11px;font-weight:700;text-decoration:none">🌐 '+(isCA?'Obrir panell':'Abrir panel')+' →</a>' +
             '</div>' +
+            (smsRestantes < 50 ? '<div style="margin-top:10px;padding:8px 10px;background:rgba(251,191,36,.1);border-left:3px solid #fbbf24;border-radius:4px;color:#fde047;font-size:11px">⚠️ '+(isCA?'Saldo baix. Recarrega al panell LabsMobile per evitar quedar-te sense enviament a mig camí.':'Saldo bajo. Recarga en el panel LabsMobile para evitar quedarte sin envíos a medio camino.')+'</div>' : '') +
             '<div style="margin-top:10px;padding-top:8px;border-top:1px dashed #334155;color:#fbbf24;font-size:10px;line-height:1.5">' +
               '💡 <b>'+(isCA?'Nota sobre remitents:':'Nota sobre remitentes:')+'</b> '+(r.senders_hint || (isCA?'LabsMobile no deixa llistar els remitents aprovats per API.':'LabsMobile no permite listar los remitentes aprobados por API.'))+' ' +
               (isCA?'Entra al panell → <b>El meu compte → Remitents</b> i copia el nom tal qual aquí dalt.':'Entra al panel → <b>Mi cuenta → Remitentes</b> y copia el nombre tal cual arriba.')+
