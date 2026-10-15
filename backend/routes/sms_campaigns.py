@@ -77,6 +77,9 @@ class SmsCampaignCreate(BaseModel):
     # Tracking
     install_id: Optional[str] = None
     client_name: Optional[str] = None
+    # 🏢 Feb 2026 · Empresa activa (TRÀFIC o CEMPLA) per aïllar històric per empresa.
+    #    Si None → campanya "global" (compat enrere, es veu a totes les empreses).
+    company: Optional[str] = None  # 'trafic' | 'cempla' | None
 
 
 class TwilioTestReq(BaseModel):
@@ -806,6 +809,8 @@ def build_router(db):
             "install_id": body.install_id or None,
             "client_name": body.client_name or None,
             "medicar_sender": _sanitize_alpha_sender(body.medicar_sender) if body.use_medicar else None,
+            # 🏢 Feb 2026 · empresa origen (per filtrar històric per empresa activa)
+            "company": (body.company or "").strip().lower() or None,
         }
         await db.sms_campaigns.insert_one(doc)
 
@@ -848,10 +853,23 @@ def build_router(db):
         }
 
     @router.get("/campaigns")
-    async def list_campaigns(x_admin_token: Optional[str] = Header(None)):
+    async def list_campaigns(
+        x_admin_token: Optional[str] = Header(None),
+        company: Optional[str] = None,
+        install_id: Optional[str] = None,
+    ):
         _admin(x_admin_token)
+        # 🏢 Feb 2026 · Filtra per empresa (trafic/cempla) i opcionalment per install_id.
+        #    Compat: campanyes antigues sense `company` es mostren a TOTES les empreses
+        #    perquè no es "perdin" en l'històric del client.
+        q: dict = {}
+        if install_id:
+            q["install_id"] = install_id
+        if company:
+            c = company.strip().lower()
+            q["$or"] = [{"company": c}, {"company": None}, {"company": {"$exists": False}}]
         cursor = db.sms_campaigns.find(
-            {}, projection={"contacts": 0}
+            q, projection={"contacts": 0}
         ).sort("created_at", -1).limit(200)
         items = []
         async for c in cursor:
@@ -895,9 +913,17 @@ def build_router(db):
         return {"ok": True, "deleted_id": campaign_id}
 
     @router.get("/stats")
-    async def stats(x_admin_token: Optional[str] = Header(None)):
+    async def stats(
+        x_admin_token: Optional[str] = Header(None),
+        company: Optional[str] = None,
+    ):
         _admin(x_admin_token)
-        cursor = db.sms_campaigns.find({}, projection={"contacts": 0}).sort("created_at", -1)
+        # 🏢 Feb 2026 · scope per empresa (compat: campanyes sense `company` sumen a totes)
+        q: dict = {}
+        if company:
+            c = company.strip().lower()
+            q["$or"] = [{"company": c}, {"company": None}, {"company": {"$exists": False}}]
+        cursor = db.sms_campaigns.find(q, projection={"contacts": 0}).sort("created_at", -1)
         total_campaigns = 0
         total_sent = 0
         total_errors = 0

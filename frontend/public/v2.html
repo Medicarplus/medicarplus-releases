@@ -13033,6 +13033,18 @@ function isTwilioMedicarEligible(){
 }
 
 async function apiSms(path, opts={}){
+  // 🏢 Feb 2026 · Scope automàtic per empresa activa en GET /campaigns i /stats
+  //    perquè l'històric NO es barregi entre TRÀFIC i CEMPLA.
+  //    Aplicat només a GET (no mètodes de mutació) i només si path no té ja ?company=.
+  try{
+    const isGetCampaigns = (!opts.method || opts.method==='GET') && (path==='/campaigns' || path==='/stats');
+    if(isGetCampaigns && !/[?&]company=/.test(path)){
+      const cur = (typeof currentCompany !== 'undefined') ? String(currentCompany||'').toLowerCase() : '';
+      if(cur){
+        path = path + (path.includes('?') ? '&' : '?') + 'company=' + encodeURIComponent(cur);
+      }
+    }
+  }catch(_){}
   const buildUrl=(base)=>base+'/api/sms'+path;
   const doFetch=(url)=>fetch(url,{...opts, headers:{'X-Admin-Token':SMS_ADMIN_TOKEN, ...(opts.headers||{})}});
   let base=getSmsApiBase();
@@ -13844,6 +13856,17 @@ function openSmsModal(){
             <button onclick="openTwilioCfgModal()" style="background:#052e16;color:#86efac;border:1px solid #22c55e;padding:3px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700">⚙️ ${isCA?'Editar':'Editar'}</button>
           </div>`;
         }
+        // 🇪🇸 Feb 2026 · Check LabsMobile (ara proveïdor únic). Si té creds completes → "Configurado OK".
+        try{
+          const lab = JSON.parse(localStorage.getItem('caja.labsmobile.creds.v1')||'{}');
+          if((lab.username||'').trim() && (lab.token||'').trim() && (lab.sender||'').trim()){
+            const senderDisp = (lab.sender||'').length>16 ? lab.sender.slice(0,16)+'…' : lab.sender;
+            return `<div style="padding:10px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:16px;background:#052e16;color:#86efac;border:1px solid #22c55e;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+              <span>✅ ${isCA?'LabsMobile configurat · Enviament real actiu':'LabsMobile configurado · Envío real activo'} · <b>${senderDisp}</b></span>
+              <button onclick="openTwilioCfgModal()" style="background:#052e16;color:#86efac;border:1px solid #22c55e;padding:3px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700">⚙️ ${isCA?'Editar':'Editar'}</button>
+            </div>`;
+          }
+        }catch(_){}
         return `<div style="padding:12px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:16px;background:#7c2d12;color:#fed7aa;border:1px solid #ea580c;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
           <span>⚠️ ${isCA?'SMS no configurats · Els SMS es simularan. Tria una opció:':'SMS no configurados · Los SMS se simularán. Elige una opción:'}</span>
           <button onclick="openTwilioCfgModal()" style="background:#f59e0b;color:#0b1121;border:1px solid #f59e0b;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:800">⚙️ ${isCA?'Configurar':'Configurar'}</button>
@@ -14338,6 +14361,11 @@ function openSmsModal(){
         }catch(e){}
         payload.install_id = liInstallId;
         payload.client_name = liClientName;
+        // 🏢 Feb 2026 · empresa activa (TRÀFIC/CEMPLA) · aïlla històric per empresa
+        try{
+          const cur = (typeof currentCompany !== 'undefined') ? String(currentCompany||'').toLowerCase() : '';
+          if(cur) payload.company = cur;
+        }catch(_){}
         // 🇪🇸 Feb 2026 · Provider = labsmobile → envia creds LAB i omet Twilio
         if(activeProvider === 'labsmobile'){
           let lab = {};
