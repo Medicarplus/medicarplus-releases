@@ -5025,28 +5025,14 @@ function computeTotals(list){const t={bruto:0,dto:0,tasas:0,neto:0,byFp:{E:0,T:0
       // El dinero sale del efectivo de caja pero entra en la reserva de cambio.
       // Como CAJA FÍSICA (display) = caja + reserva, el total físico no cambia.
       t.internalCaja -= amt;
-      // 🛡 Feb 2026 · FIX descuadre -340€: si el asiento NO fue creado por el modal
-      //   "Reserva de cambio" (que llama a saveCambio y actualiza las denominaciones),
-      //   resCambio NO refleja este traspaso → faltan `amt` € en el total CAJA FÍSICA.
-      //   Compensamos sumando `amt` a internalCaja (anula el -amt de arriba) para que
-      //   el total de efectivo quede correcto. El modal pone _reservaSynced:true para
-      //   evitar la compensación cuando SÍ se actualizó la reserva.
-      if(!e._reservaSynced) t.internalCaja += amt;
     } else if(e._transferDir === 'banco_to_reserva'){
       // El dinero sale del banco y va a la reserva de cambio (dentro de caja física).
       t.internalBanco -= amt;
-      // 🛡 Compensación simétrica: si el modal no actualizó la reserva, el total
-      //   efectivo+banco quedaría -amt. Añadimos el amt a internalCaja para
-      //   reflejar que el dinero físicamente SÍ está (en el cajón de reserva).
-      if(!e._reservaSynced) t.internalCaja += amt;
     } else if(e._transferDir === 'reserva_to_caja'){
       // Feb 2026 (simplificación): sacar cambio de la reserva a la caja física real.
       // La reserva ya baja (denominaciones bajan en loadCambio) → resCambio menor.
       // Este asiento es HABER fp:E: SUMA a caja física. Total físico no cambia.
       t.internalCaja += amt;
-      // 🛡 Si el modal NO actualizó la reserva (asiento manual), resCambio aún incluye
-      //   el amt → double count. Compensamos restando amt para dejar el total neutro.
-      if(!e._reservaSynced) t.internalCaja -= amt;
     }
     return; // NO toca facturación (neto), NO altera datáfono ni byFp
   }
