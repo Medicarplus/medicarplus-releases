@@ -12968,6 +12968,30 @@ function saveTwilioCreds(sid, token, from_number){
 function clearTwilioCreds(){ try{ localStorage.removeItem(TWILIO_LS_KEY); }catch(e){} }
 function hasTwilioCreds(){ return !!getTwilioCreds(); }
 
+// 🧹 Feb 2026 · Twilio retirado del programa.
+//    Auto-cleanup ONE-TIME de credenciales Twilio que pueda haber guardadas del cliente,
+//    para evitar cruces raros al forzar LabsMobile como único proveedor.
+//    Se ejecuta UNA sola vez (flag persistente); no borra nada en siguientes arranques.
+(function autoCleanupTwilioCreds(){
+  const FLAG = 'caja.twilio.cleanup.done.v1';
+  try{
+    if(localStorage.getItem(FLAG)) return;
+    const keys = [
+      'caja.twilio.creds.v1',
+      'caja.twilio.mode.v1',
+      'caja.twilio.medicar.sender.v1'
+    ];
+    keys.forEach(k => { try{ localStorage.removeItem(k); }catch(_){} });
+    // Si el provider estaba en 'twilio', fuerza labsmobile
+    try{
+      const prov = (localStorage.getItem('caja.sms.provider.v1')||'').toLowerCase();
+      if(prov === 'twilio' || prov === '') localStorage.setItem('caja.sms.provider.v1', 'labsmobile');
+    }catch(_){}
+    localStorage.setItem(FLAG, '1');
+    try{ console.log('[Twilio cleanup] Credenciales Twilio antiguas eliminadas · provider → labsmobile'); }catch(_){}
+  }catch(e){}
+})();
+
 // ─── Twilio Billing Mode · BYOA vs MediCar (només Premium) ────────────────
 const TWILIO_MODE_LS_KEY = 'caja.twilio.mode.v1';        // 'byoa' | 'medicar'
 const TWILIO_MEDICAR_SENDER_LS_KEY = 'caja.twilio.medicar.sender.v1';
@@ -13079,12 +13103,13 @@ async function openTwilioCfgModal(){
 
   // Tab actiu inicial: si té preview eligible i MediCar disponible, mostra MediCar
   //   Feb 2026 · si el client ja va triar LabsMobile (provider), obre aquella pestanya.
-  let smsProv = 'twilio';
-  try{ smsProv = (localStorage.getItem('caja.sms.provider.v1')||'twilio').toLowerCase(); }catch(_){}
+  //   Feb 2026 (ii) · Twilio retirat: default = LabsMobile. BYOA Twilio queda ocult.
+  let smsProv = 'labsmobile';
+  try{ smsProv = (localStorage.getItem('caja.sms.provider.v1')||'labsmobile').toLowerCase(); }catch(_){}
+  // Si el usuario tenía 'twilio' guardado de antes, forzamos a LabsMobile silenciosamente
+  if(smsProv === 'twilio') smsProv = 'labsmobile';
   const curLab = (() => { try{ return JSON.parse(localStorage.getItem('caja.labsmobile.creds.v1')||'{}'); }catch(_){ return {}; } })();
-  const initialTab = smsProv === 'labsmobile' ? 'lab'
-    : (curMode === 'medicar' && medReady) ? 'medicar'
-    : 'byoa';
+  const initialTab = (curMode === 'medicar' && medReady) ? 'medicar' : 'lab';
 
   const back = document.createElement('div');
   back.id = 'twilioCfgModal';
@@ -13101,7 +13126,7 @@ async function openTwilioCfgModal(){
 
       <!-- Tabs -->
       <div style="display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid #1e293b">
-        <button id="tabByoa" data-tab="byoa" data-testid="tab-twilio-byoa" style="flex:1;padding:10px 14px;background:transparent;border:none;border-bottom:3px solid transparent;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:700;transition:.2s">🔧 Twilio<div style="font-size:10px;color:#64748b;font-weight:400;margin-top:2px">${isCA?'EE.UU · 3-7 dies aprovar nom':'EE.UU · 3-7 días aprobar nombre'}</div></button>
+        <button id="tabByoa" data-tab="byoa" data-testid="tab-twilio-byoa" style="display:none;flex:1;padding:10px 14px;background:transparent;border:none;border-bottom:3px solid transparent;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:700;transition:.2s">🔧 Twilio<div style="font-size:10px;color:#64748b;font-weight:400;margin-top:2px">${isCA?'EE.UU · 3-7 dies aprovar nom':'EE.UU · 3-7 días aprobar nombre'}</div></button>
         <button id="tabLab" data-tab="lab" data-testid="tab-labsmobile" style="flex:1;padding:10px 14px;background:transparent;border:none;border-bottom:3px solid transparent;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:700;transition:.2s">🇪🇸 LabsMobile<div style="font-size:10px;color:#64748b;font-weight:400;margin-top:2px">${isCA?'Espanya · aprovar nom més ràpid':'España · aprobar nombre más rápido'}</div></button>
         <button id="tabMedicar" data-tab="medicar" data-testid="tab-twilio-medicar" ${medReady?'':'disabled'} style="flex:1;padding:10px 14px;background:transparent;border:none;border-bottom:3px solid transparent;color:${medReady?'#94a3b8':'#475569'};cursor:${medReady?'pointer':'not-allowed'};font-size:13px;font-weight:700;transition:.2s;opacity:${medReady?'1':'.55'}">⭐ MediCar Cloud<div style="font-size:10px;color:#64748b;font-weight:400;margin-top:2px">${eligible ? (medAvail.available ? (isCA?'Amb la teva subscripció':'Con tu suscripción') : (isCA?'Properament':'Próximamente')) : (isCA?'Només Premium':'Solo Premium')}</div></button>
       </div>
@@ -14185,8 +14210,10 @@ function openSmsModal(){
     document.getElementById('smsBtnSend').onclick=async(ev)=>{
       const btn=ev.target;
       // 🚦 Feb 2026 · Pre-flight check según provider activo
-      let activeProvider = 'twilio';
-      try{ activeProvider = (localStorage.getItem('caja.sms.provider.v1')||'twilio').toLowerCase(); }catch(_){}
+      //    Feb 2026 (ii) · Twilio retirat: default = labsmobile. Si qualcú té 'twilio' guardat de abans → migramos.
+      let activeProvider = 'labsmobile';
+      try{ activeProvider = (localStorage.getItem('caja.sms.provider.v1')||'labsmobile').toLowerCase(); }catch(_){}
+      if(activeProvider === 'twilio'){ activeProvider = 'labsmobile'; try{ localStorage.setItem('caja.sms.provider.v1','labsmobile'); }catch(_){} }
       if(activeProvider === 'labsmobile'){
         let lab = {};
         try{ lab = JSON.parse(localStorage.getItem('caja.labsmobile.creds.v1')||'{}'); }catch(_){}
