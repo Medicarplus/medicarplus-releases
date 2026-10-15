@@ -10838,7 +10838,7 @@ function openCambio(){
       <button class="btn" id="cambioReset" style="background:#7f1d1d;color:#fff;border-color:#7f1d1d;font-size:12px">🗑️ Vaciar todo</button>
       <button class="btn" id="cambioClose" style="background:#334155;color:#fff;border-color:#334155">✖</button>
     </div>
-    <p class="small" style="color:#94a3b8;margin:0 0 12px">🪙 <b>Monedes</b>: es compten per <b style="color:#f5b301">paquets</b> (banc). El paquet ja porta el seu valor típic. <br>💵 <b>Bitllets</b>: es compten per unitat. També pots afegir <b style="color:#22c55e">€ manual</b> per mitges peces o quantitats soltes.</p>
+    <p class="small" style="color:#94a3b8;margin:0 0 12px">🔒 <b>Reserva de solo lectura</b>: para modificar el cambio usa los botones <b style="color:#22c55e">➕ Añadir cambio</b> o <b style="color:#f97316">💵 Sacar cambio</b> — cada movimiento queda registrado con fecha y origen (caja o banco) para que la contabilidad cuadre día a día.</p>
     <div id="cambioTotal" style="text-align:center;padding:16px;background:linear-gradient(135deg,#065f46,#0f172a);border:2px solid #22c55e;border-radius:12px;margin-bottom:14px">
       <div style="font-size:11px;color:#a7f3d0;letter-spacing:2px;text-transform:uppercase">Total guardat</div>
       <div id="cambioTotalNum" style="font-size:36px;color:#7ee3aa;font-weight:700;font-family:'Courier New',monospace;margin-top:4px">0,00 €</div>
@@ -10847,15 +10847,6 @@ function openCambio(){
       <button class="btn" id="cambioAdd" style="background:#166534;color:#fff;border-color:#166534;flex:1;font-weight:700">➕ Añadir cambio</button>
       <button class="btn" id="cambioRemove" style="background:#7c2d12;color:#fff;border-color:#7c2d12;flex:1;font-weight:700">💵 Sacar cambio (a caja)</button>
     </div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:12px">
-      <thead><tr style="background:#0f172a;color:#f5b301">
-        <th style="padding:8px 6px;text-align:left">Denominació</th>
-        <th style="padding:8px 6px;text-align:center;width:170px">Paquets / Unitats</th>
-        <th style="padding:8px 6px;text-align:center;width:90px" title="Ajust manual en euros (mitges peces, monedes soltes...)">€ manual</th>
-        <th style="padding:8px 6px;text-align:right;width:90px">Subtotal</th>
-      </tr></thead>
-      <tbody id="cambioBody"></tbody>
-    </table>
     <div id="cambioPendiente" style="display:none;background:linear-gradient(135deg,rgba(251,191,36,.14),rgba(251,191,36,.04));border:2px solid #fbbf24;border-radius:10px;padding:12px 14px;margin-top:14px;color:#fde68a;font-size:13px;line-height:1.5">
       <b style="color:#fbbf24">🏦 Pendiente de repartir en billetes/monedas:</b>
       <span id="cambioPendienteNum" style="font-family:'Courier New',monospace;font-weight:800;color:#fbbf24;font-size:15px">0,00 €</span>
@@ -10868,32 +10859,10 @@ function openCambio(){
   back.querySelector('#cambioClose').onclick=closeModal;
 
   let data=loadCambio();
-  const bodyEl=back.querySelector('#cambioBody');
   const totalEl=back.querySelector('#cambioTotalNum');
-  const fmtQty=(n)=>{const x=Number(n)||0;return x%1===0?String(x):x.toFixed(1)};
   const render=()=>{
-    bodyEl.innerHTML=CAMBIO_DENOMS.map(d=>{
-      const q=data[d.k]||0;
-      const manual=data[d.k+'_m']||0;
-      const sub=cambioSubtotal(d,data);
-      const emoji=d.type==='coin'?'🪙':'💵';
-      const unitInfo=d.pack?`<div style="font-size:9px;color:#64748b;letter-spacing:.5px">${d.packLabel}</div>`:`<div style="font-size:9px;color:#64748b">unitat</div>`;
-      const step=d.pack?'0.5':'1';
-      const qtyLabel=d.pack?'paq.':'ud.';
-      const manualCell=d.pack
-        ? `<input type="number" min="0" step="0.01" value="${manual||''}" placeholder="0" data-inpm="${d.k}" style="width:78px;padding:6px 6px;background:#0f172a;color:#7ee3aa;border:1px solid #334155;border-radius:5px;text-align:right;font-family:'Courier New',monospace;font-size:12px" />`
-        : `<span style="color:#475569;font-size:11px">—</span>`;
-      return `<tr style="border-bottom:1px solid #1e293b">
-        <td style="padding:8px 6px"><b style="color:#e2e8f0">${emoji} ${d.label}</b>${unitInfo}</td>
-        <td style="padding:8px 6px;text-align:center;white-space:nowrap">
-          <button class="btn" data-minus="${d.k}" title="Treure 1 ${qtyLabel}" style="padding:4px 10px;background:#7f1d1d;color:#fff;border-color:#7f1d1d;font-weight:700;min-width:34px">–</button>
-          <input type="number" min="0" max="9999" step="${step}" value="${fmtQty(q)}" data-inp="${d.k}" style="width:64px;padding:6px 4px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;text-align:center;font-family:'Courier New',monospace;font-weight:700;margin:0 3px" />
-          <button class="btn" data-plus="${d.k}" title="Afegir 1 ${qtyLabel}" style="padding:4px 10px;background:#166534;color:#fff;border-color:#166534;font-weight:700;min-width:34px">+</button>
-        </td>
-        <td style="padding:8px 6px;text-align:center">${manualCell}</td>
-        <td style="padding:8px 6px;text-align:right;font-family:'Courier New',monospace;font-weight:${sub?700:400};color:${sub?'#7ee3aa':'#64748b'}">${fmt(sub)}</td>
-      </tr>`;
-    }).join('');
+    // 🔒 Vista minimalista: solo Total + banner pendiente.
+    //   La reserva solo se modifica via "➕ Añadir cambio" o "💵 Sacar cambio" (asientos dated).
     totalEl.textContent=fmt(cambioTotal(data));
     // Banner "Pendiente de repartir" del Saldo inicial
     const pendBox = back.querySelector('#cambioPendiente');
@@ -10905,12 +10874,6 @@ function openCambio(){
     } else {
       pendBox.style.display = 'none';
     }
-    // Bind events
-    const cleanQty=(k,val)=>{const d=CAMBIO_DENOMS.find(x=>x.k===k);const step=d&&d.pack?0.5:1;const v=Math.max(0,parseFloat(val)||0);return step===0.5?Math.round(v*2)/2:Math.round(v)};
-    bodyEl.querySelectorAll('[data-minus]').forEach(b=>b.onclick=()=>{const k=b.dataset.minus;const d=CAMBIO_DENOMS.find(x=>x.k===k);const step=d.pack?1:1;data[k]=Math.max(0,(Number(data[k])||0)-step);saveCambio(data);render()});
-    bodyEl.querySelectorAll('[data-plus]').forEach(b=>b.onclick=()=>{const k=b.dataset.plus;const d=CAMBIO_DENOMS.find(x=>x.k===k);const step=d.pack?1:1;data[k]=(Number(data[k])||0)+step;saveCambio(data);render()});
-    bodyEl.querySelectorAll('[data-inp]').forEach(inp=>inp.onchange=()=>{const k=inp.dataset.inp;data[k]=cleanQty(k,inp.value);saveCambio(data);render()});
-    bodyEl.querySelectorAll('[data-inpm]').forEach(inp=>inp.onchange=()=>{const k=inp.dataset.inpm+'_m';data[k]=Math.max(0,parseFloat(inp.value)||0);saveCambio(data);render()});
   };
   render();
 
