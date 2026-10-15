@@ -558,94 +558,6 @@
   async function getPendingBackup(){
     return await _get(`/api/sync/backup/pending?license_key=${encodeURIComponent(cfg.licenseKey)}&install_id=${encodeURIComponent(cfg.installId)}`);
   }
-  // 🛡 Feb 2026 · Helpers de reconciliación automática de la Reserva de cambio al RECIBIR copia.
-  //   Garantiza que, si la reserva ha subido/bajado entre el envío del PC emisor y la recepción
-  //   del PC receptor, los asientos de traspaso dated expliquen SIEMPRE la diferencia. Si no la
-  //   explican (p.ej. porque el emisor editó monedas sin crear asiento), se genera un asiento de
-  //   ajuste con fecha de la copia desde Banco (default seguro) para que la fórmula FORWARD cuadre
-  //   día a día SIN tocar ni un céntimo de la contabilidad.
-  function _reserveSum(o){
-    if(!o || typeof o !== 'object') return 0;
-    let s = 0;
-    for(const k of Object.keys(o)){
-      if(k && k.startsWith('_')) continue;
-      const v = Number(o[k]);
-      if(isFinite(v)) s += v;
-    }
-    s += +(o && o._bulk) || 0;
-    return +s.toFixed(2);
-  }
-  function _reserveTotalFromKey(key){
-    try{ return _reserveSum(JSON.parse(localStorage.getItem(key) || '{}')); }catch(e){ return 0; }
-  }
-  function _reserveTotalFromMerged(merged, key){ return _reserveSum((merged||{})[key] || {}); }
-  function _findCopyDay(merged, dataKey){
-    const bd = (merged && merged[dataKey] && merged[dataKey].byDate) || {};
-    const days = Object.keys(bd).sort();
-    return days.length ? days[days.length - 1] : null;
-  }
-  function _netTransferForDay(merged, dataKey, day){
-    const arr = ((merged && merged[dataKey] && merged[dataKey].byDate) || {})[day] || [];
-    let net = 0;
-    for(const e of arr){
-      if(!e || e.kind !== 'DH' || !e._internal) continue;
-      const amt = +e.importe || 0;
-      if(e._transferDir === 'caja_to_reserva') net += amt;
-      else if(e._transferDir === 'banco_to_reserva') net += amt;
-      else if(e._transferDir === 'reserva_to_caja') net -= amt;
-    }
-    return +net.toFixed(2);
-  }
-  function _buildReconcileAsiento(amount, source){
-    const positive = amount > 0;
-    const dir = positive ? (source === 'caja' ? 'caja_to_reserva' : 'banco_to_reserva') : 'reserva_to_caja';
-    const abs = +Math.abs(amount).toFixed(2);
-    return {
-      id: 'rec_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
-      kind: 'DH',
-      tipo: positive ? 'DEBE' : 'HABER',
-      grupo: 'Reserva de cambio',
-      nombre: '🔄 Ajuste automático sincronización',
-      importe: abs,
-      fp: source === 'caja' ? 'E' : 'B',
-      _internal: true,
-      _transferDir: dir,
-      _reconcile: true,
-      ts: Date.now()
-    };
-  }
-  function _reconcileReserveTransfers(merged, resBefore){
-    const pairs = [
-      { res: 'caja.reserva.v1', data: 'caja.v1', label: 'trafic' },
-      { res: 'caja.cempla.reserva.v1', data: 'caja.cempla.v1', label: 'cempla' }
-    ];
-    const generated = [];
-    for(const p of pairs){
-      const after = _reserveTotalFromMerged(merged, p.res);
-      const before = +(resBefore[p.res] || 0);
-      const delta = +(after - before).toFixed(2);
-      if(Math.abs(delta) < 0.01) continue;
-      const day = _findCopyDay(merged, p.data);
-      if(!day) continue;
-      // Diferencia de asientos dated del día entre lo que había antes y lo mergeado
-      const localArr = (() => { try{ const d = JSON.parse(localStorage.getItem(p.data) || '{}'); return (d.byDate||{})[day] || []; }catch(e){ return []; } })();
-      const localNet = (() => { let n=0; for(const e of localArr){ if(!e||e.kind!=='DH'||!e._internal) continue; const amt=+e.importe||0; if(e._transferDir==='caja_to_reserva')n+=amt; else if(e._transferDir==='banco_to_reserva')n+=amt; else if(e._transferDir==='reserva_to_caja')n-=amt; } return +n.toFixed(2); })();
-      const mergedNet = _netTransferForDay(merged, p.data, day);
-      const newAsientoDelta = +(mergedNet - localNet).toFixed(2);  // transferencias NUEVAS que entraron por sync
-      const unexplained = +(delta - newAsientoDelta).toFixed(2);
-      if(Math.abs(unexplained) < 0.01) continue;  // ya cuadra solo con los asientos que llegaron
-      const asiento = _buildReconcileAsiento(unexplained, 'banco');
-      if(!merged[p.data]) merged[p.data] = { byDate: {} };
-      if(!merged[p.data].byDate) merged[p.data].byDate = {};
-      if(!merged[p.data].byDate[day]) merged[p.data].byDate[day] = [];
-      merged[p.data].byDate[day].push(asiento);
-      generated.push({ company: p.label, day, amount: unexplained });
-      try{ console.info('[mcSync] 🔄 Ajuste auto reserva ' + p.label + ' día ' + day + ': ' + (unexplained>=0?'+':'') + unexplained + '€ desde Banco'); }catch(e){}
-    }
-    // Expone el resultado para que la UI avise al usuario tras aplicar
-    try{ if(generated.length) localStorage.setItem('caja.sync.lastReconcile.v1', JSON.stringify({ at: Date.now(), items: generated })); }catch(e){}
-    return generated;
-  }
   async function applyBackup(backupData, opts){
     // 🔑 Feb 2026 · opts.fullRestore=true → NO filtra claves locales (saldoInicial, irpf,
     //   cuadre.overrides). Se usa cuando la copia viene del ADMIN como rescate completo
@@ -10911,19 +10823,15 @@ function openCambio(){
       <button class="btn" id="cambioReset" style="background:#7f1d1d;color:#fff;border-color:#7f1d1d;font-size:12px">🗑️ Vaciar todo</button>
       <button class="btn" id="cambioClose" style="background:#334155;color:#fff;border-color:#334155">✖</button>
     </div>
-    <p class="small" style="color:#94a3b8;margin:0 0 12px">🔒 <b>Reserva de solo lectura</b>: para modificar el cambio usa los botones <b style="color:#22c55e">➕ Añadir cambio</b> o <b style="color:#f97316">💵 Sacar cambio</b> — cada movimiento queda registrado con fecha y origen (caja o banco) para que la contabilidad cuadre día a día.</p>
+    <p class="small" style="color:#94a3b8;margin:0 0 12px">💡 Usa <b style="color:#22c55e">➕ Añadir cambio</b> o <b style="color:#f97316">💵 Sacar cambio</b> para que el <b>otro ordenador entienda</b> el movimiento (crea traspaso con fecha). Si quieres solo <b>cuadrar el cajón</b> sin asiento, pulsa <b style="color:#fbbf24">✏️ Modificar</b>.</p>
     <div id="cambioTotal" style="text-align:center;padding:16px;background:linear-gradient(135deg,#065f46,#0f172a);border:2px solid #22c55e;border-radius:12px;margin-bottom:14px">
       <div style="font-size:11px;color:#a7f3d0;letter-spacing:2px;text-transform:uppercase">Total guardat</div>
       <div id="cambioTotalNum" style="font-size:36px;color:#7ee3aa;font-weight:700;font-family:'Courier New',monospace;margin-top:4px">0,00 €</div>
     </div>
     <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn" id="cambioAdd" style="background:#166534;color:#fff;border-color:#166534;flex:1;font-weight:700">➕ Añadir cambio</button>
-      <button class="btn" id="cambioRemove" style="background:#7c2d12;color:#fff;border-color:#7c2d12;flex:1;font-weight:700">💵 Sacar cambio (a caja)</button>
-    </div>
-    <div id="cambioPendiente" style="display:none;background:linear-gradient(135deg,rgba(251,191,36,.14),rgba(251,191,36,.04));border:2px solid #fbbf24;border-radius:10px;padding:12px 14px;margin-top:14px;color:#fde68a;font-size:13px;line-height:1.5">
-      <b style="color:#fbbf24">🏦 Pendiente de repartir en billetes/monedas:</b>
-      <span id="cambioPendienteNum" style="font-family:'Courier New',monospace;font-weight:800;color:#fbbf24;font-size:15px">0,00 €</span>
-      <div style="font-size:11.5px;color:#fde68a;margin-top:6px;opacity:.85">Este importe viene de tu Saldo inicial (Configuración → 🏦 Saldo inicial). Añade billetes y monedas hasta cuadrarlo al céntimo.</div>
+      <button class="btn" id="cambioAdd" data-testid="cambio-add" style="background:#166534;color:#fff;border-color:#166534;flex:1;min-width:160px;font-weight:700">➕ Añadir cambio</button>
+      <button class="btn" id="cambioRemove" data-testid="cambio-remove" style="background:#7c2d12;color:#fff;border-color:#7c2d12;flex:1;min-width:160px;font-weight:700">💵 Sacar cambio (a caja)</button>
+      <button class="btn" id="cambioModify" data-testid="cambio-modify" style="background:#854d0e;color:#fff;border-color:#854d0e;flex:1;min-width:160px;font-weight:700">✏️ Modificar</button>
     </div>
   </div>`;
   document.body.appendChild(back);
@@ -10934,19 +10842,10 @@ function openCambio(){
   let data=loadCambio();
   const totalEl=back.querySelector('#cambioTotalNum');
   const render=()=>{
-    // 🔒 Vista minimalista: solo Total + banner pendiente.
-    //   La reserva solo se modifica via "➕ Añadir cambio" o "💵 Sacar cambio" (asientos dated).
+    // 🔒 Vista minimalista: solo Total.
+    //   Reserva se modifica via "➕ Añadir cambio" / "💵 Sacar cambio" (asientos dated para sync)
+    //   o via "✏️ Modificar" (edición manual directa, SIN asiento).
     totalEl.textContent=fmt(cambioTotal(data));
-    // Banner "Pendiente de repartir" del Saldo inicial
-    const pendBox = back.querySelector('#cambioPendiente');
-    const pendNum = back.querySelector('#cambioPendienteNum');
-    const pend = +(data && data._bulk) || 0;
-    if(pend > 0){
-      pendBox.style.display = 'block';
-      pendNum.textContent = fmt(pend);
-    } else {
-      pendBox.style.display = 'none';
-    }
   };
   render();
 
@@ -10968,6 +10867,44 @@ function openCambio(){
   };
   back.querySelector('#cambioAdd').onclick=()=>_cambioBulkOp(data,render,'add');
   back.querySelector('#cambioRemove').onclick=()=>_cambioBulkOp(data,render,'remove');
+  // ✏️ Modificar: edición manual directa del total · SIN asiento, SIN traspaso.
+  //   Útil para cuadrar el cajón físico cuando no quieres registrar un movimiento
+  //   contable. El otro PC NO entenderá de dónde salió/entró el dinero (porque no
+  //   hay asiento dated). Se guarda en el historial para poder deshacer.
+  back.querySelector('#cambioModify').onclick=()=>{
+    const current = cambioTotal(data);
+    const raw = prompt(
+      '✏️ Nuevo total de la reserva de cambio (€)\n\n'+
+      '⚠ Esta edición NO crea asiento ni traspaso.\n'+
+      '   El otro ordenador no verá el motivo del cambio.\n\n'+
+      'Si quieres que el otro PC entienda el movimiento,\n'+
+      'cancela y usa "➕ Añadir" o "💵 Sacar".\n\n'+
+      'Total actual: '+fmt(current),
+      current.toFixed(2).replace('.',',')
+    );
+    if(raw === null) return;
+    const norm = String(raw).trim().replace(/\s/g,'').replace(',','.').replace(/[^0-9.\-]/g,'');
+    const val = parseFloat(norm);
+    if(!isFinite(val) || val < 0){ if(typeof toast==='function') toast('⚠ Importe no válido'); return; }
+    const nuevo = +val.toFixed(2);
+    if(Math.abs(nuevo - current) < 0.005){ if(typeof toast==='function') toast('✓ Sin cambios'); return; }
+    // Snapshot para "↶ Deshacer último"
+    try{
+      const HK='caja.cambio.history.v1';
+      let hist=[]; try{ hist=JSON.parse(localStorage.getItem(HK)||'[]'); }catch(_){ hist=[]; }
+      hist.push({ at: Date.now(), mode: 'modify', amount: nuevo, prev: current, snapshot: JSON.stringify(data) });
+      while(hist.length>20) hist.shift();
+      localStorage.setItem(HK, JSON.stringify(hist));
+    }catch(_){}
+    // Vacía denominaciones + _bulk_seed; deja solo _bulk con el valor manual.
+    Object.keys(data).forEach(k=>{ if(k !== '_v') delete data[k]; });
+    if(nuevo > 0) data._bulk = nuevo;
+    saveCambio(data);
+    render();
+    if(typeof toast==='function') toast('✏️ Reserva modificada a '+fmt(nuevo));
+    // Refresca la UI principal para que todos los totales se actualicen
+    try{ window.render && window.render() }catch(_){}
+  };
   // Nota Feb 2026: eliminado el modo 'return' (devolver a reserva desde caja).
   //   Ahora la lógica es simple: para mover dinero DE CAJA A RESERVA se usa "➕ Añadir cambio".
   // ↶ Deshacer último: revierte el snapshot guardado + borra el asiento DH (solo modo 'add')
