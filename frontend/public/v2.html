@@ -260,7 +260,14 @@
     if(!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
     return r.json();
   }
-  const SYNC_EXCLUDE_PREFIXES = ['caja.saldoInicial.','caja.install.','caja.sync.','caja.license.','caja.plan.preview.','caja.apibase.','caja.__sync','caja.cuadre.'];
+  // 🔧 Feb 2026 · FIX bug Reserva Histórica entre PCs:
+  //   `caja.saldoInicial.` SÍ se sincroniza ahora (antes estaba excluido). Sin esto,
+  //   el PC del gerente no tenía `si.fecha` ni `si.cambio` y la fórmula FORWARD de
+  //   `resCambioAtEndOfDate` caía al fallback legacy `now - laterNet`, que mostraba
+  //   la reserva actual (ej. 436,74 €) en TODOS los días pasados.
+  //   Multi-PC usa `_mtime` para last-write-wins → el PC con el saldo inicial más
+  //   reciente gana. Si ambos tenemos el mismo, no hay cambio.
+  const SYNC_EXCLUDE_PREFIXES = ['caja.install.','caja.sync.','caja.license.','caja.plan.preview.','caja.apibase.','caja.__sync','caja.cuadre.'];
   // 🔒 Oct 2026 · Claves excluidas EXACT MATCH del sync entre PCs (NO del backup en nube).
   //   caja.irpf.v1 · El IRPF es faena de la secretaria/gestor local, el gerente no la toca.
   //                 Se queda en el PC que lo gestiona y NO se propaga en el sync diario.
@@ -5168,7 +5175,8 @@ function getSaldoInicialFor(comp){
 function setSaldoInicialFor(comp, obj){
   const key = _saldoInicialKeyFor(comp);
   if(!obj || obj._delete){ localStorage.removeItem(key); return; }
-  const clean = { fecha: obj.fecha, efectivo: +obj.efectivo || 0, banco: +obj.banco || 0, cambio: +obj.cambio || 0, nota: obj.nota || '' };
+  // 🔗 _mtime necesario para last-write-wins en Multi-PC sync.
+  const clean = { fecha: obj.fecha, efectivo: +obj.efectivo || 0, banco: +obj.banco || 0, cambio: +obj.cambio || 0, nota: obj.nota || '', _mtime: Date.now() };
   localStorage.setItem(key, JSON.stringify(clean));
 }
 function getSaldoInicial(){
@@ -17760,7 +17768,8 @@ setTimeout(()=>{
     'caja.license.lastcheck.v1','caja.sync.admfavs.v1',
   ]);
   // 🔒 Claves LOCALES de cada PC: NUNCA viajan por sync (mismo criterio que el cliente inline)
-  const NON_SYNCABLE_PREFIXES = ['caja.saldoInicial.','caja.install.','caja.sync.','caja.license.','caja.plan.preview.','caja.apibase.','caja.cuadre.'];
+  //   Feb 2026 · `caja.saldoInicial.` RETIRADO (ver nota arriba): ahora SÍ se propaga.
+  const NON_SYNCABLE_PREFIXES = ['caja.install.','caja.sync.','caja.license.','caja.plan.preview.','caja.apibase.','caja.cuadre.'];
   const isSyncable = (k) => typeof k === 'string' && k.startsWith('caja.') && !NON_SYNCABLE.has(k) && !NON_SYNCABLE_PREFIXES.some(p=>k.startsWith(p));
   const getApiUrl = (path) => {
     let base = '';
