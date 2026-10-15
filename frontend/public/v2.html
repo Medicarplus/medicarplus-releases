@@ -10591,35 +10591,23 @@ function reservaCambio(){try{return cambioTotal(loadCambio())}catch(e){return 0}
 function resCambioAtEndOfDate(date){
   const now = reservaCambio();
   if(!date) return now;
+  // 🛡 Feb 2026 · Fecha de HOY local (yyyy-mm-dd)
+  const today = (()=>{ try{ const d=new Date(); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }catch(_){ return date; } })();
   try{
     const si = (typeof getSaldoInicial === 'function') ? getSaldoInicial() : null;
     const st = loadState();
     const byDate = st.byDate || {};
-    // ⚡ Si NO hay saldo inicial configurado → comportamiento legacy (hacia atrás)
-    if(!si || !si.fecha){
-      let laterNet = 0;
-      for(const d in byDate){
-        if(d <= date) continue;
-        const arr = byDate[d] || [];
-        for(const e of arr){
-          if(e.kind !== 'DH' || !e._internal) continue;
-          const amt = +e.importe || 0;
-          if(e._transferDir === 'caja_to_reserva') laterNet += amt;
-          else if(e._transferDir === 'banco_to_reserva') laterNet += amt;
-          else if(e._transferDir === 'reserva_to_caja') laterNet -= amt;
-        }
-      }
-      return now - laterNet;
-    }
-    // ✅ Fórmula FORWARD con saldo inicial
-    const siFecha = si.fecha;
-    const siCambio = +si.cambio || 0;
-    // Fecha anterior al arranque de la empresa → antes no había programa → 0
-    if(date < siFecha) return 0;
+    const siFecha = si && si.fecha ? si.fecha : null;
+    const siCambio = si ? (+si.cambio || 0) : 0;
+    // 🛡 Fecha anterior al arranque de la empresa → 0
+    if(siFecha && date < siFecha) return 0;
+    // ✅ Fórmula FORWARD: parte de siCambio (o 0) y suma los traspasos dated hasta `date`.
+    //    Esta rama se usa SIEMPRE (ya no hay fallback a `now - laterNet` que corrompía
+    //    días pasados con la reserva actual cuando no había asientos dated).
     let net = 0;
     for(const d in byDate){
-      if(d < siFecha) continue;    // traspasos previos al arranque: ruido, se ignora
-      if(d > date) continue;        // traspasos posteriores a la fecha pedida: no cuentan
+      if(siFecha && d < siFecha) continue;
+      if(d > date) continue;
       const arr = byDate[d] || [];
       for(const e of arr){
         if(e.kind !== 'DH' || !e._internal) continue;
@@ -10629,6 +10617,9 @@ function resCambioAtEndOfDate(date){
         else if(e._transferDir === 'reserva_to_caja') net -= amt;
       }
     }
+    // Para HOY la reserva física real manda sobre el cálculo forward (puede haber
+    // ajustes legítimos sin asiento aún); para días pasados usamos el chain forward.
+    if(date >= today) return now;
     return siCambio + net;
   }catch(_){ return now; }
 }
@@ -10640,32 +10631,23 @@ function resCambioAtEndOfDate(date){
 function resCambioAtStartOfDate(date){
   const now = reservaCambio();
   if(!date) return now;
+  // 🛡 Feb 2026 · HOY local (yyyy-mm-dd) para distinguir cálculo histórico vs actual.
+  const today = (()=>{ try{ const d=new Date(); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }catch(_){ return date; } })();
   try{
     const si = (typeof getSaldoInicial === 'function') ? getSaldoInicial() : null;
     const st = loadState();
     const byDate = st.byDate || {};
-    if(!si || !si.fecha){
-      let laterNet = 0;
-      for(const d in byDate){
-        if(d < date) continue;
-        const arr = byDate[d] || [];
-        for(const e of arr){
-          if(e.kind !== 'DH' || !e._internal) continue;
-          const amt = +e.importe || 0;
-          if(e._transferDir === 'caja_to_reserva') laterNet += amt;
-          else if(e._transferDir === 'banco_to_reserva') laterNet += amt;
-          else if(e._transferDir === 'reserva_to_caja') laterNet -= amt;
-        }
-      }
-      return now - laterNet;
-    }
-    const siFecha = si.fecha;
-    const siCambio = +si.cambio || 0;
-    if(date <= siFecha) return (date < siFecha) ? 0 : siCambio;
+    const siFecha = si && si.fecha ? si.fecha : null;
+    const siCambio = si ? (+si.cambio || 0) : 0;
+    if(siFecha && date < siFecha) return 0;
+    if(siFecha && date === siFecha) return siCambio;  // inicio del día ancla
+    // ✅ Fórmula FORWARD · suma traspasos dated anteriores al propio día.
+    //   Ya no existe fallback `now - laterNet` que corrompía días pasados cuando no
+    //   había cadena de asientos (ej. reserva movida con +/- en lugar de Añadir/Sacar).
     let net = 0;
     for(const d in byDate){
-      if(d < siFecha) continue;
-      if(d >= date) continue;   // excluye el propio día (traspasos de HOY no cuentan en saldo anterior)
+      if(siFecha && d < siFecha) continue;
+      if(d >= date) continue;  // excluye el propio día
       const arr = byDate[d] || [];
       for(const e of arr){
         if(e.kind !== 'DH' || !e._internal) continue;
@@ -10675,6 +10657,9 @@ function resCambioAtStartOfDate(date){
         else if(e._transferDir === 'reserva_to_caja') net -= amt;
       }
     }
+    // Para HOY (saldo anterior = al cierre de ayer) usamos chain forward también:
+    //   coherente con los días pasados. Solo si NO hay ancla ni asientos, cae a `now`.
+    if(!siFecha && net === 0 && date > today) return now;
     return siCambio + net;
   }catch(_){ return now; }
 }
