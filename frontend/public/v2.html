@@ -5114,7 +5114,7 @@ function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(
   // Feb 2026 · simplificación: eliminado el concepto "traspasado a caja" (_toCaja).
   // Sacar cambio ahora crea un asiento HABER _internal (fp:E) real que sube la caja
   // física a través de t.internalCaja. Añadir cambio crea un DEBE _internal que la baja.
-  const cajonCambio=reservaCambio();
+  const cajonCambio=resCambioAtEndOfDate(currentDate);
   const resCambio=cajonCambio;
   const cajaC=(efShown-delta_C)+saCC.caja+resCambio+(t.internalCaja||0);
   // 🔵 CUENTA BANCO = tarjeta declarada (trShown) + Bizum + Transf + saldo ant. + transferencias internas
@@ -10568,6 +10568,35 @@ function cambioTotal(o){
 }
 // Reserva de cambio = diner físic (metàl·lic) guardat com a fons. Repercuteix al saldo anterior (caja i total) i a la ${L('CAIXA FÍSICA','CAJA FÍSICA')}.
 function reservaCambio(){try{return cambioTotal(loadCambio())}catch(e){return 0}}
+
+// 🛡 Feb 2026 · FIX bug CRÍTICO reserva histórica: `caja.reserva.v1` solo guarda el estado ACTUAL
+//    (una sola copia), por lo que al revisar días pasados mostraba la reserva de HOY en vez de la
+//    reserva que había ese día. Esto hacía que los cuadres de días anteriores no cuadrasen cuando
+//    la reserva había cambiado desde entonces.
+//    Solución: reconstruir el valor de la reserva al FINAL del día pedido deshaciendo los asientos
+//    de traspaso (`caja_to_reserva`, `banco_to_reserva`, `reserva_to_caja`) de los días POSTERIORES.
+//    Compatible con asientos antiguos (sin flag especial) y con los nuevos del modal.
+function resCambioAtEndOfDate(date){
+  const now = reservaCambio();
+  if(!date) return now;
+  try{
+    const st = loadState();
+    let laterNet = 0;
+    const byDate = st.byDate || {};
+    for(const d in byDate){
+      if(d <= date) continue; // solo días POSTERIORES al que vemos
+      const arr = byDate[d] || [];
+      for(const e of arr){
+        if(e.kind !== 'DH' || !e._internal) continue;
+        const amt = +e.importe || 0;
+        if(e._transferDir === 'caja_to_reserva') laterNet += amt;
+        else if(e._transferDir === 'banco_to_reserva') laterNet += amt;
+        else if(e._transferDir === 'reserva_to_caja') laterNet -= amt;
+      }
+    }
+    return now - laterNet;
+  }catch(_){ return now; }
+}
 // 🔁 Cambio traspasado a caja: dinero que salió del cajón de cambio HACIA la caja.
 // NO desaparece del saldo: sigue siendo efectivo físico, solo cambió de sitio.
 function traspasoCambio(){try{return +(loadCambio()._toCaja)||0}catch(e){return 0}}
