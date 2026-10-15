@@ -13277,8 +13277,22 @@ async function openTwilioCfgModal(){
       <div id="twTestResult" style="margin-top:12px;font-size:12px;min-height:20px"></div>
     </div>`;
   document.body.appendChild(back);
-  back.addEventListener('click',(e)=>{if(e.target===back)back.remove()});
-  document.getElementById('twCfgClose').onclick=()=>back.remove();
+  // 🔧 Feb 2026 · Guardado-blindaje al cerrar el modal (click fuera o ✕):
+  //    siempre persiste lo que haya escrito en los campos LabsMobile, aunque sea parcial
+  //    y aunque el autosave de 500ms no haya corrido todavía. Garantiza cero pérdida.
+  const _labForceSaveOnClose = () => {
+    try{
+      const u = (document.getElementById('labUser')||{}).value?.trim() || '';
+      const t = (document.getElementById('labToken')||{}).value?.trim() || '';
+      const s = (document.getElementById('labSender')||{}).value?.trim() || '';
+      if(u || t || s){
+        localStorage.setItem('caja.labsmobile.creds.v1', JSON.stringify({username:u, token:t, sender:s}));
+        localStorage.setItem('caja.sms.provider.v1', 'labsmobile');
+      }
+    }catch(_){}
+  };
+  back.addEventListener('click',(e)=>{ if(e.target===back){ _labForceSaveOnClose(); back.remove(); } });
+  document.getElementById('twCfgClose').onclick=()=>{ _labForceSaveOnClose(); back.remove(); };
 
   // Tabs handler · Feb 2026 · soporta 3 pestañas: byoa / lab / medicar
   function switchTab(tab){
@@ -13616,7 +13630,15 @@ async function openTwilioCfgModal(){
           return;
         }
         // ÉXITO · muestra saldo (sin notas confusas)
-        if(statusEl) statusEl.innerHTML = '<span style="color:#86efac">✅ '+(isCA?'Compte vàlid':'Cuenta válida')+'</span>';
+        //    🔧 Feb 2026 · Además, guarda INMEDIATAMENTE las credenciales en localStorage
+        //       para que el pre-flight de envío no falle con "Faltan datos" aunque el
+        //       autosave de 500ms no haya corrido todavía.
+        try{
+          const snd = (document.getElementById('labSender')||{}).value?.trim() || '';
+          localStorage.setItem('caja.labsmobile.creds.v1', JSON.stringify({username:user, token:tok, sender:snd}));
+          localStorage.setItem('caja.sms.provider.v1', 'labsmobile');
+        }catch(_){}
+        if(statusEl) statusEl.innerHTML = '<span style="color:#86efac">✅ '+(isCA?'Compte vàlid · credencials desades':'Cuenta válida · credenciales guardadas')+'</span>';
         if(resultEl){
           const credits = r.credits || '0';
           const creditsNum = parseFloat(credits) || 0;
@@ -14228,6 +14250,19 @@ function openSmsModal(){
       if(activeProvider === 'labsmobile'){
         let lab = {};
         try{ lab = JSON.parse(localStorage.getItem('caja.labsmobile.creds.v1')||'{}'); }catch(_){}
+        // 🔧 Feb 2026 · Blindaje: si localStorage está vacío pero el modal de config está abierto
+        //    con credenciales rellenas, rescatarlas de los inputs y persistirlas al vuelo.
+        //    Evita el error "Faltan datos" cuando el autosave aún no se disparó.
+        try{
+          const u = (document.getElementById('labUser')||{}).value?.trim() || '';
+          const t = (document.getElementById('labToken')||{}).value?.trim() || '';
+          const s = (document.getElementById('labSender')||{}).value?.trim() || '';
+          if(u && t && s && (!lab.username || !lab.token || !lab.sender)){
+            lab = {username:u, token:t, sender:s};
+            localStorage.setItem('caja.labsmobile.creds.v1', JSON.stringify(lab));
+            localStorage.setItem('caja.sms.provider.v1', 'labsmobile');
+          }
+        }catch(_){}
         const miss = [];
         if(!(lab.username||'').trim()) miss.push(isCA?'Usuari (email)':'Usuario (email)');
         if(!(lab.token||'').trim()) miss.push('API Token');
