@@ -12968,6 +12968,57 @@ function saveTwilioCreds(sid, token, from_number){
 function clearTwilioCreds(){ try{ localStorage.removeItem(TWILIO_LS_KEY); }catch(e){} }
 function hasTwilioCreds(){ return !!getTwilioCreds(); }
 
+// 🇪🇸🏢 Feb 2026 · LabsMobile · Credenciales SEPARADAS por empresa con HERENCIA inteligente.
+//   Comportamiento:
+//     • Por defecto: usuario+token+sender se heredan entre empresas (una sola config vale para las 2)
+//     • Si el user cambia algo en una empresa → solo esa empresa lo recuerda, la otra sigue con lo heredado
+//     • El sender SIEMPRE es específico por empresa (nombre comercial distinto por sociedad)
+//   Estructura localStorage caja.labsmobile.creds.v1:
+//     {
+//       username, token, sender: legacy (últimos valores, compat con instalaciones sin empresa activa),
+//       byCompany: { trafic:{username,token,sender}, cempla:{username,token,sender} }
+//     }
+function _getLabStorage(){
+  try{ return JSON.parse(localStorage.getItem('caja.labsmobile.creds.v1')||'{}'); }catch(_){ return {}; }
+}
+function _activeCompanyKey(){
+  try{ return (typeof currentCompany !== 'undefined') ? String(currentCompany||'').toLowerCase() : ''; }catch(_){ return ''; }
+}
+function getLabCreds(){
+  // Devuelve {username, token, sender} para la empresa activa.
+  // Herencia: username/token caen a la otra empresa o al root legacy si falta.
+  // Sender NO hereda (debe ser específico de la empresa).
+  const l = _getLabStorage();
+  const cur = _activeCompanyKey();
+  const bc = l.byCompany || {};
+  const me = bc[cur] || {};
+  const otherKeys = Object.keys(bc).filter(k => k !== cur);
+  const other = otherKeys.length ? (bc[otherKeys[0]] || {}) : {};
+  return {
+    username: (me.username ?? '').trim() || (other.username ?? '').trim() || (l.username ?? '').trim() || '',
+    token:    (me.token    ?? '').trim() || (other.token    ?? '').trim() || (l.token    ?? '').trim() || '',
+    sender:   (me.sender   ?? '').trim() || '',  // sender nunca hereda
+  };
+}
+function saveLabCreds({username, token, sender}){
+  const l = _getLabStorage();
+  const cur = _activeCompanyKey();
+  if(cur){
+    l.byCompany = l.byCompany || {};
+    l.byCompany[cur] = l.byCompany[cur] || {};
+    if(username !== undefined) l.byCompany[cur].username = username;
+    if(token    !== undefined) l.byCompany[cur].token    = token;
+    if(sender   !== undefined) l.byCompany[cur].sender   = sender;
+  }
+  // Compat legacy: últimos valores configurados en los campos root (para apps/flows sin empresa activa)
+  if(username !== undefined) l.username = username;
+  if(token    !== undefined) l.token    = token;
+  if(sender   !== undefined) l.sender   = sender;
+  try{ localStorage.setItem('caja.labsmobile.creds.v1', JSON.stringify(l)); }catch(_){}
+}
+function getLabSenderForActive(){ return getLabCreds().sender; }
+function getLabCredsForSend(){ return getLabCreds(); }
+
 // 🧹 Feb 2026 · Twilio retirado del programa.
 //    Auto-cleanup ONE-TIME de credenciales Twilio que pueda haber guardadas del cliente,
 //    para evitar cruces raros al forzar LabsMobile como único proveedor.
@@ -13120,7 +13171,8 @@ async function openTwilioCfgModal(){
   try{ smsProv = (localStorage.getItem('caja.sms.provider.v1')||'labsmobile').toLowerCase(); }catch(_){}
   // Si el usuario tenía 'twilio' guardado de antes, forzamos a LabsMobile silenciosamente
   if(smsProv === 'twilio') smsProv = 'labsmobile';
-  const curLab = (() => { try{ return JSON.parse(localStorage.getItem('caja.labsmobile.creds.v1')||'{}'); }catch(_){ return {}; } })();
+  // 🏢 Feb 2026 · credenciales de la EMPRESA ACTIVA (con herencia si no están configuradas en esta)
+  const curLab = getLabCreds();
   const initialTab = (curMode === 'medicar' && medReady) ? 'medicar' : 'lab';
 
   const back = document.createElement('div');
@@ -13227,7 +13279,7 @@ async function openTwilioCfgModal(){
               <div style="font-size:11px;font-weight:700;color:#60a5fa;text-transform:uppercase;letter-spacing:.5px">${isCA?'Remitent (nom del centre)':'Remitente (nombre del centro)'} <span id="labSenderBadge" style="margin-left:4px;padding:1px 7px;border-radius:10px;font-size:9px;letter-spacing:.3px;background:#1e293b;color:#94a3b8;text-transform:uppercase;font-weight:700"></span></div>
               <button type="button" id="labUseCentre" style="background:#064e3b;color:#86efac;border:1px solid #22c55e;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700">⚡ ${isCA?'Usar nom del centre':'Usar nombre del centro'}</button>
             </div>
-            <input id="labSender" data-testid="lab-sender" type="text" value="${(curLab.sender||'').replace(/"/g,'&quot;')}" placeholder="CEMPLA" maxlength="11" style="width:100%;padding:11px 12px;background:#0e1a2e;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:14px;font-weight:700;letter-spacing:1px;box-sizing:border-box">
+            <input id="labSender" data-testid="lab-sender" type="text" value="${(getLabSenderForActive()||'').replace(/"/g,'&quot;')}" placeholder="CEMPLA" maxlength="11" style="width:100%;padding:11px 12px;background:#0e1a2e;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:14px;font-weight:700;letter-spacing:1px;box-sizing:border-box">
             <div style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.5">${isCA?'<b style="color:#86efac">Màxim 11 caràcters</b> · només lletres i números · sense accents ni símbols.':'<b style="color:#86efac">Máximo 11 caracteres</b> · solo letras y números · sin acentos ni símbolos.'} <span style="color:#86efac">${isCA?'Per enviar a Espanya pots posar el nom que vulguis (ex: <b>CEMPLA</b>, <b>MediCar</b>). No cal aprovació prèvia.':'Para enviar a España puedes poner el nombre que quieras (ej: <b>CEMPLA</b>, <b>MediCar</b>). No hace falta aprobación previa.'}</span></div>
             <div id="labSenderPreview" style="margin-top:10px;padding:10px 12px;background:#0b1121;border:1px dashed #334155;border-radius:8px;display:none">
               <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${isCA?'Com ho veurà el pacient':'Cómo lo verá el paciente'} 📱</div>
@@ -13298,8 +13350,8 @@ async function openTwilioCfgModal(){
       const t = (document.getElementById('labToken')||{}).value?.trim() || '';
       const s = (document.getElementById('labSender')||{}).value?.trim() || '';
       if(u || t || s){
-        localStorage.setItem('caja.labsmobile.creds.v1', JSON.stringify({username:u, token:t, sender:s}));
-        localStorage.setItem('caja.sms.provider.v1', 'labsmobile');
+        saveLabCreds({username:u, token:t, sender:s});
+        try{ localStorage.setItem('caja.sms.provider.v1', 'labsmobile'); }catch(_){}
       }
     }catch(_){}
   };
@@ -13606,7 +13658,7 @@ async function openTwilioCfgModal(){
     // 🔧 Feb 2026 · Guarda SIEMPRE lo que haya (parcial o completo) para no perder nada
     //    si el usuario cierra el modal a mitad de rellenar. Antes requería los 3 campos.
     const doSave = () => {
-      try{ localStorage.setItem('caja.labsmobile.creds.v1', JSON.stringify({username:user, token:tok, sender:snd})); }catch(_){}
+      try{ saveLabCreds({username:user, token:tok, sender:snd}); }catch(_){}
       try{ localStorage.setItem('caja.sms.provider.v1', 'labsmobile'); }catch(_){}
       // Mensaje adaptado al estado
       if(ind){
@@ -13678,7 +13730,7 @@ async function openTwilioCfgModal(){
         //       autosave de 500ms no haya corrido todavía.
         try{
           const snd = (document.getElementById('labSender')||{}).value?.trim() || '';
-          localStorage.setItem('caja.labsmobile.creds.v1', JSON.stringify({username:user, token:tok, sender:snd}));
+          saveLabCreds({username:user, token:tok, sender:snd});
           localStorage.setItem('caja.sms.provider.v1', 'labsmobile');
         }catch(_){}
         if(statusEl) statusEl.innerHTML = '<span style="color:#86efac">✅ '+(isCA?'Compte vàlid · credencials desades':'Cuenta válida · credenciales guardadas')+'</span>';
@@ -13857,10 +13909,12 @@ function openSmsModal(){
           </div>`;
         }
         // 🇪🇸 Feb 2026 · Check LabsMobile (ara proveïdor únic). Si té creds completes → "Configurado OK".
+        //    🏢 El remitent es llegeix per empresa activa amb getLabSenderForActive().
         try{
-          const lab = JSON.parse(localStorage.getItem('caja.labsmobile.creds.v1')||'{}');
-          if((lab.username||'').trim() && (lab.token||'').trim() && (lab.sender||'').trim()){
-            const senderDisp = (lab.sender||'').length>16 ? lab.sender.slice(0,16)+'…' : lab.sender;
+          const lab = _getLabStorage();
+          const senderActive = getLabSenderForActive();
+          if((lab.username||'').trim() && (lab.token||'').trim() && (senderActive||'').trim()){
+            const senderDisp = (senderActive||'').length>16 ? senderActive.slice(0,16)+'…' : senderActive;
             return `<div style="padding:10px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:16px;background:#052e16;color:#86efac;border:1px solid #22c55e;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
               <span>✅ ${isCA?'LabsMobile configurat · Enviament real actiu':'LabsMobile configurado · Envío real activo'} · <b>${senderDisp}</b></span>
               <button onclick="openTwilioCfgModal()" style="background:#052e16;color:#86efac;border:1px solid #22c55e;padding:3px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700">⚙️ ${isCA?'Editar':'Editar'}</button>
@@ -14302,8 +14356,8 @@ function openSmsModal(){
       try{ activeProvider = (localStorage.getItem('caja.sms.provider.v1')||'labsmobile').toLowerCase(); }catch(_){}
       if(activeProvider === 'twilio'){ activeProvider = 'labsmobile'; try{ localStorage.setItem('caja.sms.provider.v1','labsmobile'); }catch(_){} }
       if(activeProvider === 'labsmobile'){
-        let lab = {};
-        try{ lab = JSON.parse(localStorage.getItem('caja.labsmobile.creds.v1')||'{}'); }catch(_){}
+        // 🏢 Feb 2026 · credenciales de la empresa activa (con herencia desde la otra si falta)
+        let lab = getLabCreds();
         // 🔧 Feb 2026 · Blindaje: si localStorage está vacío pero el modal de config está abierto
         //    con credenciales rellenas, rescatarlas de los inputs y persistirlas al vuelo.
         //    Evita el error "Faltan datos" cuando el autosave aún no se disparó.
@@ -14312,9 +14366,9 @@ function openSmsModal(){
           const t = (document.getElementById('labToken')||{}).value?.trim() || '';
           const s = (document.getElementById('labSender')||{}).value?.trim() || '';
           if(u && t && s && (!lab.username || !lab.token || !lab.sender)){
-            lab = {username:u, token:t, sender:s};
-            localStorage.setItem('caja.labsmobile.creds.v1', JSON.stringify(lab));
-            localStorage.setItem('caja.sms.provider.v1', 'labsmobile');
+            saveLabCreds({username:u, token:t, sender:s});
+            lab = getLabCreds();
+            try{ localStorage.setItem('caja.sms.provider.v1', 'labsmobile'); }catch(_){}
           }
         }catch(_){}
         const miss = [];
@@ -14366,12 +14420,10 @@ function openSmsModal(){
           const cur = (typeof currentCompany !== 'undefined') ? String(currentCompany||'').toLowerCase() : '';
           if(cur) payload.company = cur;
         }catch(_){}
-        // 🇪🇸 Feb 2026 · Provider = labsmobile → envia creds LAB i omet Twilio
+        // 🇪🇸 Feb 2026 · Provider = labsmobile → envia creds LAB (per empresa activa amb herencia)
         if(activeProvider === 'labsmobile'){
-          let lab = {};
-          try{ lab = JSON.parse(localStorage.getItem('caja.labsmobile.creds.v1')||'{}'); }catch(_){}
           payload.provider = 'labsmobile';
-          payload.labsmobile_creds = { username: lab.username||'', token: lab.token||'', sender: lab.sender||'' };
+          payload.labsmobile_creds = getLabCredsForSend();
         } else {
           payload.provider = 'twilio';
           const mode = getTwilioMode();
