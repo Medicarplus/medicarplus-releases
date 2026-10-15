@@ -13541,30 +13541,43 @@ async function openTwilioCfgModal(){
     };
   }
   let _labAutoTimer = null;
-  function scheduleLabAutoSave(){
+  function scheduleLabAutoSave(immediate){
     const ind = document.getElementById('labAutoSave');
     const user = (document.getElementById('labUser')||{}).value?.trim() || '';
     const tok = (document.getElementById('labToken')||{}).value?.trim() || '';
     const snd = (document.getElementById('labSender')||{}).value?.trim() || '';
-    if(!user || !tok || !snd){
-      if(ind) ind.textContent = ''; return;
-    }
-    if(!/^[A-Za-z0-9]{1,11}$/.test(snd)){
-      if(ind) ind.innerHTML = '<span style="color:#fca5a5">⚠ ' + (isCA?'Revisa el remitent':'Revisa el remitente') + '</span>';
-      return;
-    }
-    if(ind) ind.innerHTML = '<span style="color:#64748b">⏳ ' + (isCA?'Desant…':'Guardando…') + '</span>';
-    clearTimeout(_labAutoTimer);
-    _labAutoTimer = setTimeout(()=>{
+    // 🔧 Feb 2026 · Guarda SIEMPRE lo que haya (parcial o completo) para no perder nada
+    //    si el usuario cierra el modal a mitad de rellenar. Antes requería los 3 campos.
+    const doSave = () => {
       try{ localStorage.setItem('caja.labsmobile.creds.v1', JSON.stringify({username:user, token:tok, sender:snd})); }catch(_){}
       try{ localStorage.setItem('caja.sms.provider.v1', 'labsmobile'); }catch(_){}
-      if(ind) ind.innerHTML = '<span style="color:#86efac">✅ ' + (isCA?'Desat automàticament':'Guardado automáticamente') + '</span>';
-    }, 800);
+      // Mensaje adaptado al estado
+      if(ind){
+        if(user && tok && snd){
+          if(!/^[A-Za-z0-9]{1,11}$/.test(snd)){
+            ind.innerHTML = '<span style="color:#fca5a5">⚠ ' + (isCA?'Revisa el remitent (màx 11, lletres i números)':'Revisa el remitente (máx 11, letras y números)') + '</span>';
+          } else {
+            ind.innerHTML = '<span style="color:#86efac">✅ ' + (isCA?'Credencials desades':'Credenciales guardadas') + '</span>';
+          }
+        } else if(user || tok || snd){
+          ind.innerHTML = '<span style="color:#fbbf24">💾 ' + (isCA?'Guardat parcial · completa els altres camps':'Guardado parcial · completa los otros campos') + '</span>';
+        } else {
+          ind.textContent = '';
+        }
+      }
+    };
+    if(immediate){ clearTimeout(_labAutoTimer); doSave(); return; }
+    if(ind && (user||tok||snd)) ind.innerHTML = '<span style="color:#64748b">⏳ ' + (isCA?'Desant…':'Guardando…') + '</span>';
+    clearTimeout(_labAutoTimer);
+    _labAutoTimer = setTimeout(doSave, 500);
   }
   ['labUser','labToken','labSender'].forEach(id => {
     const el = document.getElementById(id);
     if(!el) return;
-    el.addEventListener('input', () => { if(id==='labSender') refreshLabSenderUI(); scheduleLabAutoSave(); });
+    el.addEventListener('input', () => { if(id==='labSender') refreshLabSenderUI(); scheduleLabAutoSave(false); });
+    // 🔧 Feb 2026 · Guardado inmediato al perder el foco (blur) para evitar que se pierda
+    //    si el usuario cierra el modal justo después de teclear.
+    el.addEventListener('blur', () => scheduleLabAutoSave(true));
   });
   refreshLabSenderUI();
 
