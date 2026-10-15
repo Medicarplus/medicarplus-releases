@@ -5578,9 +5578,12 @@ function cajaFisicaAcumulada(date){
   return (efDay-delta)+saCC.caja;
 }
 function renderSaldoAnterior(){
-  // Saldo anterior = caja física + banc acumulats fins avui (exclusiu) + reserva de cambio (metàl·lic guardat)
+  // Saldo anterior = caja física + banc acumulats fins avui (exclusiu) + reserva al INICIO del día
+  //   🛡 FIX Feb 2026 · usamos `resCambioAtStartOfDate(currentDate)` (reserva al cierre del día ANTERIOR)
+  //   en vez de `reservaCambio()` global, para que al revisar días pasados muestre la reserva histórica
+  //   correcta y no la de HOY. Esto hace que la copia diaria sync PC↔PC no "contamine" días anteriores.
   const saCC=saldoAnteriorPorCuenta(currentDate);
-  $('#saldoAntNum').textContent=fmt(saCC.caja+saCC.banc+reservaCambio());
+  $('#saldoAntNum').textContent=fmt(saCC.caja+saCC.banc+resCambioAtStartOfDate(currentDate));
 }
 function renderHistory(){const dates=Object.keys(state.byDate).filter(d=>entriesOf(d).length).sort().reverse();$('#histCount').textContent=`${dates.length} día(s)`;$('#histList').innerHTML=dates.length?dates.map(d=>{const t=computeTotals(entriesOf(d));const cls=d===currentDate?'style="background:#1a1e27"':'';return `<div class="history-item" ${cls} data-d="${d}"><div><div class="date">${d.split('-').reverse().join('/')}</div><div class="totals">${t.cnt} entrada(s) · ${fmt(t.neto)}</div></div><button class="icon-btn" data-delday="${d}" title="Borrar día">🗑️</button></div>`}).join(''):'<div class="empty">Sin histórico todavía</div>';$$('#histList .history-item').forEach(el=>el.onclick=e=>{if(e.target.dataset.delday){const day=e.target.dataset.delday;confirmModal('Borrar día',`¿Borrar TODOS los datos del día <b>${day.split('-').reverse().join('/')}</b>?`,()=>{delete state.byDate[day];saveState();render()},'Borrar día');e.stopPropagation();return}setDate(el.dataset.d)})}
 function actEntry(act,id){
@@ -10576,25 +10579,103 @@ function reservaCambio(){try{return cambioTotal(loadCambio())}catch(e){return 0}
 //    Solución: reconstruir el valor de la reserva al FINAL del día pedido deshaciendo los asientos
 //    de traspaso (`caja_to_reserva`, `banco_to_reserva`, `reserva_to_caja`) de los días POSTERIORES.
 //    Compatible con asientos antiguos (sin flag especial) y con los nuevos del modal.
+// 🛡 Feb 2026 · FIX bug CRÍTICO reserva histórica (v2 · 15-Oct-2026):
+//    Antes: `now - laterNet` (parte de la reserva ACTUAL y resta transferencias futuras).
+//    Problema: si entre `si.fecha` (saldo inicial) y HOY hay cambios en denominaciones
+//    sin asiento dated (p.ej. recuento manual con +/- en el modal), la reserva histórica
+//    "hereda" el valor actual, falseando días pasados tras una copia diaria PC↔PC.
+//    Nueva fórmula FORWARD: siCambio + Σ(traspasos dated entre si.fecha y date, inclusive).
+//    · Cada día refleja SOLO los traspasos realmente ocurridos hasta esa fecha.
+//    · Compatible con sync: el `caja.reserva.v1` global ya NO afecta a los días pasados.
+//    · Si no hay saldo inicial configurado → fallback a la lógica previa (`now - laterNet`).
 function resCambioAtEndOfDate(date){
   const now = reservaCambio();
   if(!date) return now;
   try{
+    const si = (typeof getSaldoInicial === 'function') ? getSaldoInicial() : null;
     const st = loadState();
-    let laterNet = 0;
     const byDate = st.byDate || {};
+    // ⚡ Si NO hay saldo inicial configurado → comportamiento legacy (hacia atrás)
+    if(!si || !si.fecha){
+      let laterNet = 0;
+      for(const d in byDate){
+        if(d <= date) continue;
+        const arr = byDate[d] || [];
+        for(const e of arr){
+          if(e.kind !== 'DH' || !e._internal) continue;
+          const amt = +e.importe || 0;
+          if(e._transferDir === 'caja_to_reserva') laterNet += amt;
+          else if(e._transferDir === 'banco_to_reserva') laterNet += amt;
+          else if(e._transferDir === 'reserva_to_caja') laterNet -= amt;
+        }
+      }
+      return now - laterNet;
+    }
+    // ✅ Fórmula FORWARD con saldo inicial
+    const siFecha = si.fecha;
+    const siCambio = +si.cambio || 0;
+    // Fecha anterior al arranque de la empresa → antes no había programa → 0
+    if(date < siFecha) return 0;
+    let net = 0;
     for(const d in byDate){
-      if(d <= date) continue; // solo días POSTERIORES al que vemos
+      if(d < siFecha) continue;    // traspasos previos al arranque: ruido, se ignora
+      if(d > date) continue;        // traspasos posteriores a la fecha pedida: no cuentan
       const arr = byDate[d] || [];
       for(const e of arr){
         if(e.kind !== 'DH' || !e._internal) continue;
         const amt = +e.importe || 0;
-        if(e._transferDir === 'caja_to_reserva') laterNet += amt;
-        else if(e._transferDir === 'banco_to_reserva') laterNet += amt;
-        else if(e._transferDir === 'reserva_to_caja') laterNet -= amt;
+        if(e._transferDir === 'caja_to_reserva') net += amt;
+        else if(e._transferDir === 'banco_to_reserva') net += amt;
+        else if(e._transferDir === 'reserva_to_caja') net -= amt;
       }
     }
-    return now - laterNet;
+    return siCambio + net;
+  }catch(_){ return now; }
+}
+// 🛡 Feb 2026 · Reserva al INICIO del día (= al cierre del día anterior).
+//   Igual que resCambioAtEndOfDate pero EXCLUYE las transferencias del propio día.
+//   Se usa en `renderSaldoAnterior` (saldo acumulado ANTES del día actual).
+//   Garantiza coherencia tras aplicar la copia diaria entre PCs: cada PC mostrará
+//   la MISMA reserva histórica día a día, derivándola de las transferencias dated.
+function resCambioAtStartOfDate(date){
+  const now = reservaCambio();
+  if(!date) return now;
+  try{
+    const si = (typeof getSaldoInicial === 'function') ? getSaldoInicial() : null;
+    const st = loadState();
+    const byDate = st.byDate || {};
+    if(!si || !si.fecha){
+      let laterNet = 0;
+      for(const d in byDate){
+        if(d < date) continue;
+        const arr = byDate[d] || [];
+        for(const e of arr){
+          if(e.kind !== 'DH' || !e._internal) continue;
+          const amt = +e.importe || 0;
+          if(e._transferDir === 'caja_to_reserva') laterNet += amt;
+          else if(e._transferDir === 'banco_to_reserva') laterNet += amt;
+          else if(e._transferDir === 'reserva_to_caja') laterNet -= amt;
+        }
+      }
+      return now - laterNet;
+    }
+    const siFecha = si.fecha;
+    const siCambio = +si.cambio || 0;
+    if(date <= siFecha) return (date < siFecha) ? 0 : siCambio;
+    let net = 0;
+    for(const d in byDate){
+      if(d < siFecha) continue;
+      if(d >= date) continue;   // excluye el propio día (traspasos de HOY no cuentan en saldo anterior)
+      const arr = byDate[d] || [];
+      for(const e of arr){
+        if(e.kind !== 'DH' || !e._internal) continue;
+        const amt = +e.importe || 0;
+        if(e._transferDir === 'caja_to_reserva') net += amt;
+        else if(e._transferDir === 'banco_to_reserva') net += amt;
+        else if(e._transferDir === 'reserva_to_caja') net -= amt;
+      }
+    }
+    return siCambio + net;
   }catch(_){ return now; }
 }
 // 🔁 Cambio traspasado a caja: dinero que salió del cajón de cambio HACIA la caja.

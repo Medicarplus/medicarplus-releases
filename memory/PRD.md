@@ -1,54 +1,66 @@
 # MediCar Plus · PRD
 
-## Original problem statement
-POS y app de gestión para autoescuelas y centros médicos (TRÀFIC + CEMPLA). Zero bugs en contabilidad, PDF/Excel exports, sync offline→cloud, integridad estricta de datos.
+## Original Problem Statement
+Full-stack POS/management app for driving schools (TRÀFIC) and medical centers (CEMPLA).
+Core principle: **ZERO bugs in accounting + perfect historical data integrity + flawless offline-to-cloud sync.**
 
-## Stack
-- Frontend monolítico: `/app/frontend/public/v2.html` (~18.7k líneas) + manual (`manual-usuari.html`)
-- Backend: FastAPI + MongoDB (`/app/backend/routes/*`)
-- Desktop: Electron wrapper (`/app/commercial/electron/index.html` ofuscado)
-- Integraciones: Stripe, LabsMobile SMS, OpenAI/Claude (Emergent LLM Key)
+## Architecture
+- Monolith Vanilla JS (`/app/frontend/public/v2.html`, ~18.8k lines).
+- FastAPI + MongoDB backend.
+- Electron desktop (built via `commercial/build/obfuscate.js` → `commercial/electron/index.html`).
+- Per-company independent data spaces (`trafic` / `cempla`).
+- Multi-PC sync (push/pull snapshots + merge byDate idempotent).
 
-## Últimas sesiones
+## Reserva de Cambio · Arquitectura (Feb 2026, consolidada)
+**Modelo día-a-día (FORWARD):**
+- Saldo Inicial `si`: `{fecha, efectivo, banco, cambio, nota}` configurado al arrancar el programa (LOCAL por PC, no sincronizado).
+- Traspasos dated: cada movimiento Caja↔Reserva o Banco↔Reserva se guarda como asiento `DH _internal` con `_transferDir` en `byDate[fecha]`.
+- Reserva histórica al cierre del día X = `si.cambio + Σ(traspasos dated banco_to_reserva + caja_to_reserva − reserva_to_caja, con fecha ∈ [si.fecha, X])`.
+- Reserva al INICIO del día X = Σ con fecha ∈ [si.fecha, X−1] (= cierre día anterior).
+- Fechas < `si.fecha` → 0 €.
+- Fallback (sin si configurado): fórmula hacia atrás (`now − laterNet`).
 
-### Feb 2026 · Retirada Twilio + aislamiento 2 empresas + fix descuadre reserva
-1. **Twilio retirado del UI**: display:none en tab, default LabsMobile forzado, auto-cleanup one-time credenciales
-2. **Separación empresas en campañas SMS**: field `company` + filtro backend + frontend auto-scope. Campañas antiguas sin company se ven en ambas (compat).
-3. **LabsMobile credenciales por empresa con herencia**: username/token compartidos por defecto, pero sobrescribibles por empresa. Sender SIEMPRE específico por empresa.
-4. **5 capas de guardado LabsMobile**: autosave 500ms + blur + validate button + modal close + pre-flight rescue
-5. **Fix handler ⚡ "Usar nombre del centro" LabsMobile** (antes no funcionaba)
-6. **Banner LabsMobile reconoce config correctamente** (antes decía "SMS no configurados" aunque lo estaba)
-7. **Guía LabsMobile completa en manual de usuario** (sin Twilio tras retirada)
-8. **🐛 FIX descuadre -340€ "CAJA FÍSICA CON RESERVA + BANCO"**: 
-   - Asientos manuales `caja_to_reserva`/`banco_to_reserva`/`reserva_to_caja` no actualizaban `caja.reserva.v1`
-   - `computeTotals` ahora compensa cuando `_reservaSynced` no está presente
-   - Modal "Reserva de cambio" marca sus asientos con `_reservaSynced:true` para evitar doble compensación
-9. **Etiquetas renombradas**: "Saldo anterior caja + cambio" → "🟢 Caja física" + "💰 Reserva de cambio" + "Saldo total efectivo"
-10. **TOTAL label explícito**: "(caja + reserva de cambio + banco)"
+**Funciones:**
+- `resCambioAtEndOfDate(date)` → fin del día `date`.
+- `resCambioAtStartOfDate(date)` → inicio del día `date` (= fin del anterior).
+- `reservaCambio()` → estado FÍSICO actual (denominaciones + bulk pendiente); solo para el modal.
 
-## Backlog pendiente
-- **P1** · Export Excel (.xlsx) de "Honorarios y Gastos" (botón `#btnHonorarios`)
-- **P1** · Vídeo demo 30s en landing
-- **P2** · Export Excel Cuadre de Caja mensual
-- **P2** · "Posponer 30 días" para clientes inactivos
-- **P2** · Historial de copias aplicadas en panel sync
-- **P2** · Alerta IRPF trimestre no pagado al abrir
-- **P2** · Instalador `.dmg` iMac con electron-builder
-- **P2** · Migrar Stripe a LIVE mode
-- **P2** · Flujo CNMC Alias Registry (obligatorio Sep 2026)
-- **P2** · Chequeo pre-envío de saldo LabsMobile (bloqueo si contactos > SMS disponibles)
-- **P3** · WhatsApp Business API
+**Beneficios:**
+- Días pasados son INMUTABLES ante cambios en la reserva actual.
+- Sync PC↔PC no "contamina" el histórico aunque `caja.reserva.v1` cambie por LWW.
+- Siempre se puede explicar día a día: "el cambio sube/baja porque hay un asiento dated que mueve dinero DE/HACIA caja o banco".
 
-## Reglas críticas
-- **NO refactorizar** `v2.html` — usar `search_replace` siempre
-- Avisar al usuario tras cambios UI: `Ctrl + Shift + R` o reiniciar Electron
-- Zero regresiones: correr tests Node en `/app/frontend/public/tests/`
-- Prefijar rutas backend con `/api`
-- **Twilio queda oculto en UI** pero código permanece
-- Backup/restore separado por empresa; auto-descubrimiento `caja.*` no excluidas
+## Changelog (reciente)
+### 2026-10-15
+- ✅ **FIX CRÍTICO reserva histórica**: `resCambioAtEndOfDate` ahora usa fórmula FORWARD basada en Saldo Inicial, no `reservaCambio() global − futuro`. Resuelve el bug donde 31/08/2026 mostraba 436,74 € (reserva actual) en vez de 344,74 € (saldo inicial).
+- ✅ Nuevo `resCambioAtStartOfDate(date)` para el saldo anterior visualizado.
+- ✅ `renderSaldoAnterior()` fijado para usar `resCambioAtStartOfDate(currentDate)`.
+- ✅ Test automatizado (`/app/frontend/public/tests/test_reserva_historica_sync.js`) · 23/23 asserts OK incluyendo el caso real del usuario.
+- ✅ Compilado al Electron (`commercial/electron/index.html`).
 
-## Files of reference
-- `/app/frontend/public/v2.html` (monolito, no refactorizar)
-- `/app/frontend/public/manual-usuari.html`
-- `/app/backend/routes/sms_campaigns.py`
-- `/app/commercial/build/obfuscate.js` (regenerar tras cambios v2.html)
+### Previo
+- Twilio hidden; LabsMobile sole SMS provider (per-company Sender IDs).
+- `_mergeSnapshots` idempotente, `_filterSnapshotByDay` para "Solo día".
+- Doble empresa (TRÀFIC/CEMPLA) con datos aislados.
+
+## P0 Pending
+- [ ] Verificación por el usuario del fix 31/08/2026 → 344,74 € (requiere reinicio Electron en AMBOS PCs).
+
+## P1 Backlog
+- [ ] Export Honorarios y Gastos a Excel (.xlsx), botón `#btnHonorarios`.
+- [ ] Vídeo demo 30 s en landing page.
+- [ ] Reconciliación visual: si `reservaCambio()` (físico) ≠ `resCambioAtEndOfDate(hoy)` (calculado), avisar al usuario y proponer crear asiento de ajuste dated.
+
+## P2 Backlog
+- Excel export Cuadre de Caja mensual.
+- Botón "Posponer 30 días" para avisos de cliente inactivo.
+- Historial de copias aplicadas (fecha + remitente) en panel sync.
+- Alerta trimestre IRPF pendiente al abrir la app.
+- Instalador `.dmg` iMac via electron-builder.
+- Migrar Stripe a LIVE mode.
+
+## P3
+- WhatsApp Business API.
+
+## Credenciales de prueba
+Ver `/app/memory/test_credentials.md`.
