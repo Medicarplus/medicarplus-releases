@@ -13393,6 +13393,37 @@ async function openTwilioCfgModal(){
       if(fromInp){ fromInp.value = san || 'CENTRE'; fromInp.dispatchEvent(new Event('input',{bubbles:true})); fromInp.focus(); }
     };
   }
+  // 🔧 Feb 2026 · Handler análogo para el botón "⚡ Usar nombre del centro" de la pestaña LabsMobile
+  //    (antes no existía, el botón no hacía nada → el remitente nunca se guardaba y Enviar fallaba
+  //    con "Faltan datos · Remitente"). Rellena #labSender con el nombre sanitizado y dispara
+  //    los eventos input + blur para que el autosave corra y persista en localStorage.
+  const labUseCentreBtn = document.getElementById('labUseCentre');
+  if(labUseCentreBtn){
+    labUseCentreBtn.onclick = () => {
+      let centre = '';
+      try{
+        const cfg = JSON.parse(localStorage.getItem('caja.config.v1')||'{}');
+        const isC2 = (typeof currentCompany !== 'undefined' && currentCompany === 'cempla');
+        const c1 = (cfg.company1 && cfg.company1.name) || cfg.empresa || '';
+        const c2 = (cfg.company2 && cfg.company2.name) || cfg.empresa2 || '';
+        centre = String(isC2 ? (c2 || c1) : (c1 || c2)).trim();
+      }catch(_){}
+      if(!centre){
+        try{
+          const lic = JSON.parse(localStorage.getItem('caja.license.v1')||'{}');
+          centre = String(lic.centre || lic.client_name || '').trim();
+        }catch(_){}
+      }
+      const san = centre.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .replace(/[^A-Za-z0-9 ]/g,'').replace(/\s+/g,'').slice(0,11).toUpperCase();
+      const labInp = document.getElementById('labSender');
+      if(labInp){
+        labInp.value = san || 'CENTRE';
+        labInp.dispatchEvent(new Event('input',{bubbles:true}));
+        labInp.dispatchEvent(new Event('blur',{bubbles:true}));
+      }
+    };
+  }
   // Autosave con debounce 800 ms: cuando los 3 campos están rellenos, guarda solo
   let _autoSaveTimer = null;
   function scheduleAutoSave(){
