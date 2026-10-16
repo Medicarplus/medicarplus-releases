@@ -5605,7 +5605,38 @@ function actEntry(act,id){
     }catch(e){}
   }
   if(i<0){ try{ toast('No se pudo encontrar la entrada. Refresca la vista.', 3500); }catch(_){} return; }
-  if(act==='del'){confirmModal('Eliminar entrada',`¿Eliminar <b>${escapeHtml(list[i].nombre)}</b>?`,()=>{list.splice(i,1);saveState();render()},'Eliminar');return}
+  if(act==='del'){
+    const _ent = list[i];
+    // 🛡 Oct 2026 · si es un asiento de traspaso interno de reserva de cambio
+    //    (caja_to_reserva / banco_to_reserva / reserva_to_caja), al borrarlo
+    //    debemos revertir el ajuste en `caja.reserva.v1` para evitar desequilibrio
+    //    (si no, la reserva física queda +amt o -amt respecto a los asientos).
+    const _isReservaTransfer = _ent && _ent.kind==='DH' && _ent._internal && _ent._reservaSynced
+      && (_ent._transferDir==='caja_to_reserva' || _ent._transferDir==='banco_to_reserva' || _ent._transferDir==='reserva_to_caja');
+    confirmModal('Eliminar entrada',
+      _isReservaTransfer
+        ? `¿Eliminar <b>${escapeHtml(_ent.nombre)}</b>?<br><br><span style="color:#fbbf24;font-size:12px">⚠ También se revertirá el ajuste en la Reserva de cambio (<b>${_ent._transferDir==='reserva_to_caja'?'+':'−'}${fmt(+_ent.importe||0)}</b>).</span>`
+        : `¿Eliminar <b>${escapeHtml(_ent.nombre)}</b>?`,
+      ()=>{
+        if(_isReservaTransfer){
+          try{
+            const amt = +_ent.importe || 0;
+            const d = (typeof loadCambio==='function') ? loadCambio() : {};
+            // caja_to_reserva / banco_to_reserva → reserva BAJA el importe (deshacer la subida).
+            // reserva_to_caja → reserva SUBE el importe (deshacer la bajada).
+            const sign = (_ent._transferDir==='reserva_to_caja') ? +1 : -1;
+            const current = (typeof cambioTotal==='function') ? cambioTotal(d) : 0;
+            const nuevo = Math.max(0, +(current + sign*amt).toFixed(2));
+            // Reset limpio: borra denoms/_bulk_seed y deja _bulk con el nuevo total.
+            Object.keys(d).forEach(k=>{ if(k !== '_v') delete d[k]; });
+            if(nuevo > 0) d._bulk = nuevo;
+            if(typeof saveCambio==='function') saveCambio(d);
+          }catch(err){ console.warn('revert reserva on delete', err); }
+        }
+        list.splice(i,1); saveState(); render();
+      },'Eliminar');
+    return;
+  }
   if(act==='ret'){list[i].retorno=!list[i].retorno;saveState();render();return}
   if(act==='edit'){
     const e = list[i];
@@ -10879,37 +10910,61 @@ function openCambio(){
   //   hay asiento dated). Se guarda en el historial para poder deshacer.
   back.querySelector('#cambioModify').onclick=()=>{
     const current = cambioTotal(data);
-    const raw = prompt(
-      '✏️ Nuevo total de la reserva de cambio (€)\n\n'+
-      '⚠ Esta edición NO crea asiento ni traspaso.\n'+
-      '   El otro ordenador no verá el motivo del cambio.\n\n'+
-      'Si quieres que el otro PC entienda el movimiento,\n'+
-      'cancela y usa "➕ Añadir" o "💵 Sacar".\n\n'+
-      'Total actual: '+fmt(current),
-      current.toFixed(2).replace('.',',')
-    );
-    if(raw === null) return;
-    const norm = String(raw).trim().replace(/\s/g,'').replace(',','.').replace(/[^0-9.\-]/g,'');
-    const val = parseFloat(norm);
-    if(!isFinite(val) || val < 0){ if(typeof toast==='function') toast('⚠ Importe no válido'); return; }
-    const nuevo = +val.toFixed(2);
-    if(Math.abs(nuevo - current) < 0.005){ if(typeof toast==='function') toast('✓ Sin cambios'); return; }
-    // Snapshot para "↶ Deshacer último"
-    try{
-      const HK='caja.cambio.history.v1';
-      let hist=[]; try{ hist=JSON.parse(localStorage.getItem(HK)||'[]'); }catch(_){ hist=[]; }
-      hist.push({ at: Date.now(), mode: 'modify', amount: nuevo, prev: current, snapshot: JSON.stringify(data) });
-      while(hist.length>20) hist.shift();
-      localStorage.setItem(HK, JSON.stringify(hist));
-    }catch(_){}
-    // Vacía denominaciones + _bulk_seed; deja solo _bulk con el valor manual.
-    Object.keys(data).forEach(k=>{ if(k !== '_v') delete data[k]; });
-    if(nuevo > 0) data._bulk = nuevo;
-    saveCambio(data);
-    render();
-    if(typeof toast==='function') toast('✏️ Reserva modificada a '+fmt(nuevo));
-    // Refresca la UI principal para que todos los totales se actualicen
-    try{ window.render && window.render() }catch(_){}
+    // 🛡 Oct 2026 · reemplazamos prompt() (bloqueado en Electron) por modal custom.
+    const mb = document.createElement('div');
+    mb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100100;display:flex;align-items:center;justify-content:center;padding:20px';
+    mb.innerHTML = `
+      <div style="background:#111827;border:2px solid #854d0e;border-radius:12px;padding:22px;max-width:460px;width:100%;font-family:Arial,Helvetica,sans-serif;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+        <h3 style="margin:0 0 10px;color:#fbbf24;font-family:Georgia,serif;font-size:17px">✏️ Modificar reserva (sin asiento)</h3>
+        <p style="color:#94a3b8;font-size:11px;margin:0 0 12px;line-height:1.4">
+          ⚠ Esta edición <b style="color:#fbbf24">NO crea asiento</b> ni traspaso.
+          El otro ordenador no verá de dónde salió/entró el dinero.<br>
+          Si quieres que quede trazado, cancela y usa <b style="color:#22c55e">➕ Añadir</b> o <b style="color:#f97316">💵 Sacar</b>.
+        </p>
+        <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;margin-bottom:12px">
+          <div style="color:#64748b;font-size:10px;letter-spacing:.5px;font-weight:700">TOTAL ACTUAL</div>
+          <div style="color:#e2e8f0;font-size:18px;font-family:'Courier New',monospace;font-weight:700">${fmt(current)}</div>
+        </div>
+        <label style="display:block;color:#94a3b8;font-size:11px;font-weight:700;margin-bottom:5px">NUEVO TOTAL (€)</label>
+        <input id="_modInput" type="number" step="0.01" min="0" value="${current.toFixed(2)}" style="width:100%;padding:11px;background:#0f172a;border:2px solid #475569;border-radius:8px;color:#fbbf24;font-size:19px;font-weight:700;font-family:'Courier New',monospace;text-align:right;box-sizing:border-box;margin-bottom:14px" autofocus />
+        <div style="display:flex;gap:8px">
+          <button id="_modCancel" class="btn" style="flex:1;padding:10px 12px">Cancelar</button>
+          <button id="_modOk" class="btn" style="flex:1;background:#854d0e;color:#fff;border-color:#854d0e;font-weight:700;padding:10px 12px">✓ Guardar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(mb);
+    const close=()=>mb.remove();
+    mb.addEventListener('click',e=>{if(e.target===mb)close()});
+    mb.querySelector('#_modCancel').onclick=close;
+    const inp = mb.querySelector('#_modInput');
+    setTimeout(()=>{try{inp.focus();inp.select()}catch(_){}}, 50);
+    const commit = () => {
+      const raw = inp.value;
+      const norm = String(raw).trim().replace(/\s/g,'').replace(',','.').replace(/[^0-9.\-]/g,'');
+      const val = parseFloat(norm);
+      if(!isFinite(val) || val < 0){ if(typeof toast==='function') toast('⚠ Importe no válido'); return; }
+      const nuevo = +val.toFixed(2);
+      if(Math.abs(nuevo - current) < 0.005){ if(typeof toast==='function') toast('✓ Sin cambios'); close(); return; }
+      // Snapshot para "↶ Deshacer último"
+      try{
+        const HK='caja.cambio.history.v1';
+        let hist=[]; try{ hist=JSON.parse(localStorage.getItem(HK)||'[]'); }catch(_){ hist=[]; }
+        hist.push({ at: Date.now(), mode: 'modify', amount: nuevo, prev: current, snapshot: JSON.stringify(data) });
+        while(hist.length>20) hist.shift();
+        localStorage.setItem(HK, JSON.stringify(hist));
+      }catch(_){}
+      // Vacía denominaciones + _bulk_seed; deja solo _bulk con el valor manual.
+      Object.keys(data).forEach(k=>{ if(k !== '_v') delete data[k]; });
+      if(nuevo > 0) data._bulk = nuevo;
+      saveCambio(data);
+      render();
+      if(typeof toast==='function') toast('✏️ Reserva modificada a '+fmt(nuevo));
+      close();
+      // Refresca la UI principal para que todos los totales se actualicen
+      try{ window.render && window.render() }catch(_){}
+    };
+    mb.querySelector('#_modOk').onclick=commit;
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); commit(); } else if(e.key==='Escape'){ close(); }});
   };
   // Nota Feb 2026: eliminado el modo 'return' (devolver a reserva desde caja).
   //   Ahora la lógica es simple: para mover dinero DE CAJA A RESERVA se usa "➕ Añadir cambio".
