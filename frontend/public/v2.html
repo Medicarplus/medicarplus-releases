@@ -15596,7 +15596,11 @@ if(isPremiumLicense() && loadCalUrls().filter(u=>u.enabled).length>0){
     const qNorm=normDni(q);
     const looksLikeDni=/^[XYZ]?\d{4,8}[A-Z]?$/.test(qNorm) && qNorm.length>=4;
     const onlyYear = !!(scopeChk && scopeChk.checked);
-    const curYear = String(new Date().getFullYear());
+    // 🛡 Oct 2026 · "Este año" = año de la FECHA activa (arriba izq.), no el año real.
+    //   Si el usuario está en 2025 y marca "Este año", busca en 2025, no en 2026.
+    const curYear = (typeof currentDate === 'string' && /^\d{4}/.test(currentDate))
+      ? currentDate.slice(0,4)
+      : String(new Date().getFullYear());
     const results=[];
     Object.entries(state.byDate).forEach(([date,arr])=>{
       // 🛡 Scope filter · si checkbox marcado, solo acepta fechas del año actual (YYYY-MM-DD → YYYY)
@@ -15618,7 +15622,7 @@ if(isPremiumLicense() && loadCalUrls().filter(u=>u.enabled).length>0){
       });
     });
     results.sort((a,b)=>(b.strong-a.strong)||(a.date<b.date?1:-1));
-    const scopeLbl = onlyYear ? ' · '+(new Date().getFullYear()) : '';
+    const scopeLbl = onlyYear ? ' · '+curYear : '';
     if(!results.length){
       box.innerHTML='<div style="padding:14px;color:#94a3b8;font-size:12px;text-align:center;font-style:italic">'+(currentLang==='ca'?'Cap resultat per':'Ningún resultado para')+' <b>"'+escHtml(q)+'"</b><span style="color:#64748b">'+scopeLbl+'</span></div>';
       box.style.display='block';return;
