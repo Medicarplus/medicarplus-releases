@@ -1279,8 +1279,10 @@ const DATA_LS_KEYS = [
   'caja.tarifas.rules.v1',            // 💰 Reglas de tarifas personalizadas (patrón + importe → nombre)
   // 🆕 Feb 2026 · Claves de datos que faltaban en la whitelist original
   'caja.cambio.history.v1',           // Historial de cambio de reserva (movimientos)
-  'caja.notif.template.v1',           // Plantilla de mensaje SMS de aviso citas
-  'caja.notif.settings.v1',           // Config notificaciones (hora, activo/no)
+  'caja.notif.template.v1',           // Plantilla SMS · Empresa 1
+  'caja.cempla.notif.template.v1',    // Plantilla SMS · Empresa 2 (Oct 2026)
+  'caja.notif.settings.v1',           // Config notificaciones · Empresa 1
+  'caja.cempla.notif.settings.v1',    // Config notificaciones · Empresa 2 (Oct 2026)
   'caja.twilio.mode.v1',              // Modo Twilio: 'byoa' (cuenta propia) | 'medicar' (créditos)
   'caja.twilio.medicar.sender.v1',    // Sender name para modo medicar
   'caja.stats.seed.2026.jan-may',     // Flag que marca semilla aplicada (evita re-seed en restore)
@@ -15680,8 +15682,19 @@ if(isPremiumLicense() && loadCalUrls().filter(u=>u.enabled).length>0){
 // Les dades queden en memòria (variable local); en tancar el modal desapareixen.
 // ============================================================================
 (function initSmsModule(){
-  const NOTIF_TMPL_KEY='caja.notif.template.v1';
-  const NOTIF_SETTINGS_KEY='caja.notif.settings.v1';
+  // 🏢 Oct 2026 · Plantilla y settings de SMS INDEPENDIENTES por empresa.
+  //   Si el cliente quiere compartirlos, pone el mismo texto en ambas empresas.
+  //   Si no, cada empresa tiene su propia plantilla y horario de envío.
+  //   Legacy: la key sin prefijo (sin "cempla") sigue siendo la de Empresa 1 (compat).
+  const NOTIF_TMPL_KEY_T  = 'caja.notif.template.v1';
+  const NOTIF_TMPL_KEY_C  = 'caja.cempla.notif.template.v1';
+  const NOTIF_SET_KEY_T   = 'caja.notif.settings.v1';
+  const NOTIF_SET_KEY_C   = 'caja.cempla.notif.settings.v1';
+  const _NTK = ()=>{ const c=(typeof currentCompany!=='undefined')?String(currentCompany||'trafic').toLowerCase():'trafic'; return c==='cempla'?NOTIF_TMPL_KEY_C:NOTIF_TMPL_KEY_T; };
+  const _NSK = ()=>{ const c=(typeof currentCompany!=='undefined')?String(currentCompany||'trafic').toLowerCase():'trafic'; return c==='cempla'?NOTIF_SET_KEY_C:NOTIF_SET_KEY_T; };
+  // Objeto getter con `.toString()` para no romper comparaciones legacy que esperan string
+  const NOTIF_TMPL_KEY     = { toString(){ return _NTK(); }, get key(){ return _NTK(); } };
+  const NOTIF_SETTINGS_KEY = { toString(){ return _NSK(); }, get key(){ return _NSK(); } };
   const BACKEND_URL=(function(){
     // Deriva la URL del backend dinàmicament — es re-avalua a cada crida
     return { toString(){ try{return (typeof getApiBase==='function')?getApiBase():''}catch(e){return ''} } };
@@ -15716,8 +15729,24 @@ if(isPremiumLicense() && loadCalUrls().filter(u=>u.enabled).length>0){
   }
   function cleanPhone(p){let s=String(p||'').replace(/[\s\-\.\(\)]/g,'');if(!s)return '';if(!s.startsWith('+'))s='+34'+s.replace(/^0+/,'');return s}
   function renderModal(){
-    const settings=(function(){try{return JSON.parse(localStorage.getItem(NOTIF_SETTINGS_KEY)||'{}')}catch(e){return {}}})();
-    const template=localStorage.getItem(NOTIF_TMPL_KEY)||defaultTemplate;
+    // Settings: lee de la empresa activa, fallback a la otra (compat), fallback a defaults
+    const settings=(function(){
+      try{
+        const own = JSON.parse(localStorage.getItem(_NSK())||'null');
+        if(own && typeof own === 'object' && Object.keys(own).length) return own;
+        const other = JSON.parse(localStorage.getItem(_NSK()===NOTIF_SET_KEY_T ? NOTIF_SET_KEY_C : NOTIF_SET_KEY_T)||'null');
+        return (other && typeof other === 'object') ? other : {};
+      }catch(e){return {}}
+    })();
+    // Template: lee de la empresa activa, fallback a la otra, fallback a defaultTemplate
+    const template=(function(){
+      try{
+        const own = localStorage.getItem(_NTK());
+        if(own && own.trim()) return own;
+        const other = localStorage.getItem(_NTK()===NOTIF_TMPL_KEY_T ? NOTIF_TMPL_KEY_C : NOTIF_TMPL_KEY_T);
+        return (other && other.trim()) ? other : defaultTemplate;
+      }catch(e){return defaultTemplate}
+    })();
     const back=document.createElement('div');back.className='modal-back';back.style.zIndex='90000';
     back.innerHTML='<div class="modal" style="max-width:1200px;width:97%;max-height:96vh;display:flex;flex-direction:column;padding:0;background:#0f1115;color:#e8ecf2;border:1px solid #1f3a2e">'
       +'<div style="padding:14px 18px;background:linear-gradient(90deg,#065f46 0%,#059669 100%);border-radius:12px 12px 0 0;display:flex;align-items:center;gap:10px">'
