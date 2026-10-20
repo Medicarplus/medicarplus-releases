@@ -998,12 +998,12 @@
           <button data-tab="tab-priv" id="tabPrivBtn" data-i18n="tab_reviews">Revisiones / Certificados / Otros</button>
           <button data-tab="tab-dh" data-i18n="tab_dh">Ingresos / Gastos</button>
           <div style="flex:1"></div>
-          <div id="searchWrap" style="position:relative;margin:0 8px 0 0;display:flex;align-items:center;gap:6px">
-            <select id="searchScope" data-testid="client-search-scope" title="Ámbito de búsqueda" style="background:#0e1117;color:#e2e8f0;border:1px solid #3a4050;border-radius:6px;padding:6px 8px;font-size:11px;font-family:inherit;cursor:pointer">
-              <option value="year">📅 Este año</option>
-              <option value="all">🗂 Todos los años</option>
-            </select>
+          <div id="searchWrap" style="position:relative;margin:0 8px 0 0;display:flex;align-items:center;gap:8px">
             <input type="text" id="searchClient" placeholder="🔍 Buscar por nombre, apellido o DNI..." autocomplete="off" spellcheck="false" style="background:#0e1117;color:#e2e8f0;border:1px solid #3a4050;border-radius:6px;padding:6px 10px;font-size:12px;width:260px;font-family:inherit" data-testid="client-search-input" />
+            <label for="searchScopeYear" title="Si está marcado, solo busca en el año actual. Si no, en todos los años." style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#94a3b8;cursor:pointer;user-select:none;white-space:nowrap">
+              <input type="checkbox" id="searchScopeYear" data-testid="client-search-scope-year" style="accent-color:#f5b301;cursor:pointer;margin:0" />
+              📅 Este año
+            </label>
             <div id="searchResults" style="display:none;position:absolute;top:calc(100% + 4px);right:0;width:360px;max-height:340px;overflow:auto;background:#141821;border:1px solid #3a4050;border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.6);z-index:9998"></div>
           </div>
         </div>
@@ -15510,14 +15510,15 @@ if(isPremiumLicense() && loadCalUrls().filter(u=>u.enabled).length>0){
 (function initClientSearch(){
   const inp=document.getElementById('searchClient');
   const box=document.getElementById('searchResults');
-  const scopeSel=document.getElementById('searchScope');
+  const scopeChk=document.getElementById('searchScopeYear');
   if(!inp||!box)return;
-  // 🛡 Oct 2026 · Scope selector (Este año / Todos los años). Persistido en localStorage.
+  // 🛡 Oct 2026 · Checkbox "📅 Este año". Default DESMARCADO (= todos los años).
+  //   Si marcado → solo busca en el año actual (más rápido, menos ruido).
   const SCOPE_KEY='caja.search.scope.v1';
-  if(scopeSel){
-    try{ const saved=localStorage.getItem(SCOPE_KEY); if(saved==='year'||saved==='all') scopeSel.value=saved; else scopeSel.value='year'; }catch(_){ scopeSel.value='year'; }
-    scopeSel.addEventListener('change',()=>{
-      try{ localStorage.setItem(SCOPE_KEY, scopeSel.value); }catch(_){}
+  if(scopeChk){
+    try{ scopeChk.checked = (localStorage.getItem(SCOPE_KEY) === 'year'); }catch(_){ scopeChk.checked = false; }
+    scopeChk.addEventListener('change',()=>{
+      try{ localStorage.setItem(SCOPE_KEY, scopeChk.checked ? 'year' : 'all'); }catch(_){}
       if(inp.value.trim().length>=2) doSearch();
     });
   }
@@ -15534,12 +15535,12 @@ if(isPremiumLicense() && loadCalUrls().filter(u=>u.enabled).length>0){
     const qL=q.toLowerCase();
     const qNorm=normDni(q);
     const looksLikeDni=/^[XYZ]?\d{4,8}[A-Z]?$/.test(qNorm) && qNorm.length>=4;
-    const scope = (scopeSel && scopeSel.value) || 'year';
+    const onlyYear = !!(scopeChk && scopeChk.checked);
     const curYear = String(new Date().getFullYear());
     const results=[];
     Object.entries(state.byDate).forEach(([date,arr])=>{
-      // 🛡 Scope filter · 'year' solo deja fechas del año actual (YYYY-MM-DD → YYYY)
-      if(scope==='year' && date.slice(0,4)!==curYear) return;
+      // 🛡 Scope filter · si checkbox marcado, solo acepta fechas del año actual (YYYY-MM-DD → YYYY)
+      if(onlyYear && date.slice(0,4)!==curYear) return;
       arr.forEach(e=>{
         const nomMatch=(e.nombre||'').toLowerCase().includes(qL);
         const conceptMatch=(e.tipo||'').toLowerCase().includes(qL)||(e.grupo||'').toLowerCase().includes(qL);
@@ -15557,7 +15558,7 @@ if(isPremiumLicense() && loadCalUrls().filter(u=>u.enabled).length>0){
       });
     });
     results.sort((a,b)=>(b.strong-a.strong)||(a.date<b.date?1:-1));
-    const scopeLbl = (scopeSel && scopeSel.value==='year') ? (currentLang==='ca'?' · '+(new Date().getFullYear()):' · '+(new Date().getFullYear())) : (currentLang==='ca'?' · tots els anys':' · todos los años');
+    const scopeLbl = onlyYear ? ' · '+(new Date().getFullYear()) : '';
     if(!results.length){
       box.innerHTML='<div style="padding:14px;color:#94a3b8;font-size:12px;text-align:center;font-style:italic">'+(currentLang==='ca'?'Cap resultat per':'Ningún resultado para')+' <b>"'+escHtml(q)+'"</b><span style="color:#64748b">'+scopeLbl+'</span></div>';
       box.style.display='block';return;
