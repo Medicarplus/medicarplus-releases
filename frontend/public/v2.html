@@ -422,7 +422,7 @@
       // 🎯 Oct 2026 · Mergers específicos por clave (ANTES de los genéricos)
       if(k === 'caja.stats.v1'){ out[k] = _mergeStatsV1(lv, rv); return; }
       if(k === 'caja.irpf.v1'){  out[k] = _mergeIrpfV1(lv, rv);  return; }
-      if(k === 'caja.calendar.urls.v1'){ out[k] = _mergeArrayByField(lv, rv, 'url'); return; }
+      if(k === 'caja.calendar.urls.v1' || k === 'caja.cempla.calendar.urls.v1'){ out[k] = _mergeArrayByField(lv, rv, 'url'); return; }
       if(k === 'caja.tarifas.rules.v1'){ out[k] = _mergeArrayByField(lv, rv, 'id');  return; }
       // Objetos "aliases/overrides": merge superficial (campos nuevos entran, los existentes se preservan)
       if(k === 'caja.stats.aliases.v1' || k === 'caja.stats.traffic.overrides.v1' || k === 'caja.cuadre.overrides.v1' || k === 'caja.config.v1'){
@@ -606,7 +606,7 @@
     const keys = (window.DATA_LS_KEYS && Array.isArray(window.DATA_LS_KEYS))
       ? window.DATA_LS_KEYS
       // Fallback (si sendCloudBackup se llamara antes de definir la whitelist)
-      : ['caja.v1','caja.cempla.v1','caja.datafono','caja.cempla.datafono','caja.stats.v1','caja.stats.aliases.v1','caja.stats.traffic.overrides.v1','caja.irpf.v1','caja.saldoInicial.trafic.v1','caja.saldoInicial.cempla.v1','caja.reserva.v1','caja.cempla.reserva.v1','caja.cuadre.overrides.v1','caja.config.v1','caja.calendar.history.v1','caja.calendar.status.v1','caja.calendar.urls.v1','caja.count_zero'];
+      : ['caja.v1','caja.cempla.v1','caja.datafono','caja.cempla.datafono','caja.stats.v1','caja.stats.aliases.v1','caja.stats.traffic.overrides.v1','caja.irpf.v1','caja.saldoInicial.trafic.v1','caja.saldoInicial.cempla.v1','caja.reserva.v1','caja.cempla.reserva.v1','caja.cuadre.overrides.v1','caja.config.v1','caja.calendar.history.v1','caja.calendar.status.v1','caja.calendar.urls.v1','caja.cempla.calendar.urls.v1','caja.count_zero'];
     const excl = (window.BACKUP_EXCLUDE_KEYS && Array.isArray(window.BACKUP_EXCLUDE_KEYS)) ? window.BACKUP_EXCLUDE_KEYS : [];
     const out = {};
     // 1) Whitelist explícita
@@ -1273,7 +1273,8 @@ const DATA_LS_KEYS = [
   'caja.config.v1',                   // Configuración (empresa, socios, precios)
   'caja.calendar.history.v1',         // Historial de citas
   'caja.calendar.status.v1',          // Estado de citas
-  'caja.calendar.urls.v1',            // URLs ICS de calendarios configuradas por el usuario
+  'caja.calendar.urls.v1',            // URLs ICS de calendarios · Empresa 1
+  'caja.cempla.calendar.urls.v1',     // URLs ICS de calendarios · Empresa 2 (Oct 2026)
   'caja.count_zero',                  // Toggle "Contar 0€"
   'caja.tarifas.rules.v1',            // 💰 Reglas de tarifas personalizadas (patrón + importe → nombre)
   // 🆕 Feb 2026 · Claves de datos que faltaban en la whitelist original
@@ -1530,7 +1531,13 @@ function openBackupHistory(){
     }
   });
 }
-function switchCompany(c){currentCompany=c;localStorage.setItem('caja.company',c);state=loadState();applyCompanyUI();render()}
+function switchCompany(c){
+  // 🏢 Oct 2026 · Cada empresa tiene su propio set de calendarios (CAL_URLS_KEY_*).
+  //   Al cambiar de empresa invalidamos el cache de citas para no mostrar en pantalla
+  //   eventos de la otra empresa hasta que se refresquen con sus propias fuentes.
+  try{ localStorage.removeItem('caja.calendar.cache.v1'); }catch(_){}
+  currentCompany=c;localStorage.setItem('caja.company',c);state=loadState();applyCompanyUI();render();
+}
 function applyCompanyUI(){const hasC2=!!(window.CFG&&CFG.company2&&CFG.company2.name);const isC=hasC2&&currentCompany==='cempla';const c1=(window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1';const c2=(window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2';document.body.classList.toggle('cempla',isC);$('#cTrafic').classList.toggle('active',!isC);$('#cCempla').classList.toggle('active',isC);$('#cCempla').style.display=hasC2?'':'none';document.querySelectorAll('[data-cfg-name="1"]').forEach(el=>el.textContent=c1);document.querySelectorAll('[data-cfg-name="2"]').forEach(el=>el.textContent=c2);const titleMain=document.querySelector('#appTitle .app-title-main');if(titleMain)titleMain.textContent=isC?c2:'MediCar Plus';$('#appSub').textContent=isC?('REVISIONES · '+c2.toUpperCase()):'GESTIÓN DE CENTROS MÉDICOS';
   // Botón de estadísticas de Empresa 2: solo visible si Empresa 2 configurada
   const stE2 = document.getElementById('btnStatEmpresa2'); if(stE2) stE2.style.display = hasC2 ? '' : 'none';
@@ -12335,7 +12342,7 @@ $('#jsonInput').onchange=async ev=>{
               quarters: Object.assign({}, cur.quarters||{}, inc.quarters||{}),
             };
           }
-          if(k === 'caja.calendar.urls.v1'){
+          if(k === 'caja.calendar.urls.v1' || k === 'caja.cempla.calendar.urls.v1'){
             // Array de {name,url} · dedup por url
             const seen = new Set((cur||[]).map(x => x && x.url));
             const merged = (cur||[]).slice();
@@ -14985,12 +14992,21 @@ function pushEventsToHistory(events){
   saveCalHistory(h);
 }
 
-const CAL_URLS_KEY = 'caja.calendar.urls.v1';
+// 🏢 Oct 2026 · Keys de URLs de calendario por empresa (fuentes ICS/Doctoralia)
+//   Empresa 1 (trafic): 'caja.calendar.urls.v1'   ← legacy, se mantiene
+//   Empresa 2 (cempla): 'caja.cempla.calendar.urls.v1'
+//   Las caches y el status siguen siendo globales (status se filtra via history).
+const CAL_URLS_KEY = 'caja.calendar.urls.v1';            // compat & empresa 1
+const CAL_URLS_KEY_CEMPLA = 'caja.cempla.calendar.urls.v1'; // empresa 2
 const CAL_STATUS_KEY = 'caja.calendar.status.v1';  // {[date_uid]: 'ok'|'no'|'done'  |  {s:'ok'|'no'|'done', src:'manual'|'auto'}}
 const CAL_CACHE_KEY = 'caja.calendar.cache.v1';    // Últim resultat + timestamp
 
-function loadCalUrls(){try{return JSON.parse(localStorage.getItem(CAL_URLS_KEY)||'[]')}catch(e){return[]}}
-function saveCalUrls(arr){localStorage.setItem(CAL_URLS_KEY,JSON.stringify(arr||[]))}
+function _calUrlsKey(){
+  const c = (typeof currentCompany !== 'undefined') ? String(currentCompany||'trafic').toLowerCase() : 'trafic';
+  return c === 'cempla' ? CAL_URLS_KEY_CEMPLA : CAL_URLS_KEY;
+}
+function loadCalUrls(){try{return JSON.parse(localStorage.getItem(_calUrlsKey())||'[]')}catch(e){return[]}}
+function saveCalUrls(arr){localStorage.setItem(_calUrlsKey(),JSON.stringify(arr||[]))}
 function loadCalStatus(){try{return JSON.parse(localStorage.getItem(CAL_STATUS_KEY)||'{}')}catch(e){return{}}}
 function saveCalStatus(m){localStorage.setItem(CAL_STATUS_KEY,JSON.stringify(m||{}))}
 
@@ -15206,8 +15222,8 @@ function renderCalendarModal(){
   back.innerHTML=`<div class="modal" style="max-width:1000px;width:96%;max-height:92vh;display:flex;flex-direction:column;background:#0b1220;color:#e2e8f0;border:1px solid #1e293b">
     <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid #1e293b;margin-bottom:14px">
       <div>
-        <h3 style="margin:0;color:#0ea5e9;font-size:20px">📅 ${isCA?'Cites del dia':'Citas del día'}</h3>
-        <div style="font-size:11px;color:#64748b;margin-top:2px">${isCA?'Sincronitzat amb els teus calendaris externs':'Sincronizado con tus calendarios externos'}</div>
+        <h3 style="margin:0;color:#0ea5e9;font-size:20px">📅 ${isCA?'Cites del dia':'Citas del día'} <span style="font-size:11px;color:#64748b;font-weight:400;margin-left:6px">· <span data-cfg-name="${currentCompany==='cempla'?'2':'1'}">${currentCompany==='cempla'?((window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2'):((window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1')}</span></span></h3>
+        <div style="font-size:11px;color:#64748b;margin-top:2px">${isCA?'Sincronitzat amb els teus calendaris externs':'Sincronizado con tus calendarios externos'} <span style="color:#f5b301">· calendarios independientes por empresa</span></div>
       </div>
       <button id="calClose" class="btn" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:6px 12px" data-testid="calendar-close">✕</button>
     </div>
