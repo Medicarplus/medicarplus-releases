@@ -8641,9 +8641,28 @@ function openIRPF(){
     const activeEntries = (md.entries||[]).filter(e => e.active !== false);
     const totals=activeEntries.reduce((a,e)=>{const c=irpfCalc(e,pct);a.brut+=Number(e.brut)||0;a.ss+=Number(e.ss)||0;if(c.hasSs){a.total+=c.total;a.netSS+=c.netSS;a.totalFinal+=c.totalFinal;a.net+=c.net;}else{a.net+=c.net;}a.irpf+=c.irpf;return a},{brut:0,ss:0,total:0,irpf:0,net:0,netSS:0,totalFinal:0});
     const inactiveCount = (md.entries||[]).length - activeEntries.length;
+    // 🧮 Oct 2026 · Total certificados importados del CSV de TRÀFICO para el mes seleccionado.
+    //   Lee de caja.stats.v1 → data[YYYY-MM] = {autoescuela: cuenta, ...}.
+    //   Siempre se muestra como sugerencia; el usuario mantiene control total del input manual.
+    const _trfStatsTotal = (function(){
+      try{
+        const st = JSON.parse(localStorage.getItem('caja.stats.v1')||'null');
+        const mdata = (st && st.data && st.data[m]) || null;
+        if(!mdata) return 0;
+        return Object.values(mdata).reduce((s,v)=>s+(parseInt(v,10)||0),0);
+      }catch(e){ return 0; }
+    })();
+    const _manualTC = parseInt(md.totalCertificats,10) || 0;
+    const _tcHint = _trfStatsTotal > 0
+      ? (_manualTC === _trfStatsTotal
+          ? `<div style="font-size:11px;color:#166534;margin-top:5px;font-weight:600" data-testid="irpf-trf-hint">✓ ${L('Coincideix amb el total de Trànsit CSV','Coincide con el total de Tráfico CSV')}: <b>${_trfStatsTotal}</b></div>`
+          : (_manualTC > 0
+              ? `<div style="font-size:11px;color:#b45309;margin-top:5px;font-weight:600;display:flex;gap:8px;align-items:center;flex-wrap:wrap" data-testid="irpf-trf-hint">⚠ ${L('Trànsit CSV detecta','Tráfico CSV detecta')} <b style="font-family:'Courier New',monospace">${_trfStatsTotal}</b> ${L('certificats aquest mes','certificados este mes')} <button id="irpfUseTrfTotal" class="btn" style="padding:3px 10px;background:#166534;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer" data-testid="irpf-use-trf-total">${L('Usar','Usar')} ${_trfStatsTotal}</button></div>`
+              : `<div style="font-size:11px;color:#78350f;margin-top:5px;font-style:italic;display:flex;gap:8px;align-items:center;flex-wrap:wrap" data-testid="irpf-trf-hint">💡 ${L('Detectats','Detectados')} <b style="font-family:'Courier New',monospace">${_trfStatsTotal}</b> ${L("certificats importats del CSV de Trànsit aquest mes","certificados importados del CSV de Tráfico este mes")} <button id="irpfUseTrfTotal" class="btn" style="padding:3px 10px;background:#166534;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer" data-testid="irpf-use-trf-total">${L('Usar','Usar')} ${_trfStatsTotal}</button></div>`))
+      : `<div style="font-size:11px;color:#64748b;margin-top:5px;font-style:italic" data-testid="irpf-trf-hint">${L('Sense dades de Trànsit CSV aquest mes','Sin datos de Tráfico CSV este mes')} · ${L('introdueix manualment','introduce manualmente')}</div>`;
     back.querySelector('#irpfBody').innerHTML=`
       <div style="display:flex;gap:20px;margin-bottom:14px;padding:12px;background:#fff8e6;border:2px solid #b45309;border-radius:8px">
-        <div style="flex:1"><label style="font-weight:700;color:#78350f;display:block;margin-bottom:4px">TOTAL CERTIFICADOS del mes</label><input id="irpfTC" type="text" inputmode="numeric" value="${md.totalCertificats||''}" placeholder="0" style="width:100%;padding:10px 12px;border:1px solid #b45309;border-radius:6px;font-size:14px;font-family:'Courier New',monospace;background:#fff;color:#1a1a1a;font-weight:700" /></div>
+        <div style="flex:1"><label style="font-weight:700;color:#78350f;display:block;margin-bottom:4px">TOTAL CERTIFICADOS del mes</label><input id="irpfTC" type="text" inputmode="numeric" value="${md.totalCertificats||''}" placeholder="${_trfStatsTotal>0?_trfStatsTotal:'0'}" style="width:100%;padding:10px 12px;border:1px solid #b45309;border-radius:6px;font-size:14px;font-family:'Courier New',monospace;background:#fff;color:#1a1a1a;font-weight:700" />${_tcHint}</div>
         <div style="flex:1;display:flex;align-items:end;justify-content:flex-end"><span style="font-family:Georgia,serif;font-size:18px;color:#78350f;font-weight:700">${monthLabel(m).toUpperCase()}</span></div>
       </div>
       <table style="width:100%;border-collapse:collapse;font-family:Georgia,serif;background:#fff">
@@ -9053,6 +9072,21 @@ function openIRPF(){
       },50);
     };
     back.querySelector('#irpfTC').oninput=(ev)=>{const d2=loadIrpf();if(!d2[irpfComp].months[m])d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);d2[irpfComp].months[m].totalCertificats=parseInt(String(ev.target.value).replace(/[^0-9-]/g,''))||0;saveIrpf(d2)};
+    // 🧮 Botón "Usar X" para auto-rellenar con el total detectado del CSV de Tráfico.
+    const _useBtn = back.querySelector('#irpfUseTrfTotal');
+    if(_useBtn){
+      _useBtn.onclick=()=>{
+        const inp = back.querySelector('#irpfTC');
+        if(!inp) return;
+        inp.value = _trfStatsTotal;
+        const d2=loadIrpf();
+        if(!d2[irpfComp].months[m]) d2[irpfComp].months[m]=seedIrpfMonth(irpfComp);
+        d2[irpfComp].months[m].totalCertificats = _trfStatsTotal;
+        saveIrpf(d2);
+        if(typeof toast==='function') toast('✓ '+L('Usat ','Usado ')+_trfStatsTotal+' '+L('certificats de Trànsit CSV','certificados de Tráfico CSV'));
+        try{ render(); }catch(_){}
+      };
+    }
     back.querySelector('#irpfTCB')?.remove?.(); // Campo BOMBERS eliminado (feb 2026). Se conserva md.totalCertfBombers en localStorage por compatibilidad.
     // NOTA: El botón "✓ Marcar como ingresado" se ha retirado. Ahora el trimestre
     // se marca automáticamente cuando el usuario apunta el ingreso desde el chip
