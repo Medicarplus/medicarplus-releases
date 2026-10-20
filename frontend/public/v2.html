@@ -4375,25 +4375,55 @@ function openStats(initialSection){
   // ============================================================================
   // 📅 Cites — Estadístiques dins Estadísticas modal
   // ============================================================================
-  function renderCitesInStats(){
+  function renderCitesInStats(scopeOverride){
     const body = $('#stBody');
+    // 🏢 Oct 2026 · Scope selector por empresa dentro de "Cites" (igual que SMS)
+    //   Eventos legacy sin `company` aparecen en AMBAS pestañas (compatibilidad).
+    const hasC2 = !!(window.CFG && CFG.company2 && CFG.company2.name);
+    const c1Name = (window.CFG && CFG.company1 && CFG.company1.name) || 'Empresa 1';
+    const c2Name = (window.CFG && CFG.company2 && CFG.company2.name) || 'Empresa 2';
+    const _curComp = (typeof currentCompany !== 'undefined') ? String(currentCompany||'trafic').toLowerCase() : 'trafic';
+    const CITES_SCOPE_KEY = 'caja.cites.stats.scope.v1';
+    let scope = scopeOverride;
+    if(!scope){
+      try{ const saved = localStorage.getItem(CITES_SCOPE_KEY); if(saved==='trafic'||saved==='cempla') scope = saved; }catch(_){}
+      if(!scope) scope = _curComp;
+    }
+    if(scope==='cempla' && !hasC2) scope = 'trafic';
+    try{ localStorage.setItem(CITES_SCOPE_KEY, scope); }catch(_){}
     // Load persistent history from localStorage
     let history = {};
     try{ history = JSON.parse(localStorage.getItem('caja.calendar.history.v1')||'{}') }catch(e){ history = {} }
     let status = {};
     try{ status = JSON.parse(localStorage.getItem('caja.calendar.status.v1')||'{}') }catch(e){ status = {} }
-    const entries = Object.values(history);
+    // Filtra por empresa · legacy sin `company` cuentan en ambas
+    const allEntries = Object.values(history);
+    const entries = hasC2
+      ? allEntries.filter(e => !e.company || e.company === scope)
+      : allEntries;
     const total = entries.length;
+    // Tabs HTML (solo si Empresa 2 configurada)
+    const tabsHTML = hasC2 ? `<div data-testid="cites-stats-company-tabs" style="display:flex;gap:6px;background:#0e1117;border:1px solid #2a3040;border-radius:8px;padding:4px;align-self:flex-start;margin-bottom:14px">
+      <button data-cites-scope="trafic" data-testid="cites-stats-tab-trafic" style="padding:6px 14px;font-size:12px;font-weight:700;border-radius:5px;cursor:pointer;border:none;background:${scope==='trafic'?'#166534':'transparent'};color:${scope==='trafic'?'#fff':'#86efac'}">${escapeHtml(c1Name)}</button>
+      <button data-cites-scope="cempla" data-testid="cites-stats-tab-cempla" style="padding:6px 14px;font-size:12px;font-weight:700;border-radius:5px;cursor:pointer;border:none;background:${scope==='cempla'?'#be185d':'transparent'};color:${scope==='cempla'?'#fff':'#f9a8d4'}">${escapeHtml(c2Name)}</button>
+    </div>` : '';
     if(total === 0){
-      body.innerHTML = `<div style="text-align:center;padding:60px 20px;color:#94a3b8">
+      body.innerHTML = tabsHTML + `<div style="text-align:center;padding:60px 20px;color:#94a3b8">
         <div style="font-size:56px;margin-bottom:14px">📅</div>
-        <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:#e2e8f0">Sin histórico de citas todavía</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:#e2e8f0">Sin histórico de citas ${hasC2 ? 'para '+escapeHtml(scope==='trafic'?c1Name:c2Name) : 'todavía'}</div>
         <div style="font-size:13px;line-height:1.6">
           Cuando vincules Google Calendar o Doctoralia desde el botón <b style="color:#0ea5e9">📅 Cites</b> de la barra superior,<br>
           las citas se guardarán aquí automáticamente y podrás ver estadísticas y buscar por nombre.
         </div>
         <div style="font-size:11px;color:#64748b;margin-top:20px;font-style:italic">Función Premium</div>
       </div>`;
+      // Wire tabs even on empty state
+      body.querySelectorAll('[data-cites-scope]').forEach(btn => {
+        btn.onclick = () => {
+          const next = btn.getAttribute('data-cites-scope');
+          if(next && next !== scope) renderCitesInStats(next);
+        };
+      });
       return;
     }
     // Compute KPIs (compatible amb el nou format {s,src} i amb l'antic string)
@@ -4427,7 +4457,7 @@ function openStats(initialSection){
       </div>`;
     }).join('');
     // Build the full body
-    body.innerHTML = `
+    body.innerHTML = tabsHTML + `
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px">
         <div style="background:linear-gradient(135deg,#0c2a3e 0%,#0369a1 100%);border:1px solid #0ea5e9;border-radius:10px;padding:16px" data-testid="cites-kpi-total">
           <div style="font-size:10px;color:#7dd3fc;font-weight:700;letter-spacing:1px;margin-bottom:6px">📅 TOTAL CITAS</div>
@@ -4527,6 +4557,13 @@ function openStats(initialSection){
     let searchTO = null;
     searchInp.oninput = () => { clearTimeout(searchTO); searchTO = setTimeout(() => renderResults(searchInp.value), 150); };
     renderResults('');
+    // 🏢 Tab handlers (Empresa 1 / Empresa 2) — se enlazan al final para que el DOM ya exista
+    body.querySelectorAll('[data-cites-scope]').forEach(btn => {
+      btn.onclick = () => {
+        const next = btn.getAttribute('data-cites-scope');
+        if(next && next !== scope) renderCitesInStats(next);
+      };
+    });
   }
 
   // Aplica la secció inicial (visualment + funcionalment)
@@ -14934,11 +14971,16 @@ function saveCalHistory(h){localStorage.setItem(CAL_HISTORY_KEY,JSON.stringify(h
 function pushEventsToHistory(events){
   if(!events||!events.length)return;
   const h=loadCalHistory();
+  // 🏢 Oct 2026 · Taggeamos cada evento con la empresa activa al momento de guardarlo
+  //   para poder filtrar en Estadísticas · Cites. Eventos legacy sin `company` se
+  //   consideran compartidos (aparecen en ambas pestañas de empresa).
+  const _comp = (typeof currentCompany !== 'undefined') ? String(currentCompany||'trafic').toLowerCase() : 'trafic';
   events.forEach(e=>{
     const k=e.date+'|'+e.uid;
     // Preserve first-seen timestamp
     const first_seen=h[k]&&h[k].first_seen?h[k].first_seen:new Date().toISOString();
-    h[k]={date:e.date,time:e.time||'',end_time:e.end_time||'',summary:e.summary||'',description:e.description||'',location:e.location||'',source:e.source||'',uid:e.uid,first_seen:first_seen,last_seen:new Date().toISOString()};
+    const prev_company = (h[k] && h[k].company) || null;
+    h[k]={date:e.date,time:e.time||'',end_time:e.end_time||'',summary:e.summary||'',description:e.description||'',location:e.location||'',source:e.source||'',uid:e.uid,first_seen:first_seen,last_seen:new Date().toISOString(),company:prev_company||_comp};
   });
   saveCalHistory(h);
 }
