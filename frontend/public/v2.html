@@ -4248,13 +4248,29 @@ function openStats(initialSection){
   // ============================================================================
   // Secció SMS/Avisos · Reutilitza els endpoints /api/sms/stats + /api/sms/campaigns
   // ============================================================================
-  async function renderSmsInStats(){
+  async function renderSmsInStats(scopeOverride){
     const body = $('#stBody');
+    // 🏢 Oct 2026 · Scope selector por empresa dentro de "Avisos SMS"
+    //   Permite ver estadísticas SMS de Empresa 1 o Empresa 2 sin cambiar la empresa activa.
+    //   Si Empresa 2 no está configurada, solo se muestra Empresa 1 (comportamiento clásico).
+    const hasC2 = !!(window.CFG && CFG.company2 && CFG.company2.name);
+    const c1Name = (window.CFG && CFG.company1 && CFG.company1.name) || 'Empresa 1';
+    const c2Name = (window.CFG && CFG.company2 && CFG.company2.name) || 'Empresa 2';
+    const _curComp = (typeof currentCompany !== 'undefined') ? String(currentCompany||'trafic').toLowerCase() : 'trafic';
+    const SCOPE_KEY = 'caja.sms.stats.scope.v1';
+    let scope = scopeOverride;
+    if(!scope){
+      try{ const saved = localStorage.getItem(SCOPE_KEY); if(saved==='trafic'||saved==='cempla') scope = saved; }catch(_){}
+      if(!scope) scope = _curComp;
+    }
+    if(scope==='cempla' && !hasC2) scope = 'trafic';
+    try{ localStorage.setItem(SCOPE_KEY, scope); }catch(_){}
     body.innerHTML = `<div data-testid="sms-stats-embed" style="padding:20px;text-align:center;color:#94a3b8">Cargando avisos SMS…</div>`;
     try{
+      const qs = '?company=' + encodeURIComponent(scope);
       const [statsRes, listRes] = await Promise.all([
-        apiSms('/stats').catch(() => ({})),
-        apiSms('/campaigns').catch(() => ({ campaigns: [] })),
+        apiSms('/stats'+qs).catch(() => ({})),
+        apiSms('/campaigns'+qs).catch(() => ({ campaigns: [] })),
       ]);
       const d = statsRes || {};
       const campaigns = (listRes.campaigns || listRes.items || []).slice(0, 100);
@@ -4270,6 +4286,10 @@ function openStats(initialSection){
       }).join('');
       body.innerHTML = `
         <div data-testid="sms-stats-embed" style="display:flex;flex-direction:column;gap:14px">
+          ${hasC2 ? `<div data-testid="sms-stats-company-tabs" style="display:flex;gap:6px;background:#0e1117;border:1px solid #2a3040;border-radius:8px;padding:4px;align-self:flex-start">
+            <button data-sms-scope="trafic" data-testid="sms-stats-tab-trafic" style="padding:6px 14px;font-size:12px;font-weight:700;border-radius:5px;cursor:pointer;border:none;background:${scope==='trafic'?'#166534':'transparent'};color:${scope==='trafic'?'#fff':'#86efac'}">${escapeHtml(c1Name)}</button>
+            <button data-sms-scope="cempla" data-testid="sms-stats-tab-cempla" style="padding:6px 14px;font-size:12px;font-weight:700;border-radius:5px;cursor:pointer;border:none;background:${scope==='cempla'?'#be185d':'transparent'};color:${scope==='cempla'?'#fff':'#f9a8d4'}">${escapeHtml(c2Name)}</button>
+          </div>` : ''}
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
             <div style="padding:12px 14px;background:#0e1117;border:1px solid #2a3040;border-left:3px solid #f5b301;border-radius:6px">
               <div class="small" style="color:#94a3b8;letter-spacing:.4px">Campañas</div>
@@ -4304,6 +4324,13 @@ function openStats(initialSection){
             </div>
           </div>
         </div>`;
+      // 🏢 Tab handlers (empresa 1 / empresa 2)
+      body.querySelectorAll('[data-sms-scope]').forEach(btn => {
+        btn.onclick = () => {
+          const next = btn.getAttribute('data-sms-scope');
+          if(next && next !== scope) renderSmsInStats(next);
+        };
+      });
       body.querySelectorAll('.st-sms-row').forEach(r => {
         r.onmouseenter = () => { r.style.background = '#1a1e26' };
         r.onmouseleave = () => { r.style.background = '' };
@@ -4321,7 +4348,7 @@ function openStats(initialSection){
           if(!confirm('¿Eliminar la campaña "' + nm + '"?\n\nEsta acción NO se puede deshacer.\nSe borrará también el histórico de envíos.')) return;
           try{
             await apiSms('/campaigns/' + encodeURIComponent(id), { method: 'DELETE' });
-            renderSmsInStats(); // Refresca la llista
+            renderSmsInStats(scope); // Refresca manteniendo el scope activo
           }catch(e){
             alert('Error al eliminar: ' + e.message);
           }
