@@ -998,7 +998,11 @@
           <button data-tab="tab-priv" id="tabPrivBtn" data-i18n="tab_reviews">Revisiones / Certificados / Otros</button>
           <button data-tab="tab-dh" data-i18n="tab_dh">Ingresos / Gastos</button>
           <div style="flex:1"></div>
-          <div id="searchWrap" style="position:relative;margin:0 8px 0 0">
+          <div id="searchWrap" style="position:relative;margin:0 8px 0 0;display:flex;align-items:center;gap:6px">
+            <select id="searchScope" data-testid="client-search-scope" title="Ámbito de búsqueda" style="background:#0e1117;color:#e2e8f0;border:1px solid #3a4050;border-radius:6px;padding:6px 8px;font-size:11px;font-family:inherit;cursor:pointer">
+              <option value="year">📅 Este año</option>
+              <option value="all">🗂 Todos los años</option>
+            </select>
             <input type="text" id="searchClient" placeholder="🔍 Buscar por nombre, apellido o DNI..." autocomplete="off" spellcheck="false" style="background:#0e1117;color:#e2e8f0;border:1px solid #3a4050;border-radius:6px;padding:6px 10px;font-size:12px;width:260px;font-family:inherit" data-testid="client-search-input" />
             <div id="searchResults" style="display:none;position:absolute;top:calc(100% + 4px);right:0;width:360px;max-height:340px;overflow:auto;background:#141821;border:1px solid #3a4050;border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.6);z-index:9998"></div>
           </div>
@@ -15479,7 +15483,17 @@ if(isPremiumLicense() && loadCalUrls().filter(u=>u.enabled).length>0){
 (function initClientSearch(){
   const inp=document.getElementById('searchClient');
   const box=document.getElementById('searchResults');
+  const scopeSel=document.getElementById('searchScope');
   if(!inp||!box)return;
+  // 🛡 Oct 2026 · Scope selector (Este año / Todos los años). Persistido en localStorage.
+  const SCOPE_KEY='caja.search.scope.v1';
+  if(scopeSel){
+    try{ const saved=localStorage.getItem(SCOPE_KEY); if(saved==='year'||saved==='all') scopeSel.value=saved; else scopeSel.value='year'; }catch(_){ scopeSel.value='year'; }
+    scopeSel.addEventListener('change',()=>{
+      try{ localStorage.setItem(SCOPE_KEY, scopeSel.value); }catch(_){}
+      if(inp.value.trim().length>=2) doSearch();
+    });
+  }
   const escHtml=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normDni=s=>String(s||'').toUpperCase().replace(/[\s\-\.\/]/g,'');
   const highlight=(txt,q)=>{
@@ -15493,8 +15507,12 @@ if(isPremiumLicense() && loadCalUrls().filter(u=>u.enabled).length>0){
     const qL=q.toLowerCase();
     const qNorm=normDni(q);
     const looksLikeDni=/^[XYZ]?\d{4,8}[A-Z]?$/.test(qNorm) && qNorm.length>=4;
+    const scope = (scopeSel && scopeSel.value) || 'year';
+    const curYear = String(new Date().getFullYear());
     const results=[];
     Object.entries(state.byDate).forEach(([date,arr])=>{
+      // 🛡 Scope filter · 'year' solo deja fechas del año actual (YYYY-MM-DD → YYYY)
+      if(scope==='year' && date.slice(0,4)!==curYear) return;
       arr.forEach(e=>{
         const nomMatch=(e.nombre||'').toLowerCase().includes(qL);
         const conceptMatch=(e.tipo||'').toLowerCase().includes(qL)||(e.grupo||'').toLowerCase().includes(qL);
@@ -15512,13 +15530,14 @@ if(isPremiumLicense() && loadCalUrls().filter(u=>u.enabled).length>0){
       });
     });
     results.sort((a,b)=>(b.strong-a.strong)||(a.date<b.date?1:-1));
+    const scopeLbl = (scopeSel && scopeSel.value==='year') ? (currentLang==='ca'?' · '+(new Date().getFullYear()):' · '+(new Date().getFullYear())) : (currentLang==='ca'?' · tots els anys':' · todos los años');
     if(!results.length){
-      box.innerHTML='<div style="padding:14px;color:#94a3b8;font-size:12px;text-align:center;font-style:italic">'+(currentLang==='ca'?'Cap resultat per':'Ningún resultado para')+' <b>"'+escHtml(q)+'"</b></div>';
+      box.innerHTML='<div style="padding:14px;color:#94a3b8;font-size:12px;text-align:center;font-style:italic">'+(currentLang==='ca'?'Cap resultat per':'Ningún resultado para')+' <b>"'+escHtml(q)+'"</b><span style="color:#64748b">'+scopeLbl+'</span></div>';
       box.style.display='block';return;
     }
     const top=results.slice(0,30);
     const fpLabels={E:'💵',T:'💳',B:'📱',X:'🏦'};
-    box.innerHTML='<div style="padding:8px 12px;font-size:10px;color:#7a8394;letter-spacing:1.5px;border-bottom:1px solid #2a3040;background:#0e1117">'+results.length+' '+(currentLang==='ca'?'RESULTAT(S)':'RESULTADO(S)')+(results.length>30?(currentLang==='ca'?' · mostrant els 30 més recents':' · mostrando los 30 más recientes'):'')+'</div>'
+    box.innerHTML='<div style="padding:8px 12px;font-size:10px;color:#7a8394;letter-spacing:1.5px;border-bottom:1px solid #2a3040;background:#0e1117">'+results.length+' '+(currentLang==='ca'?'RESULTAT(S)':'RESULTADO(S)')+scopeLbl+(results.length>30?(currentLang==='ca'?' · mostrant els 30 més recents':' · mostrando los 30 más recientes'):'')+'</div>'
       +top.map(r=>{
         const imp=(r.e.importe||0)-(r.e.descuento||0)+(r.e.tasa||0);
         const isDh=r.e.kind==='DH';
