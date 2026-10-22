@@ -923,6 +923,13 @@
           <div id="cbStatusText" style="color:#cbd5e1;font-size:10px;margin-top:2px">Cargando…</div>
         </div>
         <button class="btn" id="btnExport" style="background:#1a3a2a;border-color:#3ddc97;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-testid="btn-save-backup">💾 Guardar copia</button>
+        <div id="autoBackupPanel" style="padding:7px 10px;background:#0f1f2e;border:1px solid #1e3a5f;border-radius:6px;margin:2px 0;font-size:11px;color:#bae6fd" data-testid="auto-backup-panel">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;font-weight:600">
+            <input type="checkbox" id="autoBackupToggle" data-testid="auto-backup-toggle" style="accent-color:#3ddc97;cursor:pointer;margin:0" />
+            🔄 Guardar automático
+          </label>
+          <div id="autoBackupStatus" style="color:#64748b;font-size:10px;margin-top:3px;line-height:1.3" data-testid="auto-backup-status">—</div>
+        </div>
         <button class="btn" id="btnImportJson" style="background:#3a2f1a;border-color:#f5b301;color:#fed7aa;font-weight:600;width:100%;text-align:left" data-testid="btn-restore-backup">📂 Restaurar copia</button>
         <button class="btn" id="btnHistory" style="background:#1f3a2e;border-color:#2a5e44;color:#bff0d6;font-weight:600;width:100%;text-align:left" data-testid="btn-history">🛡️ Historial de copias</button>
         <button class="btn" id="btnCloudSendNow" style="background:#0f2a3e;border-color:#38bdf8;color:#bae6fd;font-weight:600;width:100%;text-align:left" data-testid="btn-cloud-send-now" title="Envía inmediatamente una copia completa a la nube (soporte técnico)">☁️ Enviar copia AHORA a la nube</button>
@@ -11607,6 +11614,133 @@ $('#btnExport').onclick=async ev=>{
 };
 // Mostrar tooltip con destino actual
 (async()=>{const h=await getStoredHandle();if(h)$('#btnExport').title=`Guardar en ${h.name} · Shift+Click para cambiar carpeta`})();
+
+// 🔄 Oct 2026 · Auto-copia de seguridad.
+//   Guarda cada N minutos si (1) hay handle de carpeta y (2) hubo cambios desde la última copia.
+//   Si el navegador bloquea la escritura (handle revocado), muestra aviso discreto.
+(function initAutoBackup(){
+  const KEY_ENABLED = 'caja.autoBackup.enabled.v1';
+  const KEY_LAST    = 'caja.autoBackup.last.v1';
+  const KEY_HASH    = 'caja.autoBackup.hash.v1';
+  const INTERVAL_MIN = 5; // minutos entre comprobaciones
+  const toggle = document.getElementById('autoBackupToggle');
+  const statusEl = document.getElementById('autoBackupStatus');
+  if(!toggle || !statusEl) return;
+  // Default: activado (true) salvo que el usuario lo haya desactivado antes
+  const _initialEnabled = localStorage.getItem(KEY_ENABLED) !== '0';
+  toggle.checked = _initialEnabled;
+  // Hash rápido del estado (longitud + checksum simple de las claves principales)
+  function _currentHash(){
+    try{
+      const keys = ['caja.v1','caja.cempla.v1','caja.datafono','caja.cempla.datafono','caja.stats.v1','caja.irpf.v1','caja.reserva.v1','caja.cempla.reserva.v1'];
+      let s = '';
+      for(const k of keys){ const v = localStorage.getItem(k); if(v) s += k+':'+v.length+':'+(v.charCodeAt(0)||0)+(v.charCodeAt(v.length-1)||0)+'|'; }
+      return s;
+    }catch(_){ return String(Date.now()); }
+  }
+  function _timeHuman(ts){
+    if(!ts) return 'nunca';
+    const diff = Math.max(0, Date.now() - ts);
+    const sec = Math.floor(diff/1000);
+    if(sec < 60) return 'hace '+sec+' s';
+    const min = Math.floor(sec/60);
+    if(min < 60) return 'hace '+min+' min';
+    const hr = Math.floor(min/60);
+    if(hr < 24) return 'hace '+hr+' h';
+    const d = Math.floor(hr/24);
+    return 'hace '+d+' d';
+  }
+  async function _refreshStatus(){
+    const last = parseInt(localStorage.getItem(KEY_LAST)||'0',10);
+    const h = (typeof getStoredHandle==='function') ? await getStoredHandle().catch(()=>null) : null;
+    if(!toggle.checked){
+      statusEl.innerHTML = '<span style="color:#64748b">⏸ Desactivado</span>';
+    }else if(!h){
+      statusEl.innerHTML = '<span style="color:#fbbf24">⚠ Primero guarda una copia manual para fijar la carpeta</span>';
+    }else{
+      statusEl.innerHTML = '<span style="color:#86efac">✓ Activo</span> · última: '+_timeHuman(last);
+    }
+  }
+  // Llama al mismo flujo que #btnExport pero en modo silencioso (sin diálogos ni toasts).
+  async function _silentBackup(reason){
+    try{
+      const h = await getStoredHandle();
+      if(!h) return { skipped:'no_handle' };
+      // Permission check — si el navegador perdió el permiso, no re-promptear en silencio
+      let perm = 'granted';
+      try{ perm = await h.queryPermission({mode:'readwrite'}); }catch(_){ perm = 'granted'; }
+      if(perm !== 'granted') return { skipped:'no_permission' };
+      // Dispara el click del botón de export, que ya tiene toda la lógica.
+      // Pero necesitamos un modo "silent" — más simple: emulamos la construcción del JSON aquí.
+      const _lsAll = (function(){
+        const keys = (window.DATA_LS_KEYS && Array.isArray(window.DATA_LS_KEYS)) ? window.DATA_LS_KEYS : [];
+        const excl = (window.BACKUP_EXCLUDE_KEYS && Array.isArray(window.BACKUP_EXCLUDE_KEYS)) ? window.BACKUP_EXCLUDE_KEYS : [];
+        const out = {};
+        for(const k of keys){ const raw = localStorage.getItem(k); if(raw===null||raw==='') continue; try{ out[k]=JSON.parse(raw); }catch(e){ out[k]=raw; } }
+        try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(!k||!k.startsWith('caja.')) continue; if(k in out) continue; if(excl.includes(k)) continue; const raw=localStorage.getItem(k); if(raw===null||raw==='') continue; try{ out[k]=JSON.parse(raw); }catch(e){ out[k]=raw; } } }catch(_){}
+        return out;
+      })();
+      const all = {
+        _signature: 'MEDICAR-PLUS-BACKUP-V4',
+        _createdAt: new Date().toISOString(),
+        _appVersion: (window.appInfo && window.appInfo.version) || 'web',
+        _auto: true, _autoReason: reason||'interval',
+        cbTrafic: JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),
+        cempla: JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),
+        datafono: JSON.parse(localStorage.getItem('caja.datafono')||'{}'),
+        datafonoCempla: JSON.parse(localStorage.getItem('caja.cempla.datafono')||'{}'),
+        stats: JSON.parse(localStorage.getItem('caja.stats.v1')||'null'),
+        irpf: JSON.parse(localStorage.getItem('caja.irpf.v1')||'{"months":{},"quarters":{}}'),
+        data: _lsAll,
+        __origin__: {
+          install_id: localStorage.getItem('caja.install.id.v1')||'',
+          license_key: (function(){ try{ const l=JSON.parse(localStorage.getItem('caja.license.v1')||'null')||{}; return l.key||l.license_key||''; }catch(_){ return ''; } })(),
+          exported_at: new Date().toISOString(),
+        },
+      };
+      const contents = JSON.stringify(all, null, 2);
+      const w = await h.createWritable();
+      await w.write(contents);
+      await w.close();
+      localStorage.setItem(KEY_LAST, String(Date.now()));
+      localStorage.setItem(KEY_HASH, _currentHash());
+      return { ok:true, bytes: contents.length };
+    }catch(e){
+      console.warn('[autoBackup] falló:', e && e.message);
+      return { skipped:'error', error: e && e.message };
+    }
+  }
+  async function _tick(){
+    if(!toggle.checked){ _refreshStatus(); return; }
+    try{
+      const h = await getStoredHandle();
+      if(!h){ _refreshStatus(); return; }
+      // Guarda solo si hubo cambios desde la última auto-copia
+      const curHash = _currentHash();
+      const lastHash = localStorage.getItem(KEY_HASH) || '';
+      if(curHash === lastHash){ _refreshStatus(); return; }
+      await _silentBackup('interval');
+    }catch(_){}
+    _refreshStatus();
+  }
+  toggle.addEventListener('change', ()=>{
+    try{ localStorage.setItem(KEY_ENABLED, toggle.checked ? '1' : '0'); }catch(_){}
+    _refreshStatus();
+    if(toggle.checked){ _tick(); } // Dispara al activar
+  });
+  // Al cerrar la pestaña o cambiar de ventana → intenta guardar sincrónico
+  window.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'hidden' && toggle.checked){ _silentBackup('visibilitychange'); }
+  });
+  // Al enfocar la ventana, refresca el "hace X min"
+  window.addEventListener('focus', _refreshStatus);
+  // Primer tick a los 30s para dar tiempo a cargar · luego cada INTERVAL_MIN min
+  setTimeout(_tick, 30*1000);
+  setInterval(_tick, INTERVAL_MIN*60*1000);
+  // Refresca la etiqueta "hace X min" cada 30s
+  setInterval(_refreshStatus, 30*1000);
+  _refreshStatus();
+})();
 function renderCemplaSplit(){
   if(currentCompany!=='cempla')return;
   const panel=document.getElementById('cemplaSplitPanel');
