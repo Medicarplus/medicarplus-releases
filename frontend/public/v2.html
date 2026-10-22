@@ -887,10 +887,37 @@
   <h1 id="appTitle" data-testid="app-title">
     <span class="app-logo" aria-hidden="true"><span class="app-logo-dot"></span></span>
     <span class="app-title-text">
-      <span class="app-title-main" data-i18n="app_title">MediCar Plus</span>
-      <span id="appSub" class="app-title-sub" data-i18n="app_sub">GESTIÓN DE CENTROS MÉDICOS</span>
+      <span class="app-title-main">MediCar Plus</span>
+      <span id="appSub" class="app-title-sub">GESTIÓN DE CENTROS MÉDICOS</span>
     </span>
   </h1>
+  <script>
+    // 🏢 Oct 2026 · Pintar nombre de empresa INMEDIATAMENTE al parsear la cabecera.
+    //   Evita el flash "MediCar Plus / CIERRE DIARIO..." antes de que applyLang/applyCompanyUI corran.
+    //   Lee caja.config.v1 (síncrono) + caja.company + caja.lang y aplica el texto final de golpe.
+    (function _headerPrepaint(){
+      try{
+        const cfg = JSON.parse(localStorage.getItem('caja.config.v1')||'null');
+        if(!cfg) return;
+        const comp = (localStorage.getItem('caja.company')||'trafic').toLowerCase();
+        const lang = (localStorage.getItem('caja.lang')||'es').toLowerCase();
+        const c1 = cfg.company1 && cfg.company1.name;
+        const c2 = cfg.company2 && cfg.company2.name;
+        const hasC2 = !!c2;
+        const isC = hasC2 && comp === 'cempla';
+        const titleEl = document.querySelector('#appTitle .app-title-main');
+        const subEl = document.getElementById('appSub');
+        if(titleEl){
+          if(isC) titleEl.textContent = c2;
+          else if(c1) titleEl.textContent = c1;
+          // Si no hay c1 configurado, dejamos "MediCar Plus" por defecto
+        }
+        if(subEl && (isC || c1)){
+          subEl.textContent = (lang==='ca') ? 'CENTRE MÈDIC' : 'CENTRO MÉDICO';
+        }
+      }catch(_){}
+    })();
+  </script>
   <div class="company-switch" data-testid="company-switch">
     <button id="cTrafic" class="active">🚗 <span data-cfg-name="1">Empresa 1</span></button>
     <button id="cCempla" class="cempla">🩺 <span data-cfg-name="2">Empresa 2</span></button>
