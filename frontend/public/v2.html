@@ -1620,9 +1620,9 @@ function applyCompanyUI(){
   // 🏢 Oct 2026 · Tanto E1 como E2 muestran su propio nombre en la cabecera izquierda.
   //   Si el usuario aún no configuró el nombre de E1, cae al branding por defecto.
   if(titleMain) titleMain.textContent = isC ? c2 : (hasC1Name ? c1 : 'MediCar Plus');
-  $('#appSub').textContent = isC
-    ? ('REVISIONES · '+c2.toUpperCase())
-    : (hasC1Name ? c1.toUpperCase() : 'GESTIÓN DE CENTROS MÉDICOS');
+  // Subtítulo genérico "CENTRO MÉDICO" / "CENTRE MÈDIC" en ambas empresas (no repetir nombre).
+  const _subText = (typeof currentLang!=='undefined' && currentLang==='ca') ? 'CENTRE MÈDIC' : 'CENTRO MÉDICO';
+  $('#appSub').textContent = (isC || hasC1Name) ? _subText : 'GESTIÓN DE CENTROS MÉDICOS';
   // Botón de estadísticas de Empresa 2: solo visible si Empresa 2 configurada
   const stE2 = document.getElementById('btnStatEmpresa2'); if(stE2) stE2.style.display = hasC2 ? '' : 'none';
   // 🏥 Empresa 2 no usa Tasas DGT: adaptamos el chip "Devolución" y su title
