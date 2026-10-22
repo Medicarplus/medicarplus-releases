@@ -1443,17 +1443,72 @@ async function autoSaveToFile(silent){
   }catch(e){console.error('autoSaveFile',e);if(!silent)toast('❌ Error autoguardando: '+e.message,5000)}
 }
 function updateAutosaveBadge(name){
-  const b=$('#autosaveBadge');if(!b)return;
-  const t=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
-  b.textContent=`✓ ${name||'archivo'} · ${t}`;
-  b.style.display='inline-flex';
+  const b=$('#autosaveBadge');
+  if(b){
+    const t=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    b.textContent=`✓ ${name||'archivo'} · ${t}`;
+    b.style.display='inline-flex';
+  }
+  // 🔄 Oct 2026 · Actualizar también el panel del menú de copia.
+  try{
+    const sp = document.getElementById('autoBackupStatus');
+    if(sp){
+      const t2 = new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+      sp.innerHTML = '🔄 Auto-copia activa · última: '+t2;
+      sp.style.borderLeftColor = '#22c55e';
+    }
+  }catch(_){}
+  try{ localStorage.setItem('caja.autoBackup.last.v1', String(Date.now())); }catch(_){}
 }
-// Ejecutar cada 30 minutos
-setInterval(()=>autoSaveToFile(true),30*60*1000);
+// Ejecutar cada 5 minutos como red de seguridad (además del save-on-change debounced 3s)
+setInterval(()=>autoSaveToFile(true),5*60*1000);
 // También al ocultar la pestaña
 document.addEventListener('visibilitychange',()=>{if(document.hidden)autoSaveToFile(true)});
 // Al primer arranque, verificar si hay handle
 (async()=>{const h=await getStoredHandle();if(h){const b=$('#autosaveBadge');if(b){b.style.display='inline-flex';b.textContent=`🔗 ${h.name}`}}})();
+
+// ☁️ Oct 2026 · Backup DIARIO a la nube (admin panel) · siempre activo
+//   - Dispara si han pasado ≥24h desde la última copia en nube
+//   - Chequea cada hora (cubre el caso de app abierta días sin reiniciar)
+//   - Usa sendCloudBackupSafe (reintentos + cola offline)
+//   - Silencioso: no muestra toasts; traza en consola
+(function initDailyCloudBackupScheduler(){
+  const KEY_LAST = 'caja.cloudbackup.last.v1';
+  const DAILY_MS = 24 * 60 * 60 * 1000;
+  const CHECK_MS = 60 * 60 * 1000; // cada hora
+  async function _tryBackup(reason){
+    try{
+      const last = parseInt(localStorage.getItem(KEY_LAST)||'0', 10);
+      if(last && Date.now() - last < DAILY_MS) return; // ya hecho en últimas 24h
+      const sync = window.mcSync;
+      if(!sync) return;
+      // Comprobar licencia activa — solo plans premium envían a la nube
+      try{
+        const lic = JSON.parse(localStorage.getItem('caja.license.v1')||'null') || {};
+        const plan = (lic.plan||'').toString().toUpperCase();
+        const type = (lic.type||'').toString().toUpperCase();
+        const PREMIUM_PLANS = ['PRM','PREMIUM','TRIAL','MASTER'];
+        const isPremium = PREMIUM_PLANS.includes(plan) || type==='MASTER' || type==='TRIAL';
+        if(!isPremium) return;
+      }catch(_){ return; }
+      const fn = sync.sendCloudBackupSafe || sync.sendCloudBackup;
+      if(!fn) return;
+      const r = await fn.call(sync, 'daily-'+reason, { maxAttempts: 3 });
+      if(r && r.ok){
+        localStorage.setItem(KEY_LAST, String(Date.now()));
+        console.info('☁️ [daily-cloud] copia enviada · '+Math.round((r.size_bytes||0)/1024)+' KB · reason='+reason);
+      }else if(r && r.queued){
+        console.info('☁️ [daily-cloud] sin conexión · encolada ('+reason+')');
+      }
+    }catch(e){ console.warn('☁️ [daily-cloud] fallo silencioso:', e && e.message || e); }
+  }
+  // Primer intento a los 90s (dejar que mcSync.init() termine)
+  setTimeout(()=>_tryBackup('boot'), 90*1000);
+  // Chequeo horario mientras la app esté abierta
+  setInterval(()=>_tryBackup('hourly'), CHECK_MS);
+  // Al volver a enfocar la pestaña (p.ej. tras cambio de día real)
+  window.addEventListener('focus', ()=>_tryBackup('focus'));
+})();
 
 // Modal de historial de copias locales
 function openBackupHistory(){
@@ -1551,7 +1606,25 @@ function switchCompany(c){
   try{ localStorage.removeItem('caja.calendar.cache.v1'); }catch(_){}
   currentCompany=c;localStorage.setItem('caja.company',c);state=loadState();applyCompanyUI();render();
 }
-function applyCompanyUI(){const hasC2=!!(window.CFG&&CFG.company2&&CFG.company2.name);const isC=hasC2&&currentCompany==='cempla';const c1=(window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1';const c2=(window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2';document.body.classList.toggle('cempla',isC);$('#cTrafic').classList.toggle('active',!isC);$('#cCempla').classList.toggle('active',isC);$('#cCempla').style.display=hasC2?'':'none';document.querySelectorAll('[data-cfg-name="1"]').forEach(el=>el.textContent=c1);document.querySelectorAll('[data-cfg-name="2"]').forEach(el=>el.textContent=c2);const titleMain=document.querySelector('#appTitle .app-title-main');if(titleMain)titleMain.textContent=isC?c2:'MediCar Plus';$('#appSub').textContent=isC?('REVISIONES · '+c2.toUpperCase()):'GESTIÓN DE CENTROS MÉDICOS';
+function applyCompanyUI(){
+  const hasC2=!!(window.CFG&&CFG.company2&&CFG.company2.name);
+  const hasC1Name=!!(window.CFG&&CFG.company1&&CFG.company1.name);
+  const isC=hasC2&&currentCompany==='cempla';
+  const c1=(window.CFG&&CFG.company1&&CFG.company1.name)||'Empresa 1';
+  const c2=(window.CFG&&CFG.company2&&CFG.company2.name)||'Empresa 2';
+  document.body.classList.toggle('cempla',isC);
+  $('#cTrafic').classList.toggle('active',!isC);
+  $('#cCempla').classList.toggle('active',isC);
+  $('#cCempla').style.display=hasC2?'':'none';
+  document.querySelectorAll('[data-cfg-name="1"]').forEach(el=>el.textContent=c1);
+  document.querySelectorAll('[data-cfg-name="2"]').forEach(el=>el.textContent=c2);
+  const titleMain=document.querySelector('#appTitle .app-title-main');
+  // 🏢 Oct 2026 · Tanto E1 como E2 muestran su propio nombre en la cabecera izquierda.
+  //   Si el usuario aún no configuró el nombre de E1, cae al branding por defecto.
+  if(titleMain) titleMain.textContent = isC ? c2 : (hasC1Name ? c1 : 'MediCar Plus');
+  $('#appSub').textContent = isC
+    ? ('REVISIONES · '+c2.toUpperCase())
+    : (hasC1Name ? c1.toUpperCase() : 'GESTIÓN DE CENTROS MÉDICOS');
   // Botón de estadísticas de Empresa 2: solo visible si Empresa 2 configurada
   const stE2 = document.getElementById('btnStatEmpresa2'); if(stE2) stE2.style.display = hasC2 ? '' : 'none';
   // 🏥 Empresa 2 no usa Tasas DGT: adaptamos el chip "Devolución" y su title
@@ -11621,25 +11694,13 @@ $('#btnExport').onclick=async ev=>{
 // Mostrar tooltip con destino actual
 (async()=>{const h=await getStoredHandle();if(h)$('#btnExport').title=`Guardar en ${h.name} · Shift+Click para cambiar carpeta`})();
 
-// 🔄 Oct 2026 · Auto-copia de seguridad SIEMPRE activa (sin toggle).
-//   Guarda cada N minutos si (1) hay handle de carpeta (del primer "Guardar copia" manual)
-//   y (2) hubo cambios desde la última copia. También guarda al perder visibilidad y al cerrar.
-//   El usuario no tiene que activar nada: tras hacer "Guardar copia" la primera vez, el
-//   auto-save está encendido para siempre.
-(function initAutoBackup(){
-  const KEY_LAST    = 'caja.autoBackup.last.v1';
-  const KEY_HASH    = 'caja.autoBackup.hash.v1';
-  const INTERVAL_MIN = 5; // minutos entre comprobaciones
+// 🔄 Oct 2026 · Status refresher del panel de auto-copia.
+//   El guardado real lo hace autoSaveToFile() que ya está enganchado a cada cambio
+//   (saveState → scheduleFileAutoSave con debounce 3s) + interval 5min + visibilitychange.
+//   Aquí solo renderizamos el "hace X min" en el menú de copia y mostramos warning si falta handle.
+(function initAutoBackupStatus(){
   const statusEl = document.getElementById('autoBackupStatus');
-  // Hash rápido del estado (longitud + checksum simple de las claves principales)
-  function _currentHash(){
-    try{
-      const keys = ['caja.v1','caja.cempla.v1','caja.datafono','caja.cempla.datafono','caja.stats.v1','caja.irpf.v1','caja.reserva.v1','caja.cempla.reserva.v1'];
-      let s = '';
-      for(const k of keys){ const v = localStorage.getItem(k); if(v) s += k+':'+v.length+':'+(v.charCodeAt(0)||0)+(v.charCodeAt(v.length-1)||0)+'|'; }
-      return s;
-    }catch(_){ return String(Date.now()); }
-  }
+  if(!statusEl) return;
   function _timeHuman(ts){
     if(!ts) return 'aún no';
     const diff = Math.max(0, Date.now() - ts);
@@ -11649,12 +11710,10 @@ $('#btnExport').onclick=async ev=>{
     if(min < 60) return 'hace '+min+' min';
     const hr = Math.floor(min/60);
     if(hr < 24) return 'hace '+hr+' h';
-    const d = Math.floor(hr/24);
-    return 'hace '+d+' d';
+    return 'hace '+Math.floor(hr/24)+' d';
   }
   async function _refreshStatus(){
-    if(!statusEl) return;
-    const last = parseInt(localStorage.getItem(KEY_LAST)||'0',10);
+    const last = parseInt(localStorage.getItem('caja.autoBackup.last.v1')||'0',10);
     const h = (typeof getStoredHandle==='function') ? await getStoredHandle().catch(()=>null) : null;
     if(!h){
       statusEl.innerHTML = '<span style="color:#fbbf24">⚠ Pulsa "Guardar copia" una vez para fijar la carpeta — después se guarda solo</span>';
@@ -11664,73 +11723,9 @@ $('#btnExport').onclick=async ev=>{
       statusEl.style.borderLeftColor = '#22c55e';
     }
   }
-  async function _silentBackup(reason){
-    try{
-      const h = await getStoredHandle();
-      if(!h) return { skipped:'no_handle' };
-      let perm = 'granted';
-      try{ perm = await h.queryPermission({mode:'readwrite'}); }catch(_){ perm = 'granted'; }
-      if(perm !== 'granted') return { skipped:'no_permission' };
-      // Construimos el contenido completo (idéntico al botón manual).
-      const _lsAll = (function(){
-        const keys = (window.DATA_LS_KEYS && Array.isArray(window.DATA_LS_KEYS)) ? window.DATA_LS_KEYS : [];
-        const excl = (window.BACKUP_EXCLUDE_KEYS && Array.isArray(window.BACKUP_EXCLUDE_KEYS)) ? window.BACKUP_EXCLUDE_KEYS : [];
-        const out = {};
-        for(const k of keys){ const raw = localStorage.getItem(k); if(raw===null||raw==='') continue; try{ out[k]=JSON.parse(raw); }catch(e){ out[k]=raw; } }
-        try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(!k) continue; if(!k.startsWith('caja.') && !k.startsWith('mb.') && k!=='migration.log.v1') continue; if(k in out) continue; if(excl.includes(k)) continue; const raw=localStorage.getItem(k); if(raw===null||raw==='') continue; try{ out[k]=JSON.parse(raw); }catch(e){ out[k]=raw; } } }catch(_){}
-        return out;
-      })();
-      const all = {
-        _signature: 'MEDICAR-PLUS-BACKUP-V4',
-        _createdAt: new Date().toISOString(),
-        _appVersion: (window.appInfo && window.appInfo.version) || 'web',
-        _auto: true, _autoReason: reason||'interval',
-        cbTrafic: JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}'),
-        cempla: JSON.parse(localStorage.getItem('caja.cempla.v1')||'{"byDate":{}}'),
-        datafono: JSON.parse(localStorage.getItem('caja.datafono')||'{}'),
-        datafonoCempla: JSON.parse(localStorage.getItem('caja.cempla.datafono')||'{}'),
-        stats: JSON.parse(localStorage.getItem('caja.stats.v1')||'null'),
-        irpf: JSON.parse(localStorage.getItem('caja.irpf.v1')||'{"months":{},"quarters":{}}'),
-        data: _lsAll,
-        __origin__: {
-          install_id: localStorage.getItem('caja.install.id.v1')||'',
-          license_key: (function(){ try{ const l=JSON.parse(localStorage.getItem('caja.license.v1')||'null')||{}; return l.key||l.license_key||''; }catch(_){ return ''; } })(),
-          exported_at: new Date().toISOString(),
-        },
-      };
-      const contents = JSON.stringify(all, null, 2);
-      const w = await h.createWritable();
-      await w.write(contents);
-      await w.close();
-      localStorage.setItem(KEY_LAST, String(Date.now()));
-      localStorage.setItem(KEY_HASH, _currentHash());
-      return { ok:true, bytes: contents.length };
-    }catch(e){
-      console.warn('[autoBackup] falló:', e && e.message);
-      return { skipped:'error', error: e && e.message };
-    }
-  }
-  async function _tick(){
-    try{
-      const h = await getStoredHandle();
-      if(!h){ _refreshStatus(); return; }
-      // Guarda solo si hubo cambios desde la última auto-copia
-      const curHash = _currentHash();
-      const lastHash = localStorage.getItem(KEY_HASH) || '';
-      if(curHash === lastHash){ _refreshStatus(); return; }
-      await _silentBackup('interval');
-    }catch(_){}
-    _refreshStatus();
-  }
-  window.addEventListener('visibilitychange', ()=>{
-    if(document.visibilityState === 'hidden'){ _silentBackup('visibilitychange'); }
-  });
-  window.addEventListener('beforeunload', ()=>{ try{ _silentBackup('beforeunload'); }catch(_){} });
   window.addEventListener('focus', _refreshStatus);
-  setTimeout(_tick, 30*1000);
-  setInterval(_tick, INTERVAL_MIN*60*1000);
   setInterval(_refreshStatus, 30*1000);
-  _refreshStatus();
+  setTimeout(_refreshStatus, 500);
 })();
 function renderCemplaSplit(){
   if(currentCompany!=='cempla')return;
