@@ -11793,64 +11793,100 @@ applyCompanyUI();setDate(currentDate);
 /* ============ AUDITORIA DE TASAS ============ */
 function normalizeName(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim()}
 function computeAudit(dateFrom,dateTo){
+  // 🔎 Oct 2026 · Lógica reescrita con 3 categorías + "todos":
+  //   1️⃣ dup_interrumpido : mismo nombre ≥2 entradas en EL MISMO grupo, con al menos una
+  //                         con coste (importe o imp+tasa) y una sin coste (importe 0, tasa 0).
+  //   2️⃣ dup_seguro       : mismo nombre con entradas en 2+ grupos DIFERENTES, al menos
+  //                         una con coste y al menos una con importe 0 → claro traspaso.
+  //   3️⃣ posible_fallo    : entradas INDIVIDUALES con problema (no requiere duplicado):
+  //                         · importe==0 && tasa>0  (solo tasa, falta la revisión)
+  //                         · importe==0 && tasa==0 (0€ total, puede ser extra/foto o fallo)
+  //   El nombre "cliente" (y variantes "sin nombre"/"sense nom") es placeholder genérico
+  //   → NO cuenta para dup_interrumpido ni dup_seguro, pero SÍ para posible_fallo.
+  const GENERIC_NAMES = ['cliente','client','sin nombre','sense nom','sin concepto','sense concepte','sin apellido'];
+  const _isGeneric = n => {
+    const low = String(n||'').toLowerCase().trim();
+    if(!low) return true;
+    return GENERIC_NAMES.some(g => low === g || low.startsWith(g+' ') || low.endsWith(' '+g));
+  };
   const clients={};
+  const flatIssues=[]; // Para "posible_fallo" individual
   Object.entries(state.byDate).forEach(([d,arr])=>{
     if(d<dateFrom||d>dateTo)return;
     arr.forEach(e=>{
+      if(e.retorno) return;
+      if(e.kind==='DH' && e._hnBruto) return;
+      // ─── FLAT: detecta posibles fallos individuales ───
+      if(e.kind!=='DH'){
+        const imp = +e.importe||0;
+        const tsa = +e.tasa||0;
+        if(imp===0 && (tsa>0 || tsa===0)){
+          flatIssues.push({date:d,e});
+        }
+      }
+      // ─── CLIENTS: agrupa por nombre para dup_interrumpido / dup_seguro ───
       const norm=normalizeName(e.nombre);
-      if(!norm||norm.length<3||norm.includes('sin nombre')||norm.includes('sense nom')||norm.includes('sin concepto')||norm.includes('sense concepte'))return;
+      if(!norm||norm.length<3) return;
+      if(_isGeneric(e.nombre)) return;
       clients[norm]||={display:e.nombre,entries:[]};
       clients[norm].entries.push({date:d,e});
     });
   });
-  return Object.entries(clients).filter(([k,v])=>v.entries.length>=2).map(([k,v])=>{
+  const clientsList = Object.entries(clients).filter(([k,v])=>v.entries.length>=2).map(([k,v])=>{
     let totalImp=0,totalTasa=0,zeroCount=0,dhCount=0,dhSum=0,trafCount=0;
-    // Agrupació per "grupo" (Conducir/Marina/Armas/...) per detectar duplicats reals dins el mateix grup
     const byGroup={};
+    const byGroupHasPaid={}; // grupo → true si al menos una entrada con coste
+    const byGroupHasZero={}; // grupo → true si al menos una entrada a 0€
     v.entries.forEach(({e})=>{
-      if(e.retorno)return;
-      if(e.kind==='DH' && e._hnBruto) return;  // 💼 BRUTO IRPF no cuenta en stats
       if(e.kind==='DH'){dhCount++;dhSum+=(e.tipo==='HABER'?1:-1)*(e.importe||0);return}
-      trafCount++;totalImp+=e.importe||0;totalTasa+=e.tasa||0;
-      if((e.importe||0)===0&&(e.tasa||0)===0)zeroCount++;
+      trafCount++;
+      const imp=+e.importe||0, tsa=+e.tasa||0;
+      totalImp+=imp; totalTasa+=tsa;
+      const isZero = imp===0 && tsa===0;
+      if(isZero) zeroCount++;
       const g=(e.grupo||'—').toString().trim();
       byGroup[g]=(byGroup[g]||0)+1;
+      if(imp>0 || tsa>0) byGroupHasPaid[g]=true;
+      if(isZero) byGroupHasZero[g]=true;
     });
     v.entries.sort((a,b)=>a.date.localeCompare(b.date));
-    // GRUPS DUPLICATS: dins d'un mateix grup hi ha 2+ entrades del mateix nom → REVISAR (pot ser duplicat O interromput, no distingible)
     const duplicatedGroups=Object.entries(byGroup).filter(([g,c])=>c>=2).map(([g,c])=>({group:g,count:c}));
-    const hasSameGroupDup=duplicatedGroups.length>0;
-    // ERROR: fitxa a 0€ sense contrapartida D/H
-    const zeroWithoutDh=zeroCount>0&&dhCount===0;
-    // GRUPS DIFERENTS: mateix nom apareix en 2+ grups diferents → info SUAU (normal)
     const distinctGroups=Object.keys(byGroup);
-    const hasDiffGroups=distinctGroups.length>=2;
-    // CATEGORIA principal (per filtre): prioritat same_group > error > info
+    // DUP_INTERRUMPIDO: mismo grupo ≥2 veces, con al menos una paid y una zero (en el mismo grupo)
+    const dupInterrumpido = duplicatedGroups.some(dg => byGroupHasPaid[dg.group] && byGroupHasZero[dg.group]);
+    // DUP_SEGURO: distintos grupos, al menos uno paid + al menos uno con importe 0 (en otro grupo)
+    const hasAnyPaid = Object.values(byGroupHasPaid).some(Boolean);
+    const hasAnyZero = zeroCount > 0;
+    const dupSeguro = distinctGroups.length>=2 && hasAnyPaid && hasAnyZero;
+    // Categoría principal (prioridad: dup_seguro > dup_interrumpido > info)
     let category='info';
-    if(hasSameGroupDup)category='same_group';
-    else if(zeroWithoutDh)category='error';
-    else if(hasDiffGroups)category='info';
-    const suspicious=hasSameGroupDup||zeroWithoutDh;
-    // Nivell de severitat: 2=roja, 1=groga, 0=info
-    let severity=0;
-    if(hasSameGroupDup||zeroWithoutDh)severity=2;
-    else if(hasDiffGroups&&trafCount>=2)severity=1;
+    if(dupSeguro) category='dup_seguro';
+    else if(dupInterrumpido) category='dup_interrumpido';
+    else if(distinctGroups.length>=2) category='info';
     const dFirst=new Date(v.entries[0].date),dLast=new Date(v.entries[v.entries.length-1].date);
     const daySpan=Math.round((dLast-dFirst)/86400000);
-    return {key:k,display:v.display,entries:v.entries,totalImp,totalTasa,zeroCount,dhCount,dhSum,trafCount,suspicious,severity,hasSameGroupDup,duplicatedGroups,distinctGroups,daySpan,category,zeroWithoutDh};
+    const severity = (category==='dup_seguro'||category==='dup_interrumpido') ? 2 : (category==='info' ? 1 : 0);
+    return {key:k,display:v.display,entries:v.entries,totalImp,totalTasa,zeroCount,dhCount,dhSum,trafCount,dupInterrumpido,dupSeguro,duplicatedGroups,distinctGroups,daySpan,category,severity,suspicious:(dupSeguro||dupInterrumpido),hasSameGroupDup:duplicatedGroups.length>0,zeroWithoutDh:zeroCount>0&&dhCount===0};
   }).sort((a,b)=>{
-    // Ordre: severity DESC, després per número d'entrades DESC
     if(a.severity!==b.severity)return b.severity-a.severity;
     return b.entries.length-a.entries.length;
   });
+  // Devolvemos un array "ampliado": clientes (como antes) + propiedad __issues en el primero
+  clientsList.__flatIssues = flatIssues;
+  return clientsList;
 }
 $('#btnAudit').onclick=()=>{
   // Default range: solo hoy (l'usuari amplia amb els botons Hoy/1 mes/etc.)
   const today=isoToday();
   const defFrom=today;
+  // 🔎 Oct 2026 · Pestañas de filtro (Dup/Int, Dup seguro, Posible fallo, Todos).
+  //   Scope persistido en localStorage ('caja.audit.tab.v1').
+  const AUDIT_TAB_KEY='caja.audit.tab.v1';
+  const _initialTab = (function(){ try{ const s=localStorage.getItem(AUDIT_TAB_KEY); return ['dup_interrumpido','dup_seguro','posible_fallo','todos'].includes(s)?s:'dup_interrumpido';}catch(_){return 'dup_interrumpido';}})();
   const back=document.createElement('div');back.className='modal-back';
-  back.innerHTML=`<div class="modal" style="max-width:1100px;width:95%;max-height:90vh;display:flex;flex-direction:column">
-    <h3 style="color:#f97316">🔎 Auditoría de tasas · Clientes repetidos en el rango</h3>
+  back.innerHTML=`<div class="modal" style="max-width:1180px;width:95%;max-height:92vh;display:flex;flex-direction:column">
+    <h3 style="color:#f97316;margin-bottom:4px">🔎 Auditoría · detector de posibles errores</h3>
+    <div class="small" style="color:#94a3b8;margin-bottom:12px">Encuentra duplicados, interrumpidos y fichas con importe 0 que puedan descuadrar la caja.</div>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <label class="small" style="margin:0">DESDE:</label>
       <input type="date" id="auFrom" value="${defFrom}" style="background:#141821;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px" />
@@ -11865,15 +11901,24 @@ $('#btnAudit').onclick=()=>{
         <button class="btn" data-preset="12m" style="padding:6px 10px;font-size:11px">1 año</button>
         <button class="btn" data-preset="all" style="padding:6px 10px;font-size:11px">Todo</button>
       </div>
-      <span class="small" style="margin-left:auto;color:#f97316">🔴 Mismo grupo · ⚠️ Error 0€ · 🟡 Info</span>
     </div>
-    <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;background:#141821;border:1px solid #2a3040;border-radius:8px;padding:10px 14px">
-      <b style="font-size:12px;color:#f5b301;letter-spacing:1px">🔎 FILTRAR:</b>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#fed7aa"><input type="checkbox" id="fltSame" checked style="cursor:pointer;accent-color:#ea580c" /> 🔴 Mismo grupo (duplicado o interrumpido)</label>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#ff96a0"><input type="checkbox" id="fltErr" checked style="cursor:pointer;accent-color:#dc2626" /> ⚠️ Posible error (0€)</label>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#ffd58a"><input type="checkbox" id="fltInfo" style="cursor:pointer;accent-color:#a16207" /> 🟡 Info (varios grupos)</label>
-      <button class="btn" id="fltAll" style="padding:5px 10px;font-size:11px;margin-left:auto">Todo</button>
-      <button class="btn" id="fltNone" style="padding:5px 10px;font-size:11px">Solo problemas</button>
+    <div id="auTabs" data-testid="audit-tabs" style="display:flex;gap:0;background:#0e1117;border:1px solid #2a3040;border-radius:10px;padding:4px;margin-bottom:12px;overflow:hidden">
+      <button data-tab="dup_interrumpido" data-testid="audit-tab-dup-int" class="au-tab" style="flex:1;padding:11px 14px;border-radius:7px;border:none;background:transparent;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px">
+        <span>🔴 Duplicado / Interrumpido</span>
+        <span class="small au-tab-count" style="font-size:10px;color:#64748b">—</span>
+      </button>
+      <button data-tab="dup_seguro" data-testid="audit-tab-dup-seg" class="au-tab" style="flex:1;padding:11px 14px;border-radius:7px;border:none;background:transparent;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px">
+        <span>⛔ Duplicado seguro</span>
+        <span class="small au-tab-count" style="font-size:10px;color:#64748b">—</span>
+      </button>
+      <button data-tab="posible_fallo" data-testid="audit-tab-fallo" class="au-tab" style="flex:1;padding:11px 14px;border-radius:7px;border:none;background:transparent;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px">
+        <span>⚠️ Posible fallo (0€)</span>
+        <span class="small au-tab-count" style="font-size:10px;color:#64748b">—</span>
+      </button>
+      <button data-tab="todos" data-testid="audit-tab-all" class="au-tab" style="flex:1;padding:11px 14px;border-radius:7px;border:none;background:transparent;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px">
+        <span>📋 Todos</span>
+        <span class="small au-tab-count" style="font-size:10px;color:#64748b">—</span>
+      </button>
     </div>
     <div id="auBody" style="flex:1;overflow:auto;padding-right:6px"></div>
     <div class="row" style="margin-top:14px">
@@ -11883,6 +11928,7 @@ $('#btnAudit').onclick=()=>{
   document.body.appendChild(back);
   back.querySelector('[data-no]').onclick=()=>back.remove();
   back.addEventListener('click',ev=>{if(ev.target===back)back.remove()});
+  let activeTab = _initialTab;
   const applyPreset=p=>{
     const t=isoToday();const dt=new Date();
     if(p==='today'){back.querySelector('#auFrom').value=t;back.querySelector('#auTo').value=t}
@@ -11891,63 +11937,78 @@ $('#btnAudit').onclick=()=>{
     renderAudit();
   };
   back.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>applyPreset(b.dataset.preset));
+  // Tab click handler
+  back.querySelectorAll('.au-tab').forEach(btn=>{
+    btn.onclick=()=>{
+      activeTab = btn.getAttribute('data-tab');
+      try{ localStorage.setItem(AUDIT_TAB_KEY, activeTab); }catch(_){}
+      renderAudit();
+    };
+  });
+  function _updateTabStyles(counts){
+    const colors = {
+      dup_interrumpido:{bg:'#431407',fg:'#fed7aa'},
+      dup_seguro:{bg:'#450a0a',fg:'#fecaca'},
+      posible_fallo:{bg:'#422006',fg:'#fde68a'},
+      todos:{bg:'#1e293b',fg:'#e2e8f0'}
+    };
+    back.querySelectorAll('.au-tab').forEach(btn=>{
+      const tab = btn.getAttribute('data-tab');
+      const isActive = tab===activeTab;
+      const c = colors[tab]||colors.todos;
+      btn.style.background = isActive ? c.bg : 'transparent';
+      btn.style.color = isActive ? c.fg : '#94a3b8';
+      btn.style.borderBottom = isActive ? '2px solid '+c.fg : '2px solid transparent';
+      const countEl = btn.querySelector('.au-tab-count');
+      if(countEl){
+        const n = counts[tab]||0;
+        countEl.textContent = n>0 ? (n+' resultados') : 'sin resultados';
+        countEl.style.color = isActive ? c.fg : '#64748b';
+      }
+    });
+  }
   const renderAudit=()=>{
     const from=back.querySelector('#auFrom').value;
     const to=back.querySelector('#auTo').value;
     if(!from||!to||from>to){back.querySelector('#auBody').innerHTML='<div class="empty">Rango de fechas no válido</div>';return}
     const data=computeAudit(from,to);
-    // Aplica els filtres seleccionats
-    const wantSame=back.querySelector('#fltSame').checked;
-    const wantErr=back.querySelector('#fltErr').checked;
-    const wantInfo=back.querySelector('#fltInfo').checked;
-    const filtered=data.filter(c=>{
-      if(c.category==='same_group'&&wantSame)return true;
-      if(c.category==='error'&&wantErr)return true;
-      if(c.category==='info'&&wantInfo)return true;
-      return false;
-    });
+    const flatIssues = data.__flatIssues || [];
+    // Clasificación por tab
+    const bucketDupInt = data.filter(c=>c.category==='dup_interrumpido');
+    const bucketDupSeg = data.filter(c=>c.category==='dup_seguro');
+    const bucketFallo = flatIssues; // array de {date,e}
+    const bucketTodos = data; // todos los clientes con 2+ entradas (incluye info)
+    const counts = {
+      dup_interrumpido: bucketDupInt.length,
+      dup_seguro: bucketDupSeg.length,
+      posible_fallo: bucketFallo.length,
+      todos: bucketTodos.length + bucketFallo.length,
+    };
+    _updateTabStyles(counts);
     const body=back.querySelector('#auBody');
     const rangeTxt=`${from.split('-').reverse().join('/')} → ${to.split('-').reverse().join('/')}`;
-    if(!filtered.length){
-      if(!data.length)body.innerHTML=`<div class="empty" style="padding:40px">✅ Ningún cliente aparece más de una vez entre ${rangeTxt}.<br><br>Todo limpio en este rango.</div>`;
-      else body.innerHTML=`<div class="empty" style="padding:40px">🔎 Ningún resultado con los filtros seleccionados.<br><br>Hay <b>${data.length}</b> cliente(s) repetido(s) en total. Activa más filtros arriba.</div>`;
-      return;
-    }
-    const sameCount=filtered.filter(x=>x.category==='same_group').length;
-    const errCount=filtered.filter(x=>x.category==='error').length;
-    const infoCount=filtered.filter(x=>x.category==='info').length;
-    body.innerHTML=`<div style="padding:10px 14px;background:${(sameCount+errCount)?'#3a1c22':'#1f3a2e'};border:1px solid ${(sameCount+errCount)?'#5e2a33':'#2a5e44'};border-radius:8px;margin-bottom:12px;font-size:13px">
-      Rango: <b>${rangeTxt}</b> · Mostrando <b>${filtered.length}</b> de <b>${data.length}</b> repetido(s) · <b style="color:#fed7aa">${sameCount}</b> 🔴 mismo grupo · <b style="color:#ff96a0">${errCount}</b> ⚠️ errores · <b style="color:#ffd58a">${infoCount}</b> 🟡 info
-    </div>`+
-    filtered.map(c=>{
+    const _renderClientCard = (c)=>{
       const rows=c.entries.map(({date,e})=>{
         const isDh=e.kind==='DH';
         const isZero=!isDh&&(e.importe||0)===0&&(e.tasa||0)===0;
-        // Ressalta files que pertanyen a un grup duplicat (mateix grup 2+ vegades)
         const inDupGroup=!isDh&&c.duplicatedGroups.some(dg=>dg.group===(e.grupo||'—').toString().trim());
         const bg=isZero?'background:rgba(255,150,160,.12)':(inDupGroup?'background:rgba(234,88,12,.10)':(isDh?'background:rgba(90,169,255,.08)':''));
         const label=isDh?`<span class="tag ${e.tipo==='HABER'?'haber':'debe'}">${e.tipo}</span>`:`<span class="tag">${e.tipo||'-'}</span>`;
         const grupoBadge=isDh?'—':`<span class="pill" style="background:${inDupGroup?'#5e2e10':'#1f2937'};color:${inDupGroup?'#fed7aa':'#cbd5e1'};padding:2px 8px;font-size:11px">${escapeHtml(e.grupo||'—')}</span>`;
         const goto=`onclick="event.stopPropagation();document.querySelector('.modal-back').remove();setDate('${date}')" style="cursor:pointer;${bg}"`;
-        const flag=isZero?'⚠️ TRÁMITE 0€':(inDupGroup?'🔴 MISMO GRUPO':(isDh?'💰 Debe/Haber libre':''));
+        const flag=isZero?'⚠️ 0€':(inDupGroup?'🔴 MISMO GRUPO':(isDh?'💰 D/H':''));
         return `<tr ${goto}><td>${date.split('-').reverse().join('/')}</td><td>${label}</td><td>${grupoBadge}</td><td class="num">${fmt(e.importe||0)}</td><td class="num">${e.tasa?fmt(e.tasa):'—'}</td><td>${e.fp||'-'}</td><td class="small">${flag}</td></tr>`;
       }).join('');
-      const gap=c.daySpan>60?`<span class="pill" style="background:#3a2a1c;color:#ffd58a;border-color:#5e4a2a">⏱ ${c.daySpan} días entre visitas</span>`:'';
-      // Badges per etiquetes de grups
+      const gap=c.daySpan>60?`<span class="pill" style="background:#3a2a1c;color:#ffd58a;border-color:#5e4a2a">⏱ ${c.daySpan} días</span>`:'';
       const grpBadges=c.duplicatedGroups.map(dg=>`<span class="pill" style="background:#5e2e10;color:#fed7aa;border-color:#ea580c;font-weight:700">🔴 ${escapeHtml(dg.group)} ×${dg.count}</span>`).join(' ');
-      const diffGrpBadge=c.severity===1?`<span class="pill" style="background:#3a2a1c;color:#ffd58a;border-color:#a16207">🟡 ${c.distinctGroups.length} grupos: ${c.distinctGroups.map(g=>escapeHtml(g)).join(' + ')}</span>`:'';
-      // Colors card segons severitat
-      const borderColor=c.severity===2?'#ea580c':(c.severity===1?'#a16207':'#2a3040');
-      const nameColor=c.severity===2?'#fed7aa':(c.severity===1?'#ffd58a':'#e8ecf2');
-      const icon=c.severity===2?'🔴 ':(c.severity===1?'🟡 ':'');
-      // Missatge final segons severitat
+      const diffGrpBadge=c.category==='dup_seguro'?`<span class="pill" style="background:#450a0a;color:#fecaca;border-color:#991b1b;font-weight:700">⛔ ${c.distinctGroups.map(g=>escapeHtml(g)).join(' + ')}</span>`:(c.category==='info'?`<span class="pill" style="background:#3a2a1c;color:#ffd58a">🟡 ${c.distinctGroups.join(' + ')}</span>`:'');
+      const borderColor=c.category==='dup_seguro'?'#991b1b':(c.category==='dup_interrumpido'?'#ea580c':(c.category==='info'?'#a16207':'#2a3040'));
+      const nameColor=c.category==='dup_seguro'?'#fecaca':(c.category==='dup_interrumpido'?'#fed7aa':(c.category==='info'?'#ffd58a':'#e8ecf2'));
+      const icon=c.category==='dup_seguro'?'⛔ ':(c.category==='dup_interrumpido'?'🔴 ':(c.category==='info'?'🟡 ':''));
       let footer='';
-      if(c.severity===2){
-        if(c.hasSameGroupDup)footer=`<div class="small" style="margin-top:8px;color:#fed7aa">🔴 Mismo cliente repetido en el mismo grupo → puede ser un <b>duplicado</b> real (mismo trámite dos veces) o un <b>interrumpido</b> (venir varios días para completar el mismo trámite). Revísalo tú manualment.</div>`;
-        else footer=`<div class="small" style="margin-top:8px;color:#ff96a0">⚠️ Ficha a 0€ sin compensación en Debe/Haber. Probablemente aquí está el descuadre.</div>`;
-      }else if(c.severity===1){
-        footer=`<div class="small" style="margin-top:8px;color:#ffd58a">🟡 Cliente en varios grupos diferentes (${c.distinctGroups.join(', ')}) — normal, sólo informativo.</div>`;
-      }
+      if(c.category==='dup_seguro') footer=`<div class="small" style="margin-top:8px;color:#fecaca">⛔ Mismo cliente en <b>${c.distinctGroups.length} grupos diferentes</b> y al menos uno a 0€ → <b>duplicado claro</b>: con una revisión pagó ambos trámites.</div>`;
+      else if(c.category==='dup_interrumpido') footer=`<div class="small" style="margin-top:8px;color:#fed7aa">🔴 Mismo cliente, mismo grupo, con una a 0€ → puede ser <b>duplicado</b> (mismo trámite dos veces) o <b>interrumpido</b> (vino en varios días para acabar). Revísalo.</div>`;
+      else if(c.category==='info') footer=`<div class="small" style="margin-top:8px;color:#ffd58a">🟡 Mismo cliente en varios grupos pero todo cobrado — normal, informativo.</div>`;
       return `<div style="background:#141821;border:1.5px solid ${borderColor};border-radius:10px;padding:12px;margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
           <b style="font-size:15px;color:${nameColor}">${icon}${escapeHtml(c.display)} <span class="pill">📅 ${c.entries.length} fichas</span> ${grpBadges} ${diffGrpBadge} ${gap}</b>
@@ -11956,14 +12017,58 @@ $('#btnAudit').onclick=()=>{
         <table style="width:100%;font-size:12px"><thead><tr><th>Día</th><th>Tipo</th><th>Grupo</th><th class="num">Importe</th><th class="num">Tasa</th><th>FP</th><th></th></tr></thead><tbody>${rows}</tbody></table>
         ${footer}
       </div>`;
-    }).join('');
+    };
+    const _renderFlatIssueRow = ({date,e})=>{
+      const imp=+e.importe||0, tsa=+e.tasa||0;
+      const nameShown = escapeHtml(e.nombre||'(sin nombre)');
+      const grupo = escapeHtml(e.grupo||'—');
+      const tipo = escapeHtml(e.tipo||'-');
+      const flag = tsa>0 ? '⚠️ Solo tasa (falta revisión)' : '⚠️ Importe 0€';
+      const flagColor = tsa>0 ? '#fde68a' : '#fecaca';
+      const goto=`onclick="document.querySelector('.modal-back').remove();setDate('${date}')" style="cursor:pointer"`;
+      return `<tr ${goto}>
+        <td>${date.split('-').reverse().join('/')}</td>
+        <td><span class="tag">${tipo}</span></td>
+        <td><span class="pill" style="background:#1f2937;color:#cbd5e1;padding:2px 8px;font-size:11px">${grupo}</span></td>
+        <td>${nameShown}</td>
+        <td class="num">${fmt(imp)}</td>
+        <td class="num">${tsa?fmt(tsa):'—'}</td>
+        <td>${e.fp||'-'}</td>
+        <td class="small" style="color:${flagColor}"><b>${flag}</b></td>
+      </tr>`;
+    };
+    const _emptyMsg = (lbl)=>`<div class="empty" style="padding:40px;text-align:center;color:#86efac"><div style="font-size:40px;margin-bottom:10px">✅</div><div style="font-size:14px"><b>No hay ${lbl} en este rango.</b></div><div class="small" style="margin-top:6px">Rango: ${rangeTxt}</div></div>`;
+    if(activeTab==='dup_interrumpido'){
+      if(!bucketDupInt.length){ body.innerHTML = _emptyMsg('duplicados o interrumpidos'); return; }
+      body.innerHTML = `<div style="padding:10px 14px;background:#431407;border:1px solid #ea580c;border-radius:8px;margin-bottom:12px;font-size:13px;color:#fed7aa">🔴 <b>${bucketDupInt.length}</b> cliente(s) con posible duplicado o interrumpido en el mismo grupo · ${rangeTxt}</div>` + bucketDupInt.map(_renderClientCard).join('');
+    } else if(activeTab==='dup_seguro'){
+      if(!bucketDupSeg.length){ body.innerHTML = _emptyMsg('duplicados seguros'); return; }
+      body.innerHTML = `<div style="padding:10px 14px;background:#450a0a;border:1px solid #991b1b;border-radius:8px;margin-bottom:12px;font-size:13px;color:#fecaca">⛔ <b>${bucketDupSeg.length}</b> cliente(s) con duplicado claro entre grupos distintos · ${rangeTxt}</div>` + bucketDupSeg.map(_renderClientCard).join('');
+    } else if(activeTab==='posible_fallo'){
+      if(!bucketFallo.length){ body.innerHTML = _emptyMsg('entradas con importe 0 o solo tasa'); return; }
+      body.innerHTML = `<div style="padding:10px 14px;background:#422006;border:1px solid #ca8a04;border-radius:8px;margin-bottom:12px;font-size:13px;color:#fde68a">⚠️ <b>${bucketFallo.length}</b> entrada(s) con importe 0 (solo tasa, extras, o fallos) · ${rangeTxt}<div class="small" style="margin-top:4px;color:#eab308">Incluye todas las entradas con importe 0 — incluso de un solo cliente — para que no se te escape ninguna.</div></div>
+        <div style="background:#141821;border:1.5px solid #ca8a04;border-radius:10px;padding:12px">
+          <table style="width:100%;font-size:12px"><thead><tr><th>Día</th><th>Tipo</th><th>Grupo</th><th>Nombre</th><th class="num">Importe</th><th class="num">Tasa</th><th>FP</th><th>Problema</th></tr></thead><tbody>${bucketFallo.map(_renderFlatIssueRow).join('')}</tbody></table>
+        </div>`;
+    } else { // todos
+      const totalCount = bucketTodos.length + bucketFallo.length;
+      if(!totalCount){ body.innerHTML = _emptyMsg('resultados'); return; }
+      let html = `<div style="padding:10px 14px;background:#1e293b;border:1px solid #334155;border-radius:8px;margin-bottom:12px;font-size:13px;color:#e2e8f0">📋 <b>${totalCount}</b> resultado(s) · <b style="color:#fed7aa">${bucketDupInt.length}</b> duplicados/interrumpidos · <b style="color:#fecaca">${bucketDupSeg.length}</b> duplicados seguros · <b style="color:#fde68a">${bucketFallo.length}</b> entradas 0€ · ${rangeTxt}</div>`;
+      // Primero clientes agrupados (dup_seguro > dup_interrumpido > info)
+      html += bucketTodos.map(_renderClientCard).join('');
+      // Después tabla de 0€
+      if(bucketFallo.length){
+        html += `<div style="background:#141821;border:1.5px solid #ca8a04;border-radius:10px;padding:12px;margin-top:10px">
+          <div style="margin-bottom:8px;color:#fde68a;font-weight:700;font-size:13px">⚠️ Entradas sueltas con importe 0€</div>
+          <table style="width:100%;font-size:12px"><thead><tr><th>Día</th><th>Tipo</th><th>Grupo</th><th>Nombre</th><th class="num">Importe</th><th class="num">Tasa</th><th>FP</th><th>Problema</th></tr></thead><tbody>${bucketFallo.map(_renderFlatIssueRow).join('')}</tbody></table>
+        </div>`;
+      }
+      body.innerHTML = html;
+    }
   };
   back.querySelector('#auReload').onclick=renderAudit;
   back.querySelector('#auFrom').onchange=renderAudit;
   back.querySelector('#auTo').onchange=renderAudit;
-  ['#fltSame','#fltErr','#fltInfo'].forEach(s=>back.querySelector(s).onchange=renderAudit);
-  back.querySelector('#fltAll').onclick=()=>{['#fltSame','#fltErr','#fltInfo'].forEach(s=>back.querySelector(s).checked=true);renderAudit()};
-  back.querySelector('#fltNone').onclick=()=>{back.querySelector('#fltSame').checked=true;back.querySelector('#fltErr').checked=true;back.querySelector('#fltInfo').checked=false;renderAudit()};
   back.querySelector('#auAskAi').onclick=()=>{
     const from=back.querySelector('#auFrom').value;
     const to=back.querySelector('#auTo').value;
