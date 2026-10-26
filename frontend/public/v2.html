@@ -11976,18 +11976,21 @@ $('#btnAudit').onclick=()=>{
     // Clasificación por tab
     const bucketDupInt = data.filter(c=>c.category==='dup_interrumpido');
     const bucketDupSeg = data.filter(c=>c.category==='dup_seguro');
-    // 🛡 Oct 2026 · Posible fallo = entradas con importe=0 que NO están ya clasificadas
-    //   como Dup/Interrumpido ni Dup seguro. Si el cliente tiene 2+ fichas en el rango y
-    //   ya aparece en uno de los duplicados, su entrada a 0€ no se repite aquí.
+    // 🛡 Oct 2026 (revisado Feb) · Posible fallo = entradas con importe=0 cuyo cliente
+    //   NO tenga otra entrada en el mismo rango. Regla del usuario: "si hay otra entrada
+    //   del mismo cliente, es un duplicado o un interrumpido, no un fallo".
+    //   Por tanto excluimos aquí a TODOS los clientes con 2+ fichas (data), no solo
+    //   los que terminan en dup_interrumpido/dup_seguro. Los nombres genéricos
+    //   ("cliente", "sin nombre"…) no entran en `data`, así que sus 0€ sí aparecen.
     //   Casos que SÍ entran aquí:
     //     a) Cliente con UNA sola entrada en el rango que está a 0€.
     //     b) Entrada con importe=0 pero tasa>0 (solo tasa, falta la revisión).
     //     c) Entradas con nombre genérico tipo "cliente"/foto/chip con 0€.
-    const _dupClientNames = new Set([...bucketDupInt, ...bucketDupSeg].map(c=>c.key));
+    const _multiEntryNames = new Set(data.map(c=>c.key));
     const bucketFallo = rawFlatIssues.filter(({e})=>{
       const norm = (typeof normalizeName === 'function') ? normalizeName(e.nombre) : String(e.nombre||'').toLowerCase().trim();
-      // Si el cliente ya está en Dup/Int o Dup seguro, su entrada 0€ no se duplica aquí
-      return !_dupClientNames.has(norm);
+      // Si el cliente tiene 2+ entradas en el rango, pertenece a los buckets de duplicados/info — no aquí
+      return !_multiEntryNames.has(norm);
     });
     const bucketTodos = data; // todos los clientes con 2+ entradas (incluye info)
     const counts = {
@@ -12058,7 +12061,7 @@ $('#btnAudit').onclick=()=>{
       body.innerHTML = `<div style="padding:10px 14px;background:#450a0a;border:1px solid #991b1b;border-radius:8px;margin-bottom:12px;font-size:13px;color:#fecaca">⛔ <b>${bucketDupSeg.length}</b> cliente(s) con duplicado claro entre grupos distintos · ${rangeTxt}</div>` + bucketDupSeg.map(_renderClientCard).join('');
     } else if(activeTab==='posible_fallo'){
       if(!bucketFallo.length){ body.innerHTML = _emptyMsg('entradas con importe 0 o solo tasa'); return; }
-      body.innerHTML = `<div style="padding:10px 14px;background:#422006;border:1px solid #ca8a04;border-radius:8px;margin-bottom:12px;font-size:13px;color:#fde68a">⚠️ <b>${bucketFallo.length}</b> entrada(s) con importe 0 (solo tasa, extras, o fallos) · ${rangeTxt}<div class="small" style="margin-top:4px;color:#eab308">Incluye todas las entradas con importe 0 — incluso de un solo cliente — para que no se te escape ninguna.</div></div>
+      body.innerHTML = `<div style="padding:10px 14px;background:#422006;border:1px solid #ca8a04;border-radius:8px;margin-bottom:12px;font-size:13px;color:#fde68a">⚠️ <b>${bucketFallo.length}</b> entrada(s) con importe 0 (solo tasa, extras, o fallos) · ${rangeTxt}<div class="small" style="margin-top:4px;color:#eab308">Solo entradas con importe 0 cuyo cliente <b>no tiene otra ficha</b> en el rango — si hubiese otra entrada del mismo cliente, sería un duplicado o un interrumpido y aparecería en esos buckets.</div></div>
         <div style="background:#141821;border:1.5px solid #ca8a04;border-radius:10px;padding:12px">
           <table style="width:100%;font-size:12px"><thead><tr><th>Día</th><th>Tipo</th><th>Grupo</th><th>Nombre</th><th class="num">Importe</th><th class="num">Tasa</th><th>FP</th><th>Problema</th></tr></thead><tbody>${bucketFallo.map(_renderFlatIssueRow).join('')}</tbody></table>
         </div>`;
