@@ -11978,19 +11978,26 @@ $('#btnAudit').onclick=()=>{
     const bucketDupSeg = data.filter(c=>c.category==='dup_seguro');
     // 🛡 Oct 2026 (revisado Feb) · Posible fallo = entradas con importe=0.
     //   Regla del usuario:
-    //     · Si imp=0 Y tasa=0 → sólo si el cliente NO tiene otra ficha en el rango
-    //       (si la tuviera, sería duplicado/interrumpido, no fallo).
-    //     · Si imp=0 Y tasa>0 → SIEMPRE sale aquí, aunque el cliente tenga más fichas,
-    //       porque es raro tener solo la tasa sin la revisión (importe).
+    //     · Si imp=0 Y tasa=0 Y NO es extra (chip tipo Foto/Dup/C.O./Cert.Oficial)
+    //       → sólo si el cliente NO tiene otra ficha en el rango.
+    //     · Si imp=0 Y tasa>0 → SIEMPRE (raro cobrar solo la tasa sin la revisión).
+    //     · Si imp=0 Y es extra (chip: Foto, Duplicado, C.Oficial, Certificado oficial…)
+    //       → SIEMPRE (raro un extra a 0€, probable olvido de importe).
     //   Los nombres genéricos ("cliente", "sin nombre"…) no entran en `data`, así que
     //   sus 0€ sí aparecen.
     const _multiEntryNames = new Set(data.map(c=>c.key));
+    const _isExtraTipo = (t) => {
+      const s = String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      return /foto/.test(s) || /duplic/.test(s) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(s);
+    };
     const bucketFallo = rawFlatIssues.filter(({e})=>{
       const imp = +e.importe||0;
       const tsa = +e.tasa||0;
       // Solo tasa sin revisión → siempre aparece
       if(imp===0 && tsa>0) return true;
-      // 0€ puro → sólo si el cliente no tiene otra ficha en el rango
+      // Extra (chip tipo Foto/Dup/C.O./Cert. Oficial) con 0€ → siempre aparece
+      if(imp===0 && _isExtraTipo(e.tipo)) return true;
+      // 0€ puro sin ser extra → sólo si el cliente no tiene otra ficha en el rango
       const norm = (typeof normalizeName === 'function') ? normalizeName(e.nombre) : String(e.nombre||'').toLowerCase().trim();
       return !_multiEntryNames.has(norm);
     });
@@ -12040,8 +12047,12 @@ $('#btnAudit').onclick=()=>{
       const nameShown = escapeHtml(e.nombre||'(sin nombre)');
       const grupo = escapeHtml(e.grupo||'—');
       const tipo = escapeHtml(e.tipo||'-');
-      const flag = tsa>0 ? '⚠️ Solo tasa (falta revisión)' : '⚠️ Importe 0€';
-      const flagColor = tsa>0 ? '#fde68a' : '#fecaca';
+      const _tLow = String(e.tipo||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      const _isExtra = /foto/.test(_tLow) || /duplic/.test(_tLow) || /c\.?\s*ofici|certif.*ofici|\bofici/.test(_tLow);
+      let flag, flagColor;
+      if(tsa>0){ flag='⚠️ Solo tasa (falta revisión)'; flagColor='#fde68a'; }
+      else if(_isExtra){ flag='⚠️ Extra a 0€ (¿falta importe?)'; flagColor='#fed7aa'; }
+      else { flag='⚠️ Importe 0€'; flagColor='#fecaca'; }
       const goto=`onclick="document.querySelector('.modal-back').remove();setDate('${date}')" style="cursor:pointer"`;
       return `<tr ${goto}>
         <td>${date.split('-').reverse().join('/')}</td>
@@ -12063,7 +12074,7 @@ $('#btnAudit').onclick=()=>{
       body.innerHTML = `<div style="padding:10px 14px;background:#450a0a;border:1px solid #991b1b;border-radius:8px;margin-bottom:12px;font-size:13px;color:#fecaca">⛔ <b>${bucketDupSeg.length}</b> cliente(s) con duplicado claro entre grupos distintos · ${rangeTxt}</div>` + bucketDupSeg.map(_renderClientCard).join('');
     } else if(activeTab==='posible_fallo'){
       if(!bucketFallo.length){ body.innerHTML = _emptyMsg('entradas con importe 0 o solo tasa'); return; }
-      body.innerHTML = `<div style="padding:10px 14px;background:#422006;border:1px solid #ca8a04;border-radius:8px;margin-bottom:12px;font-size:13px;color:#fde68a">⚠️ <b>${bucketFallo.length}</b> entrada(s) con importe 0 (solo tasa, extras, o fallos) · ${rangeTxt}<div class="small" style="margin-top:4px;color:#eab308">Aparecen aquí las fichas con <b>importe (revisión) = 0</b> cuyo cliente no tenga otra ficha en el rango (si la tuviera, sería un duplicado o interrumpido). <b>Excepción:</b> si el importe es 0 pero <b>la tasa &gt; 0</b>, siempre sale aquí — es raro cobrar solo la tasa sin la revisión.</div></div>
+      body.innerHTML = `<div style="padding:10px 14px;background:#422006;border:1px solid #ca8a04;border-radius:8px;margin-bottom:12px;font-size:13px;color:#fde68a">⚠️ <b>${bucketFallo.length}</b> entrada(s) con importe 0 (solo tasa, extras, o fallos) · ${rangeTxt}<div class="small" style="margin-top:4px;color:#eab308">Aparecen aquí las fichas con <b>importe (revisión) = 0</b> cuyo cliente no tenga otra ficha en el rango (si la tuviera, sería un duplicado o interrumpido). <b>Excepciones (salen siempre):</b> entradas con <b>tasa &gt; 0</b> sin revisión, y <b>extras</b> (Foto, Duplicado, C.Oficial…) con importe 0 — es raro no cobrarlos.</div></div>
         <div style="background:#141821;border:1.5px solid #ca8a04;border-radius:10px;padding:12px">
           <table style="width:100%;font-size:12px"><thead><tr><th>Día</th><th>Tipo</th><th>Grupo</th><th>Nombre</th><th class="num">Importe</th><th class="num">Tasa</th><th>FP</th><th>Problema</th></tr></thead><tbody>${bucketFallo.map(_renderFlatIssueRow).join('')}</tbody></table>
         </div>`;
