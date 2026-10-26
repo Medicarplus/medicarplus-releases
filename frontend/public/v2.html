@@ -11972,11 +11972,23 @@ $('#btnAudit').onclick=()=>{
     const to=back.querySelector('#auTo').value;
     if(!from||!to||from>to){back.querySelector('#auBody').innerHTML='<div class="empty">Rango de fechas no válido</div>';return}
     const data=computeAudit(from,to);
-    const flatIssues = data.__flatIssues || [];
+    const rawFlatIssues = data.__flatIssues || [];
     // Clasificación por tab
     const bucketDupInt = data.filter(c=>c.category==='dup_interrumpido');
     const bucketDupSeg = data.filter(c=>c.category==='dup_seguro');
-    const bucketFallo = flatIssues; // array de {date,e}
+    // 🛡 Oct 2026 · Posible fallo = entradas con importe=0 que NO están ya clasificadas
+    //   como Dup/Interrumpido ni Dup seguro. Si el cliente tiene 2+ fichas en el rango y
+    //   ya aparece en uno de los duplicados, su entrada a 0€ no se repite aquí.
+    //   Casos que SÍ entran aquí:
+    //     a) Cliente con UNA sola entrada en el rango que está a 0€.
+    //     b) Entrada con importe=0 pero tasa>0 (solo tasa, falta la revisión).
+    //     c) Entradas con nombre genérico tipo "cliente"/foto/chip con 0€.
+    const _dupClientNames = new Set([...bucketDupInt, ...bucketDupSeg].map(c=>c.key));
+    const bucketFallo = rawFlatIssues.filter(({e})=>{
+      const norm = (typeof normalizeName === 'function') ? normalizeName(e.nombre) : String(e.nombre||'').toLowerCase().trim();
+      // Si el cliente ya está en Dup/Int o Dup seguro, su entrada 0€ no se duplica aquí
+      return !_dupClientNames.has(norm);
+    });
     const bucketTodos = data; // todos los clientes con 2+ entradas (incluye info)
     const counts = {
       dup_interrumpido: bucketDupInt.length,
