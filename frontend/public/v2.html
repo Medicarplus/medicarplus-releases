@@ -11902,20 +11902,20 @@ $('#btnAudit').onclick=()=>{
         <button class="btn" data-preset="all" style="padding:6px 10px;font-size:11px">Todo</button>
       </div>
     </div>
-    <div id="auTabs" data-testid="audit-tabs" style="display:flex;gap:0;background:#0e1117;border:1px solid #2a3040;border-radius:10px;padding:4px;margin-bottom:12px;overflow:hidden">
-      <button data-tab="dup_interrumpido" data-testid="audit-tab-dup-int" class="au-tab" style="flex:1;padding:11px 14px;border-radius:7px;border:none;background:transparent;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px">
+    <div id="auTabs" data-testid="audit-tabs" style="display:flex;gap:0;background:#0e1117;border:1px solid #2a3040;border-radius:10px;padding:4px;margin-bottom:12px;overflow:hidden;flex-shrink:0;min-height:62px">
+      <button data-tab="dup_interrumpido" data-testid="audit-tab-dup-int" class="au-tab" style="flex:1;padding:11px 14px;border-radius:7px;border:none;background:transparent;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:600;transition:background .15s,color .15s;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:40px">
         <span>🔴 Duplicado / Interrumpido</span>
         <span class="small au-tab-count" style="font-size:10px;color:#64748b">—</span>
       </button>
-      <button data-tab="dup_seguro" data-testid="audit-tab-dup-seg" class="au-tab" style="flex:1;padding:11px 14px;border-radius:7px;border:none;background:transparent;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px">
+      <button data-tab="dup_seguro" data-testid="audit-tab-dup-seg" class="au-tab" style="flex:1;padding:11px 14px;border-radius:7px;border:none;background:transparent;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:600;transition:background .15s,color .15s;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:40px">
         <span>⛔ Duplicado seguro</span>
         <span class="small au-tab-count" style="font-size:10px;color:#64748b">—</span>
       </button>
-      <button data-tab="posible_fallo" data-testid="audit-tab-fallo" class="au-tab" style="flex:1;padding:11px 14px;border-radius:7px;border:none;background:transparent;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px">
+      <button data-tab="posible_fallo" data-testid="audit-tab-fallo" class="au-tab" style="flex:1;padding:11px 14px;border-radius:7px;border:none;background:transparent;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:600;transition:background .15s,color .15s;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:40px">
         <span>⚠️ Posible fallo (0€)</span>
         <span class="small au-tab-count" style="font-size:10px;color:#64748b">—</span>
       </button>
-      <button data-tab="todos" data-testid="audit-tab-all" class="au-tab" style="flex:1;padding:11px 14px;border-radius:7px;border:none;background:transparent;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px">
+      <button data-tab="todos" data-testid="audit-tab-all" class="au-tab" style="flex:1;padding:11px 14px;border-radius:7px;border:none;background:transparent;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:600;transition:background .15s,color .15s;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:40px">
         <span>📋 Todos</span>
         <span class="small au-tab-count" style="font-size:10px;color:#64748b">—</span>
       </button>
