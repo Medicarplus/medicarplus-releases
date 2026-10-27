@@ -11807,7 +11807,10 @@ function computeAudit(dateFrom,dateTo){
   //   clasificar correctamente los interrumpidos/duplicados que vienen de antes
   //   del rango marcado. Las fichas de lookback NO se muestran en pantalla; solo
   //   se usan para clasificar y para excluir falsos positivos en "Posible fallo".
-  const AUDIT_LOOKBACK_MONTHS = 2;
+  //   Las fichas de lookback SÍ se muestran dentro de la tarjeta del cliente (con un
+  //   marcador "📅 Previa") para que el usuario pueda ver la historia completa.
+  //   3 meses porque la revisión médica dura 3 meses — así cerramos la trazabilidad.
+  const AUDIT_LOOKBACK_MONTHS = 3;
   const _parseD = s => { const [y,m,d] = String(s).split('-').map(Number); return new Date(y,(m||1)-1,d||1); };
   const _lb = _parseD(dateFrom);
   _lb.setMonth(_lb.getMonth() - AUDIT_LOOKBACK_MONTHS);
@@ -11846,26 +11849,19 @@ function computeAudit(dateFrom,dateTo){
   const clientsList = Object.entries(clients)
     .filter(([k,v])=> v.entries.length>=2 && v.entries.some(x=>x.inRange))
     .map(([k,v])=>{
-    // Totales / contadores: usamos TODA la ventana (incluye lookback) para clasificar.
-    //   Para la tarjeta mostramos solo los contadores en-rango (match con la tabla visible).
+    // Totales / contadores sobre TODA la ventana (coinciden con las fichas visibles,
+    // que ahora incluyen las de lookback marcadas como "previas").
     let totalImp=0,totalTasa=0,zeroCount=0,dhCount=0,dhSum=0,trafCount=0;
     const byGroup={};
-    const byGroupHasPaid={}; // grupo → true si al menos una entrada con coste (incluye lookback)
-    const byGroupHasZero={}; // grupo → true si al menos una entrada a 0€ (incluye lookback)
-    v.entries.forEach(({e,inRange})=>{
-      if(e.kind==='DH'){
-        if(inRange){ dhCount++; dhSum+=(e.tipo==='HABER'?1:-1)*(e.importe||0); }
-        return;
-      }
+    const byGroupHasPaid={};
+    const byGroupHasZero={};
+    v.entries.forEach(({e})=>{
+      if(e.kind==='DH'){dhCount++;dhSum+=(e.tipo==='HABER'?1:-1)*(e.importe||0);return}
+      trafCount++;
       const imp=+e.importe||0, tsa=+e.tasa||0;
+      totalImp+=imp; totalTasa+=tsa;
       const isZero = imp===0 && tsa===0;
-      // Totales mostrados: solo en-rango (coinciden con las fichas visibles en la card)
-      if(inRange){
-        trafCount++;
-        totalImp+=imp; totalTasa+=tsa;
-        if(isZero) zeroCount++;
-      }
-      // Mapas de grupo: toda la ventana (clasificación de dup_int / dup_seg)
+      if(isZero) zeroCount++;
       const g=(e.grupo||'—').toString().trim();
       byGroup[g]=(byGroup[g]||0)+1;
       if(imp>0 || tsa>0) byGroupHasPaid[g]=true;
@@ -11876,20 +11872,17 @@ function computeAudit(dateFrom,dateTo){
     const distinctGroups=Object.keys(byGroup);
     const dupInterrumpido = duplicatedGroups.some(dg => byGroupHasPaid[dg.group] && byGroupHasZero[dg.group]);
     const hasAnyPaid = Object.values(byGroupHasPaid).some(Boolean);
-    const hasAnyZero = v.entries.some(({e})=> e.kind!=='DH' && (+e.importe||0)===0 && (+e.tasa||0)===0);
+    const hasAnyZero = zeroCount > 0;
     const dupSeguro = distinctGroups.length>=2 && hasAnyPaid && hasAnyZero;
     let category='info';
     if(dupSeguro) category='dup_seguro';
     else if(dupInterrumpido) category='dup_interrumpido';
     else if(distinctGroups.length>=2) category='info';
-    // Entradas visibles: solo en-rango. Lookback cuenta aparte.
-    const entriesInRange = v.entries.filter(x=>x.inRange);
-    const lookbackCount = v.entries.length - entriesInRange.length;
-    const dFirst=new Date((entriesInRange[0]||v.entries[0]).date);
-    const dLast=new Date((entriesInRange[entriesInRange.length-1]||v.entries[v.entries.length-1]).date);
+    const lookbackCount = v.entries.filter(x=>!x.inRange).length;
+    const dFirst=new Date(v.entries[0].date), dLast=new Date(v.entries[v.entries.length-1].date);
     const daySpan=Math.round((dLast-dFirst)/86400000);
     const severity = (category==='dup_seguro'||category==='dup_interrumpido') ? 2 : (category==='info' ? 1 : 0);
-    return {key:k,display:v.display,entries:entriesInRange,totalImp,totalTasa,zeroCount,dhCount,dhSum,trafCount,dupInterrumpido,dupSeguro,duplicatedGroups,distinctGroups,daySpan,category,severity,suspicious:(dupSeguro||dupInterrumpido),hasSameGroupDup:duplicatedGroups.length>0,zeroWithoutDh:zeroCount>0&&dhCount===0,lookbackCount};
+    return {key:k,display:v.display,entries:v.entries,totalImp,totalTasa,zeroCount,dhCount,dhSum,trafCount,dupInterrumpido,dupSeguro,duplicatedGroups,distinctGroups,daySpan,category,severity,suspicious:(dupSeguro||dupInterrumpido),hasSameGroupDup:duplicatedGroups.length>0,zeroWithoutDh:zeroCount>0&&dhCount===0,lookbackCount};
   }).sort((a,b)=>{
     if(a.severity!==b.severity)return b.severity-a.severity;
     return b.entries.length-a.entries.length;
@@ -12037,19 +12030,21 @@ $('#btnAudit').onclick=()=>{
     const body=back.querySelector('#auBody');
     const rangeTxt=`${from.split('-').reverse().join('/')} → ${to.split('-').reverse().join('/')}`;
     const _renderClientCard = (c)=>{
-      const rows=c.entries.map(({date,e})=>{
+      const rows=c.entries.map(({date,e,inRange})=>{
         const isDh=e.kind==='DH';
         const isZero=!isDh&&(e.importe||0)===0&&(e.tasa||0)===0;
         const inDupGroup=!isDh&&c.duplicatedGroups.some(dg=>dg.group===(e.grupo||'—').toString().trim());
-        const bg=isZero?'background:rgba(255,150,160,.12)':(inDupGroup?'background:rgba(234,88,12,.10)':(isDh?'background:rgba(90,169,255,.08)':''));
+        const isPrev = (inRange===false);
+        const bg = isPrev ? 'background:rgba(100,116,139,.10);opacity:.75' : (isZero?'background:rgba(255,150,160,.12)':(inDupGroup?'background:rgba(234,88,12,.10)':(isDh?'background:rgba(90,169,255,.08)':'')));
         const label=isDh?`<span class="tag ${e.tipo==='HABER'?'haber':'debe'}">${e.tipo}</span>`:`<span class="tag">${e.tipo||'-'}</span>`;
         const grupoBadge=isDh?'—':`<span class="pill" style="background:${inDupGroup?'#5e2e10':'#1f2937'};color:${inDupGroup?'#fed7aa':'#cbd5e1'};padding:2px 8px;font-size:11px">${escapeHtml(e.grupo||'—')}</span>`;
         const goto=`onclick="event.stopPropagation();document.querySelector('.modal-back').remove();setDate('${date}')" style="cursor:pointer;${bg}"`;
-        const flag=isZero?'⚠️ 0€':(inDupGroup?'🔴 MISMO GRUPO':(isDh?'💰 D/H':''));
-        return `<tr ${goto}><td>${date.split('-').reverse().join('/')}</td><td>${label}</td><td>${grupoBadge}</td><td class="num">${fmt(e.importe||0)}</td><td class="num">${e.tasa?fmt(e.tasa):'—'}</td><td>${e.fp||'-'}</td><td class="small">${flag}</td></tr>`;
+        const flag = isPrev ? '📅 Previa (fuera del rango)' : (isZero?'⚠️ 0€':(inDupGroup?'🔴 MISMO GRUPO':(isDh?'💰 D/H':'')));
+        const dateCol = isPrev ? `<span style="color:#94a3b8">${date.split('-').reverse().join('/')}</span>` : date.split('-').reverse().join('/');
+        return `<tr ${goto}><td>${dateCol}</td><td>${label}</td><td>${grupoBadge}</td><td class="num">${fmt(e.importe||0)}</td><td class="num">${e.tasa?fmt(e.tasa):'—'}</td><td>${e.fp||'-'}</td><td class="small"${isPrev?' style="color:#94a3b8"':''}>${flag}</td></tr>`;
       }).join('');
       const gap=c.daySpan>60?`<span class="pill" style="background:#3a2a1c;color:#ffd58a;border-color:#5e4a2a">⏱ ${c.daySpan} días</span>`:'';
-      const lbBadge=(c.lookbackCount>0)?`<span class="pill" title="Fichas previas del mismo cliente detectadas en los 2 meses anteriores al rango (no se muestran, solo se usan para clasificar)" style="background:#1e293b;color:#94a3b8;border-color:#334155;font-size:11px">📅 +${c.lookbackCount} previa${c.lookbackCount>1?'s':''} (2m)</span>`:'';
+      const lbBadge=(c.lookbackCount>0)?`<span class="pill" title="Fichas previas del mismo cliente detectadas en los 3 meses anteriores al rango (visibles en gris, usadas para clasificar correctamente)" style="background:#1e293b;color:#94a3b8;border-color:#334155;font-size:11px">📅 +${c.lookbackCount} previa${c.lookbackCount>1?'s':''} (3m)</span>`:'';
       const grpBadges=c.duplicatedGroups.map(dg=>`<span class="pill" style="background:#5e2e10;color:#fed7aa;border-color:#ea580c;font-weight:700">🔴 ${escapeHtml(dg.group)} ×${dg.count}</span>`).join(' ');
       const diffGrpBadge=c.category==='dup_seguro'?`<span class="pill" style="background:#450a0a;color:#fecaca;border-color:#991b1b;font-weight:700">⛔ ${c.distinctGroups.map(g=>escapeHtml(g)).join(' + ')}</span>`:(c.category==='info'?`<span class="pill" style="background:#3a2a1c;color:#ffd58a">🟡 ${c.distinctGroups.join(' + ')}</span>`:'');
       const borderColor=c.category==='dup_seguro'?'#991b1b':(c.category==='dup_interrumpido'?'#ea580c':(c.category==='info'?'#a16207':'#2a3040'));
