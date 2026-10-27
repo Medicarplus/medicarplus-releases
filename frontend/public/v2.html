@@ -11743,25 +11743,10 @@ $('#btnExport').onclick=async ev=>{
     if(!h){
       statusEl.innerHTML = '<span style="color:#fbbf24">⚠ Pulsa "Guardar copia" una vez para fijar la carpeta — después se guarda solo</span>';
       statusEl.style.borderLeftColor = '#fbbf24';
-      return;
+    }else{
+      statusEl.innerHTML = '🔄 Auto-copia activa · última: '+_timeHuman(last);
+      statusEl.style.borderLeftColor = '#22c55e';
     }
-    // Hay handle pero puede que el permiso ya no esté concedido (Electron reinicia / navegador caducó).
-    // Si queryPermission existe y no da 'granted', avisamos para que pulse "Guardar copia" y renueve.
-    let perm = 'granted';
-    try{ if(typeof h.queryPermission === 'function') perm = await h.queryPermission({mode:'readwrite'}); }catch(_){ perm = 'granted'; }
-    if(perm !== 'granted'){
-      statusEl.innerHTML = '<span style="color:#fbbf24">⚠ Permiso de carpeta caducado · pulsa "Guardar copia" una vez para renovarlo</span>';
-      statusEl.style.borderLeftColor = '#fbbf24';
-      return;
-    }
-    // Si no hay fecha previa pero hay handle+permiso, forzamos una copia inmediata (silencioso)
-    //   para que "última" deje de ser "aún no" sin esperar los 5 min / primer cambio.
-    if(!last && typeof autoSaveToFile === 'function'){
-      try{ await autoSaveToFile(true); }catch(_){}
-    }
-    const lastNow = parseInt(localStorage.getItem('caja.autoBackup.last.v1')||'0',10);
-    statusEl.innerHTML = '🔄 Auto-copia activa · última: '+_timeHuman(lastNow);
-    statusEl.style.borderLeftColor = '#22c55e';
   }
   window.addEventListener('focus', _refreshStatus);
   setInterval(_refreshStatus, 30*1000);
