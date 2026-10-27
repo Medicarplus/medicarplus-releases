@@ -11803,6 +11803,16 @@ function computeAudit(dateFrom,dateTo){
   //                         · importe==0 && tasa==0 (0€ total, puede ser extra/foto o fallo)
   //   El nombre "cliente" (y variantes "sin nombre"/"sense nom") es placeholder genérico
   //   → NO cuenta para dup_interrumpido ni dup_seguro, pero SÍ para posible_fallo.
+  // 📅 Feb 2026 · Ventana ampliada hacia atrás AUDIT_LOOKBACK_MONTHS meses para
+  //   clasificar correctamente los interrumpidos/duplicados que vienen de antes
+  //   del rango marcado. Las fichas de lookback NO se muestran en pantalla; solo
+  //   se usan para clasificar y para excluir falsos positivos en "Posible fallo".
+  const AUDIT_LOOKBACK_MONTHS = 2;
+  const _parseD = s => { const [y,m,d] = String(s).split('-').map(Number); return new Date(y,(m||1)-1,d||1); };
+  const _lb = _parseD(dateFrom);
+  _lb.setMonth(_lb.getMonth() - AUDIT_LOOKBACK_MONTHS);
+  const _pad = n => String(n).padStart(2,'0');
+  const lookbackFrom = `${_lb.getFullYear()}-${_pad(_lb.getMonth()+1)}-${_pad(_lb.getDate())}`;
   const GENERIC_NAMES = ['cliente','client','sin nombre','sense nom','sin concepto','sense concepte','sin apellido'];
   const _isGeneric = n => {
     const low = String(n||'').toLowerCase().trim();
@@ -11810,40 +11820,52 @@ function computeAudit(dateFrom,dateTo){
     return GENERIC_NAMES.some(g => low === g || low.startsWith(g+' ') || low.endsWith(' '+g));
   };
   const clients={};
-  const flatIssues=[]; // Para "posible_fallo" individual
+  const flatIssues=[]; // Para "posible_fallo" individual (solo en-rango)
   Object.entries(state.byDate).forEach(([d,arr])=>{
-    if(d<dateFrom||d>dateTo)return;
+    if(d<lookbackFrom||d>dateTo)return;
+    const inRange = d>=dateFrom && d<=dateTo;
     arr.forEach(e=>{
       if(e.retorno) return;
       if(e.kind==='DH' && e._hnBruto) return;
-      // ─── FLAT: detecta posibles fallos individuales ───
-      if(e.kind!=='DH'){
+      // ─── FLAT: solo entradas en-rango pueden ser "posible fallo" ───
+      if(e.kind!=='DH' && inRange){
         const imp = +e.importe||0;
         const tsa = +e.tasa||0;
         if(imp===0 && (tsa>0 || tsa===0)){
           flatIssues.push({date:d,e});
         }
       }
-      // ─── CLIENTS: agrupa por nombre para dup_interrumpido / dup_seguro ───
+      // ─── CLIENTS: agrupa por nombre, incluyendo lookback ───
       const norm=normalizeName(e.nombre);
       if(!norm||norm.length<3) return;
       if(_isGeneric(e.nombre)) return;
       clients[norm]||={display:e.nombre,entries:[]};
-      clients[norm].entries.push({date:d,e});
+      clients[norm].entries.push({date:d,e,inRange});
     });
   });
-  const clientsList = Object.entries(clients).filter(([k,v])=>v.entries.length>=2).map(([k,v])=>{
+  const clientsList = Object.entries(clients)
+    .filter(([k,v])=> v.entries.length>=2 && v.entries.some(x=>x.inRange))
+    .map(([k,v])=>{
+    // Totales / contadores: usamos TODA la ventana (incluye lookback) para clasificar.
+    //   Para la tarjeta mostramos solo los contadores en-rango (match con la tabla visible).
     let totalImp=0,totalTasa=0,zeroCount=0,dhCount=0,dhSum=0,trafCount=0;
     const byGroup={};
-    const byGroupHasPaid={}; // grupo → true si al menos una entrada con coste
-    const byGroupHasZero={}; // grupo → true si al menos una entrada a 0€
-    v.entries.forEach(({e})=>{
-      if(e.kind==='DH'){dhCount++;dhSum+=(e.tipo==='HABER'?1:-1)*(e.importe||0);return}
-      trafCount++;
+    const byGroupHasPaid={}; // grupo → true si al menos una entrada con coste (incluye lookback)
+    const byGroupHasZero={}; // grupo → true si al menos una entrada a 0€ (incluye lookback)
+    v.entries.forEach(({e,inRange})=>{
+      if(e.kind==='DH'){
+        if(inRange){ dhCount++; dhSum+=(e.tipo==='HABER'?1:-1)*(e.importe||0); }
+        return;
+      }
       const imp=+e.importe||0, tsa=+e.tasa||0;
-      totalImp+=imp; totalTasa+=tsa;
       const isZero = imp===0 && tsa===0;
-      if(isZero) zeroCount++;
+      // Totales mostrados: solo en-rango (coinciden con las fichas visibles en la card)
+      if(inRange){
+        trafCount++;
+        totalImp+=imp; totalTasa+=tsa;
+        if(isZero) zeroCount++;
+      }
+      // Mapas de grupo: toda la ventana (clasificación de dup_int / dup_seg)
       const g=(e.grupo||'—').toString().trim();
       byGroup[g]=(byGroup[g]||0)+1;
       if(imp>0 || tsa>0) byGroupHasPaid[g]=true;
@@ -11852,27 +11874,30 @@ function computeAudit(dateFrom,dateTo){
     v.entries.sort((a,b)=>a.date.localeCompare(b.date));
     const duplicatedGroups=Object.entries(byGroup).filter(([g,c])=>c>=2).map(([g,c])=>({group:g,count:c}));
     const distinctGroups=Object.keys(byGroup);
-    // DUP_INTERRUMPIDO: mismo grupo ≥2 veces, con al menos una paid y una zero (en el mismo grupo)
     const dupInterrumpido = duplicatedGroups.some(dg => byGroupHasPaid[dg.group] && byGroupHasZero[dg.group]);
-    // DUP_SEGURO: distintos grupos, al menos uno paid + al menos uno con importe 0 (en otro grupo)
     const hasAnyPaid = Object.values(byGroupHasPaid).some(Boolean);
-    const hasAnyZero = zeroCount > 0;
+    const hasAnyZero = v.entries.some(({e})=> e.kind!=='DH' && (+e.importe||0)===0 && (+e.tasa||0)===0);
     const dupSeguro = distinctGroups.length>=2 && hasAnyPaid && hasAnyZero;
-    // Categoría principal (prioridad: dup_seguro > dup_interrumpido > info)
     let category='info';
     if(dupSeguro) category='dup_seguro';
     else if(dupInterrumpido) category='dup_interrumpido';
     else if(distinctGroups.length>=2) category='info';
-    const dFirst=new Date(v.entries[0].date),dLast=new Date(v.entries[v.entries.length-1].date);
+    // Entradas visibles: solo en-rango. Lookback cuenta aparte.
+    const entriesInRange = v.entries.filter(x=>x.inRange);
+    const lookbackCount = v.entries.length - entriesInRange.length;
+    const dFirst=new Date((entriesInRange[0]||v.entries[0]).date);
+    const dLast=new Date((entriesInRange[entriesInRange.length-1]||v.entries[v.entries.length-1]).date);
     const daySpan=Math.round((dLast-dFirst)/86400000);
     const severity = (category==='dup_seguro'||category==='dup_interrumpido') ? 2 : (category==='info' ? 1 : 0);
-    return {key:k,display:v.display,entries:v.entries,totalImp,totalTasa,zeroCount,dhCount,dhSum,trafCount,dupInterrumpido,dupSeguro,duplicatedGroups,distinctGroups,daySpan,category,severity,suspicious:(dupSeguro||dupInterrumpido),hasSameGroupDup:duplicatedGroups.length>0,zeroWithoutDh:zeroCount>0&&dhCount===0};
+    return {key:k,display:v.display,entries:entriesInRange,totalImp,totalTasa,zeroCount,dhCount,dhSum,trafCount,dupInterrumpido,dupSeguro,duplicatedGroups,distinctGroups,daySpan,category,severity,suspicious:(dupSeguro||dupInterrumpido),hasSameGroupDup:duplicatedGroups.length>0,zeroWithoutDh:zeroCount>0&&dhCount===0,lookbackCount};
   }).sort((a,b)=>{
     if(a.severity!==b.severity)return b.severity-a.severity;
     return b.entries.length-a.entries.length;
   });
   // Devolvemos un array "ampliado": clientes (como antes) + propiedad __issues en el primero
   clientsList.__flatIssues = flatIssues;
+  clientsList.__lookbackFrom = lookbackFrom;
+  clientsList.__lookbackMonths = AUDIT_LOOKBACK_MONTHS;
   return clientsList;
 }
 $('#btnAudit').onclick=()=>{
@@ -12024,6 +12049,7 @@ $('#btnAudit').onclick=()=>{
         return `<tr ${goto}><td>${date.split('-').reverse().join('/')}</td><td>${label}</td><td>${grupoBadge}</td><td class="num">${fmt(e.importe||0)}</td><td class="num">${e.tasa?fmt(e.tasa):'—'}</td><td>${e.fp||'-'}</td><td class="small">${flag}</td></tr>`;
       }).join('');
       const gap=c.daySpan>60?`<span class="pill" style="background:#3a2a1c;color:#ffd58a;border-color:#5e4a2a">⏱ ${c.daySpan} días</span>`:'';
+      const lbBadge=(c.lookbackCount>0)?`<span class="pill" title="Fichas previas del mismo cliente detectadas en los 2 meses anteriores al rango (no se muestran, solo se usan para clasificar)" style="background:#1e293b;color:#94a3b8;border-color:#334155;font-size:11px">📅 +${c.lookbackCount} previa${c.lookbackCount>1?'s':''} (2m)</span>`:'';
       const grpBadges=c.duplicatedGroups.map(dg=>`<span class="pill" style="background:#5e2e10;color:#fed7aa;border-color:#ea580c;font-weight:700">🔴 ${escapeHtml(dg.group)} ×${dg.count}</span>`).join(' ');
       const diffGrpBadge=c.category==='dup_seguro'?`<span class="pill" style="background:#450a0a;color:#fecaca;border-color:#991b1b;font-weight:700">⛔ ${c.distinctGroups.map(g=>escapeHtml(g)).join(' + ')}</span>`:(c.category==='info'?`<span class="pill" style="background:#3a2a1c;color:#ffd58a">🟡 ${c.distinctGroups.join(' + ')}</span>`:'');
       const borderColor=c.category==='dup_seguro'?'#991b1b':(c.category==='dup_interrumpido'?'#ea580c':(c.category==='info'?'#a16207':'#2a3040'));
@@ -12035,7 +12061,7 @@ $('#btnAudit').onclick=()=>{
       else if(c.category==='info') footer=`<div class="small" style="margin-top:8px;color:#ffd58a">🟡 Mismo cliente en varios grupos pero todo cobrado — normal, informativo.</div>`;
       return `<div style="background:#141821;border:1.5px solid ${borderColor};border-radius:10px;padding:12px;margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
-          <b style="font-size:15px;color:${nameColor}">${icon}${escapeHtml(c.display)} <span class="pill">📅 ${c.entries.length} fichas</span> ${grpBadges} ${diffGrpBadge} ${gap}</b>
+          <b style="font-size:15px;color:${nameColor}">${icon}${escapeHtml(c.display)} <span class="pill">📅 ${c.entries.length} fichas</span> ${grpBadges} ${diffGrpBadge} ${gap} ${lbBadge}</b>
           <div class="small">Total imp: <b class="num">${fmt(c.totalImp)}</b> · Tasa: <b class="num">${fmt(c.totalTasa)}</b>${c.dhCount?` · D/H: <b class="num" style="color:${c.dhSum>=0?'#7ee3aa':'#ff96a0'}">${fmt(c.dhSum)}</b>`:''}</div>
         </div>
         <table style="width:100%;font-size:12px"><thead><tr><th>Día</th><th>Tipo</th><th>Grupo</th><th class="num">Importe</th><th class="num">Tasa</th><th>FP</th><th></th></tr></thead><tbody>${rows}</tbody></table>
