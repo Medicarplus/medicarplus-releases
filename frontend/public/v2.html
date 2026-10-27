@@ -11885,9 +11885,14 @@ function computeAudit(dateFrom,dateTo){
     return {key:k,display:v.display,entries:v.entries,totalImp,totalTasa,zeroCount,dhCount,dhSum,trafCount,dupInterrumpido,dupSeguro,duplicatedGroups,distinctGroups,daySpan,category,severity,suspicious:(dupSeguro||dupInterrumpido),hasSameGroupDup:duplicatedGroups.length>0,zeroWithoutDh:zeroCount>0&&dhCount===0,lookbackCount};
   }).sort((a,b)=>{
     if(a.severity!==b.severity)return b.severity-a.severity;
+    // Dentro de la misma severidad, por fecha de la primera ficha EN RANGO (asc)
+    const _firstIn = c => { const x = c.entries.find(y=>y.inRange); return x ? x.date : '9999-99-99'; };
+    const fa=_firstIn(a), fb=_firstIn(b);
+    if(fa!==fb) return fa.localeCompare(fb);
     return b.entries.length-a.entries.length;
   });
   // Devolvemos un array "ampliado": clientes (como antes) + propiedad __issues en el primero
+  flatIssues.sort((a,b)=>a.date.localeCompare(b.date));
   clientsList.__flatIssues = flatIssues;
   clientsList.__lookbackFrom = lookbackFrom;
   clientsList.__lookbackMonths = AUDIT_LOOKBACK_MONTHS;
