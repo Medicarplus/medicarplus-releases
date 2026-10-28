@@ -35,16 +35,16 @@ LANGUAGE_CODE = "es"
 SEGMENTS = {
     "00_intro": (
         "MediCar Plus es la gestión integral para centros médicos de reconocimiento de conductores. "
-        "Importa, cobra, revisa y avisa, todo desde una sola pantalla. Mira cómo funciona."
+        "Importa, gestiona, revisa y avisa, todo desde una sola pantalla. Mira cómo funciona."
     ),
     "01_csv": (
         "Al descargar el CSV del día desde la DGT, el programa carga automáticamente todas las "
         "fichas con tipo, grupo, tasa y datos del paciente. No tienes que meter nada a mano: "
-        "al abrir el programa ya tienes el día listo para cobrar."
+        "al abrir el programa ya tienes el día preparado."
     ),
     "02_dia": (
-        "A lo largo del día cobras pagos, añades revisiones privadas, fotos, duplicados o "
-        "certificados oficiales. En la columna derecha ves el total cobrado por efectivo, "
+        "A lo largo del día registras pagos, añades revisiones privadas, fotos, duplicados o "
+        "certificados oficiales. En la columna derecha ves el total ingresado por efectivo, "
         "tarjeta, bizum y transferencia. Al cerrar, la caja cuadra sola."
     ),
     "03_stats": (
@@ -138,7 +138,10 @@ def tts(text: str, timeout_s: int = 300) -> bytes:
 def main():
     out = Path("/app/commercial/demo/audio")
     out.mkdir(parents=True, exist_ok=True)
+    wanted = set(sys.argv[1:]) or set(SEGMENTS.keys())
     for name, text in SEGMENTS.items():
+        if name not in wanted:
+            continue
         print(f"[tts] {name} · {len(text)} chars · voice={VOICE} stability={STABILITY}...")
         audio = tts(text)
         path = out / f"{name}.mp3"

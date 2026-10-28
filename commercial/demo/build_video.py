@@ -26,9 +26,9 @@ BUILD_DIR.mkdir(parents=True, exist_ok=True)
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 SEG_DUR = {
-    "00_intro": 11.8,
-    "01_csv":   14.8,
-    "02_dia":   16.2,
+    "00_intro": 11.0,
+    "01_csv":   14.0,
+    "02_dia":   14.0,
     "03_stats": 14.5,
     "04_sms":   15.6,
     "05_audit": 11.9,
