@@ -1,0 +1,48 @@
+name: Build & Publish MediCar Plus (Windows)
+
+# ============================================================================
+# Workflow a l'arrel del repositori. Compila l'Electron app des de
+# commercial/electron/ i publica el .exe al GitHub Release quan es fa push
+# d'un tag "v*" (per exemple v2.2.6).
+# ============================================================================
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    defaults:
+      run:
+        working-directory: commercial/electron
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Build & publish Windows installer + portable
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npx electron-builder --win nsis portable --x64 --publish always
+
+      - name: Upload artifacts (backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: MediCarPlus-Windows-${{ github.ref_name }}
+          path: |
+            commercial/electron/dist/*.exe
+            commercial/electron/dist/latest.yml
