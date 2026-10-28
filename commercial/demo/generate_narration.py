@@ -1,18 +1,36 @@
 """
-Genera los 7 segmentos narrados en español (voz Echo, OpenAI TTS) para el vídeo demo.
+Genera los 7 segmentos narrados en español usando Fal.ai ElevenLabs v3 TTS
+(voz Liam, multilingüe, dinámica/entusiasta) para el vídeo demo.
 
 CONTEXTO: MediCar Plus es un software para CENTROS MÉDICOS DE RECONOCIMIENTO DE CONDUCTORES
 (donde se renuevan los carnets y se emiten certificados médicos). NO ES PARA AUTOESCUELAS.
+
+Usa la Emergent Universal Key via integration-proxy (modo A del Fal playbook).
 """
-import asyncio
 import os
 import sys
+import time
 from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
 from dotenv import load_dotenv
 
 load_dotenv("/app/backend/.env")
 
-from emergentintegrations.llm.openai import OpenAITextToSpeech
+EMERGENT_LLM_KEY = os.environ["EMERGENT_LLM_KEY"]
+INTEGRATION_PROXY_BASE = os.environ.get(
+    "INTEGRATION_PROXY_URL",
+    "https://integrations.emergentagent.com",
+).rstrip("/")
+# Fal Universal Key supports queue-based inference through Emergent proxy only, not Platform APIs.
+CONTROL_BASE = f"{INTEGRATION_PROXY_BASE}/api/v1/fal"
+PUBLIC_QUEUE_BASE = f"{CONTROL_BASE}/queue"
+QUEUE_ORIGIN = "https://queue.fal.run"
+ENDPOINT_ID = "fal-ai/elevenlabs/tts/eleven-v3"
+VOICE = "Liam"           # masculino, multilingüe, tono dinámico/natural
+STABILITY = 0.35         # <0.5 → más expresivo/entusiasta
+LANGUAGE_CODE = "es"
 
 SEGMENTS = {
     "00_intro": (
@@ -49,20 +67,85 @@ SEGMENTS = {
     ),
 }
 
-async def main():
+
+def _headers(extra=None):
+    headers = {
+        "Authorization": f"Bearer {EMERGENT_LLM_KEY}",
+        "Content-Type": "application/json",
+    }
+    if extra:
+        headers.update(extra)
+    return headers
+
+
+def _trusted_proxy_queue_url(value: str) -> str:
+    candidate = urlparse(value)
+    queue_base = urlparse(PUBLIC_QUEUE_BASE)
+    queue_path_prefix = queue_base.path.rstrip("/") + "/"
+    if (
+        candidate.scheme != queue_base.scheme
+        or candidate.netloc != queue_base.netloc
+        or not candidate.path.startswith(queue_path_prefix)
+    ):
+        raise RuntimeError(f"untrusted queue url: {value}")
+    return value
+
+
+def tts(text: str, timeout_s: int = 300) -> bytes:
+    """Submit → poll → fetch result → download audio bytes."""
+    submit = requests.post(
+        f"{CONTROL_BASE}/proxy",
+        headers=_headers({"X-Fal-Target-Url": f"{QUEUE_ORIGIN}/{ENDPOINT_ID}"}),
+        json={
+            "text": text,
+            "voice": VOICE,
+            "language_code": LANGUAGE_CODE,
+            "stability": STABILITY,
+            "apply_text_normalization": "auto",
+            "timestamps": False,
+        },
+        timeout=60,
+    )
+    if submit.status_code == 402:
+        raise RuntimeError("Insufficient Universal Key credits")
+    submit.raise_for_status()
+    sub = submit.json()
+    status_url = _trusted_proxy_queue_url(sub["status_url"])
+    response_url = _trusted_proxy_queue_url(sub["response_url"])
+
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        st = requests.get(status_url, headers=_headers(), timeout=30)
+        st.raise_for_status()
+        body = st.json()
+        status = (body.get("status") or "").upper()
+        if status in {"COMPLETED", "OK"}:
+            if body.get("error"):
+                raise RuntimeError(f"TTS failed: {body['error']}")
+            res = requests.get(response_url, headers=_headers(), timeout=60)
+            res.raise_for_status()
+            result = res.json()
+            audio_url = result["audio"]["url"]
+            dl = requests.get(audio_url, timeout=120)
+            dl.raise_for_status()
+            return dl.content
+        if status in {"FAILED", "CANCELLED", "CANCELED", "ERROR"}:
+            raise RuntimeError(f"TTS failed with status {status}: {body}")
+        time.sleep(1.5)
+    raise RuntimeError("TTS timed out")
+
+
+def main():
     out = Path("/app/commercial/demo/audio")
     out.mkdir(parents=True, exist_ok=True)
-    key = os.getenv("EMERGENT_LLM_KEY")
-    if not key:
-        print("ERROR: EMERGENT_LLM_KEY no encontrada"); sys.exit(1)
-    tts = OpenAITextToSpeech(api_key=key)
     for name, text in SEGMENTS.items():
-        print(f"[tts] {name} · {len(text)} chars...")
-        audio = await tts.generate_speech(text=text, model="tts-1-hd", voice="echo", speed=1.0)
+        print(f"[tts] {name} · {len(text)} chars · voice={VOICE} stability={STABILITY}...")
+        audio = tts(text)
         path = out / f"{name}.mp3"
         path.write_bytes(audio)
         print(f"      → {path.name} ({len(audio)/1024:.1f} KB)")
     print("\nSegmentos listos en:", out)
 
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

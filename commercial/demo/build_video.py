@@ -26,13 +26,13 @@ BUILD_DIR.mkdir(parents=True, exist_ok=True)
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 SEG_DUR = {
-    "00_intro": 10.8,
-    "01_csv":   14.1,
-    "02_dia":   13.9,
-    "03_stats": 14.6,
-    "04_sms":   14.7,
-    "05_audit": 11.8,
-    "06_outro": 4.6,
+    "00_intro": 11.8,
+    "01_csv":   14.8,
+    "02_dia":   16.2,
+    "03_stats": 14.5,
+    "04_sms":   15.6,
+    "05_audit": 11.9,
+    "06_outro": 7.2,
 }
 SILENCE_SEC = 1.4
 PREVIEW_URL = "https://project-helper-47.preview.emergentagent.com/v2.html?demo=1"
@@ -55,8 +55,9 @@ def concat_audio():
     print("[audio] generando pista final...")
     silence_path = BUILD_DIR / "silence.mp3"
     subprocess.run([
-        "ffmpeg","-y","-f","lavfi","-i","anullsrc=r=24000:cl=mono",
-        "-t",str(SILENCE_SEC),"-q:a","9","-acodec","libmp3lame",str(silence_path)
+        "ffmpeg","-y","-f","lavfi","-i","anullsrc=r=44100:cl=mono",
+        "-t",str(SILENCE_SEC),"-b:a","128k","-ar","44100","-ac","1",
+        "-acodec","libmp3lame",str(silence_path)
     ], check=True, capture_output=True)
     list_path = BUILD_DIR / "concat.txt"
     lines = []
@@ -225,20 +226,26 @@ async def record_screencast(duration_target: float, timeline):
         await until("05_audit")
         try:
             await page.evaluate("document.querySelector('#btnAudit')?.click()")
-            await page.wait_for_timeout(2000)
-            # Rango por defecto es "hoy" → poner "3 meses" para ver resultados
+            await page.wait_for_timeout(1200)
+            # Rango por defecto es "hoy" → poner "3 meses" para que entren los
+            # casos sembrados (ANNA, LAURA, JORDI, CARMEN, XAVIER). Narración dice
+            # "mirando hasta tres meses atrás" → aquí visualmente coincide.
             await page.evaluate("document.querySelector('[data-preset=\"3m\"]')?.click()")
-            await page.wait_for_timeout(1800)
-            # Cambiar a la pestaña "Duplicado seguro" (hay resultados en el seed)
+            await page.wait_for_timeout(1500)
+            # Pestaña "Duplicado / Interrumpido" (2 casos: ANNA, CARMEN) — se
+            # corresponde con la palabra "interrumpidos" de la narración.
+            await page.evaluate("document.querySelector('[data-tab=\"dup_interrumpido\"]')?.click()")
+            await page.wait_for_timeout(2000)
+            await page.evaluate("document.querySelector('#auBody')?.scrollBy(0, 160)")
+            await page.wait_for_timeout(1300)
+            # Pestaña "Duplicado seguro" (2 casos: LAURA, JORDI) — palabra "duplicados".
             await page.evaluate("document.querySelector('[data-tab=\"dup_seguro\"]')?.click()")
             await page.wait_for_timeout(2200)
-            await page.evaluate("document.querySelector('#auBody')?.scrollBy(0, 180)")
-            await page.wait_for_timeout(1800)
-            # Pestaña "Todos" para enseñar la lista plana con DNIs
-            await page.evaluate("document.querySelector('[data-tab=\"todos\"]')?.click()")
-            await page.wait_for_timeout(2000)
-            await page.evaluate("document.querySelector('#auBody')?.scrollBy(0, 200)")
+            await page.evaluate("document.querySelector('#auBody')?.scrollBy(0, 160)")
             await page.wait_for_timeout(1200)
+            # Pestaña "Posible fallo (0€)" — palabra "posibles fallos con importe cero".
+            await page.evaluate("document.querySelector('[data-tab=\"posible_fallo\"]')?.click()")
+            await page.wait_for_timeout(1800)
         except Exception as e: print(f"  audit err: {e}")
 
         # ─── 06_outro (88.3-92.9s): zoom al logo ───

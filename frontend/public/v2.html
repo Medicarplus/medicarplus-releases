@@ -44,22 +44,30 @@
     ];
     var conceptos=[['Renovación',43],['Renovación',43],['Renovación',43],['Expedición',55],['Duplicado',25],['Canje',38],['Prórroga',43]];
     var fps=['E','T','T','B','E','T','X'], tasas=[0,25.60,30.90,60.80,0,0];
-    // 🔎 Casos de auditoría pre-sembrados: 3-4 personas con exactamente 2 fichas
-    //   cada una, mezclando duplicado-mismo-grupo, interrumpido y posible-fallo 0€.
-    //   Ocurren en los últimos 25 días para que caigan dentro del rango "3 meses".
+    // 🔎 Casos de auditoría pre-sembrados: 4 personas que cubren los 3 tipos de
+    //   anomalías que detecta la auditoría. Ocurren en los últimos 25 días para
+    //   que caigan dentro del rango "3 meses". Narración 05_audit menciona
+    //   explícitamente: duplicados, interrumpidos y posibles fallos a 0 €.
+    //     · ANNA PUIG SALA   → dup_interrumpido (Conducción · pago+0€, mismo grupo)
+    //     · CARMEN COMAS POU → dup_interrumpido (Conducción · pago+0€, mismo grupo)
+    //     · LAURA FONT RIBA  → dup_seguro       (Armas 55€ + Conducción 0€ · 2 grupos)
+    //     · JORDI VILA PUJOL → dup_seguro       (Marina 55€ + Armas 0€ · 2 grupos)
+    //     · (+ generamos un posible_fallo suelto: Conducción · 0€ solo tasa, ver abajo)
     var SEEDED_DUPLICATE_FICHAS = {
       // ANNA PUIG SALA · Conducción · 1er intento sin cobrar + 2do con cobro (interrumpido)
       '-18-1': {dni:'47112399T',nombre:'ANNA PUIG SALA',tipo:'Renovación',grupo:'Conducción',importe:0,tasa:0,fp:'E',autoescola:'AUTOESC. GARCÍA PAU'},
       '-14-1': {dni:'47112399T',nombre:'ANNA PUIG SALA',tipo:'Renovación',grupo:'Conducción',importe:43,tasa:30.90,fp:'T',autoescola:'AUTOESC. GARCÍA PAU'},
-      // LAURA FONT RIBA · Armas · duplicado seguro (2 fichas mismo grupo poca distancia)
+      // LAURA FONT RIBA · 2 grupos distintos (Armas pago + Conducción 0€) → dup_seguro
       '-20-1': {dni:'44228901C',nombre:'LAURA FONT RIBA',tipo:'Renovación',grupo:'Armas',importe:55,tasa:60.80,fp:'T',autoescola:'AUTOESC. VIAL CENTER'},
-      '-16-1': {dni:'44228901C',nombre:'LAURA FONT RIBA',tipo:'Renovación',grupo:'Armas',importe:0,tasa:0,fp:'E',autoescola:'AUTOESC. VIAL CENTER'},
-      // JORDI VILA PUJOL · Marina · 1er con cobro + 2do a 0€ (duplicado/interrumpido)
+      '-16-1': {dni:'44228901C',nombre:'LAURA FONT RIBA',tipo:'Renovación',grupo:'Conducción',importe:0,tasa:0,fp:'E',autoescola:'AUTOESC. VIAL CENTER'},
+      // JORDI VILA PUJOL · 2 grupos distintos (Marina pago + Armas 0€) → dup_seguro
       '-12-1': {dni:'77009812R',nombre:'JORDI VILA PUJOL',tipo:'Renovación',grupo:'Marina',importe:55,tasa:60.80,fp:'B',autoescola:''},
-      '-9-1':  {dni:'77009812R',nombre:'JORDI VILA PUJOL',tipo:'Expedición',grupo:'Marina',importe:0,tasa:0,fp:'E',autoescola:''},
-      // CARMEN COMAS POU · Conducción · 2 fichas (posible fallo 0€ claro)
+      '-9-1':  {dni:'77009812R',nombre:'JORDI VILA PUJOL',tipo:'Expedición',grupo:'Armas',importe:0,tasa:0,fp:'E',autoescola:''},
+      // CARMEN COMAS POU · Conducción · pago + 0€ (interrumpido claro)
       '-7-1':  {dni:'77821309M',nombre:'CARMEN COMAS POU',tipo:'Renovación',grupo:'Conducción',importe:43,tasa:30.90,fp:'T',autoescola:'AUTOESC. SANT JORDI'},
-      '-4-1':  {dni:'77821309M',nombre:'CARMEN COMAS POU',tipo:'Renovación',grupo:'Conducción',importe:0,tasa:0,fp:'E',autoescola:'AUTOESC. SANT JORDI'}
+      '-4-1':  {dni:'77821309M',nombre:'CARMEN COMAS POU',tipo:'Renovación',grupo:'Conducción',importe:0,tasa:0,fp:'E',autoescola:'AUTOESC. SANT JORDI'},
+      // XAVIER LLORT MAS · solo tasa sin cobro → posible_fallo (0€ importe, con tasa)
+      '-5-1':  {dni:'88321100V',nombre:'XAVIER LLORT MAS',tipo:'Renovación',grupo:'Conducción',importe:0,tasa:30.90,fp:'E',autoescola:'AUTOESC. RÀPID'}
     };
     for(var i=25;i>=0;i--){
       var d=new Date(_today.getTime()-i*86400000); if(d.getDay()===0) continue;
