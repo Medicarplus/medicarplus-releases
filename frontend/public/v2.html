@@ -17195,6 +17195,9 @@ function showActivationModal(){
     +'<div style="display:flex;align-items:center;gap:10px;margin:16px 0;color:#64748b;font-size:11px"><div style="flex:1;height:1px;background:#334155"></div><span>'+L('O si encara no tens llicència','O si aún no tienes licencia')+'</span><div style="flex:1;height:1px;background:#334155"></div></div>'
     +'<button id="licUpgradeBtn" data-testid="lic-upgrade-btn" style="width:100%;padding:14px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border:none;border-radius:10px;font-family:Georgia,serif;font-size:15px;font-weight:700;letter-spacing:1.5px;cursor:pointer;text-transform:uppercase;box-shadow:0 8px 20px rgba(168,85,247,.35)">💎 '+L('Contractar / Renovar ara','Contratar / Renovar ahora')+'</button>'
     +'<div style="font-size:10px;color:#94a3b8;text-align:center;margin-top:6px;font-style:italic">'+L('Pagament amb targeta segur via Stripe · Reps la clau al moment','Pago con tarjeta seguro vía Stripe · Recibes la clave al momento')+'</div>'
+    // 🎬 Feb 2026 · Botón VÍDEO DEMO: abre un modal con el recorrido narrado del software.
+    +'<button id="licDemoBtn" data-testid="lic-demo-btn" style="width:100%;padding:12px;background:transparent;color:#7ee3aa;border:2px solid #065f46;border-radius:10px;font-family:Georgia,serif;font-size:14px;font-weight:700;letter-spacing:1.5px;cursor:pointer;text-transform:uppercase;margin-top:12px;transition:all .18s ease" onmouseover="this.style.background=\'#052e16\';this.style.borderColor=\'#10b981\';this.style.color=\'#86efac\'" onmouseout="this.style.background=\'transparent\';this.style.borderColor=\'#065f46\';this.style.color=\'#7ee3aa\'">🎬 '+L('Veure vídeo demo (3 min)','Ver vídeo demo (3 min)')+'</button>'
+    +'<div style="font-size:10px;color:#64748b;text-align:center;margin-top:6px;font-style:italic">'+L('Veu com funciona MediCar Plus abans de contractar','Mira cómo funciona MediCar Plus antes de contratar')+'</div>'
     +'<div style="text-align:center;margin-top:14px">'
     +'<a href="#" id="showAdminLogin" data-testid="admin-login-toggle" style="color:#a855f7;font-size:12px;text-decoration:underline;cursor:pointer">🔐 ¿Eres administrador?</a>'
     +'</div>'
@@ -17260,6 +17263,47 @@ function showActivationModal(){
       }catch(e){
         window.open(LIC.REQUEST_URL||'https://medicarplus.es','_blank');
       }
+    };
+  }
+  // 🎬 Feb 2026 · Botón "VÍDEO DEMO" · abre modal con reproductor del recorrido narrado.
+  const demoBtn=back.querySelector('#licDemoBtn');
+  if(demoBtn){
+    demoBtn.onclick=()=>{
+      const vb=document.createElement('div');
+      vb.className='modal-back';
+      vb.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;z-index:100003;backdrop-filter:blur(10px);padding:20px';
+      vb.innerHTML = ''
+        +'<div style="position:relative;max-width:min(1120px,95vw);width:100%;background:#0b1121;border:1px solid #1e293b;border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.6);overflow:hidden;font-family:Georgia,serif">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(90deg,#1e3a8a,#312e81);border-bottom:1px solid #1e293b">'
+        +'<div style="display:flex;align-items:center;gap:12px"><span style="font-size:22px">🎬</span><div><div style="color:#e2e8f0;font-weight:700;font-size:15px;letter-spacing:1px">'+L('VÍDEO DEMO · MediCar Plus','VÍDEO DEMO · MediCar Plus')+'</div><div style="color:#94a3b8;font-size:11px;font-family:system-ui,sans-serif">'+L('Recorregut complet · importar CSV · estadístiques · SMS · auditoria · 3 min','Recorrido completo · importar CSV · estadísticas · SMS · auditoría · 3 min')+'</div></div></div>'
+        +'<button data-close style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:system-ui,sans-serif;font-size:12px">✕ '+L('Tancar','Cerrar')+'</button>'
+        +'</div>'
+        +'<div style="position:relative;background:#000;aspect-ratio:16/9;max-height:72vh">'
+        +'<video id="licDemoVideo" controls preload="metadata" playsinline poster="/demo/medicar_demo_poster.jpg" style="width:100%;height:100%;object-fit:contain;background:#000;display:block">'
+        +'<source src="/demo/medicar_demo.mp4" type="video/mp4">'
+        +'</video>'
+        +'<div id="licDemoFallback" style="display:none;position:absolute;inset:0;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;font-family:system-ui,sans-serif">'
+        +'<div style="font-size:52px;margin-bottom:14px">🎬</div>'
+        +'<div style="font-size:16px;font-weight:700;color:#f5b301;margin-bottom:8px">'+L('Preparant el vídeo demo…','Preparando el vídeo demo…')+'</div>'
+        +'<div style="font-size:13px;color:#94a3b8;max-width:480px;line-height:1.6">'+L("El recorregut narrat del software estarà disponible aquí en breu. Mentrestant pots demanar una demo escrivint-nos.","El recorrido narrado del software estará disponible aquí en breve. Mientras tanto, pídenos una demo escribiéndonos.")+'</div>'
+        +'<a href="mailto:'+LIC.SUPPORT_EMAIL+'" style="margin-top:16px;padding:10px 20px;background:#065f46;color:#86efac;border-radius:8px;text-decoration:none;font-weight:700;font-size:13px">✉️ '+LIC.SUPPORT_EMAIL+'</a>'
+        +'</div>'
+        +'</div>'
+        +'</div>';
+      document.body.appendChild(vb);
+      const videoEl = vb.querySelector('#licDemoVideo');
+      const fallback = vb.querySelector('#licDemoFallback');
+      // Si el vídeo no carga (404 o aún no generado), mostramos el fallback.
+      videoEl.addEventListener('error', ()=>{ videoEl.style.display='none'; fallback.style.display='flex'; });
+      videoEl.addEventListener('loadedmetadata', ()=>{ fallback.style.display='none'; videoEl.style.display='block'; });
+      // Comprobación proactiva con HEAD (si el servidor devuelve HTML de fallback → no hay vídeo aún)
+      fetch('/demo/medicar_demo.mp4', {method:'HEAD'}).then(r=>{
+        const ct = (r.headers.get('content-type')||'').toLowerCase();
+        if(!r.ok || !ct.startsWith('video/')){ videoEl.style.display='none'; fallback.style.display='flex'; }
+      }).catch(()=>{ videoEl.style.display='none'; fallback.style.display='flex'; });
+      const close = () => { try{ videoEl.pause(); }catch(_){} vb.remove(); };
+      vb.addEventListener('click', ev => { if(ev.target===vb || (ev.target.hasAttribute && ev.target.hasAttribute('data-close'))) close(); });
+      document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ close(); document.removeEventListener('keydown', esc); } });
     };
   }
   // 🔐 Admin login (usuario + contraseña) — segunda vía para entrar como MASTER

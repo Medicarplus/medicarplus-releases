@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Muestras de voz · MediCar Plus Demo</title>
+<style>
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;max-width:720px;margin:40px auto;padding:0 24px}
+  h1{color:#f5b301;font-family:Georgia,serif;font-size:24px;margin-bottom:4px}
+  p{color:#94a3b8;line-height:1.6}
+  .card{background:#141821;border:1px solid #334155;border-radius:12px;padding:20px;margin:16px 0}
+  .card h3{color:#7ee3aa;margin:0 0 6px;font-size:16px}
+  .card .desc{color:#94a3b8;font-size:12px;margin-bottom:12px}
+  audio{width:100%}
+  .warn{background:#422006;border-left:4px solid #ca8a04;padding:12px 16px;border-radius:6px;color:#fde68a;font-size:13px;line-height:1.5}
+</style>
+</head>
+<body>
+<h1>🔊 Muestras de voz IA · MediCar Plus</h1>
+<p>Escucha las 4 voces de OpenAI TTS en español y dime cuál prefieres (o si prefieres saltar a ElevenLabs para un español nativo).</p>
+
+<div class="warn">
+  ⚠️ <b>Aviso:</b> Todas las voces de OpenAI están optimizadas para inglés. En español suenan con cierto acento inglés/americano. Si eso te molesta, lo mejor es <b>ElevenLabs</b> con una voz nativa española (pero necesitarás pasarme tu API key).
+</div>
+
+<div class="card">
+  <h3>🎤 Nova <span style="color:#94a3b8;font-weight:normal">· femenina, enérgica, moderna</span></h3>
+  <div class="desc">Suele ser la mejor para locuciones comerciales dinámicas.</div>
+  <audio controls src="/demo-samples/sample_nova.mp3"></audio>
+</div>
+
+<div class="card">
+  <h3>🎤 Shimmer <span style="color:#94a3b8;font-weight:normal">· femenina, cálida, brillante</span></h3>
+  <div class="desc">Más suave, buena para tutoriales explicativos.</div>
+  <audio controls src="/demo-samples/sample_shimmer.mp3"></audio>
+</div>
+
+<div class="card">
+  <h3>🎤 Echo <span style="color:#94a3b8;font-weight:normal">· masculina, calmada</span></h3>
+  <div class="desc">Voz masculina serena, estilo narrador clásico.</div>
+  <audio controls src="/demo-samples/sample_echo.mp3"></audio>
+</div>
+
+<div class="card">
+  <h3>🎤 Alloy <span style="color:#94a3b8;font-weight:normal">· neutra, equilibrada</span></h3>
+  <div class="desc">Voz andrógina, formal.</div>
+  <audio controls src="/demo-samples/sample_alloy.mp3"></audio>
+</div>
+
+<p style="margin-top:24px;color:#64748b;font-size:12px">Texto locutado: "Bienvenido a MediCar Plus, la gestión integral para centros médicos de reconocimiento y autoescuelas. En menos de un minuto importas el CSV de la DGT, cuadras caja, revisas estadísticas y envías los avisos SMS a tus clientes."</p>
+</body>
+</html>
