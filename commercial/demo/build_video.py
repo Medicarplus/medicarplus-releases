@@ -32,7 +32,7 @@ SEG_DUR = {
     "03_stats": 14.5,
     "04_sms":   15.6,
     "05_audit": 11.9,
-    "06_outro": 7.2,
+    "06_outro": 4.9,
 }
 SILENCE_SEC = 1.4
 PREVIEW_URL = "https://project-helper-47.preview.emergentagent.com/v2.html?demo=1"

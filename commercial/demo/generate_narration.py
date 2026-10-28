@@ -63,7 +63,7 @@ SEGMENTS = {
         "cerrar el mes."
     ),
     "06_outro": (
-        "MediCar Plus. Menos tiempo con los números, más tiempo con tus pacientes."
+        "Con MediCar Plus pasas menos tiempo con los números y más tiempo con tus pacientes."
     ),
 }
 
