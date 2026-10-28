@@ -89,6 +89,22 @@ async def download_electron():
         headers={"Content-Disposition": 'attachment; filename="caja_del_dia_electron.zip"'},
     )
 
+@api_router.get("/download-demo-video")
+async def download_demo_video():
+    """Force-download the MediCar Plus landing demo (MP4). Perfect for LinkedIn."""
+    file_path = Path(__file__).parent.parent / "frontend" / "public" / "demo" / "medicar_demo.mp4"
+    if not file_path.exists():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Demo video not generated yet")
+    return FileResponse(
+        path=str(file_path),
+        media_type="application/octet-stream",
+        filename="medicar-plus-demo.mp4",
+        headers={"Content-Disposition": 'attachment; filename="medicar-plus-demo.mp4"'},
+    )
+
+
+
 
 class AiAskBody(BaseModel):
     question: str
