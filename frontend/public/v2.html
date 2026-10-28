@@ -1316,6 +1316,12 @@ const DATA_LS_KEYS = [
   'caja.stats.seed.2026.jan-may',     // Flag que marca semilla aplicada (evita re-seed en restore)
   'caja.stats.pollution.cleaned.v1',  // Flag limpieza aplicada
   'caja.stats.backfill.loaded.v1',    // Timestamp del último histórico cargado desde Excel
+  // 🎛 Feb 2026 · Chips personalizados por fila (añadidos/ocultados por el usuario).
+  //   Los `caja.chips.*` dinámicos ya entran por auto-descubrimiento, pero los listamos
+  //   explícitamente para que aparezcan en los diagnósticos del restore.
+  'caja.chips.priv.v1',               // Chips Empresa 1 (Tráfico ingresos)
+  'caja.chips.priv-cempla.v1',        // Chips Empresa 2 (CEMPLA ingresos)
+  'caja.chips.dh.v1',                 // Chips de Debe/Haber (gastos / ingresos manuales)
 ];
 // 🌐 Exponer al scope global para que la sync IIFE (definida arriba) pueda usarla en backups
 try{ window.DATA_LS_KEYS = DATA_LS_KEYS; }catch(_){}
@@ -1453,7 +1459,14 @@ async function autoSaveToFile(silent){
     };
     // Firma diff: cubre TODO (usa data)
     const sig=JSON.stringify(all.data);
-    if(sig===_lastAutoSaveContent){if(!silent)toast('✓ Sin cambios · no hace falta guardar',2000);return}
+    if(sig===_lastAutoSaveContent){
+      // 🔄 Feb 2026 · Aunque no haya cambios, actualizamos la marca de "última comprobación"
+      //   para que el panel de copia muestre siempre una fecha reciente y no "aún no".
+      try{ localStorage.setItem('caja.autoBackup.last.v1', String(Date.now())); }catch(_){}
+      try{ const sp=document.getElementById('autoBackupStatus'); if(sp){ const t2=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}); sp.innerHTML='🔄 Auto-copia activa · última: '+t2; sp.style.borderLeftColor='#22c55e'; } }catch(_){}
+      if(!silent)toast('✓ Sin cambios · no hace falta guardar',2000);
+      return;
+    }
     const content=JSON.stringify(all,null,2);
     // SAFETY: never write empty/truncated content
     if(!content||content.length<40){console.warn('autoSave: content too small, aborting');return}
@@ -1491,8 +1504,14 @@ function updateAutosaveBadge(name){
 setInterval(()=>autoSaveToFile(true),5*60*1000);
 // También al ocultar la pestaña
 document.addEventListener('visibilitychange',()=>{if(document.hidden)autoSaveToFile(true)});
-// Al primer arranque, verificar si hay handle
-(async()=>{const h=await getStoredHandle();if(h){const b=$('#autosaveBadge');if(b){b.style.display='inline-flex';b.textContent=`🔗 ${h.name}`}}})();
+// Al primer arranque, verificar si hay handle. Si lo hay con permiso, forzar un
+// primer autoSave (silencioso) para que la fecha "última" aparezca de inmediato.
+(async()=>{const h=await getStoredHandle();if(h){const b=$('#autosaveBadge');if(b){b.style.display='inline-flex';b.textContent=`🔗 ${h.name}`}
+  try{
+    const perm = (typeof h.queryPermission==='function') ? await h.queryPermission({mode:'readwrite'}) : 'granted';
+    if(perm==='granted'){ setTimeout(()=>autoSaveToFile(true), 1500); }
+  }catch(_){}
+}})();
 
 // ☁️ Oct 2026 · Backup DIARIO a la nube (admin panel) · siempre activo
 //   - Dispara si han pasado ≥24h desde la última copia en nube
@@ -5315,7 +5334,7 @@ function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(
   const cajaCB=(efShownCB-delta_CB)+saCC.caja+resCambio+(t.internalCaja||0);
   const bbvaCB=(autoT_CB+delta_CB+dfExcess_CB)+((t.byFp.B||0)+(t.tasasByFp.B||0))+((t.byFp.X||0)+(t.tasasByFp.X||0))+saCC.banc+(t.internalBanco||0);
   const datafonoHTML='';
-  $('#sumBox').innerHTML=isC?`${datafonoHTML}<div class="row" data-revisiones-detail="1" style="cursor:pointer" title="${L('Clica per veure el detall de les revisions','Clic para ver el detalle de las revisiones')}"><span style="text-decoration:underline dotted;text-decoration-color:#7a8394">Revisiones <span style="color:#7a8394;font-size:10px">▸ ${L('detall','detalle')}</span></span><b>${t.cnt-t.retornos}${t.retornos?` (${t.retornos} anulada)`:''}</b></div><div class="row"><span>Total revisiones</span><b class="num">${fmt(t.bruto)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row"><span>💵 Efectivo</span><b class="num" data-testid="efectivo-neto-c">${fmt(efIn_C-deltaDisp_C)}</b></div><div class="row"><span>💳 Tarjeta <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><div style="display:flex;gap:4px;align-items:center;justify-content:flex-end"><span data-datafono-info="1" title="Info datáfono manual" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#2a3040;color:#86b6ff;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #86b6ff;user-select:none">?</span><input type="number" step="0.01" id="datafono-inp" value="${df||''}" placeholder="manual" title="Introduce manualmente el total del datáfono (anula el automático)" style="width:70px;background:#0e1117;color:#86b6ff;border:1px solid #2a3040;border-radius:4px;padding:2px 4px;font-size:11px;text-align:right" /><button id="datafono-save" title="Guardar" style="background:#3ddc97;color:#0f1115;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px">✓</button><b class="num" ${df?'style="color:#86b6ff"':''}>${fmt(trTarShown_C)}</b></div></div><div class="row"><span>📱 Bizum <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(bizIn_C)}</b></div><div class="row"><span>🏦 Transferencia <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(trIn_C)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(126,227,170,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97;display:none"><span style="color:#7ee3aa;font-weight:700">↗ TOTAL HABER</span><b class="num big" style="color:#7ee3aa">+${fmt(haberTotalC)}</b></div><div class="row wide" style="background:rgba(255,150,160,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #ff5d6c;display:none"><span style="color:#ff96a0;font-weight:700">↘ TOTAL DEBE</span><b class="num big" style="color:#ff96a0">-${fmt(debeTotalC)}</b></div><div style="grid-column:span 2;margin:10px -16px 10px -16px;padding:16px 18px;background:linear-gradient(90deg,rgba(126,227,170,.18) 0%,rgba(126,227,170,.05) 100%);border-left:4px solid #3ddc97;border-radius:8px;display:flex;justify-content:space-between;align-items:center" data-testid="total-dia-cempla"><span style="color:#7ee3aa;font-weight:800;font-size:15px;letter-spacing:.5px">💰 TOTAL DÍA</span><span class="num" style="color:#7ee3aa;font-weight:800;font-size:22px">${fmt(t.neto)}</span></div><hr class="sep" style="grid-column:span 2"/><div class="row"><span>🟢 Caja física <span style="color:#7a8394;font-size:10px">(sin cajón de cambio)</span> <span class="tt" data-tt="Efectivo real en la caja al cierre de este día (acumulado histórico), sin incluir el cajón de reserva de cambio.">?</span></span><b class="num" data-testid="saldo-ant-solo-caja-c">${fmt(cajaC-resCambio)}</b></div><div class="row"><span>💰 Reserva de cambio <span style="color:#7a8394;font-size:10px">(cajón)</span> <span class="tt" data-tt="Dinero físico guardado en el cajón de cambio a cierre de este día: billetes y monedas destinados a dar cambio a los clientes.">?</span></span><b class="num" data-testid="reserva-cambio-display-c">${fmt(resCambio)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(61,220,151,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97"><span style="color:#7ee3aa;font-weight:600">🟢 ${L('CAIXA FÍSICA TOTAL','CAJA FÍSICA TOTAL')} <span style="color:#7a8394;font-size:10px;font-weight:400">(caja + cambio)</span></span><b class="num big" style="color:#7ee3aa">${fmt(cajaC)}</b></div><div class="row wide" style="background:rgba(134,182,255,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #5aa9ff"><span style="color:#86b6ff;font-weight:600">🔵 CUENTA BANCO</span><b class="num big" style="color:#86b6ff">${fmt(bbvaC)}</b></div><div class="row total"><span>TOTAL <span style="color:#7a8394;font-size:10px;font-weight:400">(caja física con reserva + banco)</span></span><span class="num" data-testid="total-caja-banco-c">${fmt(cajaC+bbvaC)}</span></div>`:`${datafonoHTML}<div class="row"><span>Entradas Tráfico</span><b>${t.cntDGT} ${t.retornos?`(${t.retornos} retorno)`:''}</b></div><div class="row"><span>Total Certificados Tráfico</span><b class="num">${fmt(t.brutoDGT)}</b></div><div class="row"><span>Descuentos</span><b class="num">-${fmt(t.dto)}</b></div><div class="row"><span>Tasas DGT ${(()=>{const bk=t.tasasBreakdown||{};const keys=Object.keys(bk).sort((a,b)=>+b-+a);if(keys.length===0)return '';const parts=keys.map(k=>{const cnt=bk[k];const price=+k;const sub=cnt*price;return `<span style="white-space:nowrap">${cnt}×${price.toFixed(2).replace('.',',')} = <b style="color:#7ee3aa">${sub.toFixed(2).replace('.',',')}</b></span>`});return `<div style="color:#94a3b8;font-size:10px;font-weight:400;margin-top:4px;line-height:1.6;font-family:'Consolas',monospace">${parts.join(' · ')}</div>`;})()}</span><b class="num">${fmt(t.tasasDGT)}</b></div><div style="grid-column:span 2;margin:10px -16px 4px -16px;padding:12px 16px;background:linear-gradient(90deg,rgba(var(--tint),.14) 0%,rgba(var(--tint),.04) 100%);border-left:3px solid rgb(var(--tint));border-radius:6px;display:flex;justify-content:space-between;align-items:center"><span style="color:rgb(var(--tint));font-weight:700;font-size:13px">💰 TOTAL TRÁFICO</span><span class="num" style="color:var(--accent-2);font-weight:700;font-size:17px">${fmt(t.brutoDGT+t.tasasDGT)}</span></div>${t.cntOtros>0||t.haber>0||t.refundsCount>0?`<div class="row" data-otros-detail="1" style="cursor:pointer" title="${L('Clica per veure el detall dels serveis','Clic para ver el detalle de los servicios')}"><span style="text-decoration:underline dotted;text-decoration-color:#7a8394">Otros servicios (${t.cntOtros}) <span style="color:#7a8394;font-size:10px">▸ detall</span></span><b class="num">${fmt(t.brutoOtros)}</b></div>${t.haber>0?`<div class="row"><span>Ingresos manuales</span><b class="num">${fmt(t.haber)}</b></div>`:''}${t.refundsCount>0?`<div class="row" style="background:rgba(217,119,6,.1);padding:6px 10px;border-radius:6px;border-left:3px solid #d97706"><span style="color:#fbbf24;font-weight:700">↩ Devoluciones tasas (${t.refundsCount})</span><b class="num" style="color:#fbbf24">-${fmt(t.refundsTotal)}</b></div>`:''}`:''}<div style="grid-column:span 2;margin:2px -16px 8px -16px;padding:12px 16px;background:linear-gradient(90deg,rgba(126,227,170,.14) 0%,rgba(126,227,170,.04) 100%);border-left:4px solid #3ddc97;border-radius:6px;display:flex;justify-content:space-between;align-items:center"><span style="color:#7ee3aa;font-weight:700;font-size:13px">🧾 TOTAL COBRADO</span><span class="num" style="color:#7ee3aa;font-weight:700;font-size:17px">${fmt(t.bruto+t.tasas+t.haber)}</span></div><div class="row"><span>💵 Efectivo</span><b class="num" data-testid="efectivo-neto-cb">${fmt(efIn_CB-deltaDisp_CB)}</b></div><div class="row"><span>💳 Tarjeta <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><div style="display:flex;gap:4px;align-items:center;justify-content:flex-end"><span data-datafono-info="1" title="Info datáfono manual" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#2a3040;color:#7ee3aa;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #7ee3aa;user-select:none">?</span><input type="number" step="0.01" id="datafono-inp" value="${df||''}" placeholder="manual" title="Introduce manualmente el total del datáfono (anula el automático)" style="width:70px;background:#0e1117;color:#7ee3aa;border:1px solid #2a3040;border-radius:4px;padding:2px 4px;font-size:11px;text-align:right" /><button id="datafono-save" title="Guardar" style="background:#3ddc97;color:#0f1115;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px">✓</button><b class="num" ${df?'style="color:#7ee3aa"':''}>${fmt(trTarShown_CB)}</b></div></div><div class="row"><span>📱 Bizum <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(bizIn_CB)}</b></div><div class="row"><span>🏦 Transferencia <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(trIn_CB)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(126,227,170,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97;display:none"><span style="color:#7ee3aa;font-weight:700">↗ TOTAL HABER</span><b class="num big" style="color:#7ee3aa">+${fmt(haberTotalCB)}</b></div><div class="row wide" style="background:rgba(255,150,160,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #ff5d6c;display:none"><span style="color:#ff96a0;font-weight:700">↘ TOTAL DEBE</span><b class="num big" style="color:#ff96a0">-${fmt(debeTotalCB)}</b></div><div class="row"><span>🟢 Caja física <span style="color:#7a8394;font-size:10px">(sin cajón de cambio)</span> <span class="tt" data-tt="Efectivo real en la caja al cierre de este día (acumulado histórico), sin incluir el cajón de reserva de cambio.">?</span></span><b class="num" data-testid="saldo-ant-solo-caja">${fmt(cajaCB-resCambio)}</b></div><div class="row"><span>💰 Reserva de cambio <span style="color:#7a8394;font-size:10px">(cajón)</span> <span class="tt" data-tt="Dinero físico guardado en el cajón de cambio a cierre de este día: billetes y monedas destinados a dar cambio a los clientes.">?</span></span><b class="num" data-testid="reserva-cambio-display">${fmt(resCambio)}</b></div><div style="grid-column:span 2;margin:4px -8px;padding:0;display:none" data-testid="saldo-ant-caja-cambio-wrapper"><b data-testid="saldo-ant-caja-cambio" style="display:none">${fmt(cajaCB)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(61,220,151,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97"><span style="color:#7ee3aa;font-weight:600">🟢 ${L('CAIXA FÍSICA TOTAL','CAJA FÍSICA TOTAL')} <span style="color:#7a8394;font-size:10px;font-weight:400">(caja + cambio)</span></span><b class="num big" style="color:#7ee3aa">${fmt(cajaCB)}</b></div><div class="row wide" style="background:rgba(134,182,255,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #5aa9ff"><span style="color:#86b6ff;font-weight:600">🔵 CUENTA BANCO</span><b class="num big" style="color:#86b6ff">${fmt(bbvaCB)}</b></div><div class="row total"><span>TOTAL <span style="color:#7a8394;font-size:10px;font-weight:400">(caja física con reserva + banco)</span></span><span class="num" data-testid="total-caja-banco">${fmt(cajaCB+bbvaCB)}</span></div>`;
+  $('#sumBox').innerHTML=isC?`${datafonoHTML}<div class="row" data-revisiones-detail="1" style="cursor:pointer" title="${L('Clica per veure el detall de les revisions','Clic para ver el detalle de las revisiones')}"><span style="text-decoration:underline dotted;text-decoration-color:#7a8394">Revisiones <span style="color:#7a8394;font-size:10px">▸ ${L('detall','detalle')}</span></span><b>${t.cnt-t.retornos}${t.retornos?` (${t.retornos} anulada)`:''}</b></div><div class="row"><span>Total revisiones</span><b class="num">${fmt(t.bruto)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row"><span>💵 Efectivo</span><b class="num" data-testid="efectivo-neto-c">${fmt(efIn_C-deltaDisp_C)}</b></div><div class="row"><span>💳 Tarjeta <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><div style="display:flex;gap:4px;align-items:center;justify-content:flex-end"><span data-datafono-info="1" title="Info datáfono manual" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#2a3040;color:#86b6ff;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #86b6ff;user-select:none">?</span><input type="number" step="0.01" id="datafono-inp" value="${df||''}" placeholder="manual" title="Introduce manualmente el total del datáfono (anula el automático)" style="width:70px;background:#0e1117;color:#86b6ff;border:1px solid #2a3040;border-radius:4px;padding:2px 4px;font-size:11px;text-align:right" /><button id="datafono-save" title="Guardar" style="background:#3ddc97;color:#0f1115;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px">✓</button><b class="num" ${df?'style="color:#86b6ff"':''}>${fmt(trTarShown_C)}</b></div></div><div class="row"><span>📱 Bizum <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(bizIn_C)}</b></div><div class="row"><span>🏦 Transferencia <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(trIn_C)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(126,227,170,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97;display:none"><span style="color:#7ee3aa;font-weight:700">↗ TOTAL HABER</span><b class="num big" style="color:#7ee3aa">+${fmt(haberTotalC)}</b></div><div class="row wide" style="background:rgba(255,150,160,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #ff5d6c;display:none"><span style="color:#ff96a0;font-weight:700">↘ TOTAL DEBE</span><b class="num big" style="color:#ff96a0">-${fmt(debeTotalC)}</b></div><div style="grid-column:span 2;margin:10px -16px 10px -16px;padding:16px 18px;background:linear-gradient(90deg,rgba(126,227,170,.18) 0%,rgba(126,227,170,.05) 100%);border-left:4px solid #3ddc97;border-radius:8px;display:flex;justify-content:space-between;align-items:center" data-testid="total-dia-cempla"><span style="color:#7ee3aa;font-weight:800;font-size:15px;letter-spacing:.5px">💰 TOTAL DÍA</span><span class="num" style="color:#7ee3aa;font-weight:800;font-size:22px">${fmt(t.neto)}</span></div><hr class="sep" style="grid-column:span 2"/><div class="row"><span>🟢 Caja física <span style="color:#7a8394;font-size:10px">(sin cajón de cambio)</span> <span class="tt" data-tt="Efectivo real en la caja al cierre de este día (acumulado histórico), sin incluir el cajón de reserva de cambio.">?</span></span><b class="num" data-testid="saldo-ant-solo-caja-c">${fmt(cajaC-resCambio)}</b></div><div class="row"><span>💰 Reserva de cambio <span style="color:#7a8394;font-size:10px">(cajón)</span> <span class="tt" data-tt="Dinero físico guardado en el cajón de cambio a cierre de este día: billetes y monedas destinados a dar cambio a los clientes.">?</span></span><b class="num" data-testid="reserva-cambio-display-c">${fmt(resCambio)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(61,220,151,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97"><span style="color:#7ee3aa;font-weight:600">🟢 ${L('CAIXA FÍSICA TOTAL','CAJA FÍSICA TOTAL')} <span style="color:#7a8394;font-size:10px;font-weight:400">(caja + cambio)</span></span><b class="num big" style="color:#7ee3aa">${fmt(cajaC)}</b></div><div class="row wide" style="background:rgba(134,182,255,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #5aa9ff"><span style="color:#86b6ff;font-weight:600">🔵 CUENTA BANCO</span><b class="num big" style="color:#86b6ff">${fmt(bbvaC)}</b></div><div class="row total"><span>TOTAL <span style="color:#7a8394;font-size:10px;font-weight:400">(caja física con reserva + banco)</span></span><span class="num" data-testid="total-caja-banco-c">${fmt(cajaC+bbvaC)}</span></div>`:`${datafonoHTML}<div class="row"><span>Entradas Tráfico</span><b>${t.cntDGT} ${t.retornos?`(${t.retornos} retorno)`:''}</b></div><div class="row"><span>Total Certificados Tráfico</span><b class="num">${fmt(t.brutoDGT)}</b></div><div class="row"><span>Descuentos</span><b class="num">-${fmt(t.dto)}</b></div><div class="row"><span>Tasas DGT ${(()=>{const bk=t.tasasBreakdown||{};const keys=Object.keys(bk).sort((a,b)=>+b-+a);if(keys.length===0)return '';const parts=keys.map(k=>{const cnt=bk[k];const price=+k;const sub=cnt*price;return `<span style="white-space:nowrap">${cnt}×${price.toFixed(2).replace('.',',')} = <b style="color:#7ee3aa">${sub.toFixed(2).replace('.',',')}</b></span>`});return `<div style="color:#94a3b8;font-size:10px;font-weight:400;margin-top:4px;line-height:1.6;font-family:'Consolas',monospace">${parts.join(' · ')}</div>`;})()}</span><b class="num">${fmt(t.tasasDGT)}</b></div><div style="grid-column:span 2;margin:10px -16px 4px -16px;padding:12px 16px;background:linear-gradient(90deg,rgba(var(--tint),.14) 0%,rgba(var(--tint),.04) 100%);border-left:3px solid rgb(var(--tint));border-radius:6px;display:flex;justify-content:space-between;align-items:center"><span style="color:rgb(var(--tint));font-weight:700;font-size:13px">💰 TOTAL TRÁFICO</span><span class="num" style="color:var(--accent-2);font-weight:700;font-size:17px">${fmt(t.brutoDGT+t.tasasDGT)}</span></div>${t.cntOtros>0||t.haber>0||t.refundsCount>0?`<div class="row" data-otros-detail="1" style="cursor:pointer" title="${L('Clica per veure el detall dels serveis','Clic para ver el detalle de los servicios')}"><span style="text-decoration:underline dotted;text-decoration-color:#7a8394">Otros servicios (${t.cntOtros}) <span style="color:#7a8394;font-size:10px">▸ detall</span></span><b class="num">${fmt(t.brutoOtros)}</b></div>${t.haber>0?`<div class="row"><span>Ingresos manuales</span><b class="num">${fmt(t.haber)}</b></div>`:''}${t.refundsCount>0?`<div class="row" style="background:rgba(217,119,6,.1);padding:6px 10px;border-radius:6px;border-left:3px solid #d97706"><span style="color:#fbbf24;font-weight:700">↩ Devoluciones tasas (${t.refundsCount})</span><b class="num" style="color:#fbbf24">-${fmt(t.refundsTotal)}</b></div>`:''}`:''}<div style="grid-column:span 2;margin:2px -16px 8px -16px;padding:12px 16px;background:linear-gradient(90deg,rgba(126,227,170,.14) 0%,rgba(126,227,170,.04) 100%);border-left:4px solid #3ddc97;border-radius:6px;display:flex;justify-content:space-between;align-items:center"><span style="color:#7ee3aa;font-weight:700;font-size:13px">🧾 TOTAL COBRADO DÍA</span><span class="num" style="color:#7ee3aa;font-weight:700;font-size:17px">${fmt(t.bruto+t.tasas+t.haber)}</span></div><div class="row"><span>💵 Efectivo</span><b class="num" data-testid="efectivo-neto-cb">${fmt(efIn_CB-deltaDisp_CB)}</b></div><div class="row"><span>💳 Tarjeta <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><div style="display:flex;gap:4px;align-items:center;justify-content:flex-end"><span data-datafono-info="1" title="Info datáfono manual" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#2a3040;color:#7ee3aa;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #7ee3aa;user-select:none">?</span><input type="number" step="0.01" id="datafono-inp" value="${df||''}" placeholder="manual" title="Introduce manualmente el total del datáfono (anula el automático)" style="width:70px;background:#0e1117;color:#7ee3aa;border:1px solid #2a3040;border-radius:4px;padding:2px 4px;font-size:11px;text-align:right" /><button id="datafono-save" title="Guardar" style="background:#3ddc97;color:#0f1115;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px">✓</button><b class="num" ${df?'style="color:#7ee3aa"':''}>${fmt(trTarShown_CB)}</b></div></div><div class="row"><span>📱 Bizum <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(bizIn_CB)}</b></div><div class="row"><span>🏦 Transferencia <span style="color:#86b6ff;font-size:10px">→ ${L('Banc','Banco')}</span></span><b class="num">${fmt(trIn_CB)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(126,227,170,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97;display:none"><span style="color:#7ee3aa;font-weight:700">↗ TOTAL HABER</span><b class="num big" style="color:#7ee3aa">+${fmt(haberTotalCB)}</b></div><div class="row wide" style="background:rgba(255,150,160,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #ff5d6c;display:none"><span style="color:#ff96a0;font-weight:700">↘ TOTAL DEBE</span><b class="num big" style="color:#ff96a0">-${fmt(debeTotalCB)}</b></div><div class="row"><span>🟢 Caja física <span style="color:#7a8394;font-size:10px">(sin cajón de cambio)</span> <span class="tt" data-tt="Efectivo real en la caja al cierre de este día (acumulado histórico), sin incluir el cajón de reserva de cambio.">?</span></span><b class="num" data-testid="saldo-ant-solo-caja">${fmt(cajaCB-resCambio)}</b></div><div class="row"><span>💰 Reserva de cambio <span style="color:#7a8394;font-size:10px">(cajón)</span> <span class="tt" data-tt="Dinero físico guardado en el cajón de cambio a cierre de este día: billetes y monedas destinados a dar cambio a los clientes.">?</span></span><b class="num" data-testid="reserva-cambio-display">${fmt(resCambio)}</b></div><div style="grid-column:span 2;margin:4px -8px;padding:0;display:none" data-testid="saldo-ant-caja-cambio-wrapper"><b data-testid="saldo-ant-caja-cambio" style="display:none">${fmt(cajaCB)}</b></div><hr class="sep" style="grid-column:span 2"/><div class="row wide" style="background:rgba(61,220,151,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #3ddc97"><span style="color:#7ee3aa;font-weight:600">🟢 ${L('CAIXA FÍSICA TOTAL','CAJA FÍSICA TOTAL')} <span style="color:#7a8394;font-size:10px;font-weight:400">(caja + cambio)</span></span><b class="num big" style="color:#7ee3aa">${fmt(cajaCB)}</b></div><div class="row wide" style="background:rgba(134,182,255,.08);padding:8px 12px;border-radius:6px;border-left:3px solid #5aa9ff"><span style="color:#86b6ff;font-weight:600">🔵 CUENTA BANCO</span><b class="num big" style="color:#86b6ff">${fmt(bbvaCB)}</b></div><div class="row total"><span>TOTAL <span style="color:#7a8394;font-size:10px;font-weight:400">(caja física con reserva + banco)</span></span><span class="num" data-testid="total-caja-banco">${fmt(cajaCB+bbvaCB)}</span></div>`;
   const sv=$('#datafono-save'),inp=$('#datafono-inp'),cl=$('#datafono-clear');if(sv)sv.onclick=()=>{setDatafono(currentDate,num(inp.value));toast(isC?'✓ Datàfon desat':'✓ Datáfono guardado');render()};if(inp)inp.onkeydown=e=>{if(e.key==='Enter'&&sv)sv.click()};if(cl)cl.onclick=()=>{setDatafono(currentDate,0);toast('🗑️ Datáfono borrado');render()}
   // Popup informatiu del datàfon manual
   const infoBtn=document.querySelector('[data-datafono-info]');
@@ -6868,7 +6887,7 @@ function openHonorariosPanel(){
         <button id="_hn_close" data-testid="honorarios-close" style="background:#334155;color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer">✕ Cerrar</button>
       </div>
     </div>
-    <div class="no-print" style="background:#0b1121;border:1px solid #78350f;border-radius:8px;padding:12px;margin-bottom:14px;font-size:11px;color:#fbbf24">💡 Añade pagos desde <b>Debe/Haber</b> escribiendo en el concepto libre palabras como <b>Honoraris</b>, <b>Nómina</b>, <b>Sueldo</b>, <b>Salario</b>, <b>Jornal</b>, <b>Faena externa</b>, <b>Colaborador</b> o <b>Autónomo</b> seguido del <b>nombre del trabajador</b> (ej: <i>"Nomina Pep Brugulat"</i> o <i>"Faena externa Carlos electricista"</i>). Aparecerán aquí automáticamente.</div>
+    <div class="no-print" style="background:#0b1121;border:1px solid #78350f;border-radius:8px;padding:12px;margin-bottom:14px;font-size:11px;color:#fbbf24">💡 Añade pagos desde <b>Ingresos / Gastos</b> escribiendo en el concepto libre palabras como <b>Honoraris</b>, <b>Nómina</b>, <b>Sueldo</b>, <b>Salario</b>, <b>Jornal</b>, <b>Faena externa</b>, <b>Colaborador</b> o <b>Autónomo</b> seguido del <b>nombre del trabajador</b> (ej: <i>"Nomina Josep Navarro"</i> o <i>"Faena externa Carlos electricista"</i>). Aparecerán aquí automáticamente.</div>
     ${legacyHaberEntries.length ? `<div class="no-print" data-testid="honorarios-legacy-warn" style="background:#3a1c22;border:1px solid #ff5d6c;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;color:#ffb3b8">
       ⚠️ <b>Detectados ${legacyHaberEntries.length} pagos históricos guardados como HABER (ingreso)</b>. Contablemente pagar a un trabajador es un <b>GASTO (DEBE)</b>, no un ingreso. Estas entradas suman incorrectamente en tu facturación anual.
       <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -9728,7 +9747,8 @@ function _buildAnnualReport(year, monthFilterIdx){
         //             pero sigue contando como Extra en la tarjeta (por ser manual).
         //     · Extra manual con concepto NO reconocido (Café/Coche/XYZ) → "Otros".
         //   Regla mental: "Otros" SOLO si no se sabe dónde ponerlo.
-        const _isKnownDGT = /renov|exped|canje|canj\b|recup|period|inicial|obten/.test(_catLowFlag);
+        //   🐾 Feb 2026 · "animal..." (animales p./peligrosos) también es DGT.
+        const _isKnownDGT = /renov|exped|canje|canj\b|recup|period|inicial|obten|anim/.test(_catLowFlag);
         let grupoLabelFinal;
         if(/foto/.test(_catLowFlag)){
           grupoLabelFinal = 'Foto';
@@ -10022,7 +10042,9 @@ function _buildAnnualReport(year, monthFilterIdx){
         if(/foto/.test(s)) return 'Fotos';
         if(/duplic/.test(s)) return 'Duplicado';
         if(/c\.?\s*ofici|certif.*ofici|\bofici/.test(s)) return 'C.Oficial';
-        if(/renov|exped|canj|recuper|periodic|inicial|obten/.test(s)) return 'Tráfico';
+        // 🐾 Feb 2026 · "animales p." / "animales peligrosos" son trámites de la DGT
+        //   (como Conducción, Armas, Marina...) → van a Tráfico, no a Varios.
+        if(/renov|exped|canj|recuper|periodic|inicial|obten|anim/.test(s)) return 'Tráfico';
         return 'Varios';
       };
       const catTotals = {'Tráfico':0, 'Fotos':0, 'Duplicado':0, 'C.Oficial':0, 'Varios':0};
@@ -11663,24 +11685,18 @@ $('#btnExport').onclick=async ev=>{
   // SAFETY checks
   if(!contents||contents.length<40){toast(isCA?'❌ ERROR: contingut buit, no es desa':'❌ ERROR: contenido vacío, no se guarda',5000);return}
   try{JSON.parse(contents)}catch(e){toast(isCA?'❌ ERROR: JSON invàlid, no es desa':'❌ ERROR: JSON inválido, no se guarda',5000);return}
-  // Missatge post-guardar clar (explica la creueta vermella de Windows i com restaurar)
-  const showPostSaveInfo=(filename)=>{
+  // Missatge post-guardar · minimal: solo nombre del archivo y ubicación (feb 2026).
+  const showPostSaveInfo=(filename, folderName)=>{
     const back=document.createElement('div');back.className='modal-back';back.style.zIndex='100001';
-    back.innerHTML=`<div class="modal" style="max-width:520px;padding:22px">
-      <h3 style="color:#3ddc97;margin-top:0">💾 ${isCA?'Còpia desada correctament':'Copia guardada correctamente'}</h3>
-      <div style="background:#0e1a2e;border:1px solid #1e293b;border-radius:8px;padding:12px;margin:12px 0;font-size:13px;color:#cbd5e1;line-height:1.6">
-        <b style="color:#f5b301">📄 ${isCA?'Nom del fitxer':'Nombre del archivo'}:</b><br>
-        <code style="color:#a5b4fc;font-size:12px">${filename}</code>
-      </div>
-      <div style="background:#3a2a15;border-left:3px solid #f5b301;border-radius:4px;padding:10px 14px;margin:10px 0;font-size:12.5px;color:#fde68a;line-height:1.65">
-        ⚠️ <b>${isCA?"Si Windows mostra el fitxer amb una creueta vermella o diu 'No s'ha trobat programa per obrir aquest fitxer'":"Si Windows muestra el archivo con una crucecita roja o dice 'No se ha encontrado software para abrir este archivo'"}</b> — ${isCA?"és <b>NORMAL</b>. És només l'associació de fitxers de Windows, <b>no un fallo de la còpia</b>. El fitxer és 100% correcte i està signat internament. NO cal obrir-lo a mà.":"es <b>NORMAL</b>. Es solo la asociación de archivos de Windows, <b>no un fallo de la copia</b>. El archivo es 100% correcto y está firmado internamente. NO hay que abrirlo a mano."}
-      </div>
-      <div style="background:#052e16;border-left:3px solid #22c55e;border-radius:4px;padding:10px 14px;font-size:12.5px;color:#a7f3d0;line-height:1.65">
-        ✅ <b>${isCA?'Guarda-la en un lloc segur':'Guárdala en un lugar seguro'}</b><br>
-        ${isCA?"Copia'l a un pen drive, un altre ordinador o un núvol (Google Drive, Dropbox, OneDrive).<br><br>Per <b>recuperar-la</b> més endavant, obre MediCar Plus i clica <b>📂 Restaurar còpia</b>.":"Cópialo a un pen drive, otro ordenador o una nube (Google Drive, Dropbox, OneDrive).<br><br>Para <b>recuperarla</b> más adelante, abre MediCar Plus y pulsa <b>📂 Restaurar copia</b>."}
+    const folderBlock = folderName ? `<div style="margin-top:6px;font-size:12px;color:#94a3b8"><b style="color:#f5b301">📁 ${isCA?'Carpeta':'Carpeta'}:</b> <code style="color:#a5b4fc;font-size:12px">${escapeHtml(folderName)}</code></div>` : `<div style="margin-top:6px;font-size:11px;color:#64748b;font-style:italic">${isCA?'Carpeta triada per tu durant el guardat':'Carpeta elegida por ti durante el guardado'}</div>`;
+    back.innerHTML=`<div class="modal" style="max-width:460px;padding:20px">
+      <h3 style="color:#3ddc97;margin-top:0;margin-bottom:12px">💾 ${isCA?'Còpia desada':'Copia guardada'}</h3>
+      <div style="background:#0e1a2e;border:1px solid #1e293b;border-radius:8px;padding:12px;font-size:13px;color:#cbd5e1;line-height:1.5">
+        <b style="color:#f5b301">📄 ${isCA?'Arxiu':'Archivo'}:</b> <code style="color:#a5b4fc;font-size:12px">${escapeHtml(filename)}</code>
+        ${folderBlock}
       </div>
       <div style="text-align:right;margin-top:14px">
-        <button class="btn btn-primary" data-no data-testid="backup-info-ok" style="padding:10px 24px;font-weight:700">${isCA?'Entès':'Entendido'}</button>
+        <button class="btn btn-primary" data-no data-testid="backup-info-ok" style="padding:8px 20px;font-weight:700">${isCA?'OK':'OK'}</button>
       </div>
     </div>`;
     document.body.appendChild(back);
@@ -11707,14 +11723,14 @@ $('#btnExport').onclick=async ev=>{
       // Verify file was written correctly
       try{const f=await handle.getFile();const check=await f.text();JSON.parse(check);if(check.length!==contents.length)throw new Error('tamaño no coincide')}
       catch(e){toast(isCA?'❌ AVÍS: el fitxer desat NO VERIFICA. Prova de nou o desa en un altre lloc.':'❌ AVISO: el archivo guardado NO VERIFICA. Prueba de nuevo o guarda en otro sitio.',7000);return}
-      showPostSaveInfo(handle.name||filename);
+      showPostSaveInfo(handle.name||filename, null);
       return;
     }catch(e){if(e.name==='AbortError')return;toast('❌ Error: '+e.message,5000)}
   }
   // Fallback (Firefox/Safari o error)
   const blob=new Blob([contents],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();
-  showPostSaveInfo(filename);
+  showPostSaveInfo(filename, isCA?'Carpeta de baixades':'Carpeta de descargas');
 };
 // Mostrar tooltip con destino actual
 (async()=>{const h=await getStoredHandle();if(h)$('#btnExport').title=`Guardar en ${h.name} · Shift+Click para cambiar carpeta`})();
@@ -11751,6 +11767,46 @@ $('#btnExport').onclick=async ev=>{
   window.addEventListener('focus', _refreshStatus);
   setInterval(_refreshStatus, 30*1000);
   setTimeout(_refreshStatus, 500);
+})();
+// 🧹 Feb 2026 · Red de seguridad para el bug de "no me deja escribir en entrada manual":
+//   cuando Electron recupera el foco (al desminimizar o al clicar la ventana), cerramos
+//   cualquier submenú/dropdown que haya quedado abierto por detrás bloqueando los inputs.
+//   NO tocamos modales abiertos (podría haber una copia manual en curso), solo los
+//   contenedores con `position:absolute` dentro del header que debieran estar cerrados
+//   pero quedaron con `display:flex`/`block` tras un cambio de pestaña o similar.
+(function initStuckDropdownGuard(){
+  const DROPDOWN_IDS = ['btnBackupMenu','btnAccountingMenu','btnStatsSubmenu','utilitiesMenu','searchResults'];
+  const _closeStuck = () => {
+    try{
+      DROPDOWN_IDS.forEach(id => {
+        const el = document.getElementById(id);
+        if(el && el.style.display && el.style.display !== 'none'){
+          // Si el usuario no está interactuando con él (no es `document.activeElement` ni contiene al foco)
+          const active = document.activeElement;
+          if(active && (active === el || el.contains(active))) return;
+          el.style.display = 'none';
+        }
+      });
+      // Si hay tooltips flotantes dejados por `#_tt_pop`, limpiarlos
+      const tt = document.getElementById('_tt_pop');
+      if(tt && tt.parentNode) tt.parentNode.removeChild(tt);
+    }catch(_){}
+  };
+  // Se dispara al desminimizar / cambio de pestaña del navegador
+  window.addEventListener('focus', _closeStuck);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) setTimeout(_closeStuck, 100); });
+  // Si el usuario intenta escribir en un input de entrada manual y "no responde",
+  //   el primer `pointerdown` sobre el <main> ya habrá cerrado el overlay. Si no, forzamos.
+  document.addEventListener('pointerdown', (ev)=>{
+    try{
+      const tgt = ev.target;
+      if(!tgt || !tgt.matches) return;
+      if(tgt.matches('input, textarea, select') && tgt.closest('main')){
+        // Si al clicar un input del main sigue habiendo un dropdown abierto fuera del header, lo cerramos.
+        _closeStuck();
+      }
+    }catch(_){}
+  }, true);
 })();
 function renderCemplaSplit(){
   if(currentCompany!=='cempla')return;
@@ -12059,9 +12115,15 @@ $('#btnAudit').onclick=()=>{
       if(c.category==='dup_seguro') footer=`<div class="small" style="margin-top:8px;color:#fecaca">⛔ Mismo cliente en <b>${c.distinctGroups.length} grupos diferentes</b> y al menos uno a 0€ → <b>duplicado claro</b>: con una revisión pagó ambos trámites.</div>`;
       else if(c.category==='dup_interrumpido') footer=`<div class="small" style="margin-top:8px;color:#fed7aa">🔴 Mismo cliente, mismo grupo, con una a 0€ → puede ser <b>duplicado</b> (mismo trámite dos veces) o <b>interrumpido</b> (vino en varios días para acabar). Revísalo.</div>`;
       else if(c.category==='info') footer=`<div class="small" style="margin-top:8px;color:#ffd58a">🟡 Mismo cliente en varios grupos pero todo cobrado — normal, informativo.</div>`;
+      // 📋 Feb 2026 · DNI(s) distintos del cliente (de las fichas visibles). Pill clicable
+      //   para copiar al portapapeles y pegar en otros programas.
+      const _dnis = Array.from(new Set(c.entries.map(x=>x.e&&x.e.dni).filter(Boolean).map(s=>String(s).trim().toUpperCase()))).filter(x=>x.length>=5);
+      const dniBadge = _dnis.length
+        ? _dnis.map(d => `<span class="pill" title="Clic para copiar DNI" style="background:#0e1a2e;color:#a5b4fc;border-color:#334155;font-family:Consolas,Menlo,monospace;font-size:11px;cursor:pointer" onclick="event.stopPropagation();navigator.clipboard&&navigator.clipboard.writeText('${d}').then(()=>toast&&toast('📋 DNI ${d} copiado',1800))">🪪 ${d}</span>`).join(' ')
+        : '';
       return `<div style="background:#141821;border:1.5px solid ${borderColor};border-radius:10px;padding:12px;margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
-          <b style="font-size:15px;color:${nameColor}">${icon}${escapeHtml(c.display)} <span class="pill">📅 ${c.entries.length} fichas</span> ${grpBadges} ${diffGrpBadge} ${gap} ${lbBadge}</b>
+          <b style="font-size:15px;color:${nameColor}">${icon}${escapeHtml(c.display)} ${dniBadge} <span class="pill">📅 ${c.entries.length} fichas</span> ${grpBadges} ${diffGrpBadge} ${gap} ${lbBadge}</b>
           <div class="small">Total imp: <b class="num">${fmt(c.totalImp)}</b> · Tasa: <b class="num">${fmt(c.totalTasa)}</b>${c.dhCount?` · D/H: <b class="num" style="color:${c.dhSum>=0?'#7ee3aa':'#ff96a0'}">${fmt(c.dhSum)}</b>`:''}</div>
         </div>
         <table style="width:100%;font-size:12px"><thead><tr><th>Día</th><th>Tipo</th><th>Grupo</th><th class="num">Importe</th><th class="num">Tasa</th><th>FP</th><th></th></tr></thead><tbody>${rows}</tbody></table>
@@ -12071,6 +12133,8 @@ $('#btnAudit').onclick=()=>{
     const _renderFlatIssueRow = ({date,e})=>{
       const imp=+e.importe||0, tsa=+e.tasa||0;
       const nameShown = escapeHtml(e.nombre||'(sin nombre)');
+      const dni = (e.dni||'').toString().trim().toUpperCase();
+      const dniShown = dni ? `<div style="font-family:Consolas,Menlo,monospace;font-size:10px;color:#a5b4fc;cursor:pointer" title="Clic para copiar DNI" onclick="event.stopPropagation();navigator.clipboard&&navigator.clipboard.writeText('${dni}').then(()=>toast&&toast('📋 DNI ${dni} copiado',1800))">🪪 ${dni}</div>` : '';
       const grupo = escapeHtml(e.grupo||'—');
       const tipo = escapeHtml(e.tipo||'-');
       const _tLow = String(e.tipo||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -12084,7 +12148,7 @@ $('#btnAudit').onclick=()=>{
         <td>${date.split('-').reverse().join('/')}</td>
         <td><span class="tag">${tipo}</span></td>
         <td><span class="pill" style="background:#1f2937;color:#cbd5e1;padding:2px 8px;font-size:11px">${grupo}</span></td>
-        <td>${nameShown}</td>
+        <td>${nameShown}${dniShown}</td>
         <td class="num">${fmt(imp)}</td>
         <td class="num">${tsa?fmt(tsa):'—'}</td>
         <td>${e.fp||'-'}</td>
@@ -19413,7 +19477,7 @@ document.addEventListener('keydown', function(ev){
     back.addEventListener('click', ev => { if(ev.target === back) back.remove(); });
     back.querySelector('[data-add-chip]').onclick = () => {
       cfg.custom = cfg.custom || [];
-      cfg.custom.push({ label: 'Nuevo chip', c: '', preu: '', tipo: meta.typeFixed || 'HABER' });
+      cfg.custom.push({ label: '', c: '', preu: '', tipo: meta.typeFixed || 'HABER' });
       back.remove();
       saveCfg(row, cfg);
       openConfigModal(row);
