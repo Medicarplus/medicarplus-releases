@@ -37,6 +37,10 @@ SEG_DUR = {
 SILENCE_SEC = 1.4
 PREVIEW_URL = "https://project-helper-47.preview.emergentagent.com/v2.html?demo=1"
 VIEWPORT = {"width": 1600, "height": 900}
+# Tiempo (s) que la pestaña necesita para cargar antes de que t0 arranque.
+# Debe coincidir con el `page.wait_for_timeout(PREROLL_MS)` del grabado,
+# así podemos cortarlo del webm al mergear y el audio queda sincronizado.
+PREROLL_SEC = 3.5
 
 def build_timeline():
     t = 0.0
@@ -95,14 +99,21 @@ async def record_screencast(duration_target: float, timeline):
         await page.goto(PREVIEW_URL.replace("?demo=1", ""), wait_until="domcontentloaded", timeout=30000)
         await page.evaluate("localStorage.clear()")
         await page.goto(PREVIEW_URL, wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(3500)
+        await page.wait_for_timeout(int(PREROLL_SEC * 1000))
 
         t0 = asyncio.get_event_loop().time()
 
         async def close_any_modal():
             try:
-                await page.evaluate("document.querySelectorAll('.modal-back').forEach(m=>m.remove())")
-                await page.wait_for_timeout(250)
+                # Cerrar cualquier .modal-back visible y esperar a que el DOM se
+                # repinte antes de abrir el siguiente. Añadimos un hard flush
+                # (requestAnimationFrame) para que el frame siguiente no muestre
+                # dos modales superpuestos.
+                await page.evaluate("""() => new Promise(res => {
+                    document.querySelectorAll('.modal-back').forEach(m => m.remove());
+                    requestAnimationFrame(() => requestAnimationFrame(res));
+                })""")
+                await page.wait_for_timeout(400)
             except Exception: pass
 
         async def until(label: str):
@@ -164,51 +175,70 @@ async def record_screencast(duration_target: float, timeline):
             await page.mouse.wheel(0, -350); await page.wait_for_timeout(1500)
         except Exception as e: print(f"  dia err: {e}")
 
-        # ─── 03_stats (43.0-57.6s): abrir Autoescuelas → cerrar → abrir Tráfico ───
+        # ─── 03_stats (43.0-57.6s): Facturación → Autoescuelas → Tráfico ───
+        # Narración: "facturación mensual y anual, trámites de Tráfico por grupo,
+        # pacientes derivados de cada autoescuela y comparativas año actual..."
         await close_any_modal()
         await until("03_stats")
         try:
-            # Click directo en el handler (más fiable que el submenu dropdown)
-            await page.evaluate("document.querySelector('#btnStatAutoescolas')?.click()")
-            await page.wait_for_timeout(2800)
-            await page.mouse.wheel(0, 300); await page.wait_for_timeout(2300)
-            await page.keyboard.press("Escape"); await page.wait_for_timeout(400)
+            # 1) Facturación mensual/anual al principio (narración empieza por aquí)
+            await page.evaluate("document.querySelector('#btnStatFacMensual')?.click()")
+            await page.wait_for_timeout(3200)
+            # Pequeño scroll para enseñar los KPIs y la tabla mensual
+            await page.evaluate("document.querySelector('.modal-back .modal')?.scrollBy(0, 220)")
+            await page.wait_for_timeout(2000)
+            await page.evaluate("document.querySelector('.modal-back .modal')?.scrollBy(0, 200)")
+            await page.wait_for_timeout(1800)
+            # 2) Cerrar y abrir Autoescuelas (con comparativas)
             await close_any_modal()
-            await page.evaluate("document.querySelector('#btnStatTrafico')?.click()")
-            await page.wait_for_timeout(2800)
-            await page.mouse.wheel(0, 300); await page.wait_for_timeout(2200)
-            await page.mouse.wheel(0, -300); await page.wait_for_timeout(1200)
-            await page.keyboard.press("Escape"); await page.wait_for_timeout(400)
+            await page.evaluate("document.querySelector('#btnStatAutoescolas')?.click()")
+            await page.wait_for_timeout(2600)
+            await page.evaluate("document.querySelector('#stBody')?.scrollBy(0, 120)")
+            await page.wait_for_timeout(1500)
+            # 3) Cambiar a Tráfico usando el switcher interno
+            await page.evaluate("document.querySelector('#stSectionSwitch [data-section=\"traffic\"]')?.click()")
+            await page.wait_for_timeout(2000)
+            await page.evaluate("document.querySelector('#stBody')?.scrollBy(0, 150)")
+            await page.wait_for_timeout(1200)
         except Exception as e: print(f"  stats err: {e}")
 
-        # ─── 04_sms (59.0-73.7s): abrir Estadísticas SMS ───
-        await close_any_modal()
+        # ─── 04_sms (59.0-73.7s): cambiar a sección SMS en el mismo modal ───
         await until("04_sms")
         try:
-            await page.evaluate("document.querySelector('#btnStatSms')?.click()")
-            await page.wait_for_timeout(3000)
-            await page.mouse.wheel(0, 300); await page.wait_for_timeout(2600)
-            await page.mouse.wheel(0, 300); await page.wait_for_timeout(2500)
-            await page.mouse.wheel(0, -600); await page.wait_for_timeout(1800)
-            await page.keyboard.press("Escape"); await page.wait_for_timeout(400)
+            visible = await page.evaluate("!!document.querySelector('.stats-modal')")
+            if not visible:
+                await close_any_modal()
+                await page.evaluate("document.querySelector('#btnStatSms')?.click()")
+            else:
+                await page.evaluate("document.querySelector('#stSectionSwitch [data-section=\"sms\"]')?.click()")
+            await page.wait_for_timeout(2800)
+            await page.evaluate("document.querySelector('#stBody')?.scrollBy(0, 180)")
+            await page.wait_for_timeout(2600)
+            await page.evaluate("document.querySelector('#stBody')?.scrollBy(0, 220)")
+            await page.wait_for_timeout(2500)
+            await page.evaluate("document.querySelector('#stBody')?.scrollBy(0, -400)")
+            await page.wait_for_timeout(1800)
         except Exception as e: print(f"  sms err: {e}")
 
-        # ─── 05_audit (75.1-86.9s): abrir Auditoría ───
+        # ─── 05_audit (75.1-86.9s): cerrar stats y abrir Auditoría con datos ───
         await close_any_modal()
         await until("05_audit")
         try:
             await page.evaluate("document.querySelector('#btnAudit')?.click()")
-            await page.wait_for_timeout(3000)
-            await page.mouse.wheel(0, 250); await page.wait_for_timeout(2500)
-            # Click en pestaña Posible fallo si existe
-            await page.evaluate("""() => {
-                const tabs = Array.from(document.querySelectorAll('button,div,span'));
-                const t = tabs.find(x => /Posible fallo/i.test((x.textContent||'').trim()));
-                if(t) t.click();
-            }""")
+            await page.wait_for_timeout(2000)
+            # Rango por defecto es "hoy" → poner "3 meses" para ver resultados
+            await page.evaluate("document.querySelector('[data-preset=\"3m\"]')?.click()")
+            await page.wait_for_timeout(1800)
+            # Cambiar a la pestaña "Duplicado seguro" (hay resultados en el seed)
+            await page.evaluate("document.querySelector('[data-tab=\"dup_seguro\"]')?.click()")
             await page.wait_for_timeout(2200)
-            await page.mouse.wheel(0, 150); await page.wait_for_timeout(1500)
-            await page.keyboard.press("Escape"); await page.wait_for_timeout(400)
+            await page.evaluate("document.querySelector('#auBody')?.scrollBy(0, 180)")
+            await page.wait_for_timeout(1800)
+            # Pestaña "Todos" para enseñar la lista plana con DNIs
+            await page.evaluate("document.querySelector('[data-tab=\"todos\"]')?.click()")
+            await page.wait_for_timeout(2000)
+            await page.evaluate("document.querySelector('#auBody')?.scrollBy(0, 200)")
+            await page.wait_for_timeout(1200)
         except Exception as e: print(f"  audit err: {e}")
 
         # ─── 06_outro (88.3-92.9s): zoom al logo ───
@@ -233,10 +263,14 @@ async def record_screencast(duration_target: float, timeline):
 
 def merge(webm: Path, audio: Path):
     out_mp4 = OUT_DIR / "medicar_demo.mp4"
-    print(f"[merge] → {out_mp4}")
+    print(f"[merge] → {out_mp4} (trim preroll {PREROLL_SEC}s)")
+    # El webm empieza a grabar antes de que arranque el reloj t0 (el browser
+    # tarda ~3.5s en pintar la UI). Recortamos ese preroll para que coincida
+    # con el audio, que empieza en 0.
     subprocess.run([
         "ffmpeg","-y",
-        "-i",str(webm),"-i",str(audio),
+        "-ss",str(PREROLL_SEC),"-i",str(webm),
+        "-i",str(audio),
         "-c:v","libx264","-crf","23","-preset","fast","-pix_fmt","yuv420p",
         "-c:a","aac","-b:a","128k",
         "-map","0:v:0","-map","1:a:0","-shortest","-movflags","+faststart",

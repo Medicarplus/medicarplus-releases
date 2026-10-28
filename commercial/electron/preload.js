@@ -7,8 +7,9 @@
 // perque necessitem os/crypto/require al preload).
 // ============================================================================
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 const os = require('os');
+const path = require('path');
 const crypto = require('crypto');
 
 // Llegim la versió del package.json en runtime (sandbox=false permet require)
@@ -67,5 +68,16 @@ contextBridge.exposeInMainWorld('appInfo', {
     ipcRenderer.on('update-progress', (_ev, p) => callback({ event: 'progress', ...p }));
     ipcRenderer.on('update-downloaded', (_ev, p) => callback({ event: 'downloaded', ...p }));
     ipcRenderer.on('update-error', (_ev, p) => callback({ event: 'error', ...p }));
+  },
+  // feb 2026 · Devuelve la ruta OS real del File object (Electron 32+).
+  //   El renderer la usa para mostrar la carpeta real donde se ha guardado
+  //   la copia de seguridad después de showSaveFilePicker().
+  getPathForFile: (f) => {
+    try{
+      if(!f || !webUtils || typeof webUtils.getPathForFile !== 'function') return null;
+      const full = webUtils.getPathForFile(f);
+      if(!full) return null;
+      return { full, dir: path.dirname(full), base: path.basename(full) };
+    }catch(_){ return null; }
   },
 });

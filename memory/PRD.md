@@ -13,6 +13,8 @@ Usuario: Español (es).
 - Dashboard "Caja física (sin cajón)" / "Reserva de cambio" / "CAJA FÍSICA TOTAL" ⇒ **estado físico EN VIVO**, no cambia al navegar días pasados (Oct 2026).
 
 ## Implementado — últimos cambios
+- 28-Oct-2026 · Vídeo demo regenerado (`/app/frontend/public/demo/medicar_demo.mp4`, 5.4 MB, 95.5 s). Timing audio/vídeo sincronizado (preroll de 3.5 s recortado), modales abriéndose sin pantallas por detrás, Facturación anual + Auditoría con datos variados (3-4 personas con duplicados, no una sola con 14 revisiones).
+- 28-Oct-2026 · Backup Folder Path real: preload Electron expone `webUtils.getPathForFile` → en `v2.html` tras guardar la copia se muestra la ruta OS real de la carpeta elegida y se persiste en `localStorage['caja.backup.lastDir']`. Fallback web mejorado ("la que has elegido en el diálogo del sistema"). Compilado en `commercial/electron/index.html`.
 - 15-Oct-2026 · Fix dashboard: las 3 líneas de caja física ahora reflejan el estado físico actual en tiempo real (independientes del día visualizado). Compilado en `commercial/electron/index.html`.
 - 15-Oct-2026 · Botón "🔍 Diagnóstico" en modal Cambio para desglose día-por-día.
 

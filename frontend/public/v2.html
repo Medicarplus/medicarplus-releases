@@ -29,46 +29,104 @@
     var _today=new Date(), _pad=function(n){return String(n).padStart(2,'0')}, _iso=function(d){return d.getFullYear()+'-'+_pad(d.getMonth()+1)+'-'+_pad(d.getDate())}, _uid=function(){return 'demo-'+Math.random().toString(36).slice(2,10)};
     var byDate={}, groups=['Conducción','Armas','Marina','Animales peligrosos','Grúas','Deportes'];
     var autoesc=['AUTOESC. SANT JORDI','AUTOESC. VIAL CENTER','ACADEMIA CONDUCCIÓ TORRES','AUTOESC. GARCÍA PAU','AUTOESC. RÀPID',''];
-    var nombres=['MARC RIBA MOLINA','JOSEP SEGURANYES XUMETRA','CARMEN COMAS POU','SERGIO VEGA MARTIN','JUAN PABLO SALCEDO','TOMAS TORRE PEREZ','LAURA FONT RIBA','ANNA PUIG SALA','DAVID MARTI OLIVE','JORDI VILA PUJOL','MONTSE CASAS GRAU','PAU SOLE FERRER'];
-    var dnis=['47893221K','39214657B','77821309M','40912548N','77654201X','39012874J','44228901C','47112399T','40876234Y','77009812R','39445127V','40887614P'];
+    var _nombresPool=['MARC RIBA MOLINA','JOSEP SEGURANYES XUMETRA','SERGIO VEGA MARTIN','JUAN PABLO SALCEDO','TOMAS TORRE PEREZ','DAVID MARTI OLIVE','MONTSE CASAS GRAU','PAU SOLE FERRER','ELENA ROVIRA SANZ','FERNANDO GIL SANCHEZ','MARIA LLADO BRU','VICTOR MORA ESTEVE','ROSA PERELLO FUSTER','MIGUEL LOZANO MIR','NURIA SABATE CLOS','PEDRO HERRERO ALSINA','SILVIA TORRES VIVES','RAFAEL CORTES JULIA','ALBA TEIXIDO ROS','OSCAR NAVARRO PI','CLARA MASOT COSTA','JAUME BOIX GRAU','IRENE SANZ RIBAS','ANDRES CODINA VILA','PILAR AYMERICH BOSCH','GUILLEM PRATS FABREGAT','TERESA MIR SOLANA','JOAN BARO POMES','SARA DURAN CASTELL','RAMON FITER OLIVERAS','MARTA PLANAS BUIX','CRISTINA BOU VICENS','FRANCISCO ESTEVE ARMENGOL','HELENA MAS COLL','GERARD BENET CARMONA','AINA FELIU PUJADES','SANTIAGO ROURE SABATE','VIOLETA SOLER FONTS','ADRIA CASES VIU','PATRICIA ROIG BAGUR','MIREIA FONT SELLES','XAVIER COLL GASCH','ELISABET BARO CANE','TONI OLIVER MATAS','LLUIS ROS BAIGES','ESTHER CAPDEVILA PI','ARNAU TOMAS SURRIBAS','GEMMA FABRE SEGURA','QUIM VIVES PASCUAL','BLANCA FORT RAVELL','ROGER AUBERT VILASAU','CARLA MESTRE ARAN','ISMAEL CARO BRULL','YOLANDA JORDA MASIP','POL FERRE SITJAR','MARINA BOSCH ROURE'];
+    // 🔑 DNI procedural único (DEMO0001, DEMO0002, ...) para garantizar que cada
+    //    ficha "aleatoria" sea de una persona DIFERENTE. Así la auditoría muestra
+    //    solo las 4 personas inyectadas a propósito, no duplicados fruto del azar.
+    var _dniSeq = 0;
+    var _nextDni = function(){ _dniSeq++; return 'DEMO'+String(_dniSeq).padStart(4,'0')+'X'; };
+    // Fichas específicas para la auditoría (3-4 personas con 2 revisiones cada una)
+    var AUDIT_CASES=[
+      {dni:'47112399T',nombre:'ANNA PUIG SALA'},
+      {dni:'44228901C',nombre:'LAURA FONT RIBA'},
+      {dni:'77009812R',nombre:'JORDI VILA PUJOL'},
+      {dni:'77821309M',nombre:'CARMEN COMAS POU'}
+    ];
     var conceptos=[['Renovación',43],['Renovación',43],['Renovación',43],['Expedición',55],['Duplicado',25],['Canje',38],['Prórroga',43]];
     var fps=['E','T','T','B','E','T','X'], tasas=[0,25.60,30.90,60.80,0,0];
+    // 🔎 Casos de auditoría pre-sembrados: 3-4 personas con exactamente 2 fichas
+    //   cada una, mezclando duplicado-mismo-grupo, interrumpido y posible-fallo 0€.
+    //   Ocurren en los últimos 25 días para que caigan dentro del rango "3 meses".
+    var SEEDED_DUPLICATE_FICHAS = {
+      // ANNA PUIG SALA · Conducción · 1er intento sin cobrar + 2do con cobro (interrumpido)
+      '-18-1': {dni:'47112399T',nombre:'ANNA PUIG SALA',tipo:'Renovación',grupo:'Conducción',importe:0,tasa:0,fp:'E',autoescola:'AUTOESC. GARCÍA PAU'},
+      '-14-1': {dni:'47112399T',nombre:'ANNA PUIG SALA',tipo:'Renovación',grupo:'Conducción',importe:43,tasa:30.90,fp:'T',autoescola:'AUTOESC. GARCÍA PAU'},
+      // LAURA FONT RIBA · Armas · duplicado seguro (2 fichas mismo grupo poca distancia)
+      '-20-1': {dni:'44228901C',nombre:'LAURA FONT RIBA',tipo:'Renovación',grupo:'Armas',importe:55,tasa:60.80,fp:'T',autoescola:'AUTOESC. VIAL CENTER'},
+      '-16-1': {dni:'44228901C',nombre:'LAURA FONT RIBA',tipo:'Renovación',grupo:'Armas',importe:0,tasa:0,fp:'E',autoescola:'AUTOESC. VIAL CENTER'},
+      // JORDI VILA PUJOL · Marina · 1er con cobro + 2do a 0€ (duplicado/interrumpido)
+      '-12-1': {dni:'77009812R',nombre:'JORDI VILA PUJOL',tipo:'Renovación',grupo:'Marina',importe:55,tasa:60.80,fp:'B',autoescola:''},
+      '-9-1':  {dni:'77009812R',nombre:'JORDI VILA PUJOL',tipo:'Expedición',grupo:'Marina',importe:0,tasa:0,fp:'E',autoescola:''},
+      // CARMEN COMAS POU · Conducción · 2 fichas (posible fallo 0€ claro)
+      '-7-1':  {dni:'77821309M',nombre:'CARMEN COMAS POU',tipo:'Renovación',grupo:'Conducción',importe:43,tasa:30.90,fp:'T',autoescola:'AUTOESC. SANT JORDI'},
+      '-4-1':  {dni:'77821309M',nombre:'CARMEN COMAS POU',tipo:'Renovación',grupo:'Conducción',importe:0,tasa:0,fp:'E',autoescola:'AUTOESC. SANT JORDI'}
+    };
     for(var i=25;i>=0;i--){
       var d=new Date(_today.getTime()-i*86400000); if(d.getDay()===0) continue;
       var dayKey=_iso(d), n=4+Math.floor(Math.random()*6), rows=[];
       for(var j=0;j<n;j++){
-        var c=conceptos[Math.floor(Math.random()*conceptos.length)], g=groups[Math.floor(Math.random()*groups.length)], nmi=Math.floor(Math.random()*nombres.length), fp=fps[Math.floor(Math.random()*fps.length)], tasa=tasas[Math.floor(Math.random()*tasas.length)];
-        rows.push({id:_uid(),kind:'TRAF',_csv:Math.random()>0.3,tipo:c[0],grupo:g,nombre:nombres[nmi],dni:dnis[nmi],autoescola:autoesc[Math.floor(Math.random()*autoesc.length)],importe:c[1],descuento:0,tasa:tasa,fp:fp,fpTasa:fp,retorno:false});
+        var c=conceptos[Math.floor(Math.random()*conceptos.length)], g=groups[Math.floor(Math.random()*groups.length)], nmi=Math.floor(Math.random()*_nombresPool.length), fp=fps[Math.floor(Math.random()*fps.length)], tasa=tasas[Math.floor(Math.random()*tasas.length)];
+        rows.push({id:_uid(),kind:'TRAF',_csv:Math.random()>0.3,tipo:c[0],grupo:g,nombre:_nombresPool[nmi],dni:_nextDni(),autoescola:autoesc[Math.floor(Math.random()*autoesc.length)],importe:c[1],descuento:0,tasa:tasa,fp:fp,fpTasa:fp,retorno:false});
       }
-      if(i<5) rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:'Revisión',grupo:'Animales peligrosos',nombre:'VICTOR RUIZ TORRES',dni:'48221109D',autoescola:'',importe:43,descuento:0,tasa:30.90,fp:'T',fpTasa:'T',retorno:false});
-      // Duplicados en el mismo grupo para que la auditoría muestre resultados
-      if(i===3) rows.push({id:_uid(),kind:'PRIV',tipo:'Fotos',grupo:'-',nombre:'CARMEN COMAS POU',dni:'77821309M',autoescola:'',importe:0,descuento:0,tasa:0,fp:'E',retorno:false});
-      if(i===1) rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:'Duplicado',grupo:'Conducción',nombre:'TOMAS TORRE PEREZ',dni:'39012874J',autoescola:'AUTOESC. SANT JORDI',importe:0,descuento:0,tasa:0,fp:'E',retorno:false});
-      if(i===5) rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:'Renovación',grupo:'Conducción',nombre:'LAURA FONT RIBA',dni:'44228901C',autoescola:'AUTOESC. VIAL CENTER',importe:0,descuento:0,tasa:0,fp:'E',retorno:false});
-      if(i===6) rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:'Renovación',grupo:'Conducción',nombre:'LAURA FONT RIBA',dni:'44228901C',autoescola:'AUTOESC. VIAL CENTER',importe:43,descuento:0,tasa:30.90,fp:'B',fpTasa:'B',retorno:false});
-      if(i===8) rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:'Expedición',grupo:'Armas',nombre:'JORDI VILA PUJOL',dni:'77009812R',autoescola:'',importe:0,descuento:0,tasa:0,fp:'E',retorno:false});
-      if(i===10) rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:'Renovación',grupo:'Armas',nombre:'JORDI VILA PUJOL',dni:'77009812R',autoescola:'',importe:55,descuento:0,tasa:60.80,fp:'T',fpTasa:'T',retorno:false});
+      // Inyectar fichas específicas de auditoría si tocan en este offset
+      var auditKey = '-'+i+'-1';
+      if(SEEDED_DUPLICATE_FICHAS[auditKey]){
+        var ac = SEEDED_DUPLICATE_FICHAS[auditKey];
+        rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:ac.tipo,grupo:ac.grupo,nombre:ac.nombre,dni:ac.dni,autoescola:ac.autoescola,importe:ac.importe,descuento:0,tasa:ac.tasa,fp:ac.fp,fpTasa:ac.fp,retorno:false});
+      }
       byDate[dayKey]=rows;
     }
+    // 📊 Facturación histórica · meses anteriores del año en curso + 12 meses del año previo
+    //   El renderer de Facturación Anual lee `byDate[YYYY-MM-DD]`; con 3 días por mes
+    //   obtenemos cifras realistas sin inflar el localStorage.
+    (function _seedHistoricalMonths(){
+      var currentMonth = _today.getMonth();   // 0-indexado
+      var currentYear = _today.getFullYear();
+      for(var yearOffset = 1; yearOffset >= 0; yearOffset--){
+        var y = currentYear - yearOffset;
+        var monthEnd = (yearOffset === 0) ? currentMonth - 1 : 11;
+        for(var m = 0; m <= monthEnd; m++){
+          [5, 15, 25].forEach(function(day){
+            var dd = new Date(y, m, day);
+            if(dd.getDay() === 0) dd = new Date(y, m, day+1);
+            var dk = _iso(dd);
+            if(byDate[dk]) return;
+            var nn = 5 + Math.floor(Math.random()*5);
+            var rr = [];
+            for(var k=0; k<nn; k++){
+              var cc = conceptos[Math.floor(Math.random()*conceptos.length)];
+              var gg = groups[Math.floor(Math.random()*groups.length)];
+              var ni = Math.floor(Math.random()*_nombresPool.length);
+              var fp2 = fps[Math.floor(Math.random()*fps.length)];
+              var ta2 = tasas[Math.floor(Math.random()*tasas.length)];
+              rr.push({id:_uid(),kind:'TRAF',_csv:true,tipo:cc[0],grupo:gg,nombre:_nombresPool[ni],dni:_nextDni(),autoescola:autoesc[Math.floor(Math.random()*autoesc.length)],importe:cc[1],descuento:0,tasa:ta2,fp:fp2,fpTasa:fp2,retorno:false});
+            }
+            byDate[dk] = rr;
+          });
+        }
+      }
+    })();
     try{ localStorage.setItem('caja.v1', JSON.stringify({byDate:byDate})); }catch(_){}
     try{ localStorage.setItem('caja.notif.template.v1', JSON.stringify({text:'Hola {NOMBRE}, te recordamos tu reconocimiento médico para renovar el carnet. Pide cita en el Centro Médico. Gracias.',enabled:true})); }catch(_){}
     // 📊 Autoescuelas · histórico de 12 meses de pacientes derivados por autoescuela
+    //   ⚠️ Formato correcto: data["YYYY-MM"] = { autoescuela: num } (clave plana,
+    //   no anidada por año). Es como el renderer `openStats()` lee los datos.
     try{
       var autoNames = ['AUTOESC. SANT JORDI','AUTOESC. VIAL CENTER','ACADEMIA CONDUCCIÓ TORRES','AUTOESC. GARCÍA PAU','AUTOESC. RÀPID'];
       var statsData = {};
       var yy = _today.getFullYear();
       for(var mm=1; mm<=12; mm++){
         var mmKey = String(mm).padStart(2,'0');
-        statsData[yy] = statsData[yy] || {};
-        statsData[yy][mmKey] = {};
-        autoNames.forEach(function(a){ statsData[yy][mmKey][a] = 10 + Math.floor(Math.random()*55); });
+        var fk = yy+'-'+mmKey;
+        statsData[fk] = {};
+        autoNames.forEach(function(a){ statsData[fk][a] = 10 + Math.floor(Math.random()*55); });
       }
       // año anterior también para comparativa
-      statsData[yy-1] = {};
       for(var mm2=1; mm2<=12; mm2++){
         var mmK2 = String(mm2).padStart(2,'0');
-        statsData[yy-1][mmK2] = {};
-        autoNames.forEach(function(a){ statsData[yy-1][mmK2][a] = 8 + Math.floor(Math.random()*50); });
+        var fk2 = (yy-1)+'-'+mmK2;
+        statsData[fk2] = {};
+        autoNames.forEach(function(a){ statsData[fk2][a] = 8 + Math.floor(Math.random()*50); });
       }
       localStorage.setItem('caja.stats.v1', JSON.stringify({autoescoles: autoNames, data: statsData}));
     }catch(_){}
@@ -11844,7 +11902,7 @@ $('#btnExport').onclick=async ev=>{
   // Missatge post-guardar · minimal: solo nombre del archivo y ubicación (feb 2026).
   const showPostSaveInfo=(filename, folderName)=>{
     const back=document.createElement('div');back.className='modal-back';back.style.zIndex='100001';
-    const folderBlock = folderName ? `<div style="margin-top:6px;font-size:12px;color:#94a3b8"><b style="color:#f5b301">📁 ${isCA?'Carpeta':'Carpeta'}:</b> <code style="color:#a5b4fc;font-size:12px">${escapeHtml(folderName)}</code></div>` : `<div style="margin-top:6px;font-size:12px;color:#94a3b8"><b style="color:#f5b301">📁 ${isCA?'Carpeta':'Carpeta'}:</b> <span style="color:#cbd5e1">${isCA?'la que vas triar en guardar':'la que elegiste al guardar'}</span></div>`;
+    const folderBlock = folderName ? `<div style="margin-top:6px;font-size:12px;color:#94a3b8"><b style="color:#f5b301">📁 ${isCA?'Carpeta':'Carpeta'}:</b> <code style="color:#a5b4fc;font-size:12px;word-break:break-all">${escapeHtml(folderName)}</code></div>` : `<div style="margin-top:6px;font-size:12px;color:#94a3b8"><b style="color:#f5b301">📁 ${isCA?'Carpeta':'Carpeta'}:</b> <span style="color:#cbd5e1">${isCA?'la que has triat al diàleg del sistema':'la que has elegido en el diálogo del sistema'}</span></div>`;
     back.innerHTML=`<div class="modal" style="max-width:460px;padding:20px">
       <h3 style="color:#3ddc97;margin-top:0;margin-bottom:12px">💾 ${isCA?'Còpia desada':'Copia guardada'}</h3>
       <div style="background:#0e1a2e;border:1px solid #1e293b;border-radius:8px;padding:12px;font-size:13px;color:#cbd5e1;line-height:1.5">
@@ -11876,10 +11934,24 @@ $('#btnExport').onclick=async ev=>{
       const w=await handle.createWritable();
       await w.write(contents);
       await w.close();
-      // Verify file was written correctly
-      try{const f=await handle.getFile();const check=await f.text();JSON.parse(check);if(check.length!==contents.length)throw new Error('tamaño no coincide')}
+      // Verify file was written correctly + obtener la ruta real OS (Electron)
+      let _realPath=null;
+      try{
+        const f=await handle.getFile();
+        const check=await f.text();
+        JSON.parse(check);
+        if(check.length!==contents.length)throw new Error('tamaño no coincide');
+        // feb 2026 · Si estamos en Electron, el preload expone webUtils.getPathForFile
+        //   para obtener la ruta OS real donde se guardó el archivo.
+        try{
+          const info=(window.appInfo && typeof window.appInfo.getPathForFile==='function') ? window.appInfo.getPathForFile(f) : null;
+          if(info && info.dir) _realPath=info.dir;
+        }catch(_){}
+      }
       catch(e){toast(isCA?'❌ AVÍS: el fitxer desat NO VERIFICA. Prova de nou o desa en un altre lloc.':'❌ AVISO: el archivo guardado NO VERIFICA. Prueba de nuevo o guarda en otro sitio.',7000);return}
-      showPostSaveInfo(handle.name||filename, null);
+      // Guardar última ruta en localStorage para mostrarla en el panel de copias.
+      if(_realPath){ try{ localStorage.setItem('caja.backup.lastDir', _realPath); }catch(_){} }
+      showPostSaveInfo(handle.name||filename, _realPath);
       return;
     }catch(e){if(e.name==='AbortError')return;toast('❌ Error: '+e.message,5000)}
   }
