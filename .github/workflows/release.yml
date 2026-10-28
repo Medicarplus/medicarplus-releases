@@ -36,7 +36,7 @@ jobs:
 
       - name: Build & publish Windows installer + portable
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --win nsis portable --x64 --publish always
 
       - name: Upload artifacts (backup)
