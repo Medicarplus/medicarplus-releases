@@ -1639,6 +1639,75 @@ let _lastAutoSaveContent='';
 let _fileSaveDebounce=null;
 function scheduleFileAutoSave(){clearTimeout(_fileSaveDebounce);_fileSaveDebounce=setTimeout(()=>autoSaveToFile(true),3000)}
 async function autoSaveToFile(silent){
+  // 🖥️ oct 2026 · Electron · Si tenemos lastDir (de una copia manual previa via
+  //   diálogo nativo), escribimos silenciosamente la auto-copia AHÍ MISMO.
+  //   Así el panel "Auto-copia activa" puede mostrar carpeta real OS.
+  //   Si no hay lastDir, caemos al flujo web (FileSystemHandle) de abajo.
+  try{
+    if(window.appInfo && typeof window.appInfo.autoWriteBackup==='function'){
+      const lastDir = (()=>{try{return localStorage.getItem('caja.backup.lastDir')||null;}catch(_){return null;}})();
+      if(lastDir){
+        const _pj=(k,d)=>{try{return JSON.parse(localStorage.getItem(k)||d);}catch(_){return JSON.parse(d);}};
+        const all={
+          cbTrafic:_pj('caja.v1','{"byDate":{}}'),
+          cempla:_pj('caja.cempla.v1','{"byDate":{}}'),
+          datafono:_pj('caja.datafono','{}'),
+          datafonoCempla:_pj('caja.cempla.datafono','{}'),
+          stats:_pj('caja.stats.v1','null'),
+          irpf:_pj('caja.irpf.v1','{"months":{},"quarters":{}}'),
+          saldoInicial1:_pj('caja.saldoInicial.trafic.v1','null'),
+          saldoInicial2:_pj('caja.saldoInicial.cempla.v1','null'),
+          reserva1:_pj('caja.reserva.v1','null'),
+          reserva2:_pj('caja.cempla.reserva.v1','null'),
+          cuadreOverrides:_pj('caja.cuadre.overrides.v1','null'),
+          statsAliases:_pj('caja.stats.aliases.v1','null'),
+          trafOverrides:_pj('caja.stats.traffic.overrides.v1','null'),
+          config:_pj('caja.config.v1','null'),
+          calendarHist:_pj('caja.calendar.history.v1','null'),
+          calendarStat:_pj('caja.calendar.status.v1','null'),
+          countZero:localStorage.getItem('caja.count_zero')||null,
+          data:_readAllDataKeys(),
+          _v:6,_ts:Date.now()
+        };
+        const sig=JSON.stringify(all.data);
+        if(sig===_lastAutoSaveContent){
+          try{ localStorage.setItem('caja.autoBackup.last.v1', String(Date.now())); }catch(_){}
+          try{
+            const sp=document.getElementById('autoBackupStatus');
+            if(sp){
+              const t2=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+              sp.innerHTML='🔄 Auto-copia activa · última: '+t2+'<br><span style="color:#cbd5e1;font-size:9px">📁 '+lastDir+'</span>';
+              sp.style.borderLeftColor='#22c55e';
+            }
+          }catch(_){}
+          if(!silent)toast('✓ Sin cambios · no hace falta guardar',2000);
+          return;
+        }
+        const content=JSON.stringify(all,null,2);
+        if(!content||content.length<40){console.warn('autoSave: content too small, aborting');return}
+        try{JSON.parse(content)}catch(e){console.error('autoSave: content not valid JSON, aborting');return}
+        const filename='medicar_autocopia.json';
+        const r = await window.appInfo.autoWriteBackup(content, lastDir, filename);
+        if(r && r.ok){
+          _lastAutoSaveContent=sig;
+          try{ localStorage.setItem('caja.autoBackup.last.v1', String(Date.now())); }catch(_){}
+          try{ localStorage.setItem('caja.autoBackup.lastPath.v1', r.path||''); }catch(_){}
+          try{
+            const sp=document.getElementById('autoBackupStatus');
+            if(sp){
+              const t2=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+              sp.innerHTML='🔄 Auto-copia activa · última: '+t2+'<br><span style="color:#cbd5e1;font-size:9px">📁 '+(r.dir||lastDir)+'</span>';
+              sp.style.borderLeftColor='#22c55e';
+            }
+          }catch(_){}
+          if(!silent)toast('💾 Auto-copia en '+(r.dir||lastDir),2500);
+          return;
+        }
+        // Si fallara (dir borrado etc), caemos al flujo web
+      }
+    }
+  }catch(_){ /* caemos al flujo web */ }
+
   if(!window.showSaveFilePicker)return;
   try{
     const handle=await getStoredHandle();
@@ -1679,7 +1748,7 @@ async function autoSaveToFile(silent){
       //   para que el panel de copia muestre siempre una fecha reciente y no "aún no".
       try{ localStorage.setItem('caja.autoBackup.last.v1', String(Date.now())); }catch(_){}
       // Solo actualizamos el panel del menú de copias (no el badge del header).
-      try{ const sp=document.getElementById('autoBackupStatus'); if(sp){ const t2=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}); sp.innerHTML='🔄 Auto-copia activa · última: '+t2; sp.style.borderLeftColor='#22c55e'; } }catch(_){}
+      try{ const sp=document.getElementById('autoBackupStatus'); if(sp){ const t2=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}); const _d=(localStorage.getItem('caja.backup.lastDir')||''); const _folderLine=_d?'<br><span style="color:#cbd5e1;font-size:9px">📁 '+_d+'</span>':''; sp.innerHTML='🔄 Auto-copia activa · última: '+t2+_folderLine; sp.style.borderLeftColor='#22c55e'; } }catch(_){}
       if(!silent)toast('✓ Sin cambios · no hace falta guardar',2000);
       return;
     }
@@ -1707,7 +1776,9 @@ function updateAutosaveBadge(name){
     const sp = document.getElementById('autoBackupStatus');
     if(sp){
       const t2 = new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
-      sp.innerHTML = '🔄 Auto-copia activa · última: '+t2;
+      const _d = (localStorage.getItem('caja.backup.lastDir')||'');
+      const _folderLine = _d ? '<br><span style="color:#cbd5e1;font-size:9px">📁 '+_d+'</span>' : (name?'<br><span style="color:#cbd5e1;font-size:9px">📄 '+name+'</span>':'');
+      sp.innerHTML = '🔄 Auto-copia activa · última: '+t2+_folderLine;
       sp.style.borderLeftColor = '#22c55e';
     }
   }catch(_){}

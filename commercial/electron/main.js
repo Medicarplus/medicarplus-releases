@@ -326,6 +326,29 @@ ipcMain.handle('check-for-updates', async () => {
 // Devuelve la ruta OS real porque dialog.showSaveDialog nos la da directamente.
 // Esto es lo único que funciona de forma fiable: webUtils.getPathForFile(f)
 // NO devuelve ruta cuando el File viene de showSaveFilePicker/FileSystemHandle.
+// IPC: Escritura silenciosa de auto-copia (sin diálogo). Escribe directamente a
+// `dir/filename`. Devuelve la ruta OS real para que el renderer la muestre en
+// el panel "Auto-copia activa". Si `dir` no existe, falla y el renderer caerá
+// al flujo FileSystemHandle web.
+ipcMain.handle('backup-auto-write', async (_ev, { contents, dir, filename }) => {
+  try {
+    const fs = require('fs');
+    const pathLib = require('path');
+    if (!dir || !filename) return { ok: false, error: 'dir/filename required' };
+    if (!fs.existsSync(dir)) return { ok: false, error: 'directorio no existe' };
+    const full = pathLib.join(dir, filename);
+    fs.writeFileSync(full, contents, 'utf8');
+    // Verificar
+    const written = fs.readFileSync(full, 'utf8');
+    if (written.length !== contents.length) {
+      return { ok: false, error: 'tamaño no coincide tras escritura' };
+    }
+    return { ok: true, path: full, dir, filename };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle('backup-save-dialog', async (_ev, { suggestedName, contents, lastDir }) => {
   try {
     const fs = require('fs');

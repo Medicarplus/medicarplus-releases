@@ -86,4 +86,8 @@ contextBridge.exposeInMainWorld('appInfo', {
   //   NO retorna la ruta en archivos de FileSystemFileHandle.
   saveBackupViaDialog: (contents, suggestedName, lastDir) =>
     ipcRenderer.invoke('backup-save-dialog', { contents, suggestedName, lastDir }),
+  // oct 2026 · Escritura silenciosa de la auto-copia dentro de `dir/filename`.
+  //   Devuelve { ok, path, dir, filename } con la ruta OS real para el panel.
+  autoWriteBackup: (contents, dir, filename) =>
+    ipcRenderer.invoke('backup-auto-write', { contents, dir, filename }),
 });
