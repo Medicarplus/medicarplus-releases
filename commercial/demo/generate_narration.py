@@ -43,8 +43,8 @@ SEGMENTS = {
         "al abrir el programa ya tienes el día preparado."
     ),
     "02_dia": (
-        "A lo largo del día registras pagos, añades revisiones privadas, fotos, duplicados o "
-        "certificados oficiales. En la columna derecha ves el total ingresado por efectivo, "
+        "A lo largo del día cobras pagos, añades revisiones privadas, fotos, duplicados o "
+        "certificados oficiales. En la columna derecha ves el total cobrado por efectivo, "
         "tarjeta, bizum y transferencia. Al cerrar, la caja cuadra sola."
     ),
     "03_stats": (
