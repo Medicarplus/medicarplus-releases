@@ -80,4 +80,10 @@ contextBridge.exposeInMainWorld('appInfo', {
       return { full, dir: path.dirname(full), base: path.basename(full) };
     }catch(_){ return null; }
   },
+  // oct 2026 · Guarda la copia vía diálogo nativo del main process.
+  //   Devuelve { ok, path, dir, filename } con la ruta OS real.
+  //   Preferido sobre showSaveFilePicker porque webUtils.getPathForFile
+  //   NO retorna la ruta en archivos de FileSystemFileHandle.
+  saveBackupViaDialog: (contents, suggestedName, lastDir) =>
+    ipcRenderer.invoke('backup-save-dialog', { contents, suggestedName, lastDir }),
 });

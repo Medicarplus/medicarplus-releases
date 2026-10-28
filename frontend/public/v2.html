@@ -11927,6 +11927,25 @@ $('#btnExport').onclick=async ev=>{
   };
   const forceChoose=ev.shiftKey||ev.altKey;
   const filename=`medicar_copia_${isoToday()}.json`;
+  // Electron (Oct 2026) · Preferimos el diálogo nativo del main process:
+  //   nos devuelve la ruta OS real (algo que webUtils.getPathForFile NO
+  //   puede dar sobre archivos de FileSystemFileHandle). Sólo entramos
+  //   aquí si estamos en Electron Y no forzamos elegir carpeta nueva…
+  //   bueno, aquí también Shift fuerza nuevo diálogo porque el main abre
+  //   diálogo nativo cada vez (defaultPath = lastDir).
+  if(window.appInfo && typeof window.appInfo.saveBackupViaDialog==='function'){
+    try{
+      const lastDir = (()=>{try{return localStorage.getItem('caja.backup.lastDir')||null;}catch(_){return null;}})();
+      const r = await window.appInfo.saveBackupViaDialog(contents, filename, lastDir);
+      if(r && r.canceled) return;
+      if(r && r.ok){
+        try{ localStorage.setItem('caja.backup.lastDir', r.dir); }catch(_){}
+        showPostSaveInfo(r.filename||filename, r.dir);
+        return;
+      }
+      if(r && r.error){ toast('❌ Error guardando: '+r.error, 6000); return; }
+    }catch(e){ /* si el IPC falla, caemos al flujo web */ }
+  }
   if(window.showSaveFilePicker){
     try{
       let handle=forceChoose?null:await getStoredHandle();

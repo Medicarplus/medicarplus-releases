@@ -322,6 +322,44 @@ ipcMain.handle('check-for-updates', async () => {
   }
 });
 
+// IPC: Guardar copia de seguridad via diálogo nativo del sistema.
+// Devuelve la ruta OS real porque dialog.showSaveDialog nos la da directamente.
+// Esto es lo único que funciona de forma fiable: webUtils.getPathForFile(f)
+// NO devuelve ruta cuando el File viene de showSaveFilePicker/FileSystemHandle.
+ipcMain.handle('backup-save-dialog', async (_ev, { suggestedName, contents, lastDir }) => {
+  try {
+    const fs = require('fs');
+    const pathLib = require('path');
+    const defaultPath = lastDir
+      ? pathLib.join(lastDir, suggestedName || 'medicar_copia.json')
+      : (suggestedName || 'medicar_copia.json');
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Guardar copia de seguridad MediCar Plus',
+      defaultPath,
+      filters: [{ name: 'Copia MediCar Plus', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePath) {
+      return { ok: false, canceled: true };
+    }
+    const full = result.filePath;
+    fs.writeFileSync(full, contents, 'utf8');
+    // Verificar
+    const written = fs.readFileSync(full, 'utf8');
+    if (written.length !== contents.length) {
+      return { ok: false, error: 'tamaño no coincide tras escritura' };
+    }
+    return {
+      ok: true,
+      path: full,
+      dir: pathLib.dirname(full),
+      filename: pathLib.basename(full),
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+});
+
+
 app.whenReady().then(() => {
   setupMenu();
   createWindow();
