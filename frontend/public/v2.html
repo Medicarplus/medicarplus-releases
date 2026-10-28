@@ -28,24 +28,80 @@
     try{ localStorage.setItem('caja.config.v1', JSON.stringify({configured:true,company1:{name:'Centro Médico Conductores Demo'},company2:{name:'Reconocimientos Náutica Demo'},partners:[]})); }catch(_){}
     var _today=new Date(), _pad=function(n){return String(n).padStart(2,'0')}, _iso=function(d){return d.getFullYear()+'-'+_pad(d.getMonth()+1)+'-'+_pad(d.getDate())}, _uid=function(){return 'demo-'+Math.random().toString(36).slice(2,10)};
     var byDate={}, groups=['Conducción','Armas','Marina','Animales peligrosos','Grúas','Deportes'];
+    var autoesc=['AUTOESC. SANT JORDI','AUTOESC. VIAL CENTER','ACADEMIA CONDUCCIÓ TORRES','AUTOESC. GARCÍA PAU','AUTOESC. RÀPID',''];
     var nombres=['MARC RIBA MOLINA','JOSEP SEGURANYES XUMETRA','CARMEN COMAS POU','SERGIO VEGA MARTIN','JUAN PABLO SALCEDO','TOMAS TORRE PEREZ','LAURA FONT RIBA','ANNA PUIG SALA','DAVID MARTI OLIVE','JORDI VILA PUJOL','MONTSE CASAS GRAU','PAU SOLE FERRER'];
     var dnis=['47893221K','39214657B','77821309M','40912548N','77654201X','39012874J','44228901C','47112399T','40876234Y','77009812R','39445127V','40887614P'];
     var conceptos=[['Renovación',43],['Renovación',43],['Renovación',43],['Expedición',55],['Duplicado',25],['Canje',38],['Prórroga',43]];
     var fps=['E','T','T','B','E','T','X'], tasas=[0,25.60,30.90,60.80,0,0];
     for(var i=25;i>=0;i--){
       var d=new Date(_today.getTime()-i*86400000); if(d.getDay()===0) continue;
-      var dayKey=_iso(d), n=2+Math.floor(Math.random()*5), rows=[];
+      var dayKey=_iso(d), n=4+Math.floor(Math.random()*6), rows=[];
       for(var j=0;j<n;j++){
         var c=conceptos[Math.floor(Math.random()*conceptos.length)], g=groups[Math.floor(Math.random()*groups.length)], nmi=Math.floor(Math.random()*nombres.length), fp=fps[Math.floor(Math.random()*fps.length)], tasa=tasas[Math.floor(Math.random()*tasas.length)];
-        rows.push({id:_uid(),kind:'TRAF',_csv:Math.random()>0.3,tipo:c[0],grupo:g,nombre:nombres[nmi],dni:dnis[nmi],importe:c[1],descuento:0,tasa:tasa,fp:fp,fpTasa:fp,retorno:false});
+        rows.push({id:_uid(),kind:'TRAF',_csv:Math.random()>0.3,tipo:c[0],grupo:g,nombre:nombres[nmi],dni:dnis[nmi],autoescola:autoesc[Math.floor(Math.random()*autoesc.length)],importe:c[1],descuento:0,tasa:tasa,fp:fp,fpTasa:fp,retorno:false});
       }
-      if(i<5) rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:'Renovación',grupo:'Animales peligrosos',nombre:'VICTOR RUIZ TORRES',dni:'48221109D',importe:43,descuento:0,tasa:30.90,fp:'T',fpTasa:'T',retorno:false});
-      if(i===3) rows.push({id:_uid(),kind:'PRIV',tipo:'Fotos',grupo:'-',nombre:'CARMEN COMAS POU',dni:'77821309M',importe:0,descuento:0,tasa:0,fp:'E',retorno:false});
-      if(i===1) rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:'Duplicado',grupo:'Conducción',nombre:'TOMAS TORRE PEREZ',dni:'39012874J',importe:0,descuento:0,tasa:0,fp:'E',retorno:false});
+      if(i<5) rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:'Revisión',grupo:'Animales peligrosos',nombre:'VICTOR RUIZ TORRES',dni:'48221109D',autoescola:'',importe:43,descuento:0,tasa:30.90,fp:'T',fpTasa:'T',retorno:false});
+      // Duplicados en el mismo grupo para que la auditoría muestre resultados
+      if(i===3) rows.push({id:_uid(),kind:'PRIV',tipo:'Fotos',grupo:'-',nombre:'CARMEN COMAS POU',dni:'77821309M',autoescola:'',importe:0,descuento:0,tasa:0,fp:'E',retorno:false});
+      if(i===1) rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:'Duplicado',grupo:'Conducción',nombre:'TOMAS TORRE PEREZ',dni:'39012874J',autoescola:'AUTOESC. SANT JORDI',importe:0,descuento:0,tasa:0,fp:'E',retorno:false});
+      if(i===5) rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:'Renovación',grupo:'Conducción',nombre:'LAURA FONT RIBA',dni:'44228901C',autoescola:'AUTOESC. VIAL CENTER',importe:0,descuento:0,tasa:0,fp:'E',retorno:false});
+      if(i===6) rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:'Renovación',grupo:'Conducción',nombre:'LAURA FONT RIBA',dni:'44228901C',autoescola:'AUTOESC. VIAL CENTER',importe:43,descuento:0,tasa:30.90,fp:'B',fpTasa:'B',retorno:false});
+      if(i===8) rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:'Expedición',grupo:'Armas',nombre:'JORDI VILA PUJOL',dni:'77009812R',autoescola:'',importe:0,descuento:0,tasa:0,fp:'E',retorno:false});
+      if(i===10) rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:'Renovación',grupo:'Armas',nombre:'JORDI VILA PUJOL',dni:'77009812R',autoescola:'',importe:55,descuento:0,tasa:60.80,fp:'T',fpTasa:'T',retorno:false});
       byDate[dayKey]=rows;
     }
     try{ localStorage.setItem('caja.v1', JSON.stringify({byDate:byDate})); }catch(_){}
     try{ localStorage.setItem('caja.notif.template.v1', JSON.stringify({text:'Hola {NOMBRE}, te recordamos tu reconocimiento médico para renovar el carnet. Pide cita en el Centro Médico. Gracias.',enabled:true})); }catch(_){}
+    // 📊 Autoescuelas · histórico de 12 meses de pacientes derivados por autoescuela
+    try{
+      var autoNames = ['AUTOESC. SANT JORDI','AUTOESC. VIAL CENTER','ACADEMIA CONDUCCIÓ TORRES','AUTOESC. GARCÍA PAU','AUTOESC. RÀPID'];
+      var statsData = {};
+      var yy = _today.getFullYear();
+      for(var mm=1; mm<=12; mm++){
+        var mmKey = String(mm).padStart(2,'0');
+        statsData[yy] = statsData[yy] || {};
+        statsData[yy][mmKey] = {};
+        autoNames.forEach(function(a){ statsData[yy][mmKey][a] = 10 + Math.floor(Math.random()*55); });
+      }
+      // año anterior también para comparativa
+      statsData[yy-1] = {};
+      for(var mm2=1; mm2<=12; mm2++){
+        var mmK2 = String(mm2).padStart(2,'0');
+        statsData[yy-1][mmK2] = {};
+        autoNames.forEach(function(a){ statsData[yy-1][mmK2][a] = 8 + Math.floor(Math.random()*50); });
+      }
+      localStorage.setItem('caja.stats.v1', JSON.stringify({autoescoles: autoNames, data: statsData}));
+    }catch(_){}
+    // 📱 Mock de endpoints SMS cuando se está en demo
+    try{
+      var _origFetch = window.fetch.bind(window);
+      window.fetch = function(url, opts){
+        var u = String(url||'');
+        if(u.indexOf('/api/sms/stats') > -1){
+          return Promise.resolve(new Response(JSON.stringify({
+            total_sent: 1247, total_errors: 23, total_campaigns: 18,
+            by_month: [
+              {month:'ene', sent:85, errors:2}, {month:'feb', sent:92, errors:1},
+              {month:'mar', sent:110, errors:3}, {month:'abr', sent:140, errors:5},
+              {month:'may', sent:95, errors:2}, {month:'jun', sent:82, errors:1},
+              {month:'jul', sent:68, errors:0}, {month:'ago', sent:45, errors:0},
+              {month:'sep', sent:120, errors:3}, {month:'oct', sent:165, errors:4},
+              {month:'nov', sent:155, errors:2}, {month:'dic', sent:90, errors:0}
+            ]
+          }), {status:200, headers:{'Content-Type':'application/json'}}));
+        }
+        if(u.indexOf('/api/sms/campaigns') > -1){
+          return Promise.resolve(new Response(JSON.stringify({campaigns: [
+            {id:'c1', name:'Recordatorios octubre 2026', sent_at:new Date(_today.getTime()-5*86400000).toISOString(), total:85, sent:83, errors:2, missing_phone:4},
+            {id:'c2', name:'Vencimientos clase B · 3 meses', sent_at:new Date(_today.getTime()-12*86400000).toISOString(), total:120, sent:118, errors:1, missing_phone:7},
+            {id:'c3', name:'Avisos armas · trimestre', sent_at:new Date(_today.getTime()-20*86400000).toISOString(), total:42, sent:41, errors:1, missing_phone:2},
+            {id:'c4', name:'Grúas · caducidad agosto', sent_at:new Date(_today.getTime()-40*86400000).toISOString(), total:35, sent:34, errors:0, missing_phone:1},
+            {id:'c5', name:'Clase A · septiembre', sent_at:new Date(_today.getTime()-55*86400000).toISOString(), total:68, sent:66, errors:2, missing_phone:3}
+          ]}), {status:200, headers:{'Content-Type':'application/json'}}));
+        }
+        return _origFetch.apply(this, arguments);
+      };
+    }catch(_){}
     try{ localStorage.setItem('caja.lang','es'); }catch(_){}
     try{ localStorage.setItem('caja.aiOnboardSeen','1'); }catch(_){}
     // 🎬 Feb 2026 · Suprimir cualquier onboarding / multi-PC prompt para la grabación

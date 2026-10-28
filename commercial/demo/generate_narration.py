@@ -17,40 +17,35 @@ from emergentintegrations.llm.openai import OpenAITextToSpeech
 SEGMENTS = {
     "00_intro": (
         "MediCar Plus es la gestión integral para centros médicos de reconocimiento de conductores. "
-        "Renovar carnets, emitir certificados médicos, cobrar y avisar, todo desde una sola pantalla. "
-        "Mira cómo funciona."
+        "Importa, cobra, revisa y avisa, todo desde una sola pantalla. Mira cómo funciona."
     ),
     "01_csv": (
-        "El día empieza aquí. Importas el fichero CSV que descargas de la DGT en un solo clic. "
-        "El programa clasifica cada reconocimiento médico automáticamente por tipo, grupo y tasa oficial. "
-        "Renovaciones, expediciones, canjes, armas, animales peligrosos... "
-        "todo ordenado y listo para cobrar sin tocar nada más."
+        "Al descargar el CSV del día desde la DGT, el programa carga automáticamente todas las "
+        "fichas con tipo, grupo, tasa y datos del paciente. No tienes que meter nada a mano: "
+        "al abrir el programa ya tienes el día listo para cobrar."
     ),
     "02_dia": (
-        "Durante el día añades los reconocimientos médicos, fotos, duplicados, certificados oficiales "
-        "y pagos manuales en segundos. Elige concepto, paciente, importe y forma de pago. "
-        "En la columna de la derecha ves en tiempo real cuánto has cobrado: por efectivo, tarjeta, "
-        "bizum, transferencia... La caja cuadra sola al cerrar el día."
+        "A lo largo del día cobras pagos, añades revisiones privadas, fotos, duplicados o "
+        "certificados oficiales. En la columna derecha ves el total cobrado por efectivo, "
+        "tarjeta, bizum y transferencia. Al cerrar, la caja cuadra sola."
     ),
     "03_stats": (
-        "En Estadísticas tienes todo tu centro médico en una pantalla: "
-        "facturación mensual y anual por categoría, reconocimientos por grupo, "
-        "pacientes que llegan de cada autoescuela, ingresos de los socios. "
-        "Los datos están listos para enseñar al asesor fiscal."
+        "En Estadísticas tienes el centro entero en una pantalla: facturación mensual y anual, "
+        "trámites de Tráfico por grupo, pacientes derivados de cada autoescuela y comparativas "
+        "año actual contra el anterior. Listo para el asesor fiscal."
     ),
     "04_sms": (
-        "Los avisos SMS se mandan solos. Cada paciente recibe el recordatorio de su reconocimiento "
-        "médico antes de que caduque el carnet. Puedes editar la plantilla, elegir a qué grupos "
-        "avisar y seguir las estadísticas de envíos y de respuestas en tiempo real."
+        "Los avisos SMS se envían solos. Cada paciente recibe el recordatorio de su reconocimiento "
+        "antes de que caduque el carnet. Puedes editar la plantilla, elegir a qué grupos avisar "
+        "y seguir los envíos, errores y respuestas de cada campaña."
     ),
     "05_audit": (
-        "La auditoría detecta duplicados, reconocimientos interrumpidos y posibles fallos con importe cero. "
-        "Marcas el rango, el programa mira tres meses atrás automáticamente, "
-        "y en segundos ves qué revisar antes de cerrar el mes."
+        "La auditoría encuentra duplicados, reconocimientos interrumpidos y posibles fallos con "
+        "importe cero mirando hasta tres meses atrás. En segundos sabes qué revisar antes de "
+        "cerrar el mes."
     ),
     "06_outro": (
-        "MediCar Plus. Menos tiempo con los números, más tiempo con tus pacientes. "
-        "Pruébalo hoy."
+        "MediCar Plus. Menos tiempo con los números, más tiempo con tus pacientes."
     ),
 }
 
