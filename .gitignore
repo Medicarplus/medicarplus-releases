@@ -82,3 +82,9 @@ memory/test_credentials.md
 android-sdk/commercial/electron/node_modules/electron/dist/electron
 commercial/electron/node_modules/electron/dist/electron
 frontend/public/downloads/electron-src/node_modules/electron/dist/electron
+.env
+.env.*
+*.env
+credentials.json
+*.key
+.credentials
