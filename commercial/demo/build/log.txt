@@ -1,0 +1,14 @@
+[plan] timeline:
+       00_intro:   0.0 →  10.8s
+       01_csv:  12.2 →  26.3s
+       02_dia:  27.7 →  41.6s
+       03_stats:  43.0 →  57.6s
+       04_sms:  59.0 →  73.7s
+       05_audit:  75.1 →  86.9s
+       06_outro:  88.3 →  92.9s
+[plan] total: 92.9s
+[audio] generando pista final...
+[audio] final: 93.2s
+[rec] arrancando screencast (~93s)...
+[rec] webm: /app/commercial/demo/build/rec/page@722d664d6752a15e752cdcda0819272c.webm
+[merge] → /app/frontend/public/demo/medicar_demo.mp4

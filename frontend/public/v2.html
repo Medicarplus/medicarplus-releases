@@ -16723,6 +16723,22 @@ const LAST_SEEN_VERSION_KEY = 'caja.last_seen_version';
 // IMPORTANT: L'ordre importa. La primera entrada ha de ser la MÉS RECENT.
 // Cada versió té: { version, date (dd/mm/aaaa), highlights (array de strings HTML curts) }
 const CHANGELOG = [
+  { version:'2.4.0', date:'28/10/2026', highlights:[
+    '🚫 <b>Anular citas</b>: nuevo botón en el calendario para marcar una cita como <b>anulada</b> cuando el paciente llama a avisar que no viene. La cita desaparece del listado del día y aparece como KPI aparte en las estadísticas · <b>no cuenta como "no vino"</b>.',
+    '🪪 <b>DNI en Auditoría</b>: tanto en las tarjetas de duplicados/interrumpidos como en la tabla de "Posible fallo", ahora se muestra el DNI del paciente junto al nombre · clic para copiar al portapapeles.',
+    '🐾 <b>"Animales p." y "Revisión" ya cuentan como Tráfico</b> en Facturación anual/mensual · antes caían en "Varios" y se perdían del total DGT. "Revisión" también añadido como opción del selector de concepto en la ficha diaria.',
+    '🔍 <b>Auditoría mira 3 meses atrás automáticamente</b>: aunque filtres por un rango corto, el programa comprueba hasta 3 meses antes para detectar interrumpidos y duplicados antiguos sin falsos positivos en "Posible fallo".',
+    '📅 <b>Fichas previas visibles en las tarjetas</b>: las citas detectadas en el lookback de 3 meses se muestran en gris dentro de la misma tarjeta de duplicado, con el badge <code>+N previa (3m)</code>, para que veas la historia completa de un vistazo.',
+    '✅ <b>"Posible fallo 0€" afinado con 3 reglas</b>:<br>&nbsp;&nbsp;&nbsp;&nbsp;• <b>Importe 0 + tasa &gt; 0</b> → siempre sale (es raro cobrar solo la tasa sin la revisión)<br>&nbsp;&nbsp;&nbsp;&nbsp;• <b>Importe 0 + extra</b> (Foto, Duplicado, C.Oficial…) → siempre sale (es raro un extra sin cobrar)<br>&nbsp;&nbsp;&nbsp;&nbsp;• <b>0€ puro</b> → solo si el cliente no tiene otra ficha en 3 meses (si la tiene es duplicado/interrumpido)',
+    '🔇 <b>Pantalla principal más limpia</b>: eliminado el badge con el nombre del archivo de copia automática que aparecía junto al logo. El estado real sigue viéndose en el panel 💾 Copias.',
+    '🧹 <b>Chip "Nuevo chip" eliminado</b>: al pulsar "Añadir chip" ya no se crea un placeholder con el texto "Nuevo chip" que había que renombrar · ahora abre directamente vacío para que lo nombres. Migración automática borra los chips "Nuevo chip" legacy del localStorage.',
+    '💾 <b>Modal post-copia simplificado</b>: al guardar una copia manual solo ves el nombre del archivo y la carpeta · sin textos redundantes sobre crucecitas rojas de Windows.',
+    '🔄 <b>Auto-copia visible al abrir</b>: antes "última: aún no" nunca se actualizaba hasta que había cambios · ahora si hay permiso de carpeta se dispara una copia inmediata al arrancar y la fecha aparece de entrada.',
+    '🎬 <b>Vídeo demo en la landing</b>: en medicarplus.es, última tarjeta de la rejilla de características · recorrido narrado de 90 segundos por CSV, flujo del día, estadísticas, SMS y auditoría.',
+    '💶 <b>Precios reorganizados</b>: default mensual (antes anual) · "Más popular" ahora marca el plan Premium · Premium ajustado a <b>2 usuarios simultáneos</b> · nuevo bloque "¿Tienes varios centros médicos?" con contacto info@medicarplus.es para propuestas a medida.',
+    '🖱️ <b>Red de seguridad contra inputs bloqueados</b>: cuando Electron recupera el foco (al desminimizar), se cierran automáticamente dropdowns y tooltips huérfanos que podían bloquear la escritura en los campos de entrada manual.',
+    '📋 <b>DNI copiable con feedback visible</b>: el toast "DNI copiado" ahora sale por encima del modal de Auditoría (antes quedaba oculto detrás).',
+  ]},
   { version:'2.3.0', date:'28/02/2026', highlights:[
     '☁️ <b>Copia automática en la nube cada día</b>: al abrir la app, tus datos se guardan automáticamente en la nube de MediCar. Si algún día pierdes datos por avería, se puede restaurar todo tal cual estaba, sin perder ni un céntimo ni un apunte.',
     '🚀 <b>Botón "Enviar copia AHORA"</b>: en el menú <b>💾 Copias de seguridad → ☁️ Enviar copia AHORA a la nube</b>. Fuerza un envío inmediato con toast confirmando el tamaño y el ID. Útil antes de operaciones importantes o cuando necesitas soporte técnico.',

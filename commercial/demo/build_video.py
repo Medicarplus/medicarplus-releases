@@ -110,16 +110,26 @@ async def record_screencast(duration_target: float, timeline):
             while asyncio.get_event_loop().time() - t0 < target:
                 await asyncio.sleep(0.05)
 
-        async def click_text(regex: str, parent="button,a,span,div,li"):
-            """Clica el primer elemento cuyo texto encaje con la regex."""
+        async def click_id(sel: str, label: str = ""):
+            """Click robusto por selector CSS."""
             try:
-                await page.evaluate(f"""() => {{
-                    const re = new RegExp({regex!r});
-                    const els = Array.from(document.querySelectorAll({parent!r}));
-                    const found = els.find(e => re.test((e.textContent||'').trim()));
-                    if(found){{ found.scrollIntoView({{block:'center'}}); found.click(); }}
-                }}""")
-            except Exception as e: print(f"  click_text({regex}) err: {e}")
+                el = page.locator(sel).first
+                if await el.count():
+                    await el.scroll_into_view_if_needed()
+                    await el.click(force=True)
+                    return True
+                else:
+                    print(f"  ⚠️ sel {sel} ({label}) no encontrado")
+            except Exception as e:
+                print(f"  click_id({sel}) err: {e}")
+            return False
+
+        async def open_submenu(toggle_sel: str):
+            """Abre un dropdown (si no está abierto ya)."""
+            try:
+                await page.locator(toggle_sel).first.click(force=True)
+                await page.wait_for_timeout(600)
+            except Exception: pass
 
         # ─── 00_intro (0-10.8s): home con datos cargados, pequeño pan ───
         await until("00_intro")
@@ -129,89 +139,79 @@ async def record_screencast(duration_target: float, timeline):
             await page.mouse.wheel(0, -200); await page.wait_for_timeout(1500)
         except Exception: pass
 
-        # ─── 01_csv (12.2-26.3s): recorrido por las fichas del día cargadas automáticamente ───
+        # ─── 01_csv (12.2-26.3s): hover importar + scroll por fichas ───
         await close_any_modal()
         await until("01_csv")
         try:
-            # Hover sobre el botón importar
             btn = page.locator('#btnImport').first
             if await btn.count():
                 await btn.scroll_into_view_if_needed()
                 await btn.hover(); await page.wait_for_timeout(1800)
-            # Scroll suave por la lista de entradas (demostrar fichas importadas de verdad)
             for dy in [220, 220, 220, -660]:
                 await page.mouse.wheel(0, dy); await page.wait_for_timeout(1600)
         except Exception as e: print(f"  csv err: {e}")
 
-        # ─── 02_dia (27.7-41.6s): mostrar sumatorio del día, formas de pago ───
+        # ─── 02_dia (27.7-41.6s): columna derecha totales / FPs ───
         await close_any_modal()
         await until("02_dia")
         try:
-            # Enfocar la columna derecha (totales + formas de pago)
             await page.evaluate("document.querySelector('#sumBox')?.scrollIntoView({block:'center'})")
             await page.wait_for_timeout(1500)
-            # Hover sobre un par de celdas de pagos
-            cells = page.locator('#sumBox .row').all() if False else None
             await page.mouse.move(1300, 420); await page.wait_for_timeout(1200)
             await page.mouse.move(1300, 500); await page.wait_for_timeout(1200)
             await page.mouse.move(1300, 300); await page.wait_for_timeout(1200)
-            # Pequeño scroll para mostrar reserva de cambio
             await page.mouse.wheel(0, 350); await page.wait_for_timeout(1500)
             await page.mouse.wheel(0, -350); await page.wait_for_timeout(1500)
         except Exception as e: print(f"  dia err: {e}")
 
-        # ─── 03_stats (43.0-57.6s): Estadísticas → Autoescuelas y Tráfico ───
+        # ─── 03_stats (43.0-57.6s): abrir Autoescuelas → cerrar → abrir Tráfico ───
         await close_any_modal()
         await until("03_stats")
         try:
-            # Abrir dropdown de Estadísticas desde el header
-            await click_text(r"Estad[íi]stic")
-            await page.wait_for_timeout(900)
-            # Click Autoescuelas (empezamos por aquí porque es la pestaña con más datos sembrados)
-            await click_text(r"Autoescuel|Autoescol")
-            await page.wait_for_timeout(2200)
-            # scroll por los datos
-            await page.mouse.wheel(0, 300); await page.wait_for_timeout(2000)
-            # cambiar a Tráfico
-            await click_text(r"Tr[àa]fic")
-            await page.wait_for_timeout(2200)
-            await page.mouse.wheel(0, 250); await page.wait_for_timeout(1800)
-            await page.mouse.wheel(0, -250); await page.wait_for_timeout(1200)
-            await page.keyboard.press("Escape"); await page.wait_for_timeout(500)
+            # Click directo en el handler (más fiable que el submenu dropdown)
+            await page.evaluate("document.querySelector('#btnStatAutoescolas')?.click()")
+            await page.wait_for_timeout(2800)
+            await page.mouse.wheel(0, 300); await page.wait_for_timeout(2300)
+            await page.keyboard.press("Escape"); await page.wait_for_timeout(400)
+            await close_any_modal()
+            await page.evaluate("document.querySelector('#btnStatTrafico')?.click()")
+            await page.wait_for_timeout(2800)
+            await page.mouse.wheel(0, 300); await page.wait_for_timeout(2200)
+            await page.mouse.wheel(0, -300); await page.wait_for_timeout(1200)
+            await page.keyboard.press("Escape"); await page.wait_for_timeout(400)
         except Exception as e: print(f"  stats err: {e}")
 
-        # ─── 04_sms (59.0-73.7s): SMS/Avisos ───
+        # ─── 04_sms (59.0-73.7s): abrir Estadísticas SMS ───
         await close_any_modal()
         await until("04_sms")
         try:
-            await click_text(r"Utilidades|Utilitats")
-            await page.wait_for_timeout(900)
-            await click_text(r"SMS|Avisos")
-            await page.wait_for_timeout(2500)
-            # Scroll para mostrar campañas y stats
-            await page.mouse.wheel(0, 300); await page.wait_for_timeout(2200)
-            await page.mouse.wheel(0, 300); await page.wait_for_timeout(2200)
+            await page.evaluate("document.querySelector('#btnStatSms')?.click()")
+            await page.wait_for_timeout(3000)
+            await page.mouse.wheel(0, 300); await page.wait_for_timeout(2600)
+            await page.mouse.wheel(0, 300); await page.wait_for_timeout(2500)
             await page.mouse.wheel(0, -600); await page.wait_for_timeout(1800)
-            await page.keyboard.press("Escape"); await page.wait_for_timeout(500)
+            await page.keyboard.press("Escape"); await page.wait_for_timeout(400)
         except Exception as e: print(f"  sms err: {e}")
 
-        # ─── 05_audit (75.1-86.9s): Auditoría avanzada ───
+        # ─── 05_audit (75.1-86.9s): abrir Auditoría ───
         await close_any_modal()
         await until("05_audit")
         try:
-            await click_text(r"Auditor[íi]a")
-            await page.wait_for_timeout(2500)
-            # Click 3 meses
-            await click_text(r"3 meses")
-            await page.wait_for_timeout(1600)
-            # Click pestaña Posible fallo
-            await click_text(r"Posible fallo")
-            await page.wait_for_timeout(2500)
-            await page.mouse.wheel(0, 200); await page.wait_for_timeout(1500)
-            await page.keyboard.press("Escape"); await page.wait_for_timeout(500)
+            await page.evaluate("document.querySelector('#btnAudit')?.click()")
+            await page.wait_for_timeout(3000)
+            await page.mouse.wheel(0, 250); await page.wait_for_timeout(2500)
+            # Click en pestaña Posible fallo si existe
+            await page.evaluate("""() => {
+                const tabs = Array.from(document.querySelectorAll('button,div,span'));
+                const t = tabs.find(x => /Posible fallo/i.test((x.textContent||'').trim()));
+                if(t) t.click();
+            }""")
+            await page.wait_for_timeout(2200)
+            await page.mouse.wheel(0, 150); await page.wait_for_timeout(1500)
+            await page.keyboard.press("Escape"); await page.wait_for_timeout(400)
         except Exception as e: print(f"  audit err: {e}")
 
-        # ─── 06_outro (88.3-92.9s): pantalla principal limpia ───
+        # ─── 06_outro (88.3-92.9s): zoom al logo ───
         await close_any_modal()
         await until("06_outro")
         try:
