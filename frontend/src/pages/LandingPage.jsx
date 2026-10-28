@@ -424,7 +424,7 @@ const PriceCard = ({ plan, monthlyPrice, annualPrice, period, features, highligh
 };
 
 export default function LandingPage() {
-  const [period, setPeriod] = useState("annual"); // annual | monthly
+  const [period, setPeriod] = useState("monthly"); // monthly | annual · default mensual (Feb 2026)
   const [openFeature, setOpenFeature] = useState(null);
   const apiBase = process.env.REACT_APP_BACKEND_URL;
 
@@ -1186,7 +1186,7 @@ export default function LandingPage() {
               ctaHref={`/request-license?plan=PREMIUM&period=${period}`}
               features={[
                 "Todo lo de Standard",
-                "Hasta 3 usuarios simultáneos",
+                "Hasta 2 usuarios simultáneos",
                 "SMS + WhatsApp automáticos",
                 "Recordatorios DGT clientes",
                 "Backup automático en la nube",
@@ -1195,6 +1195,27 @@ export default function LandingPage() {
                 "Actualizaciones prioritarias",
               ]}
             />
+          </div>
+
+          {/* 🏢 Feb 2026 · Mensaje de personalización para centros con varios locales */}
+          <div
+            style={{
+              marginTop: 28,
+              padding: "22px 24px",
+              background: `linear-gradient(135deg, ${C.bgCard} 0%, rgba(245,179,1,.07) 100%)`,
+              borderRadius: 14,
+              border: `1px solid ${C.gold}55`,
+              textAlign: "center",
+            }}
+          >
+            <div style={{ color: C.gold, fontWeight: 700, marginBottom: 6, fontSize: 15 }}>
+              🏢 ¿Tienes varios centros médicos?
+            </div>
+            <div style={{ color: C.text, fontSize: 14, lineHeight: 1.6, maxWidth: 720, margin: "0 auto" }}>
+              Nos adaptamos a medida. Para empresas con <b style={{ color: C.goldSoft }}>más de un local</b> ofrecemos
+              planes personalizados tanto en <b>precio</b> como en <b>soporte dedicado</b>.
+              Escríbenos a <a href="mailto:info@medicarplus.es" style={{ color: C.greenSoft }}>info@medicarplus.es</a> y te preparamos una propuesta a medida en 24 horas.
+            </div>
           </div>
 
           <div
@@ -1263,7 +1284,7 @@ export default function LandingPage() {
               },
               {
                 q: "¿Qué diferencia hay entre Standard y Premium?",
-                a: "Standard es el programa completo para 1 usuario, ideal para centros pequeños/medianos. Premium añade: hasta 3 usuarios simultáneos, envío automático de SMS/WhatsApp a clientes para recordarles renovaciones DGT (aumenta las ventas), backup en la nube automático, soporte prioritario (respuesta en 24h vs 48h) y una hora de formación gratuita.",
+                a: "Standard es el programa completo para 1 usuario, ideal para centros pequeños/medianos. Premium añade: hasta 2 usuarios simultáneos, envío automático de SMS/WhatsApp a clientes para recordarles renovaciones DGT (aumenta las ventas), backup en la nube automático, soporte prioritario (respuesta en 24h vs 48h) y una hora de formación gratuita.",
               },
               {
                 q: "¿Puedo cancelar cuando quiera?",

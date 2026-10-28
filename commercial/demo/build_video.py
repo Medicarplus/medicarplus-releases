@@ -100,6 +100,14 @@ async def record_screencast(duration_target: float, timeline):
         await page.evaluate("localStorage.clear()")
         # 1) Modo demo
         t0 = asyncio.get_event_loop().time()
+        async def close_any_modal():
+            """Cierra cualquier .modal-back abierto (y espera a que desaparezca)."""
+            try:
+                await page.evaluate("document.querySelectorAll('.modal-back').forEach(m=>m.remove())")
+                await page.wait_for_timeout(300)
+            except Exception:
+                pass
+
         async def until(label: str):
             target = marks[label]
             while asyncio.get_event_loop().time() - t0 < target:
@@ -115,24 +123,31 @@ async def record_screencast(duration_target: float, timeline):
             await page.mouse.wheel(0, -80); await page.wait_for_timeout(2500)
         except Exception: pass
 
-        # 01_csv (14.3-33.1s): abrir Importar CSV
+        # 01_csv (14.3-33.1s): abrir Importar CSV y mostrar que ya hay entradas cargadas
+        await close_any_modal()
         await until("01_csv")
         try:
+            # Primero scroll para ver las entradas del día (demostrar que YA están cargadas por CSV)
+            entries = page.locator('#entriesTable, [data-testid*="entries"], .entries').first
+            try:
+                await page.evaluate("document.querySelector('h3, h2, section')?.scrollIntoView({block:'start'})")
+            except Exception: pass
+            await page.wait_for_timeout(1500)
+            # Resaltar botón importar
             btn = page.locator('#btnImport').first
             if await btn.count():
                 await btn.scroll_into_view_if_needed()
-                await btn.hover(); await page.wait_for_timeout(900)
-                await btn.click(force=True); await page.wait_for_timeout(2000)
-                # cerrar modal si abrió
-                await page.keyboard.press("Escape"); await page.wait_for_timeout(1500)
+                await btn.hover(); await page.wait_for_timeout(2500)
+                # No abrir el picker (no se puede automatizar), solo hover prolongado
+            await page.wait_for_timeout(2000)
+            # Scroll por la lista de entradas (mostrar nombres y pagos)
+            await page.mouse.wheel(0, 350); await page.wait_for_timeout(2000)
+            await page.mouse.wheel(0, 350); await page.wait_for_timeout(2500)
+            await page.mouse.wheel(0, -700); await page.wait_for_timeout(2000)
         except Exception as e: print(f"  csv step err: {e}")
-        # recorrido por entradas del día
-        try:
-            await page.mouse.wheel(0, 300); await page.wait_for_timeout(1800)
-            await page.mouse.wheel(0, -200); await page.wait_for_timeout(1500)
-        except Exception: pass
 
         # 02_dia (34.7-54.7s): mover por entradas, hover en concepto
+        await close_any_modal()
         await until("02_dia")
         try:
             name_inp = page.locator('#t-nombre').first
@@ -159,6 +174,7 @@ async def record_screencast(duration_target: float, timeline):
         except Exception: pass
 
         # 03_stats (56.3-72.1s): abrir Estadísticas → Facturación
+        await close_any_modal()
         await until("03_stats")
         try:
             # Buscar el botón de Estadísticas en el header
@@ -180,6 +196,7 @@ async def record_screencast(duration_target: float, timeline):
         except Exception as e: print(f"  stats step err: {e}")
 
         # 04_sms (73.7-89.6s): abrir utilidades → SMS
+        await close_any_modal()
         await until("04_sms")
         try:
             await page.evaluate("""() => {
@@ -198,6 +215,7 @@ async def record_screencast(duration_target: float, timeline):
         except Exception as e: print(f"  sms step err: {e}")
 
         # 05_audit (91.2-105.1s): abrir Auditoría
+        await close_any_modal()
         await until("05_audit")
         try:
             await page.evaluate("""() => {
@@ -211,6 +229,7 @@ async def record_screencast(duration_target: float, timeline):
         except Exception as e: print(f"  audit step err: {e}")
 
         # 06_outro (106.7-112.1s): zoom al logo
+        await close_any_modal()
         await until("06_outro")
         try:
             await page.mouse.wheel(0, -2000); await page.wait_for_timeout(1500)
