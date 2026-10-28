@@ -543,6 +543,20 @@ export default function LandingPage() {
     </tbody></table>
   </div>`;
 
+  // 🎬 Feb 2026 · Vídeo demo narrado (voz Echo, 3-4 min) con recorrido completo del software.
+  //    El MP4 se sirve desde /demo/medicar_demo.mp4. Si aún no existe, el reproductor
+  //    muestra un placeholder elegante con un onError handler.
+  const MOCKUP_DEMO_VIDEO = `<div style="background:#000;border-radius:10px;overflow:hidden;position:relative">
+    <video controls preload="metadata" playsinline poster="/demo/medicar_demo_poster.jpg" style="width:100%;display:block;aspect-ratio:16/9;background:#000" onerror="(function(v){v.style.display='none';var ph=v.nextElementSibling;if(ph)ph.style.display='flex'})(this)">
+      <source src="/demo/medicar_demo.mp4" type="video/mp4">
+    </video>
+    <div style="display:none;position:absolute;inset:0;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;font-family:'Segoe UI',system-ui">
+      <div style="font-size:48px;margin-bottom:12px">🎬</div>
+      <div style="font-size:15px;font-weight:700;color:#f5b301;margin-bottom:8px">Preparando el vídeo demo…</div>
+      <div style="font-size:12px;color:#94a3b8;max-width:460px;line-height:1.6">Se está generando el recorrido narrado del software. Vuelve en unos minutos o escríbenos a <a href="mailto:info@medicarplus.es" style="color:#86efac">info@medicarplus.es</a> para una demo personalizada.</div>
+    </div>
+  </div>`;
+
   const MOCKUP_STATS = `<div style="background:#0a0f1a;border:1px solid #1e293b;border-radius:8px;padding:14px;font-family:'Segoe UI',system-ui;color:#e2e8f0;font-size:12px">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
       <div style="color:#f5b301;font-weight:700;font-size:13px">📊 Estadísticas · <span style="color:#22d3ee">MEDICAR</span></div>
@@ -1014,6 +1028,10 @@ export default function LandingPage() {
               El programa se actualiza solo. Nuevas funcionalidades, mejoras y correcciones sin que
               tengas que hacer nada.
             </Feature>
+            <Feature icon="🎬" title="Vídeo demo" mockup={MOCKUP_DEMO_VIDEO} onOpen={setOpenFeature}>
+              Recorrido narrado de 3 minutos por el software: importar CSV de la DGT, flujo del día,
+              estadísticas, SMS y auditoría. Pulsa para verlo.
+            </Feature>
           </div>
         </div>
       </section>
@@ -1141,7 +1159,6 @@ export default function LandingPage() {
               monthlyPrice={29.9}
               annualPrice={299.9}
               period={period}
-              highlighted
               apiBase={apiBase}
               packageId={period === "annual" ? "STD_ANY" : "STD_MES"}
               ctaHref={`/request-license?plan=STD&period=${period}`}
@@ -1163,6 +1180,7 @@ export default function LandingPage() {
               monthlyPrice={39.9}
               annualPrice={399.9}
               period={period}
+              highlighted
               apiBase={apiBase}
               packageId={period === "annual" ? "PREMIUM_ANY" : "PREMIUM_MES"}
               ctaHref={`/request-license?plan=PREMIUM&period=${period}`}

@@ -9,6 +9,99 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>MediCar Plus</title>
 <script>
+/* 🎬 MediCar Plus · Modo DEMO (Feb 2026) · activación por URL ?demo=1
+   Inyecta una licencia MASTER temporal + datos de ejemplo convincentes para
+   grabar el vídeo demo o enseñar el software a un cliente sin credenciales. */
+(function(){
+  try{
+    var params = new URLSearchParams(location.search);
+    if(params.get('demo') !== '1') return;
+    window.__MEDICAR_DEMO__ = true;
+    try{
+      localStorage.setItem('caja.license.v1', JSON.stringify({
+        key:'MB-MASTER-BRUGULAT-2026-OWNER', centre:'Centro Médico Demo', plan:'premium',
+        expires:Date.now()+365*86400000, type:'MASTER'
+      }));
+      localStorage.setItem('caja.install.id.v1', 'CD-DEMO-DEMO-DEMO-DEMO');
+      localStorage.setItem('caja.install.date.v1', new Date().toISOString());
+    }catch(_){}
+    try{ localStorage.setItem('caja.config.v1', JSON.stringify({configured:true,company1:{name:'Centro Médico Conductores Demo'},company2:{name:'Reconocimientos Náutica Demo'},partners:[]})); }catch(_){}
+    var _today=new Date(), _pad=function(n){return String(n).padStart(2,'0')}, _iso=function(d){return d.getFullYear()+'-'+_pad(d.getMonth()+1)+'-'+_pad(d.getDate())}, _uid=function(){return 'demo-'+Math.random().toString(36).slice(2,10)};
+    var byDate={}, groups=['Conducción','Armas','Marina','Animales peligrosos','Grúas','Deportes'];
+    var nombres=['MARC RIBA MOLINA','JOSEP SEGURANYES XUMETRA','CARMEN COMAS POU','SERGIO VEGA MARTIN','JUAN PABLO SALCEDO','TOMAS TORRE PEREZ','LAURA FONT RIBA','ANNA PUIG SALA','DAVID MARTI OLIVE','JORDI VILA PUJOL','MONTSE CASAS GRAU','PAU SOLE FERRER'];
+    var dnis=['47893221K','39214657B','77821309M','40912548N','77654201X','39012874J','44228901C','47112399T','40876234Y','77009812R','39445127V','40887614P'];
+    var conceptos=[['Renovación',43],['Renovación',43],['Renovación',43],['Expedición',55],['Duplicado',25],['Canje',38],['Prórroga',43]];
+    var fps=['E','T','T','B','E','T','X'], tasas=[0,25.60,30.90,60.80,0,0];
+    for(var i=25;i>=0;i--){
+      var d=new Date(_today.getTime()-i*86400000); if(d.getDay()===0) continue;
+      var dayKey=_iso(d), n=2+Math.floor(Math.random()*5), rows=[];
+      for(var j=0;j<n;j++){
+        var c=conceptos[Math.floor(Math.random()*conceptos.length)], g=groups[Math.floor(Math.random()*groups.length)], nmi=Math.floor(Math.random()*nombres.length), fp=fps[Math.floor(Math.random()*fps.length)], tasa=tasas[Math.floor(Math.random()*tasas.length)];
+        rows.push({id:_uid(),kind:'TRAF',_csv:Math.random()>0.3,tipo:c[0],grupo:g,nombre:nombres[nmi],dni:dnis[nmi],importe:c[1],descuento:0,tasa:tasa,fp:fp,fpTasa:fp,retorno:false});
+      }
+      if(i<5) rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:'Renovación',grupo:'Animales peligrosos',nombre:'VICTOR RUIZ TORRES',dni:'48221109D',importe:43,descuento:0,tasa:30.90,fp:'T',fpTasa:'T',retorno:false});
+      if(i===3) rows.push({id:_uid(),kind:'PRIV',tipo:'Fotos',grupo:'-',nombre:'CARMEN COMAS POU',dni:'77821309M',importe:0,descuento:0,tasa:0,fp:'E',retorno:false});
+      if(i===1) rows.push({id:_uid(),kind:'TRAF',_csv:true,tipo:'Duplicado',grupo:'Conducción',nombre:'TOMAS TORRE PEREZ',dni:'39012874J',importe:0,descuento:0,tasa:0,fp:'E',retorno:false});
+      byDate[dayKey]=rows;
+    }
+    try{ localStorage.setItem('caja.v1', JSON.stringify({byDate:byDate})); }catch(_){}
+    try{ localStorage.setItem('caja.notif.template.v1', JSON.stringify({text:'Hola {NOMBRE}, te recordamos tu reconocimiento médico para renovar el carnet. Pide cita en el Centro Médico. Gracias.',enabled:true})); }catch(_){}
+    try{ localStorage.setItem('caja.lang','es'); }catch(_){}
+    try{ localStorage.setItem('caja.aiOnboardSeen','1'); }catch(_){}
+    // 🎬 Feb 2026 · Suprimir cualquier onboarding / multi-PC prompt para la grabación
+    try{ localStorage.setItem('caja.onboard.initialSeen.v1','1'); }catch(_){}
+    try{ localStorage.setItem('caja.onboard.lang.v1','es'); }catch(_){}
+    try{ localStorage.setItem('caja.multiPc.dismissed.v1','1'); }catch(_){}
+    try{ localStorage.setItem('caja.multiPc.mode.v1','standalone'); }catch(_){}
+    try{ localStorage.setItem('caja.sync.mode.v1','standalone'); }catch(_){}
+    try{ localStorage.setItem('caja.sync.modeChosen.v1','independent'); }catch(_){}
+    try{ localStorage.setItem('caja.firstRunSeen.v1','1'); }catch(_){}
+    // Marcar config como ya rellenada para que no abra "Configuración inicial"
+    try{ localStorage.setItem('caja.config.firstRunSeen.v1','1'); }catch(_){}
+    document.addEventListener('DOMContentLoaded', function(){
+      try{
+        var b=document.createElement('div');
+        b.textContent='🎬 MODO DEMO';
+        b.style.cssText='position:fixed;top:10px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#f59e0b,#d97706);color:#0f172a;padding:6px 16px;border-radius:999px;font-family:Georgia,serif;font-size:11px;font-weight:800;letter-spacing:2px;z-index:99998;box-shadow:0 4px 14px rgba(245,158,11,.4);pointer-events:none';
+        document.body.appendChild(b);
+      }catch(_){}
+      // Cerrar cualquier modal que aparezca durante la primera carga (onboarding, multi-PC, etc.)
+      var _closeIntrusiveModals = function(){
+        try{
+          document.querySelectorAll('.modal-back').forEach(function(m){
+            if(m.querySelector('#licDemoVideo')) return;        // no cerrar el modal del vídeo demo
+            if(m.querySelector('[data-testid="demo-protect"]')) return; // ni los marcados explícitamente
+            m.remove();
+          });
+        }catch(_){}
+      };
+      setTimeout(_closeIntrusiveModals, 300);
+      setTimeout(_closeIntrusiveModals, 1200);
+      setTimeout(_closeIntrusiveModals, 2500);
+      // Red de seguridad persistente: durante los primeros 15 s, cada modal nuevo que no
+      //   sea el vídeo demo se cierra automáticamente. Al grabar, basta con lanzar los
+      //   modales que nos interesen pulsando los botones de la UI (que no pasan por aquí).
+      try{
+        var _mo = new MutationObserver(function(muts){
+          muts.forEach(function(m){
+            m.addedNodes && m.addedNodes.forEach(function(node){
+              if(!node || node.nodeType!==1) return;
+              if(node.classList && node.classList.contains('modal-back')){
+                if(node.querySelector('#licDemoVideo')) return;
+                if(node.querySelector('[data-testid="demo-protect"]')) return;
+                setTimeout(function(){ try{ node.remove(); }catch(_){} }, 50);
+              }
+            });
+          });
+        });
+        _mo.observe(document.body, {childList:true});
+        setTimeout(function(){ _mo.disconnect(); }, 15000);
+      }catch(_){}
+    });
+  }catch(e){ console.warn('[DEMO] setup fail:', e); }
+})();
+</script>
+<script>
 /* MediCar Plus · Asset URL Fix per Electron bootstrap
    Quan el bootstrap fa document.write, la pàgina queda a file://.../index.html.
    Les URLs relatives (logo, favicons) es resoldrien contra file:// i fallarien.
@@ -124,7 +217,7 @@
   .history-item:hover{background:#1a1e27}
   .history-item .date{font-weight:600}
   .history-item .totals{color:var(--muted);font-size:12px}
-  .toast{position:fixed;bottom:20px;right:20px;background:#222a35;border:1px solid var(--line);padding:12px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:99;animation:slide .25s ease}
+  .toast{position:fixed;bottom:20px;right:20px;background:#222a35;border:1px solid var(--line);padding:12px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:200000;animation:slide .25s ease}
   @keyframes slide{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
   hr.sep{border:none;border-top:1px dashed #262b36;margin:14px 0}
   .pill{padding:2px 8px;border-radius:6px;background:#202531;border:1px solid #2a3040;font-size:11px;color:var(--muted)}
@@ -1011,7 +1104,7 @@
     </style>
     <a id="btnWebsite" href="https://medicarplus.es" target="_blank" rel="noopener" title="Obrir medicarplus.es · Compte, ajuda, actualitzacions" style="background:linear-gradient(90deg,#0f172a 0%,#1e293b 100%);color:#f5b301;border:1px solid #f5b301;border-radius:6px;padding:8px 14px;font-weight:700;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:'Segoe UI',sans-serif" data-testid="btn-website">🌐 medicarplus.es</a>
     <div id="trialBadge" data-testid="trial-badge" style="display:none;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;font-family:'Segoe UI',sans-serif;font-size:12px;font-weight:700;border:1px solid;letter-spacing:.3px"></div>
-    <span id="autosaveBadge" style="display:none;padding:5px 10px;border-radius:6px;background:#1f3a2e;color:#7ee3aa;font-size:11px;font-family:'Consolas',monospace;letter-spacing:.3px;border:1px solid #2a5e44"></span>
+    <span id="autosaveBadge" style="display:none" aria-hidden="true"></span>
     <button class="btn" id="btnPrint" data-i18n="print">📥 Descargar PDF</button>
     <button class="btn" id="btnSettings" title="Configuración" style="background:linear-gradient(135deg,#334155,#1e293b);border-color:#475569;color:#e8ecf2;font-weight:700;padding:6px 12px" data-testid="btn-settings">⚙️ <span data-i18n="settings">Configuración</span></button>
     <button class="btn" id="btnLang" style="display:none" data-testid="lang-toggle"><span id="langLabel">ES</span></button>
@@ -1463,6 +1556,7 @@ async function autoSaveToFile(silent){
       // 🔄 Feb 2026 · Aunque no haya cambios, actualizamos la marca de "última comprobación"
       //   para que el panel de copia muestre siempre una fecha reciente y no "aún no".
       try{ localStorage.setItem('caja.autoBackup.last.v1', String(Date.now())); }catch(_){}
+      // Solo actualizamos el panel del menú de copias (no el badge del header).
       try{ const sp=document.getElementById('autoBackupStatus'); if(sp){ const t2=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}); sp.innerHTML='🔄 Auto-copia activa · última: '+t2; sp.style.borderLeftColor='#22c55e'; } }catch(_){}
       if(!silent)toast('✓ Sin cambios · no hace falta guardar',2000);
       return;
@@ -1483,12 +1577,9 @@ async function autoSaveToFile(silent){
   }catch(e){console.error('autoSaveFile',e);if(!silent)toast('❌ Error autoguardando: '+e.message,5000)}
 }
 function updateAutosaveBadge(name){
-  const b=$('#autosaveBadge');
-  if(b){
-    const t=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
-    b.textContent=`✓ ${name||'archivo'} · ${t}`;
-    b.style.display='inline-flex';
-  }
+  // 🔇 Feb 2026 · El badge visible junto al logo molesta en la pantalla principal.
+  //   Lo mantenemos oculto (el estado real está en el panel de copias). Solo
+  //   actualizamos el estado del panel y la marca de "última copia".
   // 🔄 Oct 2026 · Actualizar también el panel del menú de copia.
   try{
     const sp = document.getElementById('autoBackupStatus');
@@ -1506,7 +1597,8 @@ setInterval(()=>autoSaveToFile(true),5*60*1000);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)autoSaveToFile(true)});
 // Al primer arranque, verificar si hay handle. Si lo hay con permiso, forzar un
 // primer autoSave (silencioso) para que la fecha "última" aparezca de inmediato.
-(async()=>{const h=await getStoredHandle();if(h){const b=$('#autosaveBadge');if(b){b.style.display='inline-flex';b.textContent=`🔗 ${h.name}`}
+(async()=>{const h=await getStoredHandle();if(h){
+  // 🔇 Feb 2026 · No mostrar nombre del archivo en el header. Solo verificar permiso y disparar primer autoSave.
   try{
     const perm = (typeof h.queryPermission==='function') ? await h.queryPermission({mode:'readwrite'}) : 'granted';
     if(perm==='granted'){ setTimeout(()=>autoSaveToFile(true), 1500); }
@@ -9747,8 +9839,8 @@ function _buildAnnualReport(year, monthFilterIdx){
         //             pero sigue contando como Extra en la tarjeta (por ser manual).
         //     · Extra manual con concepto NO reconocido (Café/Coche/XYZ) → "Otros".
         //   Regla mental: "Otros" SOLO si no se sabe dónde ponerlo.
-        //   🐾 Feb 2026 · "animal..." (animales p./peligrosos) también es DGT.
-        const _isKnownDGT = /renov|exped|canje|canj\b|recup|period|inicial|obten|anim/.test(_catLowFlag);
+        //   🐾 Feb 2026 · "animal..." (animales p./peligrosos) + "revis..." (revisión) también es DGT.
+        const _isKnownDGT = /renov|revis|exped|canje|canj\b|recup|period|inicial|obten|anim/.test(_catLowFlag);
         let grupoLabelFinal;
         if(/foto/.test(_catLowFlag)){
           grupoLabelFinal = 'Foto';
@@ -10042,9 +10134,9 @@ function _buildAnnualReport(year, monthFilterIdx){
         if(/foto/.test(s)) return 'Fotos';
         if(/duplic/.test(s)) return 'Duplicado';
         if(/c\.?\s*ofici|certif.*ofici|\bofici/.test(s)) return 'C.Oficial';
-        // 🐾 Feb 2026 · "animales p." / "animales peligrosos" son trámites de la DGT
-        //   (como Conducción, Armas, Marina...) → van a Tráfico, no a Varios.
-        if(/renov|exped|canj|recuper|periodic|inicial|obten|anim/.test(s)) return 'Tráfico';
+        // 🐾 Feb 2026 · "animales p." / "animales peligrosos" + "revisión" (sinónimo de
+        //   renovación para animales peligrosos y otros grupos) → Tráfico, no Varios.
+        if(/renov|revis|exped|canj|recuper|periodic|inicial|obten|anim/.test(s)) return 'Tráfico';
         return 'Varios';
       };
       const catTotals = {'Tráfico':0, 'Fotos':0, 'Duplicado':0, 'C.Oficial':0, 'Varios':0};
@@ -18887,6 +18979,8 @@ document.addEventListener('keydown', function(ev){
     return window.API_BASE || 'https://project-helper-47.emergent.host';
   }
   async function initSync(){
+    // 🎬 Feb 2026 · En modo demo, no iniciar sync ni comprobar buzones de backup.
+    if(window.__MEDICAR_DEMO__) return;
     const lic = _lic(); const iid = _installId();
     const licKey = lic && (lic.license_key || lic.key);
     if(!licKey || !iid || !window.mcSync) return;
