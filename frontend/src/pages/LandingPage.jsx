@@ -93,7 +93,11 @@ const FeatureModal = ({ feature, onClose }) => {
           >✕</button>
         </div>
         <div style={{ padding: "16px 24px", color: C.textDim, fontSize: 14, lineHeight: 1.6 }}>{feature.children}</div>
-        <div style={{ padding: "0 24px 24px" }} dangerouslySetInnerHTML={{ __html: feature.mockup }} />
+        <div
+          style={{ padding: "0 24px 24px" }}
+          onClick={(e) => e.stopPropagation()}
+          dangerouslySetInnerHTML={{ __html: feature.mockup }}
+        />
         <div style={{ textAlign: "center", padding: "8px 24px 20px", color: C.textDim, fontSize: 11, fontStyle: "italic" }}>Clica en cualquier punto para cerrar · o pulsa Esc</div>
       </div>
     </div>
