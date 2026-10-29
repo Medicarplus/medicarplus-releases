@@ -1,0 +1,1455 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TramiMed Lab · Prototipo de tramitación médica</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --gold:#f5b301; --gold-dim:#d97706; --navy:#0f172a; --navy-2:#1e293b; --navy-3:#334155; }
+  html, body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+  .font-serif { font-family: 'Playfair Display', Georgia, serif; }
+  /* === OSCURO (MediCar style) === */
+  .theme-dark { background:#0a0f1a; color:#e2e8f0; }
+  .theme-dark .surface { background:#0f172a; border-color:#1e293b; }
+  .theme-dark .surface-2 { background:#0b1120; border-color:#1e293b; }
+  .theme-dark .input { background:#0b1120; border:1px solid #334155; color:#e2e8f0; }
+  .theme-dark .input:focus { border-color:var(--gold); box-shadow:0 0 0 3px rgba(245,179,1,.15); outline:none; }
+  .theme-dark .accent { color: var(--gold); }
+  .theme-dark .btn-primary { background: linear-gradient(135deg,#f5b301,#d97706); color:#0f172a; font-weight:700; }
+  .theme-dark .btn-primary:hover { filter:brightness(1.1); }
+  .theme-dark .btn-ghost { background:transparent; border:1px solid #334155; color:#e2e8f0; }
+  .theme-dark .btn-ghost:hover { background:#1e293b; }
+  .theme-dark .step-active { background: linear-gradient(135deg,#f5b301,#d97706); color:#0f172a; }
+  .theme-dark .step-done { background:#166534; color:#86efac; }
+  .theme-dark .step-pending { background:#1e293b; color:#64748b; }
+  .theme-dark .pill { background:#1e293b; color:#94a3b8; border:1px solid #334155; }
+  .theme-dark .pill-gold { background:rgba(245,179,1,.15); color:#f5b301; border:1px solid #f5b301; }
+  .theme-dark .label { color:#94a3b8; font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; }
+  .theme-dark .divider { border-color:#1e293b; }
+  .theme-dark .card-cat { background:#0f172a; border:1px solid #1e293b; }
+  .theme-dark .card-cat:hover { border-color:var(--gold); }
+  .theme-dark .card-cat-active { border-color:var(--gold); background:rgba(245,179,1,.08); }
+
+  /* === BLANCO MÉDICO (Doctolib style) === */
+  .theme-light { background:#f8fafc; color:#0f172a; }
+  .theme-light .surface { background:#ffffff; border-color:#e2e8f0; }
+  .theme-light .surface-2 { background:#f1f5f9; border-color:#e2e8f0; }
+  .theme-light .input { background:#ffffff; border:1px solid #cbd5e1; color:#0f172a; }
+  .theme-light .input:focus { border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.15); outline:none; }
+  .theme-light .accent { color: #2563eb; }
+  .theme-light .btn-primary { background: linear-gradient(135deg,#2563eb,#1d4ed8); color:#fff; font-weight:600; }
+  .theme-light .btn-primary:hover { filter:brightness(1.08); }
+  .theme-light .btn-ghost { background:#fff; border:1px solid #cbd5e1; color:#0f172a; }
+  .theme-light .btn-ghost:hover { background:#f1f5f9; }
+  .theme-light .step-active { background:#2563eb; color:#fff; }
+  .theme-light .step-done { background:#16a34a; color:#fff; }
+  .theme-light .step-pending { background:#e2e8f0; color:#64748b; }
+  .theme-light .pill { background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; }
+  .theme-light .pill-gold { background:#dbeafe; color:#1e40af; border:1px solid #2563eb; }
+  .theme-light .label { color:#64748b; font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; }
+  .theme-light .divider { border-color:#e2e8f0; }
+  .theme-light .card-cat { background:#fff; border:1px solid #e2e8f0; }
+  .theme-light .card-cat:hover { border-color:#2563eb; }
+  .theme-light .card-cat-active { border-color:#2563eb; background:#dbeafe; }
+
+  /* Signature canvas */
+  .sig-canvas { touch-action:none; cursor:crosshair; border-radius:8px; }
+  .theme-dark .sig-canvas { background:#fff; border:2px solid #334155; }
+  .theme-light .sig-canvas { background:#fff; border:2px dashed #94a3b8; }
+
+  /* Stepper line */
+  .stepper-line { position:absolute; top:50%; left:0; right:0; height:2px; transform:translateY(-50%); z-index:0; }
+  .theme-dark .stepper-line { background:#1e293b; }
+  .theme-light .stepper-line { background:#e2e8f0; }
+
+  /* Transitions */
+  .fade-in { animation:fadeIn .25s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+  /* Modern checkbox */
+  .chk { display:inline-flex; align-items:center; gap:8px; cursor:pointer; padding:6px 10px; border-radius:8px; font-size:13px; transition:background .15s; }
+  .theme-dark .chk:hover { background:#1e293b; }
+  .theme-light .chk:hover { background:#f1f5f9; }
+  .chk input { accent-color:var(--gold); width:16px; height:16px; }
+  .theme-light .chk input { accent-color:#2563eb; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width:10px; height:10px; }
+  .theme-dark ::-webkit-scrollbar-track { background:#0a0f1a; }
+  .theme-dark ::-webkit-scrollbar-thumb { background:#334155; border-radius:5px; }
+  .theme-light ::-webkit-scrollbar-track { background:#f1f5f9; }
+  .theme-light ::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:5px; }
+</style>
+</head>
+<body>
+<div x-data="app()" x-init="init()" :class="theme === 'dark' ? 'theme-dark' : 'theme-light'" class="min-h-screen">
+
+  <!-- ========== TOP BAR ========== -->
+  <header class="surface border-b sticky top-0 z-50" style="backdrop-filter:blur(12px)">
+    <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg flex items-center justify-center font-black text-lg"
+             :class="theme === 'dark' ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-slate-900' : 'bg-gradient-to-br from-blue-500 to-blue-700 text-white'">T+</div>
+        <div>
+          <div class="font-serif text-xl leading-none" :class="theme === 'dark' ? 'text-amber-400' : 'text-blue-600'">TramiMed</div>
+          <div class="text-[10px] uppercase tracking-widest opacity-60">Prototipo · Centro médico</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="pill text-[11px] px-2 py-1 rounded">v0.1 · lab</span>
+        <button @click="theme = theme === 'dark' ? 'light' : 'dark'; persist()" class="btn-ghost px-3 py-1.5 rounded-lg text-sm flex items-center gap-2">
+          <span x-text="theme === 'dark' ? '☀️' : '🌙'"></span>
+          <span x-text="theme === 'dark' ? 'Modo claro' : 'Modo oscuro'"></span>
+        </button>
+        <button @click="newRecord()" class="btn-primary px-4 py-1.5 rounded-lg text-sm">+ Nuevo expediente</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8">
+
+    <!-- ========== STEPPER ========== -->
+    <div class="mb-10">
+      <div class="relative flex justify-between items-center max-w-3xl mx-auto">
+        <div class="stepper-line"></div>
+        <template x-for="(s, i) in steps" :key="i">
+          <button @click="goStep(i)" class="relative z-10 flex flex-col items-center gap-2 group">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all"
+                 :class="i < step ? 'step-done' : (i === step ? 'step-active scale-110 shadow-lg' : 'step-pending')">
+              <span x-show="i < step">✓</span>
+              <span x-show="i >= step" x-text="i+1"></span>
+            </div>
+            <span class="text-[11px] font-semibold uppercase tracking-wider opacity-80 group-hover:opacity-100" x-text="s"></span>
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <!-- ========== STEP 1 · FILIACIÓN ========== -->
+    <section x-show="step === 0" class="fade-in">
+      <div class="grid lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 surface rounded-2xl border p-6">
+          <div class="flex items-center justify-between mb-5">
+            <div>
+              <h2 class="font-serif text-2xl accent">Filiación del cliente</h2>
+              <p class="text-sm opacity-60 mt-1">Datos personales y de contacto. Se guardan localmente.</p>
+            </div>
+            <button @click="buscarDNI()" class="btn-ghost px-3 py-1.5 rounded text-sm">🔍 Buscar DNI existente</button>
+          </div>
+
+          <div class="grid grid-cols-6 gap-4">
+            <div class="col-span-2">
+              <label class="label block mb-1">DNI / NIE</label>
+              <input class="input w-full rounded-lg px-3 py-2 font-mono" x-model="rec.dni" placeholder="12345678A" @blur="validarDNI()" />
+            </div>
+            <div class="col-span-2">
+              <label class="label block mb-1">Fecha nacimiento</label>
+              <input type="date" class="input w-full rounded-lg px-3 py-2" x-model="rec.fnac" @change="calcEdad()" />
+            </div>
+            <div>
+              <label class="label block mb-1">Edad</label>
+              <input readonly class="input w-full rounded-lg px-3 py-2 opacity-70" :value="rec.edad" />
+            </div>
+            <div>
+              <label class="label block mb-1">Sexo</label>
+              <select class="input w-full rounded-lg px-3 py-2" x-model="rec.sexo">
+                <option value="V">V</option><option value="M">M</option>
+              </select>
+            </div>
+
+            <div class="col-span-3">
+              <label class="label block mb-1">Nombre</label>
+              <input class="input w-full rounded-lg px-3 py-2" x-model="rec.nombre" placeholder="Nombre" />
+            </div>
+            <div class="col-span-3">
+              <label class="label block mb-1">Nacionalidad</label>
+              <select class="input w-full rounded-lg px-3 py-2" x-model="rec.nac">
+                <option>ESPAÑA</option><option>MARRUECOS</option><option>RUMANÍA</option><option>COLOMBIA</option><option>OTRO</option>
+              </select>
+            </div>
+
+            <div class="col-span-3">
+              <label class="label block mb-1">Primer apellido</label>
+              <input class="input w-full rounded-lg px-3 py-2" x-model="rec.ape1" />
+            </div>
+            <div class="col-span-3">
+              <label class="label block mb-1">Segundo apellido</label>
+              <input class="input w-full rounded-lg px-3 py-2" x-model="rec.ape2" />
+            </div>
+
+            <div class="col-span-6 border-t divider pt-4 mt-2">
+              <div class="label mb-3">Domicilio</div>
+            </div>
+
+            <div class="col-span-2">
+              <label class="label block mb-1">Tipo vía</label>
+              <select class="input w-full rounded-lg px-3 py-2" x-model="rec.tvia">
+                <option>CALLE</option><option>AVENIDA</option><option>CARRETERA</option><option>PLAZA</option><option>CAMINO</option><option>POLÍGONO</option>
+              </select>
+            </div>
+            <div class="col-span-4">
+              <label class="label block mb-1">Nombre vía</label>
+              <input class="input w-full rounded-lg px-3 py-2" x-model="rec.nvia" />
+            </div>
+
+            <div><label class="label block mb-1">Núm.</label><input class="input w-full rounded-lg px-3 py-2" x-model="rec.num" /></div>
+            <div><label class="label block mb-1">Blq.</label><input class="input w-full rounded-lg px-3 py-2" x-model="rec.blq" /></div>
+            <div><label class="label block mb-1">Portal</label><input class="input w-full rounded-lg px-3 py-2" x-model="rec.portal" /></div>
+            <div><label class="label block mb-1">Esc.</label><input class="input w-full rounded-lg px-3 py-2" x-model="rec.esc" /></div>
+            <div><label class="label block mb-1">Planta</label><input class="input w-full rounded-lg px-3 py-2" x-model="rec.planta" /></div>
+            <div><label class="label block mb-1">Pta.</label><input class="input w-full rounded-lg px-3 py-2" x-model="rec.pta" /></div>
+
+            <div class="col-span-2">
+              <label class="label block mb-1">Provincia</label>
+              <select class="input w-full rounded-lg px-3 py-2" x-model="rec.prov">
+                <option>BARCELONA</option><option>GIRONA</option><option>LLEIDA</option><option>TARRAGONA</option><option>MADRID</option><option>VALENCIA</option>
+              </select>
+            </div>
+            <div class="col-span-2">
+              <label class="label block mb-1">Municipio</label>
+              <input class="input w-full rounded-lg px-3 py-2" x-model="rec.muni" />
+            </div>
+            <div>
+              <label class="label block mb-1">C.P.</label>
+              <input class="input w-full rounded-lg px-3 py-2" maxlength="5" x-model="rec.cp" />
+            </div>
+            <div>
+              <label class="label block mb-1">Pueblo</label>
+              <input class="input w-full rounded-lg px-3 py-2" x-model="rec.pueblo" />
+            </div>
+
+            <div class="col-span-6 border-t divider pt-4 mt-2">
+              <div class="label mb-3">Contacto</div>
+            </div>
+
+            <div class="col-span-2">
+              <label class="label block mb-1">Teléfono</label>
+              <input class="input w-full rounded-lg px-3 py-2" x-model="rec.tel" />
+            </div>
+            <div class="col-span-2">
+              <label class="label block mb-1">Móvil</label>
+              <input class="input w-full rounded-lg px-3 py-2" x-model="rec.movil" />
+            </div>
+            <div class="col-span-2">
+              <label class="label block mb-1">Correo electrónico</label>
+              <input type="email" class="input w-full rounded-lg px-3 py-2" x-model="rec.email" />
+            </div>
+
+            <div class="col-span-6 flex flex-wrap gap-3 mt-2">
+              <label class="chk"><input type="checkbox" x-model="rec.revision"><span>Permite recordatorio revisión</span></label>
+              <label class="chk"><input type="checkbox" x-model="rec.informacion"><span>Permite envío de información</span></label>
+              <label class="chk"><input type="checkbox" x-model="rec.servicios"><span>Acepta otros servicios</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right rail: foto, firma, meta -->
+        <div class="space-y-4">
+          <div class="surface rounded-2xl border p-5">
+            <div class="label mb-2">Fotografía</div>
+            <div class="aspect-[3/4] rounded-lg flex items-center justify-center overflow-hidden"
+                 :class="theme === 'dark' ? 'bg-slate-900 border border-slate-700' : 'bg-slate-100 border border-slate-200'">
+              <template x-if="rec.foto"><img :src="rec.foto" class="w-full h-full object-cover" /></template>
+              <template x-if="!rec.foto"><span class="opacity-40 text-sm">Sin foto</span></template>
+            </div>
+            <div class="flex gap-2 mt-3">
+              <label class="btn-ghost flex-1 text-xs py-1.5 rounded cursor-pointer text-center">
+                📷 Capturar
+                <input type="file" accept="image/*" capture="user" class="hidden" @change="uploadFoto($event)" />
+              </label>
+              <label class="btn-ghost flex-1 text-xs py-1.5 rounded cursor-pointer text-center">
+                📁 Importar
+                <input type="file" accept="image/*" class="hidden" @change="uploadFoto($event)" />
+              </label>
+            </div>
+          </div>
+
+          <div class="surface rounded-2xl border p-5">
+            <div class="label mb-2">Firma del cliente</div>
+            <canvas id="sig" class="sig-canvas w-full h-32 block"
+                    @mousedown="sigStart($event)" @mousemove="sigMove($event)" @mouseup="sigEnd()" @mouseleave="sigEnd()"
+                    @touchstart="sigStart($event)" @touchmove="sigMove($event)" @touchend="sigEnd()"></canvas>
+            <div class="flex gap-2 mt-3">
+              <button @click="sigClear()" class="btn-ghost flex-1 text-xs py-1.5 rounded">🧽 Borrar</button>
+              <button @click="sigSave()" class="btn-ghost flex-1 text-xs py-1.5 rounded">💾 Guardar</button>
+            </div>
+          </div>
+
+          <div class="surface rounded-2xl border p-5 text-center">
+            <div class="label mb-2">Nº Cliente</div>
+            <div class="font-mono text-2xl font-bold accent" x-text="rec.ncli || '—'"></div>
+            <div class="text-xs opacity-60 mt-2">Sin tramitar · <span x-text="rec.pendientes || 0"></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== STEP 2 · TRÁMITE ========== -->
+    <section x-show="step === 1" class="fade-in">
+      <div class="surface rounded-2xl border p-6">
+        <h2 class="font-serif text-2xl accent mb-2">Tipo de trámite</h2>
+        <p class="text-sm opacity-60 mb-6">Elige el tipo de permiso o certificado que vas a emitir hoy.</p>
+
+        <div class="grid md:grid-cols-4 gap-3">
+          <template x-for="cat in categorias" :key="cat.id">
+            <button @click="rec.cat = cat.id" class="card-cat rounded-xl p-5 text-left transition-all"
+                    :class="rec.cat === cat.id ? 'card-cat-active shadow-lg' : ''">
+              <div class="text-3xl mb-2" x-text="cat.icon"></div>
+              <div class="font-bold text-sm" x-text="cat.name"></div>
+              <div class="text-xs opacity-60 mt-1" x-text="cat.desc"></div>
+            </button>
+          </template>
+        </div>
+
+        <div class="mt-8 grid md:grid-cols-4 gap-4" x-show="rec.cat">
+          <div>
+            <label class="label block mb-1">Motivo</label>
+            <select class="input w-full rounded-lg px-3 py-2" x-model="rec.motivo">
+              <option>Renovación</option><option>Expedición</option><option>Duplicado</option><option>Canje</option><option>Prórroga</option>
+            </select>
+          </div>
+          <div>
+            <label class="label block mb-1">Permiso solicitado</label>
+            <select class="input w-full rounded-lg px-3 py-2" x-model="rec.permiso">
+              <template x-for="p in permisosByCategoria()" :key="p"><option x-text="p"></option></template>
+            </select>
+          </div>
+          <div>
+            <label class="label block mb-1">Clase</label>
+            <input class="input w-full rounded-lg px-3 py-2" x-model="rec.clase" placeholder="B / B+E / C1 / D1..." />
+          </div>
+          <div>
+            <label class="label block mb-1">Tarifa</label>
+            <select class="input w-full rounded-lg px-3 py-2" x-model="rec.tarifa">
+              <option>Normal</option><option>Jubilado</option><option>Discapacidad</option><option>Convenio</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="label block mb-1">Importe (€)</label>
+            <input type="number" step="0.01" class="input w-full rounded-lg px-3 py-2" x-model="rec.importe" />
+          </div>
+          <div>
+            <label class="label block mb-1">Tasa DGT (€)</label>
+            <input type="number" step="0.01" class="input w-full rounded-lg px-3 py-2" x-model="rec.tasa_imp" />
+          </div>
+          <div>
+            <label class="label block mb-1">Cobrado</label>
+            <input type="number" step="0.01" class="input w-full rounded-lg px-3 py-2" x-model="rec.cobrado" />
+          </div>
+          <div>
+            <label class="label block mb-1">Método</label>
+            <select class="input w-full rounded-lg px-3 py-2" x-model="rec.metodo">
+              <option>Efectivo</option><option>Tarjeta</option><option>Bizum</option><option>Transferencia</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== STEP 3 · DATOS SALUD ========== -->
+    <section x-show="step === 2" class="fade-in">
+      <div class="surface rounded-2xl border p-6">
+        <h2 class="font-serif text-2xl accent mb-6">Datos de salud (declaración del paciente)</h2>
+
+        <div class="grid md:grid-cols-2 gap-6">
+          <div>
+            <div class="label mb-2">Km. recorridos (anual estimado)</div>
+            <div class="grid grid-cols-4 gap-2">
+              <input class="input rounded-lg px-2 py-1.5 text-sm" placeholder="Día laboral" x-model="rec.km_laboral" />
+              <input class="input rounded-lg px-2 py-1.5 text-sm" placeholder="Fin de semana" x-model="rec.km_finde" />
+              <input class="input rounded-lg px-2 py-1.5 text-sm" placeholder="% ciudad" x-model="rec.km_ciudad" />
+              <input class="input rounded-lg px-2 py-1.5 text-sm" placeholder="% carretera" x-model="rec.km_carretera" />
+            </div>
+            <div class="mt-4">
+              <label class="label block mb-1">¿En qué trabaja / profesión?</label>
+              <input class="input w-full rounded-lg px-3 py-2" x-model="rec.profesion" />
+            </div>
+          </div>
+
+          <div>
+            <div class="label mb-2">Historial de conducción</div>
+            <div class="space-y-1.5">
+              <label class="chk w-full"><input type="checkbox" x-model="rec.retirada_puntos"><span>¿Ha tenido retirada o pérdida de puntos?</span></label>
+              <label class="chk w-full"><input type="checkbox" x-model="rec.accidente_grave"><span>¿Ha sufrido accidentes graves (últimos 5 años)?</span></label>
+              <label class="chk w-full"><input type="checkbox" x-model="rec.revisiones_trabajo"><span>¿Se somete a revisiones médicas en el trabajo?</span></label>
+              <label class="chk w-full"><input type="checkbox" x-model="rec.coche_trabajo"><span>¿Utiliza el coche para trabajar o ir al trabajo?</span></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t divider mt-6 pt-6 grid md:grid-cols-2 gap-6">
+          <div>
+            <label class="chk font-semibold"><input type="checkbox" x-model="rec.padece_enfermedad"><span>¿Padece alguna enfermedad?</span></label>
+            <textarea x-show="rec.padece_enfermedad" x-model="rec.enfermedad_desc" class="input w-full rounded-lg px-3 py-2 mt-2 text-sm" rows="2" placeholder="Describir..."></textarea>
+          </div>
+          <div>
+            <label class="chk font-semibold"><input type="checkbox" x-model="rec.ingresado"><span>¿Ha estado ingresado en un hospital?</span></label>
+            <textarea x-show="rec.ingresado" x-model="rec.ingreso_desc" class="input w-full rounded-lg px-3 py-2 mt-2 text-sm" rows="2" placeholder="Motivo y fechas..."></textarea>
+          </div>
+        </div>
+
+        <div class="border-t divider mt-6 pt-6">
+          <div class="label mb-3">Antecedentes cardiovasculares</div>
+          <div class="grid md:grid-cols-4 gap-2">
+            <template x-for="ant in ['Trasplante renal','Trasplante hepático','Trasplante pulmonar','Trasplante cardiaco','Implante valvular','Marcapasos','Desfibrilador síncron.','By-pass coronario','Revascularización percután.']" :key="ant">
+              <label class="chk"><input type="checkbox" :value="ant" x-model="rec.antecedentes"><span x-text="ant"></span></label>
+            </template>
+          </div>
+        </div>
+
+        <div class="border-t divider mt-6 pt-6">
+          <div class="flex items-center justify-between mb-3">
+            <div class="label">Medicamentos / tratamientos</div>
+            <button @click="rec.meds.push({nombre:'',duracion:'',med:false,farm:false,aut:false})" class="btn-ghost text-xs px-3 py-1 rounded">+ Añadir medicación</button>
+          </div>
+          <div class="space-y-2">
+            <template x-for="(m, i) in rec.meds" :key="i">
+              <div class="grid grid-cols-12 gap-2 items-center">
+                <input class="input col-span-6 rounded px-2 py-1.5 text-sm" placeholder="Nombre medicamento" x-model="m.nombre" />
+                <input class="input col-span-2 rounded px-2 py-1.5 text-sm" placeholder="Duración (meses)" x-model="m.duracion" />
+                <label class="chk col-span-1"><input type="checkbox" x-model="m.med"><span>Méd</span></label>
+                <label class="chk col-span-1"><input type="checkbox" x-model="m.farm"><span>Farm</span></label>
+                <label class="chk col-span-1"><input type="checkbox" x-model="m.aut"><span>Aut</span></label>
+                <button class="col-span-1 text-xs opacity-60 hover:opacity-100" @click="rec.meds.splice(i,1)">✕</button>
+              </div>
+            </template>
+            <div x-show="rec.meds.length === 0" class="text-xs opacity-50 text-center py-4">No se han declarado medicaciones.</div>
+          </div>
+          <div class="grid md:grid-cols-5 gap-2 mt-4">
+            <template x-for="g in ['Antidiabéticos / Insulina','Hipotensores','Anticoagulantes (Sintrom)','Antihistamínicos','Anticonvulsionantes','Quimioterapia','Psicotrópicos','Analgésicos','Otros']" :key="g">
+              <label class="chk"><input type="checkbox" :value="g" x-model="rec.grupos_med"><span x-text="g"></span></label>
+            </template>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== STEP 4 · EXPLORACIÓN MÉDICA ========== -->
+    <section x-show="step === 3" class="fade-in">
+      <div class="surface rounded-2xl border p-6">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="font-serif text-2xl accent">Exploración</h2>
+          <div class="flex gap-1 p-1 rounded-lg surface-2 border">
+            <template x-for="t in ['Médico','Oftalmo','Psico']" :key="t">
+              <button @click="subExp = t" class="px-4 py-1.5 rounded-md text-sm font-semibold transition-all"
+                      :class="subExp === t ? (theme==='dark'?'btn-primary':'btn-primary') : 'opacity-60 hover:opacity-100'"
+                      x-text="t"></button>
+            </template>
+          </div>
+        </div>
+
+        <!-- ====== SUB-TAB MÉDICO ====== -->
+        <div x-show="subExp === 'Médico'">
+        <div class="grid md:grid-cols-2 gap-6">
+          <!-- Síntomas generales -->
+          <div>
+            <div class="label mb-3">Síntomas y antecedentes <span class="opacity-60 normal-case font-normal">(los que marque el paciente)</span></div>
+            <div class="space-y-1">
+              <template x-for="s in sintomas" :key="s">
+                <label class="chk w-full"><input type="checkbox" :value="s" x-model="rec.sintomas"><span x-text="s"></span></label>
+              </template>
+            </div>
+          </div>
+
+          <div class="space-y-6">
+            <!-- Audiometría -->
+            <div>
+              <div class="label mb-2">Audiometría (dB) · Pérdida auditiva</div>
+              <table class="w-full text-sm">
+                <thead><tr class="opacity-60 text-xs">
+                  <th class="text-left pb-1">Hz</th><th>500</th><th>1000</th><th>2000</th><th>4000</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td class="pr-2">Oído Der.</td>
+                    <td><input class="input w-14 rounded px-1 py-1 text-center text-sm" x-model="rec.audio_der[0]" /></td>
+                    <td><input class="input w-14 rounded px-1 py-1 text-center text-sm" x-model="rec.audio_der[1]" /></td>
+                    <td><input class="input w-14 rounded px-1 py-1 text-center text-sm" x-model="rec.audio_der[2]" /></td>
+                    <td><input class="input w-14 rounded px-1 py-1 text-center text-sm" x-model="rec.audio_der[3]" /></td>
+                  </tr>
+                  <tr><td class="pr-2">Oído Izq.</td>
+                    <td><input class="input w-14 rounded px-1 py-1 text-center text-sm" x-model="rec.audio_izq[0]" /></td>
+                    <td><input class="input w-14 rounded px-1 py-1 text-center text-sm" x-model="rec.audio_izq[1]" /></td>
+                    <td><input class="input w-14 rounded px-1 py-1 text-center text-sm" x-model="rec.audio_izq[2]" /></td>
+                    <td><input class="input w-14 rounded px-1 py-1 text-center text-sm" x-model="rec.audio_izq[3]" /></td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="flex gap-3 mt-2 text-xs">
+                <label class="chk"><input type="checkbox" x-model="rec.ipc35"><span>IPC &gt; 35%</span></label>
+                <label class="chk"><input type="checkbox" x-model="rec.ipc45"><span>IPC &gt; 45%</span></label>
+                <div class="flex items-center gap-1"><span class="opacity-60">IPC%</span><input class="input w-14 rounded px-1 py-1 text-center text-sm" x-model="rec.ipc_val" /></div>
+              </div>
+            </div>
+
+            <!-- Tensión + alcohol -->
+            <div>
+              <div class="label mb-2">Constantes</div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <div class="text-xs opacity-70 mb-1">Tensión arterial</div>
+                  <select class="input w-full rounded-lg px-2 py-1.5 text-sm" x-model="rec.tension_cat">
+                    <option>normal</option><option>hipertensión controlada</option><option>hipertensión no controlada</option><option>hipotensión</option>
+                  </select>
+                  <div class="flex gap-1 mt-2 items-center text-xs">
+                    <span class="opacity-60">TA</span>
+                    <input class="input w-12 rounded px-1 py-1 text-center" placeholder="SIS" x-model="rec.ta_sis" />/
+                    <input class="input w-12 rounded px-1 py-1 text-center" placeholder="DIA" x-model="rec.ta_dia" />
+                    <span class="opacity-60 ml-2">FC</span>
+                    <input class="input w-12 rounded px-1 py-1 text-center" x-model="rec.fc" />
+                  </div>
+                </div>
+                <div>
+                  <div class="text-xs opacity-70 mb-1">¿Toma alcohol?</div>
+                  <select class="input w-full rounded-lg px-2 py-1.5 text-sm" x-model="rec.alcohol">
+                    <option>nunca</option><option>en ocasiones</option><option>habitualmente</option>
+                  </select>
+                  <div class="grid grid-cols-3 gap-1 mt-2">
+                    <input class="input rounded px-1 py-1 text-xs text-center" placeholder="UBE día" x-model="rec.ube_dia" />
+                    <input class="input rounded px-1 py-1 text-xs text-center" placeholder="UBE finde" x-model="rec.ube_finde" />
+                    <input class="input rounded px-1 py-1 text-xs text-center" placeholder="UBE semana" x-model="rec.ube_sem" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Avanzado locomotor/cardio plegable -->
+        <details class="mt-6 border-t divider pt-4">
+          <summary class="label cursor-pointer select-none">+ Explorar locomotor / cardio / inspección general (opcional)</summary>
+          <div class="grid md:grid-cols-3 gap-6 mt-4">
+            <div>
+              <div class="label mb-2">Locomotor y neurológico</div>
+              <div class="space-y-1">
+                <template x-for="l in ['Limitaciones anatómicas','Amputaciones','Rigideces / Deformidades','Limitaciones funcionales','Fuerza y tono muscular','Temblores']" :key="l">
+                  <label class="chk w-full"><input type="checkbox" :value="l" x-model="rec.locomotor"><span x-text="l"></span></label>
+                </template>
+              </div>
+            </div>
+            <div>
+              <div class="label mb-2">Cardio / respiratorio</div>
+              <div class="space-y-1">
+                <template x-for="c in ['Inspección','Auscultación C/R','SAOS','Disnea','IC-NYA','Ritmo','Frecuencia','HT controlada','HT no controlada','Hipotensión']" :key="c">
+                  <label class="chk w-full"><input type="checkbox" :value="c" x-model="rec.cardio"><span x-text="c"></span></label>
+                </template>
+              </div>
+            </div>
+            <div>
+              <div class="label mb-2">Inspección general</div>
+              <div class="space-y-1">
+                <label class="chk w-full"><input type="checkbox" x-model="rec.insp_general"><span>Inspección general normal</span></label>
+                <label class="chk w-full"><input type="checkbox" x-model="rec.piel"><span>Piel y mucosas</span></label>
+              </div>
+              <div class="grid grid-cols-2 gap-2 mt-3">
+                <div><div class="text-xs opacity-60 mb-1">Talla (cm)</div><input class="input w-full rounded px-2 py-1 text-sm" x-model="rec.talla" /></div>
+                <div><div class="text-xs opacity-60 mb-1">Peso (kg)</div><input class="input w-full rounded px-2 py-1 text-sm" x-model="rec.peso" /></div>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <div class="mt-6 flex items-center justify-between border-t divider pt-6">
+          <div>
+            <div class="label mb-1">Dictamen parcial · Médico</div>
+            <select class="input rounded-lg px-3 py-2 text-sm font-bold" x-model="rec.dictamen_med">
+              <option>APTO</option><option>APTO CON RESTRICCIONES</option><option>NO APTO</option><option>PENDIENTE</option>
+            </select>
+          </div>
+          <button class="btn-ghost rounded-lg px-4 py-2 text-sm">📸 Adjuntar pruebas</button>
+        </div>
+        </div>
+
+        <!-- ====== SUB-TAB OFTALMO ====== -->
+        <div x-show="subExp === 'Oftalmo'" class="fade-in">
+          <div class="grid md:grid-cols-2 gap-6">
+            <div>
+              <div class="label mb-3">Anamnesis oftalmológica</div>
+              <div class="space-y-1">
+                <label class="chk w-full"><input type="checkbox" x-model="rec.oft_oftalmologo"><span>¿Ha ido al oftalmólogo en los últimos años?</span></label>
+                <label class="chk w-full"><input type="checkbox" x-model="rec.oft_enfermedad"><span>¿Ha tenido o tiene alguna enfermedad en los ojos?</span></label>
+                <label class="chk w-full"><input type="checkbox" x-model="rec.oft_tratamiento"><span>¿Sigue algún tratamiento para la vista?</span></label>
+                <label class="chk w-full"><input type="checkbox" x-model="rec.oft_operado"><span>¿Le han operado de la vista?</span></label>
+                <label class="chk w-full"><input type="checkbox" x-model="rec.oft_gafas"><span>¿Usa gafas o lentillas?</span></label>
+              </div>
+            </div>
+
+            <div>
+              <div class="label mb-3">Agudeza visual (/10)</div>
+              <table class="w-full text-sm">
+                <thead><tr class="opacity-60 text-xs">
+                  <th></th><th class="pb-1">Sin corrección</th><th class="pb-1">Con corrección</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td class="pr-2 font-semibold" style="color:#16a34a">OJO DERECHO</td>
+                    <td><input class="input w-full rounded px-2 py-1 text-center" placeholder="—" x-model="rec.av_od_sin" /></td>
+                    <td><input class="input w-full rounded px-2 py-1 text-center" x-model="rec.av_od_con" /></td>
+                  </tr>
+                  <tr><td class="pr-2 font-semibold" style="color:#16a34a">OJO IZQUIERDO</td>
+                    <td><input class="input w-full rounded px-2 py-1 text-center" placeholder="—" x-model="rec.av_oi_sin" /></td>
+                    <td><input class="input w-full rounded px-2 py-1 text-center" x-model="rec.av_oi_con" /></td>
+                  </tr>
+                  <tr><td class="pr-2 font-semibold" style="color:#16a34a">AMBOS OJOS</td>
+                    <td><input class="input w-full rounded px-2 py-1 text-center" placeholder="—" x-model="rec.av_ao_sin" /></td>
+                    <td><input class="input w-full rounded px-2 py-1 text-center" x-model="rec.av_ao_con" /></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-6 mt-6">
+            <div>
+              <div class="label mb-2">Pruebas visuales realizadas</div>
+              <div class="grid grid-cols-2 gap-1">
+                <template x-for="p in ['Agudeza visual','Dioptrías','Afaquias/pseudoafaquias','Cirugía refractiva','Campo central','Sens. contraste mesópica','Visión de colores','Sens. contraste fotópica']" :key="p">
+                  <label class="chk"><input type="checkbox" :value="p" x-model="rec.oft_pruebas"><span x-text="p"></span></label>
+                </template>
+              </div>
+            </div>
+            <div>
+              <div class="label mb-2">Motilidad ocular</div>
+              <div class="grid grid-cols-2 gap-1">
+                <template x-for="m in ['Estrabismos','Forias','Nistagmus','Diplopias']" :key="m">
+                  <label class="chk"><input type="checkbox" :value="m" x-model="rec.oft_motilidad"><span x-text="m"></span></label>
+                </template>
+              </div>
+              <div class="mt-3">
+                <label class="chk"><input type="checkbox" x-model="rec.oft_deslumbramiento_chk"><span>T.R. al deslumbramiento</span></label>
+                <input class="input w-24 rounded px-2 py-1 text-sm ml-2" x-show="rec.oft_deslumbramiento_chk" x-model="rec.oft_deslumbramiento_val" placeholder="seg" />
+              </div>
+            </div>
+          </div>
+
+          <details class="mt-6 border-t divider pt-4">
+            <summary class="label cursor-pointer select-none">+ Pruebas avanzadas (perimetría, PIO, fondo de ojo)</summary>
+            <div class="grid grid-cols-3 gap-1 mt-3">
+              <label class="chk"><input type="checkbox" x-model="rec.oft_perimetria"><span>Perimetría: otros meridianos</span></label>
+              <label class="chk"><input type="checkbox" x-model="rec.oft_pio"><span>Presión intraocular</span></label>
+              <label class="chk"><input type="checkbox" x-model="rec.oft_fondo"><span>Fondo de ojo</span></label>
+            </div>
+          </details>
+
+          <div class="mt-6 border-t divider pt-6">
+            <div class="label mb-1">Dictamen parcial · Oftalmo</div>
+            <select class="input rounded-lg px-3 py-2 text-sm font-bold" x-model="rec.dictamen_oft">
+              <option>APTO</option><option>APTO CON RESTRICCIONES</option><option>NO APTO</option><option>PENDIENTE</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- ====== SUB-TAB PSICO ====== -->
+        <div x-show="subExp === 'Psico'" class="fade-in">
+          <div class="grid md:grid-cols-2 gap-6">
+            <div>
+              <div class="label mb-3">Anamnesis psicológica</div>
+              <div class="space-y-1">
+                <label class="chk w-full"><input type="checkbox" x-model="rec.psi_pastillas"><span>¿Ha tomado o toma pastillas para los nervios, depresión o dormir?</span></label>
+                <label class="chk w-full"><input type="checkbox" x-model="rec.psi_tratamiento"><span>¿Ha estado en tratamiento psiquiátrico o psicológico?</span></label>
+                <label class="chk w-full"><input type="checkbox" x-model="rec.psi_inestabilidad"><span>¿Inestabilidad laboral, social o familiar?</span></label>
+                <label class="chk w-full"><input type="checkbox" x-model="rec.psi_baja"><span>¿Ha tenido alguna baja laboral prolongada?</span></label>
+              </div>
+            </div>
+
+            <div>
+              <div class="label mb-3">General</div>
+              <div class="grid grid-cols-2 gap-1">
+                <label class="chk"><input type="checkbox" x-model="rec.psi_aseo"><span>Aseo personal</span></label>
+                <label class="chk"><input type="checkbox" x-model="rec.psi_lenguaje"><span>Lenguaje</span></label>
+                <label class="chk"><input type="checkbox" x-model="rec.psi_gestos"><span>Gestos</span></label>
+                <label class="chk"><input type="checkbox" x-model="rec.psi_conducta"><span>Conducta (signos externos)</span></label>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6">
+            <div class="label mb-3">Aptitud perceptivo-motora</div>
+            <div class="grid md:grid-cols-3 gap-x-6 gap-y-2">
+              <div class="space-y-1">
+                <label class="chk"><input type="checkbox" x-model="rec.psi_apm"><span>Aptitud perceptivo motora</span></label>
+                <label class="chk"><input type="checkbox" x-model="rec.psi_atencion"><span>Atención</span></label>
+                <label class="chk"><input type="checkbox" x-model="rec.psi_velocidad"><span>Velocidad de anticipación</span></label>
+                <label class="chk"><input type="checkbox" x-model="rec.psi_coord"><span>Coordinación bimanual</span></label>
+                <label class="chk"><input type="checkbox" x-model="rec.psi_reaccion"><span>Tiempo de reacción múltiple</span></label>
+              </div>
+              <div class="space-y-1">
+                <label class="chk"><input type="checkbox" x-model="rec.psi_calidad"><span>Calidad de ejecución</span></label>
+                <label class="chk"><input type="checkbox" x-model="rec.psi_nerviosismo"><span>Nerviosismo-tranquilidad</span></label>
+                <label class="chk"><input type="checkbox" x-model="rec.psi_comprension"><span>Comprensión instrucciones</span></label>
+                <label class="chk"><input type="checkbox" x-model="rec.psi_concentracion"><span>Concentración</span></label>
+                <label class="chk"><input type="checkbox" x-model="rec.psi_ip"><span>Inteligencia práctica</span></label>
+              </div>
+              <div>
+                <div class="label mb-2">Puntuaciones reactivímetro</div>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                  <div class="flex items-center gap-1"><span class="opacity-60 w-16">PC TM</span><input class="input flex-1 rounded px-2 py-1" x-model="rec.pc_tm" /></div>
+                  <div class="flex items-center gap-1"><span class="opacity-60 w-16">PC TT</span><input class="input flex-1 rounded px-2 py-1" x-model="rec.pc_tt" /></div>
+                  <div class="flex items-center gap-1"><span class="opacity-60 w-16">PC NT</span><input class="input flex-1 rounded px-2 py-1" x-model="rec.pc_nt" /></div>
+                  <div class="flex items-center gap-1"><span class="opacity-60 w-16">PC TMR</span><input class="input flex-1 rounded px-2 py-1" x-model="rec.pc_tmr" /></div>
+                  <div class="flex items-center gap-1 col-span-2"><span class="opacity-60 w-16">PC ER</span><input class="input flex-1 rounded px-2 py-1" x-model="rec.pc_er" /></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <details class="mt-6 border-t divider pt-4">
+            <summary class="label cursor-pointer select-none">+ Trastornos mentales y de conducta (poco frecuente)</summary>
+            <div class="grid grid-cols-4 gap-2 mt-3">
+              <label class="chk"><input type="checkbox" x-model="rec.psi_psicosis"><span>Psicosis</span></label>
+              <label class="chk"><input type="checkbox" x-model="rec.psi_depresion"><span>Depresión / ansiedad</span></label>
+              <label class="chk"><input type="checkbox" x-model="rec.psi_deterioro"><span>Deterioro cognitivo</span></label>
+              <label class="chk"><input type="checkbox" x-model="rec.psi_trast_int"><span>Trastorno inteligencia</span></label>
+            </div>
+          </details>
+
+          <div class="mt-6 border-t divider pt-6">
+            <div class="label mb-1">Dictamen parcial · Psico</div>
+            <select class="input rounded-lg px-3 py-2 text-sm font-bold" x-model="rec.dictamen_psi">
+              <option>APTO</option><option>APTO CON RESTRICCIONES</option><option>NO APTO</option><option>PENDIENTE</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== STEP 5 · DICTAMEN ========== -->
+    <section x-show="step === 4" class="fade-in">
+      <div class="grid lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 surface rounded-2xl border p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="font-serif text-2xl accent">Dictamen final</h2>
+            <button @click="marcarTodoNormal()" class="btn-ghost text-xs px-3 py-1.5 rounded flex items-center gap-1">
+              ✨ Paciente sin alteraciones
+            </button>
+          </div>
+
+          <!-- Resultado grande -->
+          <div class="grid grid-cols-4 gap-2 mb-6">
+            <template x-for="opt in ['APTO','APTO C/REST.','INTERRUMPIDO','NO APTO']" :key="opt">
+              <button @click="rec.resultado = opt" class="p-4 rounded-xl border-2 font-bold text-center transition-all"
+                :class="rec.resultado === opt
+                  ? (opt === 'APTO' ? 'bg-green-500/20 border-green-500 text-green-500'
+                    : opt === 'NO APTO' ? 'bg-red-500/20 border-red-500 text-red-500'
+                    : opt === 'INTERRUMPIDO' ? 'bg-amber-500/20 border-amber-500 text-amber-500'
+                    : 'bg-blue-500/20 border-blue-500 text-blue-500')
+                  : 'opacity-50 hover:opacity-100 border-transparent surface-2'"
+                x-text="opt"></button>
+            </template>
+          </div>
+
+          <!-- Vigencia solo si APTO o APTO C/REST -->
+          <div x-show="['APTO','APTO C/REST.'].includes(rec.resultado)" class="grid grid-cols-3 gap-4 mb-6">
+            <div>
+              <label class="label block mb-1">Vigencia (años)</label>
+              <select class="input w-full rounded-lg px-3 py-2" x-model="rec.vigencia">
+                <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>10</option>
+              </select>
+            </div>
+            <div>
+              <label class="label block mb-1">O.L.R.</label>
+              <input class="input w-full rounded-lg px-3 py-2" x-model="rec.olr" placeholder="0101" />
+            </div>
+            <div>
+              <label class="label block mb-1">Nº factura</label>
+              <input class="input w-full rounded-lg px-3 py-2" x-model="rec.factura" />
+            </div>
+          </div>
+
+          <!-- Interrumpido · campos específicos -->
+          <div x-show="rec.resultado === 'INTERRUMPIDO'" class="border-l-4 border-amber-500 bg-amber-500/10 p-4 rounded-r-lg mb-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-amber-500 font-bold">⚠️ Expediente interrumpido</span>
+              <span class="opacity-60 text-xs">se podrá retomar cuando llegue el informe</span>
+            </div>
+            <textarea x-model="rec.interrumpido_motivo" class="input w-full rounded-lg px-3 py-2 text-sm" rows="2" placeholder="Motivo de la interrupción (ej.: pendiente informe especialista cardiología)"></textarea>
+            <div class="grid grid-cols-6 gap-2 mt-2">
+              <template x-for="n in 6" :key="n"><input class="input rounded px-2 py-1 text-center text-xs" :placeholder="'Código motivo '+n" x-model="rec.interrumpido_codigos[n-1]" /></template>
+            </div>
+            <div class="mt-3 flex items-center gap-3">
+              <label class="label">Fecha prevista recepción informe</label>
+              <input type="date" class="input rounded px-2 py-1" x-model="rec.fecha_informe" />
+            </div>
+          </div>
+
+          <!-- Consejo / Petición informe -->
+          <div class="grid md:grid-cols-2 gap-4 mb-6">
+            <div class="surface-2 border rounded-lg p-3">
+              <label class="chk font-semibold"><input type="checkbox" x-model="rec.consejo_chk"><span>📋 Administración de CONSEJO</span></label>
+              <textarea x-show="rec.consejo_chk" x-model="rec.consejo_text" class="input w-full rounded px-2 py-1 text-sm mt-2" rows="2" placeholder="Recomendación al paciente..."></textarea>
+            </div>
+            <div class="surface-2 border rounded-lg p-3">
+              <label class="chk font-semibold"><input type="checkbox" x-model="rec.peticion_chk"><span>📨 Petición de informe especialista</span></label>
+              <textarea x-show="rec.peticion_chk" x-model="rec.peticion_text" class="input w-full rounded px-2 py-1 text-sm mt-2" rows="2" placeholder="A qué especialista y motivo..."></textarea>
+            </div>
+          </div>
+
+          <!-- Deficiencias con búsqueda inteligente -->
+          <div class="mb-6">
+            <div class="flex items-center justify-between mb-2">
+              <label class="label">Enfermedades / Deficiencias detectadas</label>
+              <div class="flex gap-2">
+                <button @click="pickerOpen = true" class="btn-primary text-xs px-3 py-1.5 rounded flex items-center gap-1">
+                  🔍 Buscador completo (todas las familias)
+                </button>
+                <button @click="rec.deficiencias = []; rec.restricciones = []" x-show="rec.deficiencias.length || rec.restricciones.length" class="btn-ghost text-xs px-3 py-1.5 rounded">Vaciar todo</button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-7 gap-2 mb-4">
+              <template x-for="fam in familias" :key="fam.id">
+                <button @click="pickerFam = fam.id; pickerOpen = true" class="card-cat rounded-lg p-2 text-center transition-all hover:scale-105" :title="fam.name">
+                  <div class="text-2xl mb-1" x-text="fam.icon"></div>
+                  <div class="text-[10px] opacity-70" x-text="fam.name"></div>
+                </button>
+              </template>
+            </div>
+
+            <div x-show="rec.deficiencias.length" class="space-y-1 mb-4">
+              <template x-for="(d, i) in rec.deficiencias" :key="i">
+                <div class="pill flex items-center gap-2 px-3 py-2 rounded text-sm">
+                  <span class="text-base" x-text="iconForCode(d)"></span>
+                  <span class="flex-1" x-text="d"></span>
+                  <button @click="rec.deficiencias.splice(i,1)" class="opacity-60 hover:opacity-100">✕</button>
+                </div>
+              </template>
+            </div>
+            <div x-show="!rec.deficiencias.length" class="text-xs opacity-40 italic text-center py-3">
+              Sin enfermedades añadidas · 90% de los pacientes están aquí
+            </div>
+          </div>
+
+          <!-- Restricciones agrupadas en 4 cajas -->
+          <div>
+            <label class="label mb-2 block">Restricciones aplicadas</label>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <template x-for="g in restGrupos" :key="g.id">
+                <div class="surface-2 border rounded-lg p-3 min-h-[80px]">
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="label flex items-center gap-1"><span x-text="g.icon"></span><span x-text="g.name"></span></div>
+                    <button @click="pickerRestGrupo = g.id; pickerRestOpen = true" class="text-xs opacity-60 hover:opacity-100">+ Añadir</button>
+                  </div>
+                  <div class="space-y-1">
+                    <template x-for="(r, i) in filterRestByGrupo(g.id)" :key="i">
+                      <div class="pill-gold flex items-center justify-between px-2 py-1 rounded text-xs">
+                        <span x-text="r"></span>
+                        <button @click="rec.restricciones = rec.restricciones.filter(x => x !== r)" class="opacity-60 hover:opacity-100">✕</button>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Comentarios del dictamen -->
+          <div class="mt-6">
+            <label class="label block mb-1">Comentarios del dictamen (uso interno)</label>
+            <textarea x-model="rec.comentarios" class="input w-full rounded-lg px-3 py-2 text-sm" rows="2" placeholder="Observaciones del médico, aclaraciones, próxima revisión…"></textarea>
+          </div>
+        </div>
+
+        <!-- Resumen a la derecha -->
+        <aside class="surface rounded-2xl border p-5 self-start sticky top-28">
+          <div class="label mb-3">Resumen expediente</div>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between"><span class="opacity-60">Cliente</span><span class="font-semibold text-right" x-text="(rec.nombre||'—')+' '+(rec.ape1||'')"></span></div>
+            <div class="flex justify-between"><span class="opacity-60">DNI</span><span class="font-mono" x-text="rec.dni||'—'"></span></div>
+            <div class="flex justify-between"><span class="opacity-60">Permiso</span><span class="font-semibold" x-text="rec.permiso||'—'"></span></div>
+            <div class="flex justify-between"><span class="opacity-60">Motivo</span><span x-text="rec.motivo||'—'"></span></div>
+            <div class="flex justify-between"><span class="opacity-60">Clase</span><span x-text="rec.clase||'—'"></span></div>
+            <div class="flex justify-between"><span class="opacity-60">Importe</span><span class="font-mono" x-text="(rec.importe||0)+' €'"></span></div>
+            <div class="flex justify-between"><span class="opacity-60">Tasa DGT</span><span class="font-mono" x-text="(rec.tasa_imp||0)+' €'"></span></div>
+            <div class="border-t divider pt-2 mt-2 flex justify-between">
+              <span class="opacity-60">Dict. Médico</span><span x-text="rec.dictamen_med"></span>
+            </div>
+            <div class="flex justify-between"><span class="opacity-60">Dict. Oftalmo</span><span x-text="rec.dictamen_oft"></span></div>
+            <div class="flex justify-between"><span class="opacity-60">Dict. Psico</span><span x-text="rec.dictamen_psi"></span></div>
+            <div class="border-t divider pt-2 mt-2 flex justify-between items-center">
+              <span class="opacity-60">RESULTADO</span>
+              <span class="font-bold text-lg"
+                :class="rec.resultado === 'NO APTO' ? 'text-red-500' : (rec.resultado === 'INTERRUMPIDO' ? 'text-amber-500' : 'accent')"
+                x-text="rec.resultado||'—'"></span>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ========== STEP 6 · FIRMA Y PDF ========== -->
+    <section x-show="step === 5" class="fade-in">
+      <div class="surface rounded-2xl border p-6 text-center">
+        <div class="text-5xl mb-3">✍️</div>
+        <h2 class="font-serif text-2xl accent mb-3">Firma del médico y generación de PDF</h2>
+        <p class="text-sm opacity-70 max-w-xl mx-auto mb-6">
+          Al pulsar <b>Tramitar</b>, el expediente se marcará como enviado y se generará el PDF oficial.
+          En este prototipo la transmisión al DGT está <b>desactivada</b> — sólo guardado local y PDF visual.
+        </p>
+
+        <div class="max-w-md mx-auto mb-6">
+          <div class="label mb-2 text-left">Firma del médico colegiado</div>
+          <canvas id="sig2" class="sig-canvas w-full h-32 block"
+                  @mousedown="sigStart($event,'sig2')" @mousemove="sigMove($event,'sig2')" @mouseup="sigEnd()" @mouseleave="sigEnd()"
+                  @touchstart="sigStart($event,'sig2')" @touchmove="sigMove($event,'sig2')" @touchend="sigEnd()"></canvas>
+          <div class="flex gap-2 mt-3">
+            <button @click="sigClear('sig2')" class="btn-ghost flex-1 text-xs py-1.5 rounded">🧽 Borrar firma</button>
+          </div>
+        </div>
+
+        <div class="flex justify-center gap-3">
+          <button @click="generarPDF()" class="btn-ghost px-5 py-2.5 rounded-lg">📄 Previsualizar PDF</button>
+          <button @click="tramitar()" class="btn-primary px-6 py-2.5 rounded-lg">
+            <span x-text="rec.motivo === 'Expedición' ? '📤 Expedir' : '📨 Tramitar'"></span>
+          </button>
+        </div>
+
+        <div x-show="tramitado" class="mt-8 inline-block pill-gold px-5 py-3 rounded-lg font-bold">
+          ✓ Expediente guardado en memoria local · Nº <span x-text="rec.ncli"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== NAVIGATION ========== -->
+    <div class="flex justify-between items-center mt-10 max-w-3xl mx-auto">
+      <button @click="prev()" :disabled="step === 0" class="btn-ghost px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">← Anterior</button>
+      <div class="text-xs opacity-60">Paso <span x-text="step+1"></span> de <span x-text="steps.length"></span></div>
+      <button @click="next()" x-show="step < steps.length-1" class="btn-primary px-5 py-2.5 rounded-lg">Siguiente →</button>
+      <button @click="tramitar()" x-show="step === steps.length-1" class="btn-primary px-5 py-2.5 rounded-lg">Finalizar ✓</button>
+    </div>
+
+  </main>
+
+  <!-- ========== MODAL · BUSCADOR DE ENFERMEDADES Y RESTRICCIONES ========== -->
+  <div x-show="pickerOpen" @keydown.escape.window="pickerOpen=false" x-cloak
+       class="fixed inset-0 z-[100] flex items-center justify-center p-4"
+       style="background:rgba(0,0,0,.75); backdrop-filter:blur(8px)" @click="pickerOpen=false">
+    <div class="surface rounded-2xl border max-w-6xl w-full max-h-[92vh] overflow-hidden flex flex-col" @click.stop>
+      <div class="flex items-center justify-between p-5 border-b divider">
+        <div>
+          <h3 class="font-serif text-xl accent">Enfermedades y restricciones</h3>
+          <p class="text-xs opacity-60 mt-1">14 familias · ~200 códigos oficiales DGT · teclea para buscar</p>
+        </div>
+        <button @click="pickerOpen=false" class="btn-ghost rounded-lg w-9 h-9 flex items-center justify-center">✕</button>
+      </div>
+
+      <div class="p-5 border-b divider flex gap-3 items-center flex-wrap">
+        <input x-model="pickerSearch" class="input flex-1 rounded-lg px-4 py-2.5 text-sm" placeholder="🔍 Buscar: diabetes, visión, corazón, oído..." autofocus />
+        <div class="flex gap-1 overflow-x-auto">
+          <button @click="pickerFam=''" class="px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all"
+                  :class="pickerFam === '' ? 'btn-primary' : 'btn-ghost'">Todas</button>
+          <template x-for="fam in familias" :key="fam.id">
+            <button @click="pickerFam = pickerFam === fam.id ? '' : fam.id" class="px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all flex items-center gap-1"
+                    :class="pickerFam === fam.id ? 'btn-primary' : 'btn-ghost'">
+              <span x-text="fam.icon"></span><span x-text="fam.name"></span>
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <div class="grid lg:grid-cols-2 gap-0 flex-1 overflow-hidden">
+        <!-- Columna izquierda: lista de enfermedades filtrada -->
+        <div class="border-r divider overflow-auto p-4">
+          <div class="label mb-2">Enfermedades y deficiencias</div>
+          <div class="space-y-1">
+            <template x-for="code in filteredCodes()" :key="code.id">
+              <button @click="togglePickerCode(code)"
+                      class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all"
+                      :class="rec.deficiencias.some(d => d.startsWith(code.id)) ? 'pill-gold' : 'hover:surface-2'">
+                <span class="text-xl" x-text="code.icon || famIcon(code.id)"></span>
+                <div class="flex-1">
+                  <div class="text-sm font-semibold" x-text="code.name"></div>
+                  <div class="text-[10px] opacity-50 font-mono" x-text="code.id"></div>
+                </div>
+                <span x-show="rec.deficiencias.some(d => d.startsWith(code.id))" class="text-green-500">✓</span>
+              </button>
+            </template>
+            <div x-show="filteredCodes().length === 0" class="text-center opacity-40 py-10">
+              <div class="text-4xl mb-2">🔍</div>
+              <div class="text-sm">Sin resultados para "<span x-text="pickerSearch"></span>"</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Columna derecha: 4 cajas de restricciones -->
+        <div class="overflow-auto p-4">
+          <div class="label mb-2">Restricciones (sugeridas por las enfermedades seleccionadas)</div>
+          <div class="space-y-3">
+            <template x-for="g in restGrupos" :key="g.id">
+              <div class="surface-2 border rounded-lg p-3">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="font-semibold flex items-center gap-2 text-sm"><span x-text="g.icon"></span><span x-text="g.name"></span></div>
+                </div>
+                <div class="space-y-1">
+                  <template x-for="r in restricciones.filter(x => x.grupo === g.id)" :key="r.id">
+                    <button @click="togglePickerRest(r)" class="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-xs transition-all"
+                            :class="rec.restricciones.some(x => x.startsWith(r.id)) ? 'pill-gold' : 'hover:surface-2'">
+                      <span class="font-mono opacity-60 w-10" x-text="r.id"></span>
+                      <span class="flex-1" x-text="r.name"></span>
+                      <span x-show="rec.restricciones.some(x => x.startsWith(r.id))">✓</span>
+                    </button>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 border-t divider flex items-center justify-between">
+        <div class="text-xs opacity-60">
+          <span x-text="rec.deficiencias.length"></span> enfermedades ·
+          <span x-text="rec.restricciones.length"></span> restricciones
+        </div>
+        <button @click="pickerOpen=false" class="btn-primary px-5 py-2 rounded-lg text-sm">Aplicar y cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="max-w-7xl mx-auto px-6 py-6 text-center text-xs opacity-50">
+    TramiMed Lab · Prototipo visual aislado · <b>No conectado a DGT</b> · Los datos se guardan solo en este navegador.
+  </footer>
+
+</div>
+
+<script>
+function app() {
+  return {
+    theme: 'dark',
+    step: 0,
+    subExp: 'Médico',
+    tramitado: false,
+    pickerOpen: false, pickerSearch: '', pickerFam: '', pickerRestGrupo: '', pickerRestOpen: false,
+    steps: ['Filiación','Trámite','Datos salud','Exploración','Dictamen','Firma'],
+    familias: [
+      { id:'01', name:'Vista',          icon:'👁️' },
+      { id:'02', name:'Oído',           icon:'👂' },
+      { id:'03', name:'Locomotor',      icon:'🦾' },
+      { id:'04', name:'Cardio',         icon:'❤️' },
+      { id:'05', name:'Sangre',         icon:'🩸' },
+      { id:'06', name:'Renal',          icon:'🫘' },
+      { id:'07', name:'Respirat.',      icon:'🫁' },
+      { id:'08', name:'Metabólico',     icon:'🧁' },
+      { id:'09', name:'Neurol.',        icon:'🧠' },
+      { id:'10', name:'Mental',         icon:'💭' },
+      { id:'11', name:'Adicciones',     icon:'🍺' },
+      { id:'12', name:'Psicomotor',     icon:'🎯' },
+      { id:'13', name:'Otros',          icon:'📌' },
+      { id:'14', name:'Oncológico',     icon:'🎗️' },
+    ],
+    // ~50 códigos reales DGT (muestra representativa)
+    codigos: [
+      { id:'01A.1.1', name:'Agudeza visual' },
+      { id:'01B.1.2', name:'Campo visual' },
+      { id:'01C.1.3', name:'Afaquias' },
+      { id:'01D.1.4', name:'Sensibilidad al contraste' },
+      { id:'01E.1.5', name:'Motilidad palpebral' },
+      { id:'01F.1.6', name:'Motilidad del globo ocular' },
+      { id:'01G.1.7', name:'Deterioro progresivo de la capacidad visual' },
+      { id:'01H.1.8', name:'Deterioro agudo de la capacidad visual' },
+      { id:'02A.2.1', name:'Agudeza auditiva' },
+      { id:'03A.3.1', name:'Motilidad: Mano izquierda' },
+      { id:'03B.3.1', name:'Motilidad: Mano derecha' },
+      { id:'03C.3.1', name:'Motilidad: Antebrazo izquierdo' },
+      { id:'03D.3.1', name:'Motilidad: Antebrazo derecho' },
+      { id:'03E.3.1', name:'Motilidad: Brazo izquierdo' },
+      { id:'03F.3.1', name:'Motilidad: Brazo derecho' },
+      { id:'03G.3.1', name:'Motilidad: Pie izquierdo' },
+      { id:'03H.3.1', name:'Motilidad: Pie derecho' },
+      { id:'03I.3.1', name:'Motilidad: Pierna izquierda' },
+      { id:'03J.3.1', name:'Motilidad: Pierna derecha' },
+      { id:'03K.3.1', name:'Motilidad: Muslo izquierdo' },
+      { id:'03L.3.1', name:'Motilidad: Muslo derecho' },
+      { id:'03M.3.3', name:'Talla alta' },
+      { id:'03N.3.3', name:'Talla baja' },
+      { id:'03P.3.1', name:'Movilidad cervical limitada' },
+      { id:'03S.3.2', name:'Afecciones o anomalías progresivas' },
+      { id:'04A.4.1', name:'Insuficiencia cardíaca' },
+      { id:'04F.4.6', name:'Hipertensión arterial' },
+      { id:'04G.4.7', name:'Aneurismas de grandes vasos' },
+      { id:'04H.4.8', name:'Arteriopatías periféricas' },
+      { id:'04I.4.9', name:'Enfermedades venosas' },
+      { id:'04J.4.10', name:'Trasplante cardíaco' },
+      { id:'04K.4.11', name:'Cardiopatías congénitas' },
+      { id:'04L.4.12', name:'Miocardiopatías' },
+      { id:'05A.5.1', name:'Trastornos oncohematológicos' },
+      { id:'05B.5.2', name:'Trastornos no oncohematológicos' },
+      { id:'06A.6.1', name:'Nefropatías' },
+      { id:'06B.6.2', name:'Trasplante renal' },
+      { id:'07A.7.1', name:'Disneas' },
+      { id:'07B.7.2', name:'Trastornos del sueño' },
+      { id:'07C.7.3', name:'Otras enfermedad del aparato respiratorio' },
+      { id:'08A.8.1', name:'Diabetes Mellitus' },
+      { id:'08B.8.2', name:'Cuadros de hipoglucemia' },
+      { id:'08C.8.3', name:'Enfermedades Tiroideas' },
+      { id:'08D.8.4', name:'Enfermedades Paratiroideas' },
+      { id:'08E.8.5', name:'Enfermedades Adrenales' },
+      { id:'09A.9.1', name:'Enfermedades del sistema nervioso central' },
+      { id:'09B.9.2', name:'Epilepsias y crisis convulsivas de otras etiologías' },
+      { id:'09C.9.3', name:'Alteraciones del equilibrio' },
+      { id:'09D.9.4', name:'Enfermedades neuromusculares' },
+      { id:'09E.9.5', name:'Enfermedades cerebrovasculares' },
+      { id:'09F.9.6', name:'Accidentes isquémicos recurrentes' },
+      { id:'10A.10.1', name:'Delirium, demencia, trastornos amnésicos' },
+      { id:'10B.10.2', name:'Trastornos mentales debidos a enfermedad médica' },
+      { id:'10C.10.3', name:'Esquizofrenia y otros trastornos psicóticos' },
+      { id:'10D.10.4', name:'Trastornos del estado de ánimo' },
+      { id:'10E.10.5', name:'Trastornos disociativos' },
+      { id:'10F.10.6', name:'Trastornos del sueño no respiratorio' },
+      { id:'10G.10.7', name:'Trastornos del control de los impulsos' },
+      { id:'10H.10.8', name:'Trastornos de la personalidad' },
+      { id:'10I.10.9', name:'Trastornos del desarrollo intelectual' },
+      { id:'10J.10.10', name:'Trastornos por déficit de atención' },
+      { id:'10K.10.11', name:'Otros trastornos mentales no incluidos' },
+      { id:'11A.11.1', name:'Abusos de alcohol' },
+      { id:'11B.11.2', name:'Dependencia de alcohol' },
+      { id:'11C.11.3', name:'Trastornos inducidos por alcohol' },
+      { id:'11D.11.4', name:'Consumo habitual de drogas y medicamentos' },
+      { id:'11E.11.5', name:'Abuso de drogas o medicamentos' },
+      { id:'11F.11.6', name:'Dependencia de drogas y medicamentos' },
+      { id:'11G.11.7', name:'Trastornos inducidos por drogas y medicamentos' },
+      { id:'12A.12.1', name:'Estimación del movimiento' },
+      { id:'12B.12.2', name:'Coordinación visomotora' },
+      { id:'12C.12.3', name:'Tiempo de reacciones múltiples' },
+      { id:'12D.12.4', name:'Inteligencia práctica' },
+      { id:'13.13', name:'Otras causas no especificadas' },
+      { id:'14.14', name:'Procesos oncológicos no hematológicos' },
+    ],
+    restGrupos: [
+      { id:'OBL', name:'Obligatorias', icon:'⚠️' },
+      { id:'OPT', name:'Optativas',    icon:'🔧' },
+      { id:'VIG', name:'Vigencia',     icon:'⏳' },
+      { id:'VEL', name:'Velocidad',    icon:'🛑' },
+    ],
+    restricciones: [
+      // Obligatorias
+      { id:'0101', grupo:'OBL', name:'Gafas' },
+      { id:'0106', grupo:'OBL', name:'Gafas o lentes de contacto' },
+      { id:'0203', grupo:'OBL', name:'Audífono mono/binaural' },
+      { id:'20',   grupo:'OBL', name:'Vehículo con cambio automático' },
+      { id:'25',   grupo:'OBL', name:'Vehículo adaptado' },
+      // Optativas
+      { id:'0501', grupo:'OPT', name:'Control médico anual' },
+      { id:'0502', grupo:'OPT', name:'Control médico cada 6 meses' },
+      { id:'0509', grupo:'OPT', name:'Informe especialista periódico' },
+      // Vigencia
+      { id:'1041', grupo:'VIG', name:'1 año de duración' },
+      { id:'1042', grupo:'VIG', name:'2 años de duración' },
+      { id:'1043', grupo:'VIG', name:'3 años de duración' },
+      { id:'1044', grupo:'VIG', name:'4 años de duración' },
+      { id:'1045', grupo:'VIG', name:'5 años de duración' },
+      // Velocidad
+      { id:'1301', grupo:'VEL', name:'Vel. máx. autopista 90 km/h' },
+      { id:'1302', grupo:'VEL', name:'Vel. máx. autopista 100 km/h' },
+      { id:'1303', grupo:'VEL', name:'Prohibido conducir en autopista/autovía' },
+      { id:'1304', grupo:'VEL', name:'Prohibido conducción nocturna' },
+    ],
+    // Reglas de autosugerencia: enfermedad → restricciones típicas
+    sugerencias: {
+      '08A': ['1044','0501'],              // Diabetes → 4 años + control anual
+      '01A': ['0101'],                      // Agudeza visual → gafas
+      '02A': ['0203'],                      // Agudeza auditiva → audífono
+      '04A': ['1043','0501'],               // Insuf. cardíaca → 3 años + control
+      '04F': ['1044'],                      // Hipertensión → 4 años
+      '07B': ['1304'],                      // Trast. sueño → no nocturna
+      '09B': ['1041','0509'],               // Epilepsia → 1 año + informe
+    },
+    categorias: [
+      { id:'conducir', name:'Conducción', icon:'🚗', desc:'Carnet de conducir' },
+      { id:'armas',    name:'Armas',       icon:'🔫', desc:'Licencia de armas' },
+      { id:'seguridad',name:'Seguridad',   icon:'🛡️', desc:'Vigilantes privados' },
+      { id:'animales', name:'Animales Pel.',icon:'🐕', desc:'Perros potencialmente peligrosos' },
+      { id:'grua_torre',name:'Grúa Torre', icon:'🏗️', desc:'Operadores torre' },
+      { id:'grua_movil',name:'Grúa Móvil', icon:'🚜', desc:'Operadores móvil' },
+      { id:'deportes', name:'Deportes',    icon:'🏔️', desc:'Caza, buceo, etc.' },
+      { id:'marina',   name:'Marina',      icon:'⛵', desc:'Náutica recreo' },
+    ],
+    sintomas: [
+      '¿Tiene dificultad para oír?','¿Le cuesta respirar durante el ejercicio?','¿Se le olvidan las cosas fácilmente?',
+      '¿Sufre o ha sufrido mareos o vértigos?','¿Ha tenido palpitaciones o fatiga?','¿Le entra sueño con facilidad?',
+      '¿Tiene dificultad para realizar algún movimiento?','¿Ha sufrido convulsiones?','¿Ronca habitualmente?',
+      '¿Ha padecido/padece enfermedad del corazón?','¿Se ha desmayado alguna vez?','¿Tiene dificultad para dormir?',
+      '¿Ha tomado alguna substancia (porros, pastillas…) en el último año?'
+    ],
+    rec: emptyRec(),
+
+    init() {
+      // Load persisted theme + draft
+      try {
+        const s = JSON.parse(localStorage.getItem('tramimed-state')||'{}');
+        if (s.theme) this.theme = s.theme;
+        if (s.draft) this.rec = Object.assign(emptyRec(), s.draft);
+      } catch(e){}
+      this.$watch('rec', () => this.persist(), {deep:true});
+      this.$watch('step', () => { this.$nextTick(() => this.initCanvases()); });
+      this.$nextTick(() => this.initCanvases());
+    },
+    persist() {
+      try { localStorage.setItem('tramimed-state', JSON.stringify({theme:this.theme, draft:this.rec})); } catch(e){}
+    },
+    newRecord() {
+      if (!confirm('¿Crear expediente nuevo? Se perderá el borrador actual.')) return;
+      this.rec = emptyRec();
+      this.rec.ncli = String(Math.floor(10000 + Math.random()*90000));
+      this.step = 0;
+      this.tramitado = false;
+    },
+    goStep(i){ this.step = i; },
+    next(){ if (this.step < this.steps.length-1) this.step++; },
+    prev(){ if (this.step > 0) this.step--; },
+    buscarDNI(){ alert('🔍 Prototipo: aquí se abriría buscador de clientes existentes.'); },
+    validarDNI(){
+      const dni = (this.rec.dni||'').toUpperCase();
+      if (dni && !/^\d{8}[A-Z]$|^[XYZ]\d{7}[A-Z]$/.test(dni)) {
+        alert('⚠️  Formato DNI/NIE no válido');
+      }
+    },
+    calcEdad(){
+      if (!this.rec.fnac) { this.rec.edad=''; return; }
+      const d = new Date(this.rec.fnac), hoy = new Date();
+      let e = hoy.getFullYear()-d.getFullYear();
+      if (hoy.getMonth() < d.getMonth() || (hoy.getMonth()===d.getMonth() && hoy.getDate()<d.getDate())) e--;
+      this.rec.edad = e;
+    },
+    permisosByCategoria(){
+      switch(this.rec.cat){
+        case 'conducir': return ['Ordinario','Profesional','BTP','ADR','LCC'];
+        case 'armas': return ['Tipo A','Tipo B','Tipo C','Tipo D','Tipo E','Tipo F'];
+        case 'seguridad': return ['Vigilante','Escolta','Explosivos'];
+        case 'animales': return ['Perro potencialmente peligroso'];
+        case 'grua_torre': return ['Operador grúa torre'];
+        case 'grua_movil': return ['Operador grúa móvil autopropulsada'];
+        case 'deportes': return ['Caza','Buceo','Montaña','Submarinismo profesional'];
+        case 'marina': return ['Patrón navegación básica','Patrón embarcación recreo','Patrón yate','Capitán yate'];
+        default: return [];
+      }
+    },
+    addCode(tipo, val){
+      if (!val) return;
+      const list = tipo === 'def' ? this.rec.deficiencias : this.rec.restricciones;
+      if (!list.includes(val)) list.push(val);
+    },
+    marcarTodoNormal(){
+      // Rellena todos los valores "sin alteraciones" típicos de un reconocimiento normal
+      Object.assign(this.rec, {
+        dictamen_med:'APTO', dictamen_oft:'APTO', dictamen_psi:'APTO',
+        resultado:'APTO', vigencia:'10',
+        tension_cat:'normal', ta_sis:'120', ta_dia:'70', fc:'72',
+        audio_der:[20,20,20,20], audio_izq:[20,20,20,20],
+        av_od_sin:'10', av_od_con:'10', av_oi_sin:'10', av_oi_con:'10', av_ao_sin:'10', av_ao_con:'10',
+        oft_pruebas:['Agudeza visual'], oft_motilidad:[],
+        locomotor:[], cardio:[], sintomas:[], antecedentes:[], meds:[],
+        insp_general:true, piel:false,
+        psi_apm:false, psi_atencion:false, psi_velocidad:false, psi_coord:false,
+      });
+      alert('✓ Marcados valores normales. El médico ahora solo tiene que marcar lo que SÍ encuentre.');
+    },
+
+    // === Picker helpers ===
+    famIcon(codeId){
+      const fam = codeId.substring(0, 2);
+      const f = this.familias.find(x => x.id === fam);
+      return f ? f.icon : '📌';
+    },
+    iconForCode(dStr){
+      const match = dStr.match(/^(\d{2})/);
+      return match ? this.famIcon(match[1]) : '📌';
+    },
+    filteredCodes(){
+      const q = (this.pickerSearch||'').toLowerCase().trim();
+      return this.codigos.filter(c => {
+        if (this.pickerFam && !c.id.startsWith(this.pickerFam)) return false;
+        if (!q) return true;
+        return c.id.toLowerCase().includes(q) || c.name.toLowerCase().includes(q);
+      });
+    },
+    togglePickerCode(c){
+      const txt = c.id + '.' + c.name;
+      const idx = this.rec.deficiencias.findIndex(d => d.startsWith(c.id));
+      if (idx >= 0) {
+        this.rec.deficiencias.splice(idx, 1);
+      } else {
+        this.rec.deficiencias.push(txt);
+        // Auto-sugerir restricciones
+        const fam3 = c.id.substring(0, 3);
+        const sug = this.sugerencias[fam3];
+        if (sug) {
+          sug.forEach(rid => {
+            const r = this.restricciones.find(x => x.id === rid);
+            if (r && !this.rec.restricciones.some(x => x.startsWith(rid))) {
+              this.rec.restricciones.push(r.id + '.' + r.name);
+            }
+          });
+        }
+      }
+    },
+    togglePickerRest(r){
+      const txt = r.id + '.' + r.name;
+      const idx = this.rec.restricciones.findIndex(x => x.startsWith(r.id));
+      if (idx >= 0) this.rec.restricciones.splice(idx, 1);
+      else this.rec.restricciones.push(txt);
+    },
+    filterRestByGrupo(gid){
+      return this.rec.restricciones.filter(r => {
+        const match = r.match(/^(\d+)/);
+        if (!match) return false;
+        const code = match[1];
+        const rest = this.restricciones.find(x => x.id === code);
+        return rest && rest.grupo === gid;
+      });
+    },
+    uploadFoto(ev){
+      const file = ev.target.files[0]; if (!file) return;
+      const r = new FileReader();
+      r.onload = () => { this.rec.foto = r.result; };
+      r.readAsDataURL(file);
+    },
+
+    // Signature pad
+    sigCtx: {}, sigDrawing: false, sigLast:{x:0,y:0},
+    initCanvases(){
+      ['sig','sig2'].forEach(id => {
+        const c = document.getElementById(id);
+        if (c && !this.sigCtx[id]) {
+          c.width = c.offsetWidth; c.height = c.offsetHeight;
+          const ctx = c.getContext('2d');
+          ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+          this.sigCtx[id] = ctx;
+          // Load saved
+          const saved = id === 'sig' ? this.rec.firma_cli : this.rec.firma_med;
+          if (saved) { const img = new Image(); img.onload = () => ctx.drawImage(img, 0, 0, c.width, c.height); img.src = saved; }
+        }
+      });
+    },
+    _pos(ev, c){
+      const r = c.getBoundingClientRect();
+      const t = ev.touches ? ev.touches[0] : ev;
+      return {x: t.clientX - r.left, y: t.clientY - r.top};
+    },
+    sigStart(ev, id='sig'){
+      ev.preventDefault(); this.sigDrawing = true;
+      this.sigLast = this._pos(ev, document.getElementById(id));
+    },
+    sigMove(ev, id='sig'){
+      if (!this.sigDrawing) return;
+      ev.preventDefault();
+      const c = document.getElementById(id), ctx = this.sigCtx[id];
+      const p = this._pos(ev, c);
+      ctx.beginPath(); ctx.moveTo(this.sigLast.x, this.sigLast.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+      this.sigLast = p;
+    },
+    sigEnd(){ this.sigDrawing = false; },
+    sigClear(id='sig'){
+      const c = document.getElementById(id); if (!c) return;
+      this.sigCtx[id].clearRect(0, 0, c.width, c.height);
+      if (id === 'sig') this.rec.firma_cli = ''; else this.rec.firma_med = '';
+    },
+    sigSave(id='sig'){
+      const c = document.getElementById(id); if (!c) return;
+      const data = c.toDataURL('image/png');
+      if (id === 'sig') this.rec.firma_cli = data; else this.rec.firma_med = data;
+      alert('✓ Firma guardada');
+    },
+
+    generarPDF(){
+      // Preview opens in new tab as printable HTML
+      const w = window.open('', '_blank');
+      w.document.write(this.renderPDF());
+      w.document.close();
+    },
+    tramitar(){
+      // Save the signature(s)
+      ['sig','sig2'].forEach(id => {
+        const c = document.getElementById(id);
+        if (c) { const d = c.toDataURL('image/png');
+          if (id === 'sig') this.rec.firma_cli = d; else this.rec.firma_med = d; }
+      });
+      this.rec.fecha_tramitacion = new Date().toISOString();
+      // Push into local "libro de registro"
+      const libro = JSON.parse(localStorage.getItem('tramimed-libro')||'[]');
+      libro.unshift(JSON.parse(JSON.stringify(this.rec)));
+      localStorage.setItem('tramimed-libro', JSON.stringify(libro.slice(0, 500)));
+      this.tramitado = true;
+    },
+
+    renderPDF(){
+      const r = this.rec;
+      return `<!doctype html><html><head><meta charset="utf-8"><title>Informe ${r.ncli||''}</title>
+<style>
+body{font-family:Georgia,serif;max-width:800px;margin:30px auto;padding:40px;color:#0f172a;line-height:1.5}
+h1{color:#d97706;border-bottom:2px solid #d97706;padding-bottom:8px}
+.row{display:flex;gap:24px;margin:12px 0}.row>div{flex:1}
+.label{font-size:11px;text-transform:uppercase;color:#64748b;letter-spacing:.08em}
+.val{font-weight:600;font-size:15px;border-bottom:1px solid #e2e8f0;padding-bottom:2px;min-height:18px}
+.dict{background:#dbeafe;border-left:4px solid #2563eb;padding:14px;margin:20px 0;font-size:20px;font-weight:800}
+.footer{margin-top:60px;display:flex;gap:40px;align-items:end}.sig{border-top:1px solid #0f172a;padding-top:4px;flex:1;text-align:center;font-size:12px}
+img.sigimg{max-height:60px;display:block;margin:0 auto 4px}
+.print{position:fixed;top:10px;right:10px}@media print{.print{display:none}}
+</style></head><body>
+<button class="print" onclick="window.print()">🖨️ Imprimir</button>
+<h1>Informe de aptitud psicofísica</h1>
+<div class="row"><div><div class="label">Nº expediente</div><div class="val">${r.ncli||''}</div></div>
+<div><div class="label">Fecha</div><div class="val">${new Date().toLocaleDateString('es-ES')}</div></div>
+<div><div class="label">Tipo</div><div class="val">${r.motivo||''} · ${r.permiso||''}</div></div></div>
+<div class="row"><div><div class="label">Cliente</div><div class="val">${r.nombre||''} ${r.ape1||''} ${r.ape2||''}</div></div>
+<div><div class="label">DNI</div><div class="val">${r.dni||''}</div></div>
+<div><div class="label">F. nacimiento</div><div class="val">${r.fnac||''}</div></div></div>
+<div class="row"><div><div class="label">Domicilio</div><div class="val">${r.tvia||''} ${r.nvia||''} ${r.num||''}, ${r.cp||''} ${r.muni||''} (${r.prov||''})</div></div></div>
+<div class="dict">DICTAMEN: ${r.resultado||'PENDIENTE'} ${r.vigencia?'· Vigencia '+r.vigencia+' años':''}</div>
+<div class="row"><div><div class="label">Deficiencias</div><div class="val">${(r.deficiencias||[]).join('; ')||'—'}</div></div></div>
+<div class="row"><div><div class="label">Restricciones</div><div class="val">${(r.restricciones||[]).join('; ')||'—'}</div></div></div>
+<div class="footer">
+<div class="sig">${r.firma_cli?'<img class="sigimg" src="'+r.firma_cli+'">':''}Firma del cliente</div>
+<div class="sig">${r.firma_med?'<img class="sigimg" src="'+r.firma_med+'">':''}Firma del médico colegiado</div>
+</div></body></html>`;
+    }
+  };
+}
+
+function emptyRec(){
+  return {
+    ncli:'', dni:'', fnac:'', edad:'', sexo:'V', nombre:'', ape1:'', ape2:'', nac:'ESPAÑA',
+    tvia:'CALLE', nvia:'', num:'', blq:'', portal:'', esc:'', planta:'', pta:'',
+    prov:'BARCELONA', muni:'', cp:'', pueblo:'',
+    tel:'', movil:'', email:'',
+    revision:true, informacion:true, servicios:false,
+    foto:'', firma_cli:'', firma_med:'',
+    cat:'', motivo:'Renovación', permiso:'', clase:'', tarifa:'Normal',
+    importe:0, tasa_imp:0, cobrado:0, metodo:'Efectivo',
+    km_laboral:'', km_finde:'', km_ciudad:'', km_carretera:'', profesion:'',
+    retirada_puntos:false, accidente_grave:false, revisiones_trabajo:false, coche_trabajo:false,
+    padece_enfermedad:false, enfermedad_desc:'', ingresado:false, ingreso_desc:'',
+    antecedentes:[], meds:[], grupos_med:[],
+    sintomas:[], audio_der:[20,20,20,20], audio_izq:[20,20,20,20],
+    ipc35:false, ipc45:false, ipc_val:'',
+    tension_cat:'normal', ta_sis:'120', ta_dia:'70', fc:'72',
+    alcohol:'nunca', ube_dia:0, ube_finde:0, ube_sem:0,
+    locomotor:[], cardio:[], insp_general:true, piel:false, talla:'', peso:'',
+    dictamen_parcial:'APTO', dictamen_med:'APTO', dictamen_oft:'APTO', dictamen_psi:'APTO',
+    resultado:'APTO', vigencia:'10',
+    // Oftalmo
+    oft_oftalmologo:false, oft_enfermedad:false, oft_tratamiento:false, oft_operado:false, oft_gafas:false,
+    av_od_sin:'', av_od_con:'', av_oi_sin:'', av_oi_con:'', av_ao_sin:'', av_ao_con:'',
+    oft_pruebas:[], oft_motilidad:[], oft_deslumbramiento_chk:false, oft_deslumbramiento_val:'',
+    oft_perimetria:false, oft_pio:false, oft_fondo:false,
+    // Psico
+    psi_pastillas:false, psi_tratamiento:false, psi_inestabilidad:false, psi_baja:false,
+    psi_aseo:false, psi_lenguaje:false, psi_gestos:false, psi_conducta:false,
+    psi_apm:false, psi_atencion:false, psi_velocidad:false, psi_coord:false, psi_reaccion:false,
+    psi_calidad:false, psi_nerviosismo:false, psi_comprension:false, psi_concentracion:false, psi_ip:false,
+    pc_tm:'', pc_tt:'', pc_nt:'', pc_tmr:'', pc_er:'',
+    psi_psicosis:false, psi_depresion:false, psi_deterioro:false, psi_trast_int:false,
+    // Dictamen
+    deficiencias:[], restricciones:[], olr:'', factura:'',
+    interrumpido_motivo:'', interrumpido_codigos:['','','','','',''], fecha_informe:'',
+    consejo_chk:false, consejo_text:'', peticion_chk:false, peticion_text:'',
+    comentarios:'',
+    fecha_tramitacion:'', pendientes:0
+  };
+}
+</script>
+</body>
+</html>
