@@ -551,7 +551,7 @@ export default function LandingPage() {
   //    El MP4 se sirve desde /demo/medicar_demo.mp4. Si aún no existe, el reproductor
   //    muestra un placeholder elegante con un onError handler.
   const MOCKUP_DEMO_VIDEO = `<div style="background:#000;border-radius:10px;overflow:hidden;position:relative">
-    <video controls preload="metadata" playsinline poster="/demo/medicar_demo_poster.jpg" style="width:100%;display:block;aspect-ratio:16/9;background:#000" onerror="(function(v){v.style.display='none';var ph=v.nextElementSibling;if(ph)ph.style.display='flex'})(this)">
+    <video controls preload="metadata" playsinline webkit-playsinline="true" x5-playsinline="true" x5-video-player-type="h5-page" poster="/demo/medicar_demo_poster.jpg" style="width:100%;display:block;aspect-ratio:16/9;background:#000" onerror="(function(v){v.style.display='none';var ph=v.nextElementSibling;if(ph)ph.style.display='flex'})(this)">
       <source src="/demo/medicar_demo.mp4" type="video/mp4">
     </video>
     <div style="display:none;position:absolute;inset:0;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;font-family:'Segoe UI',system-ui">
