@@ -19,7 +19,14 @@ on:
       - 'commercial/electron/**'
       - 'frontend/public/**'
       - '.github/workflows/release.yml'
+    tags:
+      - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versión a publicar (ej: 2.3.1)'
+        required: false
+        default: ''
 
 concurrency:
   group: release-${{ github.ref }}
