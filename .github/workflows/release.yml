@@ -14,7 +14,7 @@ name: Build & Publish MediCar Plus (Windows)
 on:
   push:
     branches:
-      - main
+      - '**'          # cualquier rama (main, emergent-main, master, etc.)
     paths:
       - 'commercial/electron/**'
       - 'frontend/public/**'
@@ -88,7 +88,7 @@ jobs:
           git add commercial/electron/package.json
           git commit -m "chore(release): v$NEW [skip ci]" || echo "No changes"
           git tag -a "v$NEW" -m "Release v$NEW"
-          git push origin main --follow-tags
+          git push origin HEAD --follow-tags
           echo "new_version=$NEW" >> $GITHUB_OUTPUT
           echo "skip=false" >> $GITHUB_OUTPUT
 
@@ -110,8 +110,6 @@ jobs:
     steps:
       - name: Checkout repository (with bump commit)
         uses: actions/checkout@v4
-        with:
-          ref: main
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
