@@ -36,26 +36,34 @@
   .theme-dark .card-cat-active { border-color:var(--gold); background:rgba(245,179,1,.08); }
 
   /* === BLANCO MÉDICO (Doctolib style) === */
-  .theme-light { background:#f8fafc; color:#0f172a; }
-  .theme-light .surface { background:#ffffff; border-color:#e2e8f0; }
-  .theme-light .surface-2 { background:#f1f5f9; border-color:#e2e8f0; }
-  .theme-light .input { background:#ffffff; border:1px solid #cbd5e1; color:#0f172a; }
-  .theme-light .input:focus { border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.15); outline:none; }
-  .theme-light .accent { color: #2563eb; }
-  .theme-light .btn-primary { background: linear-gradient(135deg,#2563eb,#1d4ed8); color:#fff; font-weight:600; }
+  .theme-light { background:#f6f8fb; color:#0f172a; }
+  .theme-light .surface { background:#ffffff; border-color:#e5eaf2; }
+  .theme-light .surface-2 { background:#f1f4fa; border-color:#e5eaf2; }
+  .theme-light .input { background:#ffffff; border:1px solid #d4dbe6; color:#0f172a; }
+  .theme-light .input:focus { border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.15); outline:none; }
+  .theme-light .accent { color: #0369a1; }
+  .theme-light .btn-primary { background: linear-gradient(135deg,#0ea5e9,#0369a1); color:#fff; font-weight:600; box-shadow:0 1px 3px rgba(14,165,233,.4); }
   .theme-light .btn-primary:hover { filter:brightness(1.08); }
-  .theme-light .btn-ghost { background:#fff; border:1px solid #cbd5e1; color:#0f172a; }
-  .theme-light .btn-ghost:hover { background:#f1f5f9; }
-  .theme-light .step-active { background:#2563eb; color:#fff; }
-  .theme-light .step-done { background:#16a34a; color:#fff; }
-  .theme-light .step-pending { background:#e2e8f0; color:#64748b; }
-  .theme-light .pill { background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; }
-  .theme-light .pill-gold { background:#dbeafe; color:#1e40af; border:1px solid #2563eb; }
+  .theme-light .btn-ghost { background:#fff; border:1px solid #d4dbe6; color:#0f172a; }
+  .theme-light .btn-ghost:hover { background:#f1f4fa; }
+  .theme-light .step-active { background:#0ea5e9; color:#fff; }
+  .theme-light .step-done { background:#10b981; color:#fff; }
+  .theme-light .step-pending { background:#e5eaf2; color:#64748b; }
+  .theme-light .pill { background:#f1f4fa; color:#475569; border:1px solid #e5eaf2; }
+  .theme-light .pill-gold { background:#e0f2fe; color:#0369a1; border:1px solid #0ea5e9; }
   .theme-light .label { color:#64748b; font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; }
-  .theme-light .divider { border-color:#e2e8f0; }
-  .theme-light .card-cat { background:#fff; border:1px solid #e2e8f0; }
-  .theme-light .card-cat:hover { border-color:#2563eb; }
-  .theme-light .card-cat-active { border-color:#2563eb; background:#dbeafe; }
+  .theme-light .divider { border-color:#e5eaf2; }
+  .theme-light .card-cat { background:#fff; border:1px solid #e5eaf2; }
+  .theme-light .card-cat:hover { border-color:#0ea5e9; box-shadow:0 4px 12px rgba(14,165,233,.1); }
+  .theme-light .card-cat-active { border-color:#0ea5e9; background:#e0f2fe; }
+  .theme-light .tab-active { background:linear-gradient(135deg,#0ea5e9,#0369a1); color:#fff; }
+  .theme-light .tab-inactive { background:#fff; color:#334155; }
+  .theme-light .tab-hover { background:#f1f4fa; }
+
+  /* Tab styling dark */
+  .theme-dark .tab-active { background:linear-gradient(135deg,#f5b301,#d97706); color:#0f172a; }
+  .theme-dark .tab-inactive { background:#0f172a; color:#cbd5e1; }
+  .theme-dark .tab-hover { background:#1e293b; }
 
   /* Signature canvas */
   .sig-canvas { touch-action:none; cursor:crosshair; border-radius:8px; }
@@ -113,18 +121,25 @@
 
   <main class="max-w-7xl mx-auto px-6 py-8">
 
-    <!-- ========== STEPPER ========== -->
-    <div class="mb-10">
-      <div class="relative flex justify-between items-center max-w-3xl mx-auto">
-        <div class="stepper-line"></div>
+    <!-- ========== TABS NAVIGATION (siempre accesibles, como GIC) ========== -->
+    <div class="mb-6 surface rounded-2xl border overflow-hidden shadow-sm">
+      <div class="flex overflow-x-auto">
         <template x-for="(s, i) in steps" :key="i">
-          <button @click="goStep(i)" class="relative z-10 flex flex-col items-center gap-2 group">
-            <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all"
-                 :class="i < step ? 'step-done' : (i === step ? 'step-active scale-110 shadow-lg' : 'step-pending')">
-              <span x-show="i < step">✓</span>
-              <span x-show="i >= step" x-text="i+1"></span>
+          <button @click="step = i"
+                  class="relative flex-1 min-w-[140px] px-5 py-4 text-left transition-all border-r divider last:border-r-0"
+                  :class="step === i ? 'tab-active' : 'tab-inactive hover:tab-hover'">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                   :class="step === i ? 'bg-white/20 text-white'
+                           : (hasData(i) ? 'bg-emerald-500 text-white' : 'surface-2 opacity-60')">
+                <span x-show="!hasData(i) || step === i" x-text="i+1"></span>
+                <span x-show="hasData(i) && step !== i">✓</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-[10px] uppercase tracking-wider opacity-70 font-semibold">Paso <span x-text="i+1"></span></div>
+                <div class="text-sm font-bold truncate" x-text="s"></div>
+              </div>
             </div>
-            <span class="text-[11px] font-semibold uppercase tracking-wider opacity-80 group-hover:opacity-100" x-text="s"></span>
           </button>
         </template>
       </div>
@@ -913,12 +928,19 @@
       </div>
     </section>
 
-    <!-- ========== NAVIGATION ========== -->
-    <div class="flex justify-between items-center mt-10 max-w-3xl mx-auto">
-      <button @click="prev()" :disabled="step === 0" class="btn-ghost px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">← Anterior</button>
-      <div class="text-xs opacity-60">Paso <span x-text="step+1"></span> de <span x-text="steps.length"></span></div>
-      <button @click="next()" x-show="step < steps.length-1" class="btn-primary px-5 py-2.5 rounded-lg">Siguiente →</button>
-      <button @click="tramitar()" x-show="step === steps.length-1" class="btn-primary px-5 py-2.5 rounded-lg">Finalizar ✓</button>
+    <!-- ========== BOTTOM BAR · ACCIONES RÁPIDAS ========== -->
+    <div class="flex items-center justify-between mt-10 surface rounded-2xl border p-4 shadow-sm">
+      <div class="flex gap-2">
+        <button @click="prev()" :disabled="step === 0" class="btn-ghost px-4 py-2 rounded-lg text-sm disabled:opacity-30">← Anterior</button>
+        <button @click="next()" :disabled="step === steps.length-1" class="btn-ghost px-4 py-2 rounded-lg text-sm disabled:opacity-30">Siguiente →</button>
+      </div>
+      <div class="text-xs opacity-60">Puedes saltar libremente a cualquier pestaña · Autoguardado activo</div>
+      <div class="flex gap-2">
+        <button @click="generarPDF()" class="btn-ghost px-4 py-2 rounded-lg text-sm">📄 Previsualizar PDF</button>
+        <button @click="tramitar()" class="btn-primary px-5 py-2 rounded-lg text-sm">
+          <span x-text="rec.motivo === 'Expedición' ? '📤 Expedir' : '📨 Tramitar'"></span>
+        </button>
+      </div>
     </div>
 
   </main>
@@ -1018,7 +1040,7 @@
 <script>
 function app() {
   return {
-    theme: 'dark',
+    theme: 'light',
     step: 0,
     subExp: 'Médico',
     tramitado: false,
@@ -1040,11 +1062,23 @@ function app() {
       { id:'13', name:'Otros',          icon:'📌' },
       { id:'14', name:'Oncológico',     icon:'🎗️' },
     ],
-    // ~50 códigos reales DGT (muestra representativa)
+    // ~70 códigos con sub-códigos reales DGT (expandibles)
     codigos: [
-      { id:'01A.1.1', name:'Agudeza visual' },
+      { id:'01A.1.1', name:'Agudeza visual', subs:[
+        { id:'01A0', name:'Agudeza visual binocular ≥ 0,5 con o sin lentes correctoras' },
+        { id:'01A1', name:'Visión monocular con agudeza ≥ 0,5' },
+        { id:'01A2', name:'Cirugía refractiva (distinta de afaquia) entre un mes y un año' },
+        { id:'01A3', name:'Cirugía refractiva tras un año' },
+        { id:'01A4', name:'Cirugía refractiva tras menos de un mes' },
+        { id:'11A1', name:'Visión monocular con agudeza menor de 0,5' },
+        { id:'21A0', name:'Agudeza visual binocular menor de 0,5' },
+        { id:'31A1', name:'Visión monocular menor de 6 meses' },
+      ]},
       { id:'01B.1.2', name:'Campo visual' },
-      { id:'01C.1.3', name:'Afaquias' },
+      { id:'01C.1.3', name:'Afaquias', subs:[
+        { id:'01C1', name:'Afaquia o pseudoafaquia transcurrido un mes de establecidas' },
+        { id:'01C2', name:'Afaquia o pseudoafaquia transcurrido menos de un mes' },
+      ]},
       { id:'01D.1.4', name:'Sensibilidad al contraste' },
       { id:'01E.1.5', name:'Motilidad palpebral' },
       { id:'01F.1.6', name:'Motilidad del globo ocular' },
@@ -1068,7 +1102,26 @@ function app() {
       { id:'03P.3.1', name:'Movilidad cervical limitada' },
       { id:'03S.3.2', name:'Afecciones o anomalías progresivas' },
       { id:'04A.4.1', name:'Insuficiencia cardíaca' },
-      { id:'04F.4.6', name:'Hipertensión arterial' },
+      { id:'04B.4.2', name:'Trastornos del ritmo' },
+      { id:'04C.4.3', name:'Marcapasos y Desfibrilador A.I y otros dispositivos' },
+      { id:'04D.4.4', name:'Patología valvular' },
+      { id:'04E.4.5', name:'Enfermedad arterial coronaria', subs:[
+        { id:'44E2', name:'Cirugía de revascularización o revascularización percután.' },
+        { id:'54E1', name:'Síndrome coronario agudo superado el primer año con informe favorable del cardiólogo' },
+        { id:'54E2', name:'Angina en tratamiento en ausencia de síntomas' },
+        { id:'54E3', name:'Transcurrido el primer año de la cirugía de revasc.' },
+        { id:'54E4', name:'Transcurrida 1 semana de la Intervención percutánea' },
+        { id:'54E9', name:'Transcurridas al menos 3 semanas del Síndrome coronario agudo' },
+        { id:'54E0', name:'Síndrome coronario agudo sin superar tiempo' },
+        { id:'64E1', name:'Angina que origina sintomatología correspondiente' },
+        { id:'64E2', name:'Intervención revascularización coronaria o percutánea' },
+        { id:'64E3', name:'Cirugía de revascularización coronaria habiendo' },
+        { id:'64E4', name:'Cirugía de revascularización coronaria habiendo' },
+      ]},
+      { id:'04F.4.6', name:'Hipertensión arterial', subs:[
+        { id:'04F1', name:'Hipertensión arterial maligna asociada a daño irreversible' },
+        { id:'04F3', name:'Hipertensión arterial maligna controlada con informe' },
+      ]},
       { id:'04G.4.7', name:'Aneurismas de grandes vasos' },
       { id:'04H.4.8', name:'Arteriopatías periféricas' },
       { id:'04I.4.9', name:'Enfermedades venosas' },
@@ -1104,7 +1157,7 @@ function app() {
       { id:'10I.10.9', name:'Trastornos del desarrollo intelectual' },
       { id:'10J.10.10', name:'Trastornos por déficit de atención' },
       { id:'10K.10.11', name:'Otros trastornos mentales no incluidos' },
-      { id:'11A.11.1', name:'Abusos de alcohol' },
+      { id:'11A.11.1', name:'Abusos de Alcohol' },
       { id:'11B.11.2', name:'Dependencia de alcohol' },
       { id:'11C.11.3', name:'Trastornos inducidos por alcohol' },
       { id:'11D.11.4', name:'Consumo habitual de drogas y medicamentos' },
@@ -1115,7 +1168,10 @@ function app() {
       { id:'12B.12.2', name:'Coordinación visomotora' },
       { id:'12C.12.3', name:'Tiempo de reacciones múltiples' },
       { id:'12D.12.4', name:'Inteligencia práctica' },
-      { id:'13.13', name:'Otras causas no especificadas' },
+      { id:'13.13', name:'Otras causas no especificadas', subs:[
+        { id:'13A', name:'Otras causas no especificadas, no apto para la conducción' },
+        { id:'13A1', name:'Otras causas no especificadas' },
+      ]},
       { id:'14.14', name:'Procesos oncológicos no hematológicos' },
     ],
     restGrupos: [
@@ -1126,26 +1182,38 @@ function app() {
     ],
     restricciones: [
       // Obligatorias
-      { id:'0101', grupo:'OBL', name:'Gafas' },
-      { id:'0106', grupo:'OBL', name:'Gafas o lentes de contacto' },
-      { id:'0203', grupo:'OBL', name:'Audífono mono/binaural' },
-      { id:'20',   grupo:'OBL', name:'Vehículo con cambio automático' },
-      { id:'25',   grupo:'OBL', name:'Vehículo adaptado' },
+      { id:'0101', grupo:'OBL', name:'Gafas', ligaA:['01A','01C'] },
+      { id:'0102', grupo:'OBL', name:'Lente o lentes de contacto', ligaA:['01A','01C'] },
+      { id:'0105', grupo:'OBL', name:'Recubrimiento del ojo', ligaA:['01E','01F'] },
+      { id:'0106', grupo:'OBL', name:'Gafas o lentes de contacto', ligaA:['01A','01C'] },
+      { id:'0203', grupo:'OBL', name:'Audífono mono/binaural', ligaA:['02A'] },
+      { id:'20',   grupo:'OBL', name:'Vehículo con cambio automático', ligaA:['03'] },
+      { id:'25',   grupo:'OBL', name:'Vehículo adaptado', ligaA:['03'] },
       // Optativas
-      { id:'0501', grupo:'OPT', name:'Control médico anual' },
-      { id:'0502', grupo:'OPT', name:'Control médico cada 6 meses' },
-      { id:'0509', grupo:'OPT', name:'Informe especialista periódico' },
+      { id:'0002', grupo:'OPT', name:'Prótesis auditiva/ayuda a la comunicación', ligaA:['02A'] },
+      { id:'0501', grupo:'OPT', name:'Control médico anual', ligaA:['04','05','06','08','09','10'] },
+      { id:'0502', grupo:'OPT', name:'Control médico cada 6 meses', ligaA:['04','08','09'] },
+      { id:'0509', grupo:'OPT', name:'Informe especialista periódico', ligaA:['04','09','10'] },
+      { id:'0061', grupo:'OPT', name:'Limitación a conducción diurna', ligaA:['01','07','09'] },
+      { id:'0062_05', grupo:'OPT', name:'Limitación a 5 km del domicilio', ligaA:['04','09','10'] },
+      { id:'0062_10', grupo:'OPT', name:'Limitación a 10 km del domicilio', ligaA:['04','09','10'] },
+      { id:'0062_15', grupo:'OPT', name:'Limitación a 15 km del domicilio', ligaA:['04','09','10'] },
+      { id:'0062_20', grupo:'OPT', name:'Limitación a 20 km del domicilio', ligaA:['04','09','10'] },
+      { id:'0062_25', grupo:'OPT', name:'Limitación a 25 km del domicilio', ligaA:['04','09','10'] },
       // Vigencia
-      { id:'1041', grupo:'VIG', name:'1 año de duración' },
-      { id:'1042', grupo:'VIG', name:'2 años de duración' },
-      { id:'1043', grupo:'VIG', name:'3 años de duración' },
-      { id:'1044', grupo:'VIG', name:'4 años de duración' },
-      { id:'1045', grupo:'VIG', name:'5 años de duración' },
+      { id:'1041', grupo:'VIG', name:'Un año de duración' },
+      { id:'1042', grupo:'VIG', name:'Dos años de duración' },
+      { id:'1043', grupo:'VIG', name:'Tres años de duración' },
+      { id:'1044', grupo:'VIG', name:'Cuatro años de duración' },
+      { id:'1045', grupo:'VIG', name:'Cinco años de duración' },
+      { id:'1046', grupo:'VIG', name:'Seis años de duración' },
+      { id:'1047', grupo:'VIG', name:'Siete años de duración' },
+      { id:'1048', grupo:'VIG', name:'Ocho años de duración' },
       // Velocidad
-      { id:'1301', grupo:'VEL', name:'Vel. máx. autopista 90 km/h' },
-      { id:'1302', grupo:'VEL', name:'Vel. máx. autopista 100 km/h' },
-      { id:'1303', grupo:'VEL', name:'Prohibido conducir en autopista/autovía' },
-      { id:'1304', grupo:'VEL', name:'Prohibido conducción nocturna' },
+      { id:'0064_50',  grupo:'VEL', name:'Vel. máx. 50 km/h · limitación', ligaA:['09','10','11'] },
+      { id:'0064_60',  grupo:'VEL', name:'Vel. máx. 60 km/h · limitación', ligaA:['09','10','11'] },
+      { id:'0064_70',  grupo:'VEL', name:'Vel. máx. 70 km/h · limitación', ligaA:['09','10','11'] },
+      { id:'0064_100', grupo:'VEL', name:'Vel. máx. 100 km/h · limitación', ligaA:['04','09'] },
     ],
     // Reglas de autosugerencia: enfermedad → restricciones típicas
     sugerencias: {
@@ -1157,6 +1225,7 @@ function app() {
       '07B': ['1304'],                      // Trast. sueño → no nocturna
       '09B': ['1041','0509'],               // Epilepsia → 1 año + informe
     },
+    expandedCodes: [],
     categorias: [
       { id:'conducir', name:'Conducción', icon:'🚗', desc:'Carnet de conducir' },
       { id:'armas',    name:'Armas',       icon:'🔫', desc:'Licencia de armas' },
@@ -1198,6 +1267,18 @@ function app() {
       this.tramitado = false;
     },
     goStep(i){ this.step = i; },
+    hasData(i){
+      const r = this.rec;
+      switch(i){
+        case 0: return !!(r.dni || r.nombre || r.ape1);
+        case 1: return !!r.cat;
+        case 2: return !!(r.profesion || r.km_laboral || r.padece_enfermedad || r.meds.length);
+        case 3: return !!(r.ta_sis !== '120' || r.sintomas.length || r.locomotor.length || r.oft_pruebas.length || r.psi_apm);
+        case 4: return !!(r.resultado !== 'APTO' || r.deficiencias.length || r.restricciones.length || r.comentarios);
+        case 5: return !!r.firma_med;
+        default: return false;
+      }
+    },
     next(){ if (this.step < this.steps.length-1) this.step++; },
     prev(){ if (this.step > 0) this.step--; },
     buscarDNI(){ alert('🔍 Prototipo: aquí se abriría buscador de clientes existentes.'); },

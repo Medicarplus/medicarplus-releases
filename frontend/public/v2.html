@@ -5475,15 +5475,21 @@ function showRevisionesDetail(list){
   const rows = revs.map((e,i)=>{
     const fpFull = ({E:'Efectivo',T:'Tarjeta',B:'Bizum',X:'Transferencia'})[e.fp] || e.fp || '—';
     const tipoBadge = e.tipo ? `<span class="tag" style="font-size:10px">${escapeHtml(e.tipo)}</span>` : '—';
-    return `<tr><td style="padding:6px 8px">${i+1}</td><td style="padding:6px 8px">${tipoBadge}</td><td style="padding:6px 8px">${escapeHtml(e.nombre||'')}</td><td class="num" style="padding:6px 8px">${fmt(e.importe-(e.descuento||0))}</td><td style="padding:6px 8px;text-align:center;font-size:11px;color:#86b6ff">${fpFull}</td></tr>`;
+    // 🐛 FIX feb 2026: añadir badge de Grupo (Conducción/Marina/Armas/Animales Pel./etc.)
+    const grupoBadge = e.grupo && e.grupo!=='-' ? `<span class="pill" style="background:#1f2937;color:#cbd5e1;padding:2px 8px;font-size:11px">${escapeHtml(e.grupo)}</span>` : '<span style="color:#64748b;font-size:11px">—</span>';
+    return `<tr><td style="padding:6px 8px">${i+1}</td><td style="padding:6px 8px">${tipoBadge}</td><td style="padding:6px 8px">${grupoBadge}</td><td style="padding:6px 8px">${escapeHtml(e.nombre||'')}</td><td class="num" style="padding:6px 8px">${fmt(e.importe-(e.descuento||0))}</td><td style="padding:6px 8px;text-align:center;font-size:11px;color:#86b6ff">${fpFull}</td></tr>`;
   }).join('');
   const total = revs.reduce((s,e)=> s + ((e.importe||0) - (e.descuento||0)), 0);
-  back.innerHTML = `<div class="modal" style="max-width:720px;width:95%"><h3>🩺 ${L('Revisions del dia','Revisiones del día')} · ${L('Detall','Detalle')} (${revs.length})</h3><p style="color:#9aa3b2;font-size:12px;margin:-4px 0 12px">${L("Totes les revisions registrades avui, amb nom, import i forma de pagament.", "Todas las revisiones registradas hoy, con nombre, importe y forma de pago.")}</p><div style="max-height:420px;overflow:auto;border:1px solid #262b36;border-radius:6px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead style="background:#171a21;position:sticky;top:0"><tr><th style="padding:8px;text-align:left">#</th><th style="padding:8px;text-align:left">${L('Tipus','Tipo')}</th><th style="padding:8px;text-align:left">${L('Nom','Nombre')}</th><th style="padding:8px;text-align:right">${L('Import','Importe')}</th><th style="padding:8px;text-align:center">${L('F. Pag','F. Pago')}</th></tr></thead><tbody>${rows}</tbody><tfoot style="background:#171a21"><tr><td colspan="3" style="padding:8px;font-weight:700">TOTAL</td><td class="num" style="padding:8px;font-weight:700;color:#7ee3aa">${fmt(total)}</td><td></td></tr></tfoot></table></div><div class="row" style="margin-top:14px"><button class="btn btn-primary" data-close>${L('Tancar','Cerrar')}</button></div></div>`;
+  back.innerHTML = `<div class="modal" style="max-width:780px;width:95%"><h3>🩺 ${L('Revisions del dia','Revisiones del día')} · ${L('Detall','Detalle')} (${revs.length})</h3><p style="color:#9aa3b2;font-size:12px;margin:-4px 0 12px">${L("Totes les revisions registrades avui, amb nom, import i forma de pagament.", "Todas las revisiones registradas hoy, con nombre, importe y forma de pago.")}</p><div style="max-height:420px;overflow:auto;border:1px solid #262b36;border-radius:6px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead style="background:#171a21;position:sticky;top:0"><tr><th style="padding:8px;text-align:left">#</th><th style="padding:8px;text-align:left">${L('Tipus','Tipo')}</th><th style="padding:8px;text-align:left">${L('Grup','Grupo')}</th><th style="padding:8px;text-align:left">${L('Nom','Nombre')}</th><th style="padding:8px;text-align:right">${L('Import','Importe')}</th><th style="padding:8px;text-align:center">${L('F. Pag','F. Pago')}</th></tr></thead><tbody>${rows}</tbody><tfoot style="background:#171a21"><tr><td colspan="4" style="padding:8px;font-weight:700">TOTAL</td><td class="num" style="padding:8px;font-weight:700;color:#7ee3aa">${fmt(total)}</td><td></td></tr></tfoot></table></div><div class="row" style="margin-top:14px"><button class="btn btn-primary" data-close>${L('Tancar','Cerrar')}</button></div></div>`;
   document.body.appendChild(back);
   back.addEventListener('click', ev=>{ if(ev.target===back||ev.target.matches('[data-close]')) back.remove(); });
   document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ back.remove(); document.removeEventListener('keydown', esc); } });
 }
-function showOtrosDetail(list){const otros=list.filter(e=>!e.retorno&&e.kind!=='DH'&&!isTramiteDGT(e));if(!otros.length){toast('No hay otros servicios');return}const back=document.createElement('div');back.className='modal-back';const rows=otros.map((e,i)=>`<tr><td style="padding:6px 8px">${i+1}</td><td style="padding:6px 8px"><span class="tag" style="font-size:10px">${e.tipo||'-'}</span></td><td style="padding:6px 8px">${escapeHtml(e.nombre)}</td><td class="num" style="padding:6px 8px">${fmt(e.importe)}</td><td class="num" style="padding:6px 8px">${e.tasa?fmt(e.tasa):'—'}</td><td style="padding:6px 8px;text-align:center"><span title="Forma de pago">${e.fp||'E'}</span></td></tr>`).join('');const total=otros.reduce((s,e)=>s+(e.importe-(e.descuento||0)),0);const tasas=otros.reduce((s,e)=>s+(e.tasa||0),0);back.innerHTML=`<div class="modal" style="max-width:720px;width:95%"><h3>📋 Otros servicios · Detalle (${otros.length})</h3><p style="color:#9aa3b2;font-size:12px;margin:-4px 0 12px">Estos son los servicios que <b>NO</b> vienen del CSV de la DGT (añadidos manualmente).</p><div style="max-height:400px;overflow:auto;border:1px solid #262b36;border-radius:6px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead style="background:#171a21;position:sticky;top:0"><tr><th style="padding:8px;text-align:left">#</th><th style="padding:8px;text-align:left">Tipo</th><th style="padding:8px;text-align:left">Nombre / Concepto</th><th style="padding:8px;text-align:right">Importe</th><th style="padding:8px;text-align:right">Tasa</th><th style="padding:8px;text-align:center">FP</th></tr></thead><tbody>${rows}</tbody><tfoot style="background:#171a21"><tr><td colspan="3" style="padding:8px;font-weight:700">TOTAL</td><td class="num" style="padding:8px;font-weight:700">${fmt(total)}</td><td class="num" style="padding:8px;font-weight:700">${fmt(tasas)}</td><td></td></tr></tfoot></table></div><div class="row" style="margin-top:14px"><button class="btn btn-primary" data-close>Cerrar</button></div></div>`;document.body.appendChild(back);back.addEventListener('click',ev=>{if(ev.target===back||ev.target.matches('[data-close]'))back.remove()});document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){back.remove();document.removeEventListener('keydown',esc)}})}
+function showOtrosDetail(list){const otros=list.filter(e=>!e.retorno&&e.kind!=='DH'&&!isTramiteDGT(e));if(!otros.length){toast('No hay otros servicios');return}const back=document.createElement('div');back.className='modal-back';const rows=otros.map((e,i)=>{
+  // 🐛 FIX feb 2026: añadir badge de Grupo (Conducción/Marina/Armas/Animales Pel./etc.)
+  const grupoBadge = e.grupo && e.grupo!=='-' ? `<span class="pill" style="background:#1f2937;color:#cbd5e1;padding:2px 8px;font-size:11px">${escapeHtml(e.grupo)}</span>` : '<span style="color:#64748b;font-size:11px">—</span>';
+  return `<tr><td style="padding:6px 8px">${i+1}</td><td style="padding:6px 8px"><span class="tag" style="font-size:10px">${e.tipo||'-'}</span></td><td style="padding:6px 8px">${grupoBadge}</td><td style="padding:6px 8px">${escapeHtml(e.nombre)}</td><td class="num" style="padding:6px 8px">${fmt(e.importe)}</td><td class="num" style="padding:6px 8px">${e.tasa?fmt(e.tasa):'—'}</td><td style="padding:6px 8px;text-align:center"><span title="Forma de pago">${e.fp||'E'}</span></td></tr>`;
+}).join('');const total=otros.reduce((s,e)=>s+(e.importe-(e.descuento||0)),0);const tasas=otros.reduce((s,e)=>s+(e.tasa||0),0);back.innerHTML=`<div class="modal" style="max-width:780px;width:95%"><h3>📋 Otros servicios · Detalle (${otros.length})</h3><p style="color:#9aa3b2;font-size:12px;margin:-4px 0 12px">Estos son los servicios que <b>NO</b> vienen del CSV de la DGT (añadidos manualmente).</p><div style="max-height:400px;overflow:auto;border:1px solid #262b36;border-radius:6px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead style="background:#171a21;position:sticky;top:0"><tr><th style="padding:8px;text-align:left">#</th><th style="padding:8px;text-align:left">Tipo</th><th style="padding:8px;text-align:left">Grupo</th><th style="padding:8px;text-align:left">Nombre / Concepto</th><th style="padding:8px;text-align:right">Importe</th><th style="padding:8px;text-align:right">Tasa</th><th style="padding:8px;text-align:center">FP</th></tr></thead><tbody>${rows}</tbody><tfoot style="background:#171a21"><tr><td colspan="4" style="padding:8px;font-weight:700">TOTAL</td><td class="num" style="padding:8px;font-weight:700">${fmt(total)}</td><td class="num" style="padding:8px;font-weight:700">${fmt(tasas)}</td><td></td></tr></tfoot></table></div><div class="row" style="margin-top:14px"><button class="btn btn-primary" data-close>Cerrar</button></div></div>`;document.body.appendChild(back);back.addEventListener('click',ev=>{if(ev.target===back||ev.target.matches('[data-close]'))back.remove()});document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){back.remove();document.removeEventListener('keydown',esc)}})}
 function showFpMenu(x,y,id,which){document.querySelectorAll('.fp-menu').forEach(m=>m.remove());const list=entriesOf(currentDate);const e=list.find(x=>x.id===id);if(!e)return;const opts=[{k:'E',lbl:L('💵 Efectiu','💵 Efectivo'),c:'#3ddc97'},{k:'T',lbl:L('💳 Targeta → Banc','💳 Tarjeta → Banco'),c:'#5aa9ff'},{k:'B',lbl:L('📱 Bizum → Banc','📱 Bizum → Banco'),c:'#f5b301'},{k:'X',lbl:L('🏦 Transferència → Banc','🏦 Transferencia → Banco'),c:'#a78bfa'}];const menu=document.createElement('div');menu.className='fp-menu';menu.style.cssText=`position:fixed;top:${y}px;left:${x}px;background:#1a1e26;border:1px solid #3a4050;border-radius:8px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.6);z-index:9999;min-width:200px`;menu.innerHTML=`<div style="padding:6px 10px;font-size:11px;color:#7a8394;border-bottom:1px solid #2a3040;margin-bottom:4px">${L('Canviar mètode de pagament','Cambiar método de pago')}${which==='fpTasa'?' (tasa DGT)':''}</div>`+opts.map(o=>`<div data-k="${o.k}" style="padding:8px 12px;cursor:pointer;border-radius:5px;color:${o.c};font-weight:${e[which]===o.k?700:500};background:${e[which]===o.k?'rgba(255,255,255,.05)':'transparent'};display:flex;justify-content:space-between;align-items:center"><span>${o.lbl}</span>${e[which]===o.k?'<span style="font-size:12px">✓</span>':''}</div>`).join('');document.body.appendChild(menu);menu.querySelectorAll('[data-k]').forEach(row=>{row.onmouseenter=()=>row.style.background='rgba(255,255,255,.08)';row.onmouseleave=()=>row.style.background=e[which]===row.dataset.k?'rgba(255,255,255,.05)':'transparent';row.onclick=()=>{e[which]=row.dataset.k;saveState();render();toast(L('✓ Mètode de pagament actualitzat','✓ Método de pago actualizado'))}});setTimeout(()=>{document.addEventListener('click',function close(ev){if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('click',close)}})},50)}
 function escapeHtml(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 function fpTag(fp,id,which){if(!fp)return '—';const m={E:'Efectivo',T:'Tarjeta',B:'Bizum',X:'Transf.'};const attrs=id?` data-fp-tag="${id}" data-fp-which="${which||'fp'}" style="cursor:context-menu" title="Clic dret per canviar mètode de pagament"`:'';return `<span class="tag ${fp}"${attrs}>${m[fp]||fp}</span>`}
@@ -6156,6 +6162,10 @@ function openEditEntryModal(e, ownerDate){
     {k:'X', lbl:'🏦 Transferencia → Banco'},
   ];
   const fpSel = fpOpts.map(o => `<option value="${o.k}" ${e.fp===o.k?'selected':''}>${o.lbl}</option>`).join('');
+  // 🐛 FIX feb 2026: permitir editar también Concepto y Grupo (pedido para fichas importadas del CSV)
+  const _grupos = ['Conducción','Armas','Marina','Seguridad','Animales Peligrosos','Deportes','Grúas','Grúa Torre','Grúa Móvil','-'];
+  const grupoSel = _grupos.map(g => `<option value="${g}" ${(e.grupo||'-')===g?'selected':''}>${g}</option>`).join('');
+  const isTraf = e.kind === 'TRAF';
   const back = document.createElement('div');
   back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px';
   back.innerHTML = `
@@ -6167,6 +6177,17 @@ function openEditEntryModal(e, ownerDate){
       <div style="font-size:11px;color:#94a3b8;margin-bottom:14px">Día: <b style="color:#e2e8f0">${(ownerDate||currentDate).split('-').reverse().join('/')}</b> · Tipo: <b style="color:#e2e8f0">${e.kind}</b>${e.tipo?` · ${e.tipo}`:''}</div>
       <label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">${isDh?'CONCEPTO':'NOMBRE / CONCEPTO'}</label>
       <input id="_ee_nombre" type="text" value="${(e.nombre||'').replace(/"/g,'&quot;')}" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:14px;box-sizing:border-box;margin-bottom:12px" autofocus />
+      ${isTraf?`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>
+          <label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">CONCEPTO (texto CSV original)</label>
+          <input id="_ee_concepto" type="text" value="${(e.concepto||'').replace(/"/g,'&quot;')}" placeholder="Opcional · ej.: RENOV CARNET B-E" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box" />
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">GRUPO</label>
+          <select id="_ee_grupo" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box">${grupoSel}</select>
+        </div>
+      </div>`:''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div>
           <label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">IMPORTE (€)</label>
@@ -6212,6 +6233,13 @@ function openEditEntryModal(e, ownerDate){
     e.fp = fp;
     e.fpTasa = fp;
     if(isPriv) e.descuento = desc;
+    // 🐛 FIX feb 2026: guardar concepto y grupo si se editaron (sólo TRAF)
+    if(isTraf){
+      const _cptEl = $$('#_ee_concepto');
+      const _grpEl = $$('#_ee_grupo');
+      if(_cptEl) e.concepto = _cptEl.value.trim();
+      if(_grpEl) e.grupo = _grpEl.value || e.grupo;
+    }
     saveState();
     render();
     close();
@@ -10494,7 +10522,11 @@ function _buildAnnualReport(year, monthFilterIdx){
       .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     if(!s || s === 'gasto') return 'Otros / Varios';
     // Orden: patrones más específicos primero
-    if(/\b(acomiada|indemniz|finiquit|despid|liquidaci)/.test(s)) return 'Indemnizaciones / Despidos';
+    // 🐛 FIX feb 2026: "LIQUIDACION DE INTERESES BBVA" se clasificaba como Indemnización.
+    // Ahora Comisiones bancarias detecta primero intereses/cargos/liquidaciones/despeses de bancos.
+    const _bancos = /(bbva|santander|caixa\s*bank|caixabank|sabadell|bancsabadell|kutxa|ibercaja|openban|unicaja|bankinter|bankia|laboral\s*kutxa|banc\s|\bbanco\b)/;
+    if(/\b(comissi|comiss\b|comiss\.|comisi[oó]n|comisio|tpv|c[aà]rrec\s+banc|banc\s+cargo|banc\s+cost|cost\s+banc|interess|intereses?\b|liquidaci[oó]n\s+(de\s+)?(interess|interes|comiss|comisi))/.test(s) || (_bancos.test(s) && /(interess|interes|comiss|comisi|despes|cost|c[aà]rrec|liquidaci)/.test(s))) return 'Comisiones bancarias';
+    if(/\b(acomiada|indemniz|finiquit|despid)/.test(s) || /\bliquidaci[oó]n\s+(final|laboral|despid|indemn|empleat|trabajad|personal|sueldo|n[oó]mina|salari)/.test(s)) return 'Indemnizaciones / Despidos';
     if(/\b(nomina|nòmina|sueldo|salari|jornal|faena)\b|\bhonoraris?\s+[a-z]/.test(s)) return 'Nóminas y sueldos';
     if(/\b(irpf|iva|hacienda|s\.?\s*s\.?|seguridad social|cotitzacio|cotizaci|tesoreria|cuota\s+aut|autonom)/.test(s)) return 'Impuestos y cotizaciones';
     if(/ascreme|associaci|asociaci|cuota\s+col|colegi/.test(s)) return 'Cuotas y asociaciones';
@@ -10508,7 +10540,6 @@ function _buildAnnualReport(year, monthFilterIdx){
     if(/pulit|neteja|limpi|clean/.test(s)) return 'Limpieza';
     if(/copy|copies|copias|paper|papel|tinta|toner|impr|material|oficin|mercadona|carrefour|lidl|dia\b/.test(s)) return 'Material / Oficina';
     if(/manteni|reparac|reparaci|averia|averi|gic\s*pro|general\s+asde|asde|informat|softw/.test(s)) return 'Mantenimiento y servicios';
-    if(/comissi|comisi[oó]n|comisio|tpv|c[aà]rrec\s+banc|banc\s+cargo|banc\s+cost|cost\s+banc/.test(s)) return 'Comisiones bancarias';
     if(/devol|devoluci|reintegro/.test(s)) return 'Devoluciones';
     if(/publici|marqueting|marketing|anunci/.test(s)) return 'Publicidad y marketing';
     if(/transport|combustibl|gasolin|dies[eé]l|peatje|peaje|aparcam|parking/.test(s)) return 'Transporte';
@@ -12676,9 +12707,28 @@ $('#btnAiAsk').onclick=()=>{
       let auditSummary=null;
       try{currentCompany='trafic';state=JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}');const au=computeAudit(dFrom,dTo);auditSummary={from:dFrom,to:dTo,totalRepeated:au.length,suspiciousCount:au.filter(x=>x.suspicious).length,clients:au.slice(0,30).map(c=>({name:c.display,fichas:c.entries.length,suspicious:c.suspicious,totalImp:c.totalImp,totalTasa:c.totalTasa,dhSum:c.dhSum,daySpan:c.daySpan,dates:c.entries.map(x=>x.date),entries:c.entries.map(({date,e})=>({date,kind:e.kind,tipo:e.tipo,importe:e.importe,tasa:e.tasa,fp:e.fp}))}))}}catch(er){}
       currentCompany=prevCompany;state=savedState;
+      // 🐛 FIX feb 2026: incluir las REGLAS DE TARIFAS personalizadas del usuario para que
+      // la IA no marque como "posible fallo" un precio que el usuario ya ha configurado
+      // como regla propia (ej.: 66,50€ Expedición + Conducción = Canje).
+      let pricingRulesNote='';
+      try{
+        const _rawRules=localStorage.getItem('caja.tarifas.rules.v1');
+        const _rules=_rawRules?JSON.parse(_rawRules):[];
+        if(Array.isArray(_rules) && _rules.length){
+          const lines=_rules.filter(r=>r && !r.disabled).map(r=>{
+            const partes=[];
+            if(r.tipo) partes.push(`tipo=${r.tipo}`);
+            if(r.grupo) partes.push(`grupo=${r.grupo}`);
+            if(r.importe!=null) partes.push(`importe=${r.importe}€`);
+            if(r.importeMin!=null && r.importeMax!=null) partes.push(`importe entre ${r.importeMin}€ y ${r.importeMax}€`);
+            return `  • Si ${partes.join(' Y ')} → cuenta como "${r.resultado||'?'}"`;
+          }).join('\n');
+          pricingRulesNote=`\n\n[REGLAS DE TARIFAS CONFIGURADAS POR EL USUARIO · deben respetarse como fuente de verdad, NO marcar como fallo ninguna entrada que cumpla una de estas reglas]:\n${lines}`;
+        }
+      }catch(_){/* silencioso */}
       // Añade el rango al prompt para que la IA lo tenga presente
       const rangeNote=(dFromInput||dToInput)?`\n\n[Rango solicitado: ${dFromInput||'inicio'} → ${dToInput||'hoy'}]`:'';
-      const res=await fetch(getAiEndpoint(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q+rangeNote,data:allData,company:currentCompany==='cempla'?'cempla':'cbTrafic',diff,userGeminiKey:userKey,auditSummary,dateRange:{from:dFromInput||null,to:dToInput||null}})});
+      const res=await fetch(getAiEndpoint(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q+pricingRulesNote+rangeNote,data:allData,company:currentCompany==='cempla'?'cempla':'cbTrafic',diff,userGeminiKey:userKey,auditSummary,dateRange:{from:dFromInput||null,to:dToInput||null}})});
       const j=await res.json();
       const answer=(j.source==='user-key'?'🎁 (Respuesta gratuita con tu clave Google)\n\n':'')+(j.answer||'(sin respuesta)');
       ansEl.textContent=answer;
