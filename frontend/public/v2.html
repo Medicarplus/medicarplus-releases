@@ -6162,7 +6162,9 @@ function openEditEntryModal(e, ownerDate){
     {k:'X', lbl:'🏦 Transferencia → Banco'},
   ];
   const fpSel = fpOpts.map(o => `<option value="${o.k}" ${e.fp===o.k?'selected':''}>${o.lbl}</option>`).join('');
-  // 🐛 FIX feb 2026: permitir editar también Concepto y Grupo (pedido para fichas importadas del CSV)
+  // 🐛 FIX feb 2026: permitir editar también Tipo, Concepto y Grupo (pedido para fichas importadas del CSV)
+  const _tipos = ['Renovación','Expedición','Canje','Duplicado','Prórroga','Recuperación','Revisión','Periódica','Inicial','Obtención','Otro'];
+  const tipoSel = _tipos.map(t => `<option value="${t}" ${(e.tipo||'')===t?'selected':''}>${t}</option>`).join('');
   const _grupos = ['Conducción','Armas','Marina','Seguridad','Animales Peligrosos','Deportes','Grúas','Grúa Torre','Grúa Móvil','-'];
   const grupoSel = _grupos.map(g => `<option value="${g}" ${(e.grupo||'-')===g?'selected':''}>${g}</option>`).join('');
   const isTraf = e.kind === 'TRAF';
@@ -6178,14 +6180,18 @@ function openEditEntryModal(e, ownerDate){
       <label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">${isDh?'CONCEPTO':'NOMBRE / CONCEPTO'}</label>
       <input id="_ee_nombre" type="text" value="${(e.nombre||'').replace(/"/g,'&quot;')}" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:14px;box-sizing:border-box;margin-bottom:12px" autofocus />
       ${isTraf?`
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
         <div>
-          <label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">CONCEPTO (texto CSV original)</label>
-          <input id="_ee_concepto" type="text" value="${(e.concepto||'').replace(/"/g,'&quot;')}" placeholder="Opcional · ej.: RENOV CARNET B-E" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box" />
+          <label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">TIPO</label>
+          <select id="_ee_tipo" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box">${tipoSel}</select>
         </div>
         <div>
           <label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">GRUPO</label>
           <select id="_ee_grupo" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box">${grupoSel}</select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px">CONCEPTO (texto CSV)</label>
+          <input id="_ee_concepto" type="text" value="${(e.concepto||'').replace(/"/g,'&quot;')}" placeholder="Opcional" style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box" />
         </div>
       </div>`:''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
@@ -6233,10 +6239,12 @@ function openEditEntryModal(e, ownerDate){
     e.fp = fp;
     e.fpTasa = fp;
     if(isPriv) e.descuento = desc;
-    // 🐛 FIX feb 2026: guardar concepto y grupo si se editaron (sólo TRAF)
+    // 🐛 FIX feb 2026: guardar tipo, concepto y grupo si se editaron (sólo TRAF)
     if(isTraf){
+      const _tipoEl = $$('#_ee_tipo');
       const _cptEl = $$('#_ee_concepto');
       const _grpEl = $$('#_ee_grupo');
+      if(_tipoEl) e.tipo = _tipoEl.value || e.tipo;
       if(_cptEl) e.concepto = _cptEl.value.trim();
       if(_grpEl) e.grupo = _grpEl.value || e.grupo;
     }
@@ -10428,9 +10436,25 @@ function _buildAnnualReport(year, monthFilterIdx){
       const concepts = catConceptsMap[cat] || [];
       concepts.slice().sort((a,b)=>b[1]-a[1]).forEach(([conc, cTot, cCnt, cEnts]) => {
         const _entJson = encodeURIComponent(JSON.stringify(cEnts||[]));
+        // 🐛 FIX feb 2026: añadir desglose por GRUPO debajo del concepto para que el
+        // usuario vea si Renovación/Expedición/Canje/... es de Conducción/Armas/Marina/etc.
+        // Omitimos grupos auxiliares ("Foto","Duplicado","C.Oficial","Otros","Altres","General")
+        // porque esos ya son categorías propias en la tabla.
+        const _gcData = grandTotals.byGroupConcept || {};
+        const _AUX = new Set(['Foto','Duplicado','C.Oficial','Otros','Altres','General']);
+        const _gruposDeConc = Object.keys(_gcData)
+          .filter(g => !_AUX.has(g) && _gcData[g] && _gcData[g][conc] && _gcData[g][conc].count > 0)
+          .map(g => ({grupo:g, count:_gcData[g][conc].count, total:_gcData[g][conc].total}))
+          .sort((a,b) => b.count - a.count);
+        const _grupoPills = _gruposDeConc.length
+          ? _gruposDeConc.map(x => `<span style="display:inline-block;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;border-radius:4px;padding:1px 6px;margin:0 3px 2px 0;font-size:10px;font-weight:600">${escapeHtml(x.grupo)}: <b>${x.count}</b> · ${fmt(x.total)}</span>`).join('')
+          : '';
         html += `<tr class="cat-detail ${cid} ar-clickable-item" data-entries="${_entJson}" data-concept="${escapeHtml(conc)}" style="display:none;background:#fafafa;border-bottom:1px dashed #e5e7eb;cursor:pointer" title="${L('Clica per veure els dies i saltar-hi','Clic para ver los días e ir')}">
           <td></td>
-          <td style="padding:5px 8px 5px 32px;font-size:12px;color:#475569;font-style:italic">${escapeHtml(conc)} <span style="color:#0891b2;font-size:10px">📅 ver días</span></td>
+          <td style="padding:5px 8px 5px 32px;font-size:12px;color:#475569;font-style:italic">
+            ${escapeHtml(conc)} <span style="color:#0891b2;font-size:10px">📅 ver días</span>
+            ${_grupoPills ? `<div style="margin-top:4px;font-style:normal;line-height:1.5">${_grupoPills}</div>` : ''}
+          </td>
           <td style="padding:5px 8px;text-align:right;font-family:'Courier New',monospace;font-size:12px;color:#0891b2">${cCnt}</td>
           <td style="padding:5px 8px;text-align:right;font-family:'Courier New',monospace;font-size:12px;color:#166534">${fmt(cTot)}</td>
           <td></td>
@@ -12707,15 +12731,17 @@ $('#btnAiAsk').onclick=()=>{
       let auditSummary=null;
       try{currentCompany='trafic';state=JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}');const au=computeAudit(dFrom,dTo);auditSummary={from:dFrom,to:dTo,totalRepeated:au.length,suspiciousCount:au.filter(x=>x.suspicious).length,clients:au.slice(0,30).map(c=>({name:c.display,fichas:c.entries.length,suspicious:c.suspicious,totalImp:c.totalImp,totalTasa:c.totalTasa,dhSum:c.dhSum,daySpan:c.daySpan,dates:c.entries.map(x=>x.date),entries:c.entries.map(({date,e})=>({date,kind:e.kind,tipo:e.tipo,importe:e.importe,tasa:e.tasa,fp:e.fp}))}))}}catch(er){}
       currentCompany=prevCompany;state=savedState;
-      // 🐛 FIX feb 2026: incluir las REGLAS DE TARIFAS personalizadas del usuario para que
-      // la IA no marque como "posible fallo" un precio que el usuario ya ha configurado
-      // como regla propia (ej.: 66,50€ Expedición + Conducción = Canje).
-      let pricingRulesNote='';
+      // 🐛 FIX feb 2026: incluir las REGLAS DE TARIFAS personalizadas del usuario + reglas
+      // "built-in" que la app aplica automáticamente, para que la IA no marque como
+      // "posible fallo" un precio que el programa ya considera válido.
+      // 🔒 Regla built-in obligatoria: 66,50€ + Expedición + Conducción = Canje
+      let pricingRulesNote='\n\n[REGLAS DE TARIFAS CONFIGURADAS · deben respetarse como fuente de verdad, NO marcar como fallo ninguna entrada que cumpla una de estas reglas]:';
+      pricingRulesNote += '\n  • SIEMPRE: si tipo=Expedición Y grupo=Conducción Y importe=66,50€ → es un CANJE (el usuario reclasifica expediciones con este importe exacto como canje de carnet). NO es error de precio ni servicio extra.';
       try{
         const _rawRules=localStorage.getItem('caja.tarifas.rules.v1');
         const _rules=_rawRules?JSON.parse(_rawRules):[];
         if(Array.isArray(_rules) && _rules.length){
-          const lines=_rules.filter(r=>r && !r.disabled).map(r=>{
+          const extra=_rules.filter(r=>r && !r.disabled && r.id!=='canje-default').map(r=>{
             const partes=[];
             if(r.tipo) partes.push(`tipo=${r.tipo}`);
             if(r.grupo) partes.push(`grupo=${r.grupo}`);
@@ -12723,7 +12749,7 @@ $('#btnAiAsk').onclick=()=>{
             if(r.importeMin!=null && r.importeMax!=null) partes.push(`importe entre ${r.importeMin}€ y ${r.importeMax}€`);
             return `  • Si ${partes.join(' Y ')} → cuenta como "${r.resultado||'?'}"`;
           }).join('\n');
-          pricingRulesNote=`\n\n[REGLAS DE TARIFAS CONFIGURADAS POR EL USUARIO · deben respetarse como fuente de verdad, NO marcar como fallo ninguna entrada que cumpla una de estas reglas]:\n${lines}`;
+          if(extra) pricingRulesNote += '\n'+extra;
         }
       }catch(_){/* silencioso */}
       // Añade el rango al prompt para que la IA lo tenga presente
