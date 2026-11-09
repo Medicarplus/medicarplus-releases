@@ -1,104 +1,22 @@
 name: Build & Publish MediCar Plus (Windows)
 
 # ============================================================================
-# Auto-release en cada push a main:
-#   1. Lee la versión actual de commercial/electron/package.json
-#   2. Incrementa el patch (2.3.0 → 2.3.1) y commitea el cambio
-#   3. Crea el tag vX.Y.Z
-#   4. Compila el .exe de Electron
-#   5. Publica el Release en GitHub con el .exe
-# Así el usuario sólo tiene que pulsar "Save to Github" y automáticamente
-# obtiene una versión nueva que el auto-updater (electron-updater) coge.
+# Simple y robusto · dispara en push de tag "v*" (como en v2.2.7 y anteriores).
+# Flujo del usuario:
+#   1. Save to Github (push normal de código)
+#   2. Crear Release en GitHub con tag v2.3.X → PUBLISH
+#   3. Este workflow compila el .exe y lo adjunta a la Release
+#   4. El .exe del usuario se auto-actualiza al abrirlo.
 # ============================================================================
 
 on:
   push:
-    branches:
-      - '**'          # cualquier rama (main, emergent-main, master, etc.)
-    paths:
-      - 'commercial/electron/**'
-      - 'frontend/public/**'
-      - '.github/workflows/release.yml'
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Versión a publicar (ej: 2.3.1)'
-        required: false
-        default: ''
-
-concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
 
 jobs:
-  bump-version:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    outputs:
-      new_version: ${{ steps.bump.outputs.new_version }}
-      skip: ${{ steps.bump.outputs.skip }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Skip if commit comes from bot or already is a bump
-        id: pre
-        run: |
-          MSG=$(git log -1 --pretty=%s)
-          echo "Last commit: $MSG"
-          if echo "$MSG" | grep -qE '^chore\(release\):|\[skip ci\]'; then
-            echo "Skipping bump — commit already a release bump."
-            echo "skip_bump=true" >> $GITHUB_OUTPUT
-          else
-            echo "skip_bump=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Setup Node.js
-        if: steps.pre.outputs.skip_bump == 'false'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Bump patch version and commit
-        id: bump
-        if: steps.pre.outputs.skip_bump == 'false'
-        run: |
-          cd commercial/electron
-          OLD=$(node -p "require('./package.json').version")
-          NEW=$(node -e "
-            const [m, mi, p] = require('./package.json').version.split('.').map(Number);
-            console.log([m, mi, p + 1].join('.'));
-          ")
-          echo "Old: $OLD  →  New: $NEW"
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
-            pkg.version = '$NEW';
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
-          cd ../..
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add commercial/electron/package.json
-          git commit -m "chore(release): v$NEW [skip ci]" || echo "No changes"
-          git tag -a "v$NEW" -m "Release v$NEW"
-          git push origin HEAD --follow-tags
-          echo "new_version=$NEW" >> $GITHUB_OUTPUT
-          echo "skip=false" >> $GITHUB_OUTPUT
-
-      - name: Mark job as skipped (no output)
-        if: steps.pre.outputs.skip_bump == 'true'
-        run: echo "skip=true" >> $GITHUB_OUTPUT
-
   build-windows:
-    needs: bump-version
-    if: needs.bump-version.outputs.skip != 'true'
     runs-on: windows-latest
     permissions:
       contents: write
@@ -108,7 +26,7 @@ jobs:
         working-directory: commercial/electron
 
     steps:
-      - name: Checkout repository (with bump commit)
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -127,7 +45,7 @@ jobs:
       - name: Upload artifacts (backup)
         uses: actions/upload-artifact@v4
         with:
-          name: MediCarPlus-Windows-v${{ needs.bump-version.outputs.new_version }}
+          name: MediCarPlus-Windows-${{ github.ref_name }}
           path: |
             commercial/electron/dist/*.exe
             commercial/electron/dist/latest.yml
