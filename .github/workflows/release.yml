@@ -1,19 +1,97 @@
 name: Build & Publish MediCar Plus (Windows)
 
 # ============================================================================
-# Workflow a l'arrel del repositori. Compila l'Electron app des de
-# commercial/electron/ i publica el .exe al GitHub Release quan es fa push
-# d'un tag "v*" (per exemple v2.2.6).
+# Auto-release en cada push a main:
+#   1. Lee la versión actual de commercial/electron/package.json
+#   2. Incrementa el patch (2.3.0 → 2.3.1) y commitea el cambio
+#   3. Crea el tag vX.Y.Z
+#   4. Compila el .exe de Electron
+#   5. Publica el Release en GitHub con el .exe
+# Así el usuario sólo tiene que pulsar "Save to Github" y automáticamente
+# obtiene una versión nueva que el auto-updater (electron-updater) coge.
 # ============================================================================
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+    paths:
+      - 'commercial/electron/**'
+      - 'frontend/public/**'
+      - '.github/workflows/release.yml'
   workflow_dispatch:
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
+      skip: ${{ steps.bump.outputs.skip }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Skip if commit comes from bot or already is a bump
+        id: pre
+        run: |
+          MSG=$(git log -1 --pretty=%s)
+          echo "Last commit: $MSG"
+          if echo "$MSG" | grep -qE '^chore\(release\):|\[skip ci\]'; then
+            echo "Skipping bump — commit already a release bump."
+            echo "skip_bump=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip_bump=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Node.js
+        if: steps.pre.outputs.skip_bump == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Bump patch version and commit
+        id: bump
+        if: steps.pre.outputs.skip_bump == 'false'
+        run: |
+          cd commercial/electron
+          OLD=$(node -p "require('./package.json').version")
+          NEW=$(node -e "
+            const [m, mi, p] = require('./package.json').version.split('.').map(Number);
+            console.log([m, mi, p + 1].join('.'));
+          ")
+          echo "Old: $OLD  →  New: $NEW"
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
+            pkg.version = '$NEW';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          cd ../..
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add commercial/electron/package.json
+          git commit -m "chore(release): v$NEW [skip ci]" || echo "No changes"
+          git tag -a "v$NEW" -m "Release v$NEW"
+          git push origin main --follow-tags
+          echo "new_version=$NEW" >> $GITHUB_OUTPUT
+          echo "skip=false" >> $GITHUB_OUTPUT
+
+      - name: Mark job as skipped (no output)
+        if: steps.pre.outputs.skip_bump == 'true'
+        run: echo "skip=true" >> $GITHUB_OUTPUT
+
   build-windows:
+    needs: bump-version
+    if: needs.bump-version.outputs.skip != 'true'
     runs-on: windows-latest
     permissions:
       contents: write
@@ -23,8 +101,10 @@ jobs:
         working-directory: commercial/electron
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repository (with bump commit)
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -42,7 +122,7 @@ jobs:
       - name: Upload artifacts (backup)
         uses: actions/upload-artifact@v4
         with:
-          name: MediCarPlus-Windows-${{ github.ref_name }}
+          name: MediCarPlus-Windows-v${{ needs.bump-version.outputs.new_version }}
           path: |
             commercial/electron/dist/*.exe
             commercial/electron/dist/latest.yml
