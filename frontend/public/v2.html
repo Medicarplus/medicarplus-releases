@@ -1360,7 +1360,14 @@
       <div class="panel" style="margin-bottom:14px"><h2 style="display:flex;align-items:center;gap:8px"><span data-i18n="day_close">Cierre del día</span><button id="btnReviewDayAi" data-testid="btn-review-day-ai" title="Preguntar al Asesor IA por el día actual (busca descuadres, duplicados, importes raros)" style="margin-left:auto;background:linear-gradient(135deg,#7c3aed,#a855f7);border:none;color:#fff;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:700;box-shadow:0 2px 6px rgba(124,58,237,.35)">🔎 Repasar día (IA)</button><button id="btnPrivacyToggle" data-testid="btn-privacy-toggle" title="Ocultar/mostrar importes (privacidad)" style="background:transparent;border:1px solid #3a4050;color:#94a3b8;border-radius:6px;padding:3px 8px;font-size:14px;cursor:pointer;line-height:1">👁️</button></h2><div class="body"><div class="summary" id="sumBox"></div></div></div>
       <div class="panel" id="cemplaSplitPanel" style="margin-bottom:14px;display:none"><h2 data-i18n="month_split">Repartiment mes actual</h2><div class="body" id="cemplaSplitBox"></div></div>
       <div class="panel" style="margin-bottom:14px"><h2 data-i18n="by_concept">Resumen por concepto</h2><div class="body" id="byConcept"></div></div>
-      <div class="panel"><h2><span data-i18n="history_title">Histórico</span> <span class="small" id="histCount"></span></h2><div id="histList" style="max-height:40vh;overflow:auto"></div></div>
+      <div class="panel" id="histPanel" data-collapsed="1">
+        <h2 id="histHeader" style="cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px" title="Pulsa para abrir/cerrar">
+          <span id="histCaret" style="font-size:14px;color:#64748b;transition:transform .2s;display:inline-block">▸</span>
+          <span data-i18n="history_title">Histórico</span>
+          <span class="small" id="histCount"></span>
+        </h2>
+        <div id="histList" style="max-height:40vh;overflow:auto;display:none"></div>
+      </div>
     </div>
   </div>
 </main>
@@ -6094,7 +6101,29 @@ function renderSaldoAnterior(){
   const saCC=saldoAnteriorPorCuenta(currentDate);
   $('#saldoAntNum').textContent=fmt(saCC.caja+saCC.banc+resCambioAtStartOfDate(currentDate));
 }
-function renderHistory(){const dates=Object.keys(state.byDate).filter(d=>entriesOf(d).length).sort().reverse();$('#histCount').textContent=`${dates.length} día(s)`;$('#histList').innerHTML=dates.length?dates.map(d=>{const t=computeTotals(entriesOf(d));const cls=d===currentDate?'style="background:#1a1e27"':'';return `<div class="history-item" ${cls} data-d="${d}"><div><div class="date">${d.split('-').reverse().join('/')}</div><div class="totals">${t.cnt} entrada(s) · ${fmt(t.neto)}</div></div><button class="icon-btn" data-delday="${d}" title="Borrar día">🗑️</button></div>`}).join(''):'<div class="empty">Sin histórico todavía</div>';$$('#histList .history-item').forEach(el=>el.onclick=e=>{if(e.target.dataset.delday){const day=e.target.dataset.delday;confirmModal('Borrar día',`¿Borrar TODOS los datos del día <b>${day.split('-').reverse().join('/')}</b>?`,()=>{delete state.byDate[day];saveState();render()},'Borrar día');e.stopPropagation();return}setDate(el.dataset.d)})}
+function renderHistory(){const dates=Object.keys(state.byDate).filter(d=>entriesOf(d).length).sort().reverse();$('#histCount').textContent=`${dates.length} día(s)`;$('#histList').innerHTML=dates.length?dates.map(d=>{const t=computeTotals(entriesOf(d));const cls=d===currentDate?'style="background:#1a1e27"':'';return `<div class="history-item" ${cls} data-d="${d}"><div><div class="date">${d.split('-').reverse().join('/')}</div><div class="totals">${t.cnt} entrada(s) · ${fmt(t.neto)}</div></div><button class="icon-btn" data-delday="${d}" title="Borrar día">🗑️</button></div>`}).join(''):'<div class="empty">Sin histórico todavía</div>';$$('#histList .history-item').forEach(el=>el.onclick=e=>{if(e.target.dataset.delday){const day=e.target.dataset.delday;confirmModal('Borrar día',`¿Borrar TODOS los datos del día <b>${day.split('-').reverse().join('/')}</b>?`,()=>{delete state.byDate[day];saveState();render()},'Borrar día');e.stopPropagation();return}setDate(el.dataset.d)});
+  // 🐛 FIX feb 2026: panel Histórico colapsable (abrir/cerrar al pulsar cabecera).
+  //   Estado persistido en localStorage para que recuerde la preferencia del usuario.
+  const _hdr = document.getElementById('histHeader');
+  if(_hdr && !_hdr._wired){
+    _hdr._wired = true;
+    const _panel = document.getElementById('histPanel');
+    const _list = document.getElementById('histList');
+    const _caret = document.getElementById('histCaret');
+    const _saved = localStorage.getItem('caja.histPanel.open') === '1';
+    const _apply = (open) => {
+      _panel.dataset.collapsed = open ? '0' : '1';
+      _list.style.display = open ? '' : 'none';
+      if(_caret) _caret.style.transform = open ? 'rotate(90deg)' : 'rotate(0deg)';
+    };
+    _apply(_saved);
+    _hdr.addEventListener('click', () => {
+      const open = _panel.dataset.collapsed === '1';
+      _apply(open);
+      localStorage.setItem('caja.histPanel.open', open ? '1' : '0');
+    });
+  }
+}
 function actEntry(act,id){
   // Busca primero en el día actual; si no está (vista filtrada por rango con entradas de otros días),
   // busca en TODAS las fechas del estado en memoria y usa la que contiene la entrada.
