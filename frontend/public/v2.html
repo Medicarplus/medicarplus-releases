@@ -12731,17 +12731,17 @@ $('#btnAiAsk').onclick=()=>{
       let auditSummary=null;
       try{currentCompany='trafic';state=JSON.parse(localStorage.getItem('caja.v1')||'{"byDate":{}}');const au=computeAudit(dFrom,dTo);auditSummary={from:dFrom,to:dTo,totalRepeated:au.length,suspiciousCount:au.filter(x=>x.suspicious).length,clients:au.slice(0,30).map(c=>({name:c.display,fichas:c.entries.length,suspicious:c.suspicious,totalImp:c.totalImp,totalTasa:c.totalTasa,dhSum:c.dhSum,daySpan:c.daySpan,dates:c.entries.map(x=>x.date),entries:c.entries.map(({date,e})=>({date,kind:e.kind,tipo:e.tipo,importe:e.importe,tasa:e.tasa,fp:e.fp}))}))}}catch(er){}
       currentCompany=prevCompany;state=savedState;
-      // 🐛 FIX feb 2026: incluir las REGLAS DE TARIFAS personalizadas del usuario + reglas
-      // "built-in" que la app aplica automáticamente, para que la IA no marque como
-      // "posible fallo" un precio que el programa ya considera válido.
-      // 🔒 Regla built-in obligatoria: 66,50€ + Expedición + Conducción = Canje
-      let pricingRulesNote='\n\n[REGLAS DE TARIFAS CONFIGURADAS · deben respetarse como fuente de verdad, NO marcar como fallo ninguna entrada que cumpla una de estas reglas]:';
-      pricingRulesNote += '\n  • SIEMPRE: si tipo=Expedición Y grupo=Conducción Y importe=66,50€ → es un CANJE (el usuario reclasifica expediciones con este importe exacto como canje de carnet). NO es error de precio ni servicio extra.';
+      // 🐛 FIX feb 2026: incluir las REGLAS DE TARIFAS que el usuario tiene guardadas
+      // EN SU PROPIO ORDENADOR (caja.tarifas.rules.v1). Cada centro médico tiene sus
+      // reglas (unos facturan el canje a 66,50€, otros a 55€, otros no tienen canje).
+      // La IA SÓLO debe fiarse de estas reglas, NUNCA suponer nada por su cuenta.
+      let pricingRulesNote='';
       try{
         const _rawRules=localStorage.getItem('caja.tarifas.rules.v1');
         const _rules=_rawRules?JSON.parse(_rawRules):[];
-        if(Array.isArray(_rules) && _rules.length){
-          const extra=_rules.filter(r=>r && !r.disabled && r.id!=='canje-default').map(r=>{
+        const _activas=Array.isArray(_rules)?_rules.filter(r=>r && !r.disabled):[];
+        if(_activas.length){
+          const lines=_activas.map(r=>{
             const partes=[];
             if(r.tipo) partes.push(`tipo=${r.tipo}`);
             if(r.grupo) partes.push(`grupo=${r.grupo}`);
@@ -12749,7 +12749,9 @@ $('#btnAiAsk').onclick=()=>{
             if(r.importeMin!=null && r.importeMax!=null) partes.push(`importe entre ${r.importeMin}€ y ${r.importeMax}€`);
             return `  • Si ${partes.join(' Y ')} → cuenta como "${r.resultado||'?'}"`;
           }).join('\n');
-          if(extra) pricingRulesNote += '\n'+extra;
+          pricingRulesNote=`\n\n[REGLAS DE TARIFAS CONFIGURADAS EN ESTE ORDENADOR · fuente de verdad del centro · ANTES de marcar una entrada como "posible fallo de precio" comprueba si alguna de estas reglas la cubre; si la cubre NO la señales]:\n${lines}`;
+        } else {
+          pricingRulesNote=`\n\n[Este ordenador NO tiene reglas de tarifas personalizadas configuradas · si ves un precio raro, dilo pero aclara que puede haber un servicio o convenio distinto que justifique la diferencia]`;
         }
       }catch(_){/* silencioso */}
       // Añade el rango al prompt para que la IA lo tenga presente
