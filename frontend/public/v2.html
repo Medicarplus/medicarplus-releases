@@ -5367,7 +5367,12 @@ function setCountZero(v){localStorage.setItem('caja.count_zero',v?'1':'0')}
 // Filtre d'entrades: tipus+grup + rang de dates
 const entryFilter = { types: new Set(), from: null, to: null };
 function _entryKey(e){
-  const t = String(e.tipo||'').trim() || '?';
+  // 🐛 FIX feb 2026: aplica las REGLAS DE TARIFAS personalizadas del usuario al tipo
+  //   mostrado en los chips de filtro "Entradas del día".
+  //   Ej.: Expedición + Conducir + 66,50€ se agrupa como "CANJE · CONDUCIR" si el
+  //   centro lo tiene configurado así. Si no hay reglas, cae al comportamiento normal.
+  const tRaw = (e.kind === 'TRAF' && window._effectiveTipo) ? window._effectiveTipo(e) : e.tipo;
+  const t = String(tRaw||'').trim() || '?';
   // ↩ Devoluciones de tasa: se agrupan bajo su propio chip "DEVOLUCIÓN E/T/etc"
   if(e.kind==='DH' && e._tasaRefund){ return 'DEVOLUCIÓN ' + (e.fp||'E'); }
   if(e.kind==='DH' && e._internal){
@@ -5663,7 +5668,11 @@ function renderSummary(list){const t=computeTotals(list);const sa=saldoAnterior(
     };
   }
 }
-function renderByConcept(list){const map={};list.forEach(e=>{if(e.retorno)return;if(e.kind==='DH' && (e._internal||e._tasaRefund||e._hnBruto))return;const gn=window._normalizeGrupo?window._normalizeGrupo(e.grupo):e.grupo;const key=e.kind==='DH'?`[${e.tipo}] libre`:`${e.tipo}${gn&&gn!=='-'?' · '+gn:''}`;map[key]||={n:0,total:0};map[key].n++;const signo=e.kind==='DH'&&e.tipo==='DEBE'?-1:1;map[key].total+=signo*((e.importe-(e.descuento||0))+(e.tasa||0))});const entries=Object.entries(map).sort((a,b)=>b[1].total-a[1].total);$('#byConcept').innerHTML=entries.length?`<table style="width:100%"><tbody>${entries.map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td class="num">${v.n}×</td><td class="num"><b>${fmt(v.total)}</b></td></tr>`).join('')}</tbody></table>`:`<div class="small">Sin datos</div>`}
+function renderByConcept(list){
+  // 🐛 FIX feb 2026: aplica las REGLAS DE TARIFAS personalizadas del usuario al tipo
+  //   mostrado en "Resumen por concepto". Igual que en los chips: 66,50€ Expedición·Conducir
+  //   se muestra como "Canje · Conducir" si el centro tiene esa regla.
+  const map={};list.forEach(e=>{if(e.retorno)return;if(e.kind==='DH' && (e._internal||e._tasaRefund||e._hnBruto))return;const gn=window._normalizeGrupo?window._normalizeGrupo(e.grupo):e.grupo;const tipoFinal=(e.kind==='TRAF' && window._effectiveTipo)?window._effectiveTipo(e):e.tipo;const key=e.kind==='DH'?`[${e.tipo}] libre`:`${tipoFinal}${gn&&gn!=='-'?' · '+gn:''}`;map[key]||={n:0,total:0};map[key].n++;const signo=e.kind==='DH'&&e.tipo==='DEBE'?-1:1;map[key].total+=signo*((e.importe-(e.descuento||0))+(e.tasa||0))});const entries=Object.entries(map).sort((a,b)=>b[1].total-a[1].total);$('#byConcept').innerHTML=entries.length?`<table style="width:100%"><tbody>${entries.map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td class="num">${v.n}×</td><td class="num"><b>${fmt(v.total)}</b></td></tr>`).join('')}</tbody></table>`:`<div class="small">Sin datos</div>`}
 // 💰 Saldo inicial (opening balance) · Para clientes que empiezan a usar la app
 // a mediados de año y no quieren pasar todo el histórico día a día. Se guarda
 // por empresa. NUNCA entra en estadísticas (no es una entrada de facturación),
