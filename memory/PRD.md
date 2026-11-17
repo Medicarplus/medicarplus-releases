@@ -16,6 +16,7 @@ Full-stack POS and management application for medical driver-license centers.
 - Separate prototype lab at `/app/tramitacion-lab/` (NOT deployed with MediCar).
 
 ## Changelog
+- **2026-11-17 · CI/CD fix**: Bumped `commercial/electron/package.json` to **2.3.4** and added a pre-build **version/tag mismatch guard** in `.github/workflows/release.yml`. Root cause of silent 1m 11s failure: package.json was `2.3.1` while user created tag `v2.3.3`, so `electron-builder --publish always` targeted the wrong GitHub release (the one matching the pkg version). The new guard fails the workflow loudly if tag ≠ package.json version.
 - **2026-11-09 · Round 2 (after user feedback)**:
   - Modal Editar entrada: added **TIPO** dropdown (Renovación/Expedición/Canje/Duplicado/Prórroga/Recuperación/Revisión/Periódica/Inicial/Obtención) alongside Grupo and Concepto. Only for TRAF entries.
   - AI prompt: REMOVED hardcoded "66,50€ Expedición Conducción = Canje" default. The AI now reads EACH user's `caja.tarifas.rules.v1` from their own localStorage. If no rules exist, the AI is informed and is more cautious. No server-side assumptions.
