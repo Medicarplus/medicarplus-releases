@@ -16,6 +16,10 @@ Full-stack POS and management application for medical driver-license centers.
 - Separate prototype lab at `/app/tramitacion-lab/` (NOT deployed with MediCar).
 
 ## Changelog
+- **2026-11-18 (tarde v2) · Refinamiento Detector**:
+  - ❌ Eliminados los botones inline `➕ Etiquetar`/`✏️ Editar` y mini-modal rápido (podían llevar a categorizar descuentos puntuales). La declaración de tarifas ocurre SOLO en Configuración → Precios, que es la fuente de verdad.
+  - ✅ Banner actualizado: ahora tiene botón directo **⚙️ Configurar precios** que abre `openTariffsEditor` y texto más claro distinguiendo tarifa fija vs descuento puntual.
+  - ✅ Mantenida la detección automática (⚠️ N precios detectados por fila + badge 🏷️ cuando matchea una regla declarada).
 - **2026-11-18 (tarde) · Detector de tarifas**:
   - **Auto-detección de variantes** en `_trafBuildDetail`: calcula `variantCount` por (tipo+grupo) y marca ⚠️ las filas que pertenecen a un servicio con 2+ precios distintos.
   - **Banner inteligente** 🤖 arriba del desglose: "Hemos detectado X precios que podrían tener una tarifa especial". Solo aparece si realmente hay algo por etiquetar.

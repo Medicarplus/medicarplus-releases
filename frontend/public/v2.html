@@ -4315,27 +4315,23 @@ function openStats(initialSection){
       const needsFlag = (d.variantCount >= 2 && !d.customLabel)
         ? `<div style="font-size:9.5px;color:#fbbf24;margin-top:2px;font-weight:600">⚠️ ${d.variantCount} precios detectados</div>`
         : '';
-      const labelBtn = !d.customLabel
-        ? `<button class="traf-label-btn" data-tipo="${escapeHtml(d.tipo)}" data-grupo="${escapeHtml(d.grupo)}" data-precio="${d.precio}" title="Ponle nombre a este precio (ej. +70 años)" style="background:${d.variantCount>=2?'#78350f':'#1e293b'};color:${d.variantCount>=2?'#fbbf24':'#94a3b8'};border:1px solid ${d.variantCount>=2?'#fbbf24':'#334155'};padding:3px 8px;border-radius:5px;font-size:10.5px;font-weight:700;cursor:pointer;white-space:nowrap">➕ Etiquetar</button>`
-        : `<button class="traf-label-btn" data-tipo="${escapeHtml(d.tipo)}" data-grupo="${escapeHtml(d.grupo)}" data-precio="${d.precio}" data-current="${escapeHtml(d.customLabel)}" title="Editar etiqueta" style="background:#1e293b;color:#f5b301;border:1px solid #f5b301;padding:3px 8px;border-radius:5px;font-size:10.5px;font-weight:700;cursor:pointer;white-space:nowrap">✏️ Editar</button>`;
       return `<tr>
         <td style="padding:6px 10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff">${d.count}</td>
         <td style="padding:6px 10px;border:1px solid #2a3040;color:${color};font-weight:700">${d.tipo}${customBadge}${needsFlag}</td>
         <td style="padding:6px 10px;border:1px solid #2a3040;color:#e2e8f0">${d.grupo}</td>
         <td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;color:#94a3b8">${d.precio ? _fmtEur(d.precio) : '—'}</td>
         <td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;color:#3ddc97;font-weight:700">${d.total ? _fmtEur(d.total) : '—'}</td>
-        <td style="padding:6px 10px;border:1px solid #2a3040;text-align:center">${labelBtn}</td>
       </tr>`;
     }).join('');
     const totalCount = rows.reduce((s,d) => s + d.count, 0);
     const totalAmount = rows.reduce((s,d) => s + d.total, 0);
     const banner = needsLabel > 0
-      ? `<div data-testid="traf-tariff-banner" style="margin-bottom:10px;padding:10px 14px;background:linear-gradient(90deg,rgba(251,191,36,.12),rgba(251,191,36,.03));border:1px solid #fbbf24;border-radius:8px;display:flex;align-items:center;gap:10px">
-          <span style="font-size:20px">🤖</span>
-          <div style="flex:1;color:#fbbf24;font-size:12.5px;line-height:1.45">
-            Hemos detectado <b>${needsLabel} precio${needsLabel===1?'':'s'}</b> que podría${needsLabel===1?'':'n'} tener una tarifa especial de tu centro (ej. +70 años, Nocturno, Convenio…).<br>
-            Pulsa <b>➕ Etiquetar</b> en cada fila marcada con ⚠️ para ponerle un nombre y que no se vea como duplicado.
+      ? `<div data-testid="traf-tariff-banner" style="margin-bottom:10px;padding:12px 14px;background:linear-gradient(90deg,rgba(251,191,36,.12),rgba(251,191,36,.03));border:1px solid #fbbf24;border-radius:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span style="font-size:22px">🤖</span>
+          <div style="flex:1;min-width:260px;color:#fbbf24;font-size:12.5px;line-height:1.5">
+            Hemos detectado <b>${needsLabel} precio${needsLabel===1?'':'s'}</b> que no coincide${needsLabel===1?'':'n'} con tu tarifa habitual. Si es porque tienes una tarifa especial para ese servicio (ej. +70 años, convenio, nocturno…), decláralo en los ajustes para que aparezca categorizado en estadísticas.<br><span style="color:#cbd5e1;font-size:11.5px">Si es un descuento puntual a una persona, déjalo como está — no hace falta etiquetarlo.</span>
           </div>
+          <button data-testid="traf-open-tariffs" onclick="(function(){try{if(typeof openTariffsEditor==='function')openTariffsEditor();}catch(e){console.warn(e)}})()" style="background:#f5b301;color:#1a1a1a;border:1px solid #f5b301;padding:9px 16px;border-radius:8px;font-weight:800;font-size:12.5px;cursor:pointer;white-space:nowrap">⚙️ Configurar precios</button>
         </div>`
       : '';
     return `
@@ -4349,14 +4345,12 @@ function openStats(initialSection){
             <th style="padding:8px;border:1px solid #2a3040;color:#c084fc;text-align:left">GRUPO</th>
             <th style="padding:8px;border:1px solid #2a3040;color:#94a3b8">PRECIO UNIT.</th>
             <th style="padding:8px;border:1px solid #2a3040;color:#3ddc97">TOTAL</th>
-            <th style="padding:8px;border:1px solid #2a3040;color:#fbbf24">ETIQUETA</th>
           </tr></thead>
           <tbody>${bodyRows}</tbody>
           <tfoot><tr style="background:#1f2530">
             <td style="padding:8px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff;font-size:14px">${totalCount}</td>
             <td colspan="3" style="padding:8px;border:1px solid #2a3040;font-weight:700;color:#e2e8f0">TOTAL FACTURACIÓN</td>
             <td style="padding:8px;border:1px solid #2a3040;text-align:right;font-weight:700;color:#3ddc97;font-size:14px">${_fmtEur(totalAmount)}</td>
-            <td style="padding:8px;border:1px solid #2a3040"></td>
           </tr></tfoot>
         </table>
         <div class="small" style="color:#64748b;margin-top:6px;font-style:italic">💡 Cada combinación única de Tipo·Grupo·Precio aparece como una fila con su cantidad y facturación total.</div>
@@ -4388,101 +4382,6 @@ function openStats(initialSection){
       </tr></tfoot></table>`;
   }
   function _fmtEur(n){ n = +n || 0; return n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €' }
-
-  // 💰 Mini-modal para etiquetar un precio desde el desglose (1 clic → regla guardada).
-  //    Si ya existe una regla con mismo tipo+grupo+precioExacto, la edita (en vez de duplicar).
-  function _trafOpenQuickLabel(tipo, grupo, precio, currentLabel){
-    try{ document.querySelectorAll('.traf-quicklabel-back').forEach(m=>m.remove()); }catch(_){}
-    const back = document.createElement('div');
-    back.className = 'modal-back traf-quicklabel-back';
-    back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;z-index:100005;backdrop-filter:blur(6px);padding:20px';
-    const safeCur = String(currentLabel||'').replace(/"/g,'&quot;');
-    back.innerHTML = `
-      <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:22px 24px;max-width:460px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.6)">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-          <span style="font-size:22px">🏷️</span>
-          <div style="font-size:16px;font-weight:700;color:#e2e8f0">Etiquetar este precio</div>
-        </div>
-        <div style="padding:12px 14px;background:#141821;border:1px solid #1e293b;border-radius:8px;margin-bottom:14px;font-family:'Consolas',monospace;font-size:13px;color:#cbd5e1;line-height:1.7">
-          <b style="color:#f5b301">${escapeHtml(tipo)}</b> · <b style="color:#c084fc">${escapeHtml(grupo)}</b> · <b style="color:#3ddc97">${_fmtEur(precio)}</b>
-        </div>
-        <label style="display:block;font-size:11px;color:#94a3b8;letter-spacing:.8px;margin-bottom:5px;text-transform:uppercase">Nombre corto para este precio</label>
-        <input id="tqlInput" type="text" value="${safeCur}" placeholder="Ej: +70 años · Nocturno · Convenio · Descuento familiar…" data-testid="traf-quick-label-input" style="width:100%;box-sizing:border-box;padding:10px 12px;background:#141821;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:14px;margin-bottom:6px">
-        <div class="small" style="color:#64748b;line-height:1.5;margin-bottom:16px">Esta etiqueta aparecerá cada vez que importes un CSV con una entrada <b>${escapeHtml(tipo)} · ${escapeHtml(grupo)} · ${_fmtEur(precio)}</b>. Se guarda en tu ordenador como regla de tarifa personalizada.</div>
-        <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button id="tqlCancel" data-testid="traf-quick-label-cancel" style="background:transparent;color:#94a3b8;border:1px solid #334155;padding:9px 16px;border-radius:7px;font-weight:600;cursor:pointer">Cancelar</button>
-          ${currentLabel ? `<button id="tqlDelete" data-testid="traf-quick-label-delete" style="background:#7f1d1d;color:#fecaca;border:1px solid #991b1b;padding:9px 16px;border-radius:7px;font-weight:700;cursor:pointer">🗑️ Quitar</button>` : ''}
-          <button id="tqlSave" data-testid="traf-quick-label-save" style="background:#f5b301;color:#1a1a1a;border:1px solid #f5b301;padding:9px 18px;border-radius:7px;font-weight:800;cursor:pointer">💾 Guardar</button>
-        </div>
-      </div>`;
-    document.body.appendChild(back);
-    const inp = back.querySelector('#tqlInput');
-    setTimeout(()=>{ try{ inp.focus(); inp.select(); }catch(_){} }, 30);
-    const close = () => back.remove();
-    back.addEventListener('click', e => { if(e.target === back) close(); });
-    back.querySelector('#tqlCancel').onclick = close;
-    const doDelete = back.querySelector('#tqlDelete');
-    if(doDelete){ doDelete.onclick = () => { _trafSaveQuickLabel(tipo, grupo, precio, ''); close(); try{ renderTrafficTable(); toast('🏷️ Etiqueta eliminada'); }catch(_){} }; }
-    const doSave = () => {
-      const name = String(inp.value||'').trim();
-      if(!name){ try{ toast('Escribe un nombre o pulsa Cancelar'); }catch(_){}; return; }
-      _trafSaveQuickLabel(tipo, grupo, precio, name);
-      close();
-      try{ renderTrafficTable(); toast('🏷️ Etiqueta guardada'); }catch(_){}
-    };
-    back.querySelector('#tqlSave').onclick = doSave;
-    inp.addEventListener('keydown', e => { if(e.key === 'Enter') doSave(); if(e.key === 'Escape') close(); });
-  }
-  // Crea o actualiza (o elimina si name==='') la regla de tarifa correspondiente.
-  function _trafSaveQuickLabel(tipo, grupo, precio, name){
-    const rules = (window._getTariffRules && window._getTariffRules()) || [];
-    const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[.\-_]/g,' ').replace(/\s+/g,' ').trim();
-    const tNorm = norm(tipo), gNorm = norm(grupo), p = +precio;
-    const match = rules.find(r => {
-      const tipos = (r.tipos||[]).map(norm);
-      const grupos = (r.grupos||[]).map(norm);
-      const exact = (r.importeExacto != null) ? Math.abs(+r.importeExacto - p) < 0.005 : false;
-      return tipos.includes(tNorm) && grupos.includes(gNorm) && exact;
-    });
-    if(!name){
-      if(match){
-        const idx = rules.indexOf(match);
-        rules.splice(idx, 1);
-        if(window._saveTariffRules) window._saveTariffRules(rules);
-      }
-      return;
-    }
-    if(match){
-      match.resultado = name;
-    } else {
-      rules.push({
-        id: 'r-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),
-        tipos: [tipo],
-        grupos: [grupo],
-        importeExacto: p,
-        importeMin: null, importeMax: null,
-        resultado: name,
-        notes: 'Creada desde el desglose · '+new Date().toLocaleDateString('es-ES'),
-      });
-    }
-    if(window._saveTariffRules) window._saveTariffRules(rules);
-  }
-  // Conecta los botones ➕ Etiquetar / ✏️ Editar del desglose
-  function _trafBindDetailLabels(root){
-    try{
-      root.querySelectorAll('.traf-label-btn').forEach(btn => {
-        btn.addEventListener('click', ev => {
-          ev.preventDefault();
-          const tipo = btn.getAttribute('data-tipo') || '';
-          const grupo = btn.getAttribute('data-grupo') || '';
-          const precio = +btn.getAttribute('data-precio') || 0;
-          const cur = btn.getAttribute('data-current') || '';
-          _trafOpenQuickLabel(tipo, grupo, precio, cur);
-        });
-      });
-    }catch(e){ console.warn('_trafBindDetailLabels error', e); }
-  }
-  window._trafBindDetailLabels = _trafBindDetailLabels;
 
   function _barChartHtml(labels, values, colors, height){
     const H = height || 160;
@@ -4877,7 +4776,7 @@ function openStats(initialSection){
           ${licenseBlock}
         </div>`;
       // Inicializa handlers de edición inline (después de inyectar el HTML)
-      setTimeout(() => { _trafBindCellEditing(body); _trafBindDetailLabels(body); }, 0);
+      setTimeout(() => { _trafBindCellEditing(body); }, 0);
     }else{
       // Monthly detail view: aggregate + daily breakdown
       const agg = _trafAggregate(year, monthSel);
@@ -4952,7 +4851,6 @@ function openStats(initialSection){
           ${monthDetailBlock}
           ${licenseBlockM}
         </div>`;
-      setTimeout(() => { _trafBindDetailLabels(body); }, 0);
     }
   }
   function printTrafficReport(){
