@@ -4313,7 +4313,7 @@ function openStats(initialSection){
         ? `<div style="font-size:10px;color:#f5b301;margin-top:2px;font-weight:600;letter-spacing:.3px">🏷️ ${escapeHtml(d.customLabel)}</div>`
         : '';
       const needsFlag = (d.variantCount >= 2 && !d.customLabel)
-        ? `<div style="font-size:9.5px;color:#fbbf24;margin-top:2px;font-weight:600">⚠️ ${d.variantCount} precios detectados</div>`
+        ? `<div style="font-size:9.5px;color:#64748b;margin-top:1px;font-weight:500">· ${d.variantCount} precios</div>`
         : '';
       return `<tr>
         <td style="padding:6px 10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff">${d.count}</td>
@@ -4326,18 +4326,21 @@ function openStats(initialSection){
     const totalCount = rows.reduce((s,d) => s + d.count, 0);
     const totalAmount = rows.reduce((s,d) => s + d.total, 0);
     const banner = needsLabel > 0
-      ? `<div data-testid="traf-tariff-banner" style="margin-bottom:10px;padding:12px 14px;background:linear-gradient(90deg,rgba(251,191,36,.12),rgba(251,191,36,.03));border:1px solid #fbbf24;border-radius:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <span style="font-size:22px">🤖</span>
-          <div style="flex:1;min-width:260px;color:#fbbf24;font-size:12.5px;line-height:1.5">
-            Hemos detectado <b>${needsLabel} precio${needsLabel===1?'':'s'}</b> que no coincide${needsLabel===1?'':'n'} con tu tarifa habitual. Si es porque tienes una tarifa especial para ese servicio (ej. +70 años, convenio, nocturno…), decláralo en los ajustes para que aparezca categorizado en estadísticas.<br><span style="color:#cbd5e1;font-size:11.5px">Si es un descuento puntual a una persona, déjalo como está — no hace falta etiquetarlo.</span>
-          </div>
-          <button data-testid="traf-open-tariffs" onclick="(function(){try{if(typeof openTariffsEditor==='function')openTariffsEditor();}catch(e){console.warn(e)}})()" style="background:#f5b301;color:#1a1a1a;border:1px solid #f5b301;padding:9px 16px;border-radius:8px;font-weight:800;font-size:12.5px;cursor:pointer;white-space:nowrap">⚙️ Configurar precios</button>
+      ? `<div data-testid="traf-tariff-banner" id="trafTariffHint" style="margin-bottom:8px;padding:5px 10px;background:transparent;border:1px dashed #334155;border-radius:6px;display:flex;align-items:center;gap:8px;font-size:11px;color:#64748b">
+          <span style="opacity:.8">${needsLabel} precio${needsLabel===1?'':'s'} con tarifa distinta a la habitual · si quieres categorizarlo${needsLabel===1?'':'s'}:</span>
+          <a href="javascript:void(0)" data-testid="traf-open-tariffs" onclick="(function(){try{if(typeof openTariffsEditor==='function')openTariffsEditor();}catch(e){console.warn(e)}})()" style="color:#7ec8ff;text-decoration:underline;cursor:pointer;font-weight:600">configurar precios</a>
+          <button data-testid="traf-hint-dismiss" onclick="(function(){try{localStorage.setItem('caja.traf.hint.dismissed','1');var el=document.getElementById('trafTariffHint');if(el)el.remove();}catch(e){}})()" title="Ocultar este aviso" style="margin-left:auto;background:transparent;border:0;color:#475569;cursor:pointer;font-size:14px;line-height:1;padding:2px 6px">×</button>
         </div>`
       : '';
+    // Respeta la preferencia "no mostrar" guardada en localStorage
+    const bannerHtml = (function(){
+      try{ if(localStorage.getItem('caja.traf.hint.dismissed') === '1') return ''; }catch(_){}
+      return banner;
+    })();
     return `
       <div style="margin-top:16px" data-testid="traf-detail-block">
         <div class="small" style="margin-bottom:8px;color:#94a3b8;font-weight:600;letter-spacing:.5px">📋 DESGLOSE PROFESIONAL · ${label} · agrupado por Tipo + Grupo + Precio</div>
-        ${banner}
+        ${bannerHtml}
         <table style="border-collapse:collapse;font-size:12px;font-family:'Consolas','Menlo',monospace;width:100%">
           <thead><tr style="background:#1a1e26">
             <th style="padding:8px;border:1px solid #2a3040;color:#7ec8ff">CANTIDAD</th>
