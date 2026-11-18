@@ -16,7 +16,11 @@ Full-stack POS and management application for medical driver-license centers.
 - Separate prototype lab at `/app/tramitacion-lab/` (NOT deployed with MediCar).
 
 ## Changelog
-- **2026-11-17 · CI/CD fix**: Bumped `commercial/electron/package.json` to **2.3.4** and added a pre-build **version/tag mismatch guard** in `.github/workflows/release.yml`. Root cause of silent 1m 11s failure: package.json was `2.3.1` while user created tag `v2.3.3`, so `electron-builder --publish always` targeted the wrong GitHub release (the one matching the pkg version). The new guard fails the workflow loudly if tag ≠ package.json version.
+- **2026-11-18 · Estadísticas Tráfico + Desglose**:
+  - Nueva **matriz de carnets de Conducción** al final de Estadísticas → Tráfico (vista anual y mensual). Filas = Clase (B, C1, D…) · Columnas = Expedición / Renovación / Recuperación · cada una subdividida en Normal / Profesional. Fila/columna de totales + KPIs. Solo cuenta entradas del grupo Conducción. Mientras el CSV de GIC no incluya las columnas nuevas de clase+profesional, muestra placeholder (fichas antiguas inalteradas).
+  - Nuevo **badge 🏷️ en Desglose profesional** (`_trafBuildDetail`/`_trafDetailBlockHtml`): cuando una entrada hace match con una regla de tarifa personalizada (`caja.tarifas.rules.v1`) y el nombre resultado difiere del tipo base, se muestra la etiqueta de la regla debajo del tipo (p.ej. "+70 años", "Nocturno"). Elimina la sensación de duplicados cuando hay precios legítimamente distintos por edad/convenio.
+  - Añadida pre-validación tag↔package.json en `.github/workflows/release.yml` para evitar fallos silenciosos tipo v2.3.3.
+- **2026-11-17 · CI/CD fix**: Bumped `commercial/electron/package.json` to **2.3.4**. Root cause of silent 1m 11s failure: package.json mismatch con tag.
 - **2026-11-09 · Round 2 (after user feedback)**:
   - Modal Editar entrada: added **TIPO** dropdown (Renovación/Expedición/Canje/Duplicado/Prórroga/Recuperación/Revisión/Periódica/Inicial/Obtención) alongside Grupo and Concepto. Only for TRAF entries.
   - AI prompt: REMOVED hardcoded "66,50€ Expedición Conducción = Canje" default. The AI now reads EACH user's `caja.tarifas.rules.v1` from their own localStorage. If no rules exist, the AI is informed and is more cautious. No server-side assumptions.

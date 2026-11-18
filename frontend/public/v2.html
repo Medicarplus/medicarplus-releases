@@ -4269,8 +4269,17 @@ function openStats(initialSection){
           const tipo = _trafBaseCat(window._effectiveTipo?window._effectiveTipo(e):e.tipo);
           const grupo = (window._normalizeGrupo?window._normalizeGrupo(e.grupo):String(e.grupo || 'Sin grupo').trim()) || 'Sin grupo';
           const precio = +imp || 0;
-          const k = `${tipo}||${grupo}||${precio.toFixed(2)}`;
-          if(!detailMap[k]) detailMap[k] = { tipo, grupo, precio, count:0, total:0, tasa:0 };
+          // 💰 Captura la etiqueta de la regla de tarifa (si hay match) para distinguir
+          //    visualmente precios "legítimos" (ej. "+70 años", "Nocturno"…) de duplicados.
+          let customLabel = '';
+          try{
+            if(window._matchTariffRule){
+              const ruleName = window._matchTariffRule(e);
+              if(ruleName && _trafBaseCat(ruleName) !== tipo) customLabel = ruleName;
+            }
+          }catch(_){}
+          const k = `${tipo}||${grupo}||${precio.toFixed(2)}||${customLabel}`;
+          if(!detailMap[k]) detailMap[k] = { tipo, grupo, precio, customLabel, count:0, total:0, tasa:0 };
           detailMap[k].count++;
           detailMap[k].total += imp;
           detailMap[k].tasa += ta;
@@ -4286,9 +4295,12 @@ function openStats(initialSection){
     const label = monthLabel ? `${monthLabel} ${year}` : `${year}`;
     const bodyRows = rows.map(d => {
       const color = (colorMap && colorMap[d.tipo]) || '#94a3b8';
+      const customBadge = d.customLabel
+        ? `<div style="font-size:10px;color:#f5b301;margin-top:2px;font-weight:600;letter-spacing:.3px">🏷️ ${escapeHtml(d.customLabel)}</div>`
+        : '';
       return `<tr>
         <td style="padding:6px 10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#7ec8ff">${d.count}</td>
-        <td style="padding:6px 10px;border:1px solid #2a3040;color:${color};font-weight:700">${d.tipo}</td>
+        <td style="padding:6px 10px;border:1px solid #2a3040;color:${color};font-weight:700">${d.tipo}${customBadge}</td>
         <td style="padding:6px 10px;border:1px solid #2a3040;color:#e2e8f0">${d.grupo}</td>
         <td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;color:#94a3b8">${d.precio ? _fmtEur(d.precio) : '—'}</td>
         <td style="padding:6px 10px;border:1px solid #2a3040;text-align:right;color:#3ddc97;font-weight:700">${d.total ? _fmtEur(d.total) : '—'}</td>
@@ -4323,7 +4335,7 @@ function openStats(initialSection){
     const label = monthLabel ? `${monthLabel} ${year}` : `${year}`;
     const bodyRows = rows.map(d => `<tr>
         <td style="text-align:center;font-weight:700">${d.count}</td>
-        <td style="text-align:left;font-weight:600">${d.tipo}</td>
+        <td style="text-align:left;font-weight:600">${d.tipo}${d.customLabel?` <span style="font-size:9pt;color:#92400e">(${escapeHtml(d.customLabel)})</span>`:''}</td>
         <td style="text-align:left">${d.grupo}</td>
         <td style="text-align:right">${d.precio ? _fmtEur(d.precio) : '—'}</td>
         <td style="text-align:right;font-weight:700">${d.total ? _fmtEur(d.total) : '—'}</td>
@@ -4358,6 +4370,195 @@ function openStats(initialSection){
     }).join('');
     return `<div style="display:flex;align-items:flex-end;gap:6px;height:${H}px;padding:8px;background:#0e1117;border:1px solid #2a3040;border-radius:8px">${bars}</div>`;
   }
+
+  // ============================================================================
+  // 🪪 Matriz de carnets Conducción · (Clase × [Expedición/Renovación/Recuperación] × Normal/Pro)
+  // ----------------------------------------------------------------------------
+  // Activa automáticamente cuando el CSV de GIC incluye las columnas de CLASE y
+  // PROFESIONAL (aún no disponibles). Mientras no haya datos nuevos, el bloque
+  // muestra un placeholder. Las fichas antiguas sin esa info quedan EXCLUIDAS
+  // de esta matriz (siguen contándose en el resto de estadísticas).
+  //
+  // Reglas de extracción (robustas, para que no falle cuando GIC active el CSV):
+  //  - Tokens de clase PRO:   C, C1, C+E, C1+E, D, D1, D+E, D1+E, BTP (profesional)
+  //  - Tokens de clase NORM:  A, A1, A2, AM, B, B+E (uso normal)
+  //  - Marcadores textuales:  "profesional"/"professional"  → pro
+  //                            "normal"                      → normal
+  //  - Si el CSV añade la clase como sufijo al tipo (línea 5305 del parser),
+  //    se buscará en los segmentos del string separados por coma/"·"/"/" /"|".
+  // ============================================================================
+  const _TRAF_CLASS_PRO  = ['C','C1','C+E','C1+E','D','D1','D+E','D1+E','BTP'];
+  const _TRAF_CLASS_NORM = ['A','A1','A2','AM','B','B+E','B1'];
+  const _TRAF_CLASS_ALL  = [..._TRAF_CLASS_NORM, ..._TRAF_CLASS_PRO]; // orden de visualización
+  const _TRAF_LICENSE_TYPES = ['Expedición','Renovación','Recuperación'];
+
+  function _trafExtractLicenseInfo(e){
+    if(!e || e.kind !== 'TRAF' || e.retorno) return null;
+    const tipoRaw = String(e.tipo||'').trim();
+    if(!tipoRaw) return null;
+    // Segmentamos por los separadores habituales
+    const segments = tipoRaw.split(/[,·\|\/]+/).map(s => s.trim()).filter(Boolean);
+    // Normalizamos cada segmento: mayúsculas, sin espacios internos, acepta "C + E" → "C+E"
+    const norm = s => String(s||'').toUpperCase().replace(/\s+/g,'').replace(/\./g,'');
+    let licenseClass = null;
+    let isProfesional = null;
+    const proSet  = new Set(_TRAF_CLASS_PRO.map(norm));
+    const normSet = new Set(_TRAF_CLASS_NORM.map(norm));
+    for(const seg of segments){
+      const up = norm(seg);
+      if(up && proSet.has(up))  { licenseClass = up; isProfesional = true;  continue; }
+      if(up && normSet.has(up)) { licenseClass = up; if(isProfesional==null) isProfesional = false; continue; }
+      const lc = seg.toLowerCase();
+      if(/^profesion(al|als)?$/i.test(lc) || /^profession(al|als)?$/i.test(lc)) { isProfesional = true; continue; }
+      if(/^normal(es)?$/i.test(lc)) { if(isProfesional==null) isProfesional = false; continue; }
+    }
+    if(licenseClass && isProfesional === null){
+      // Si solo detectamos la clase, inferimos pro/normal por la propia clase
+      isProfesional = proSet.has(norm(licenseClass));
+    }
+    return { licenseClass, isProfesional };
+  }
+
+  function _trafBuildLicenseMatrix(filterYear, filterMonth){
+    // Devuelve { matrix, classesSeen, totalCount, anyData }
+    // matrix[cls] = { Expedición:{norm,pro}, Renovación:{norm,pro}, Recuperación:{norm,pro} }
+    const matrix = {};
+    const classesSeen = new Set();
+    let totalCount = 0;
+    const ensureCell = (cls, type) => {
+      if(!matrix[cls]) matrix[cls] = {};
+      if(!matrix[cls][type]) matrix[cls][type] = { norm:0, pro:0 };
+    };
+    try{
+      const src = (JSON.parse(localStorage.getItem(KEYS['trafic']))||{}).byDate || {};
+      for(const iso of Object.keys(src)){
+        const dt = new Date(iso + 'T00:00:00');
+        if(isNaN(dt) || dt.getFullYear() !== +filterYear) continue;
+        if(filterMonth != null && (dt.getMonth()+1) !== +filterMonth) continue;
+        for(const e of (src[iso]||[])){
+          if(!e || e.kind !== 'TRAF' || e.retorno) continue;
+          // Solo Conducción
+          const grp = window._normalizeGrupo ? window._normalizeGrupo(e.grupo) : String(e.grupo||'').trim();
+          if(grp !== 'Conducción') continue;
+          // Solo los 3 tipos pedidos
+          const tipoRaw = window._effectiveTipo ? window._effectiveTipo(e) : e.tipo;
+          const baseType = _trafBaseCat(tipoRaw);
+          if(!_TRAF_LICENSE_TYPES.includes(baseType)) continue;
+          // Extraer clase + pro/normal del CSV nuevo
+          const info = _trafExtractLicenseInfo(e);
+          if(!info || !info.licenseClass) continue;
+          const kPro = info.isProfesional ? 'pro' : 'norm';
+          ensureCell(info.licenseClass, baseType);
+          matrix[info.licenseClass][baseType][kPro]++;
+          classesSeen.add(info.licenseClass);
+          totalCount++;
+        }
+      }
+    }catch(err){ console.warn('_trafBuildLicenseMatrix error', err); }
+    // Ordena clases: primero por orden canónico, al final las desconocidas
+    const canon = _TRAF_CLASS_ALL.filter(c => classesSeen.has(c));
+    const extra = [...classesSeen].filter(c => !_TRAF_CLASS_ALL.includes(c)).sort();
+    return { matrix, classesSeen: [...canon, ...extra], totalCount, anyData: totalCount > 0 };
+  }
+
+  function _trafLicenseMatrixHtml(data, year, monthLabel){
+    const periodo = monthLabel ? `${monthLabel} ${year}` : `${year}`;
+    if(!data.anyData){
+      return `
+        <div data-testid="traf-license-matrix-empty" style="margin-top:14px;padding:16px 18px;background:#0e1117;border:1px dashed #334155;border-radius:10px;color:#94a3b8">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <span style="font-size:18px">🪪</span>
+            <div style="font-weight:700;color:#cbd5e1;letter-spacing:.3px">CARNETS DE CONDUCCIÓN · ${periodo}</div>
+          </div>
+          <div style="font-size:12.5px;line-height:1.55">
+            Sin datos de clase de carnet todavía en este periodo. Este apartado se activará automáticamente cuando GIC incluya las columnas <b>profesional</b> y <b>clase de carnet</b> en el CSV. Las fichas antiguas se mantienen igual y siguen sumando en el resto de estadísticas.
+          </div>
+        </div>`;
+    }
+    const classes = data.classesSeen;
+    // Totales fila
+    const rowTotals = {};
+    const colTotals = { Expedición:{norm:0,pro:0}, Renovación:{norm:0,pro:0}, Recuperación:{norm:0,pro:0} };
+    let grandTotal = 0;
+    classes.forEach(c => {
+      let rt = 0;
+      _TRAF_LICENSE_TYPES.forEach(t => {
+        const cell = (data.matrix[c] && data.matrix[c][t]) || { norm:0, pro:0 };
+        rt += cell.norm + cell.pro;
+        colTotals[t].norm += cell.norm;
+        colTotals[t].pro  += cell.pro;
+      });
+      rowTotals[c] = rt;
+      grandTotal += rt;
+    });
+    const typeColors = { 'Expedición':'#3ddc97', 'Renovación':'#7ec8ff', 'Recuperación':'#f5b301' };
+    const cell = (n, color) => `<td style="padding:6px 8px;border:1px solid #2a3040;text-align:center;font-family:'Consolas',monospace;color:${n?color:'#475569'};font-weight:${n?'600':'400'}">${n || ''}</td>`;
+    const rows = classes.map(c => {
+      const parts = [];
+      parts.push(`<td style="padding:6px 10px;border:1px solid #2a3040;font-weight:700;background:#141821;color:#e2e8f0;font-family:'Consolas',monospace">${c}</td>`);
+      _TRAF_LICENSE_TYPES.forEach(t => {
+        const d = (data.matrix[c] && data.matrix[c][t]) || { norm:0, pro:0 };
+        parts.push(cell(d.norm, typeColors[t]));
+        parts.push(cell(d.pro,  typeColors[t]));
+      });
+      parts.push(`<td style="padding:6px 10px;border:1px solid #2a3040;text-align:center;font-weight:700;color:#a855f7;font-family:'Consolas',monospace">${rowTotals[c]}</td>`);
+      return `<tr>${parts.join('')}</tr>`;
+    }).join('');
+    const tfootParts = [`<td style="padding:8px 10px;border:1px solid #2a3040;background:#1f2530;font-weight:700;color:#e2e8f0">TOTAL ${periodo}</td>`];
+    _TRAF_LICENSE_TYPES.forEach(t => {
+      const d = colTotals[t];
+      tfootParts.push(`<td style="padding:8px 10px;border:1px solid #2a3040;background:#1f2530;text-align:center;font-weight:700;color:${typeColors[t]};font-family:'Consolas',monospace">${d.norm || ''}</td>`);
+      tfootParts.push(`<td style="padding:8px 10px;border:1px solid #2a3040;background:#1f2530;text-align:center;font-weight:700;color:${typeColors[t]};font-family:'Consolas',monospace">${d.pro || ''}</td>`);
+    });
+    tfootParts.push(`<td style="padding:8px 10px;border:1px solid #2a3040;background:#1f2530;text-align:center;font-weight:800;color:#a855f7;font-family:'Consolas',monospace;font-size:14px">${grandTotal}</td>`);
+    // KPIs resumen rápido
+    const kpi = (label, n, color) => `
+      <div style="padding:8px 10px;background:#0e1117;border:1px solid #2a3040;border-left:3px solid ${color};border-radius:6px">
+        <div class="small" style="color:#94a3b8;letter-spacing:.4px">${label}</div>
+        <div style="font-size:18px;font-weight:700;color:${color};font-family:'Consolas',monospace">${n || 0}</div>
+      </div>`;
+    const sumNorm = _TRAF_LICENSE_TYPES.reduce((s,t)=>s+colTotals[t].norm, 0);
+    const sumPro  = _TRAF_LICENSE_TYPES.reduce((s,t)=>s+colTotals[t].pro,  0);
+    return `
+      <div data-testid="traf-license-matrix" style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:18px">🪪</span>
+          <div style="font-weight:700;color:#e2e8f0;letter-spacing:.3px">CARNETS DE CONDUCCIÓN · ${periodo}</div>
+          <div class="small" style="color:#64748b">(solo fichas con clase detectada en el CSV)</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+          ${kpi('Normales', sumNorm, '#7ec8ff')}
+          ${kpi('Profesionales', sumPro, '#f5b301')}
+          ${kpi('Expediciones', colTotals['Expedición'].norm + colTotals['Expedición'].pro, '#3ddc97')}
+          ${kpi('Renovaciones', colTotals['Renovación'].norm + colTotals['Renovación'].pro, '#7ec8ff')}
+          ${kpi('Recuperaciones', colTotals['Recuperación'].norm + colTotals['Recuperación'].pro, '#f5b301')}
+        </div>
+        <div style="overflow-x:auto">
+          <table style="border-collapse:collapse;font-size:12px;width:100%;min-width:720px">
+            <thead>
+              <tr style="background:#1a1e26">
+                <th rowspan="2" style="padding:8px 10px;border:1px solid #2a3040;background:#1a1e26;text-align:left;min-width:80px;color:#cbd5e1">CLASE</th>
+                <th colspan="2" style="padding:8px;border:1px solid #2a3040;background:#1a1e26;text-align:center;color:${typeColors['Expedición']};text-transform:uppercase">EXPEDICIÓN</th>
+                <th colspan="2" style="padding:8px;border:1px solid #2a3040;background:#1a1e26;text-align:center;color:${typeColors['Renovación']};text-transform:uppercase">RENOVACIÓN</th>
+                <th colspan="2" style="padding:8px;border:1px solid #2a3040;background:#1a1e26;text-align:center;color:${typeColors['Recuperación']};text-transform:uppercase">RECUPERACIÓN</th>
+                <th rowspan="2" style="padding:8px 10px;border:1px solid #2a3040;background:#1a1e26;text-align:center;color:#a855f7">TOTAL</th>
+              </tr>
+              <tr style="background:#141821">
+                <th style="padding:5px 6px;border:1px solid #2a3040;background:#141821;font-size:10.5px;color:#94a3b8;text-transform:uppercase">Normal</th>
+                <th style="padding:5px 6px;border:1px solid #2a3040;background:#141821;font-size:10.5px;color:#f5b301;text-transform:uppercase">Pro</th>
+                <th style="padding:5px 6px;border:1px solid #2a3040;background:#141821;font-size:10.5px;color:#94a3b8;text-transform:uppercase">Normal</th>
+                <th style="padding:5px 6px;border:1px solid #2a3040;background:#141821;font-size:10.5px;color:#f5b301;text-transform:uppercase">Pro</th>
+                <th style="padding:5px 6px;border:1px solid #2a3040;background:#141821;font-size:10.5px;color:#94a3b8;text-transform:uppercase">Normal</th>
+                <th style="padding:5px 6px;border:1px solid #2a3040;background:#141821;font-size:10.5px;color:#f5b301;text-transform:uppercase">Pro</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+            <tfoot><tr>${tfootParts.join('')}</tr></tfoot>
+          </table>
+        </div>
+      </div>`;
+  }
+
   // 🖊 Edición inline de celdas de la tabla Tráfico. Guarda overrides.
   function _trafBindCellEditing(root){
     const cells = root.querySelectorAll('.traf-cell');
@@ -4490,6 +4691,9 @@ function openStats(initialSection){
       // 📋 Desglose profesional por Tipo + Grupo + Precio (como tu Excel de cierre de mes)
       const detailRowsData = _trafBuildDetail(year);
       const detailBlock = _trafDetailBlockHtml(detailRowsData, year, null, COLORS);
+      // 🪪 Nueva matriz de carnets Conducción (B, C1, D, etc.) · Normal vs Profesional · Exped/Renov/Recup
+      const licenseData = _trafBuildLicenseMatrix(year);
+      const licenseBlock = _trafLicenseMatrixHtml(licenseData, year, null);
       body.innerHTML = `
         <div data-testid="traffic-stats-year" style="display:flex;flex-direction:column;gap:14px">
           <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
@@ -4541,6 +4745,7 @@ function openStats(initialSection){
             ✏️ <b>Corrección manual</b> · Haz clic en cualquier celda de tipo (Renovación, Prórroga, Periódica, etc.) para ajustar el número a mano si algo no cuadra. <b>Pasa el ratón por encima</b> para ver el desglose por grupo (Marina, Armas, Conducir…). Doble clic sobre una celda editada (borde amarillo) para volver al valor original del CSV.
           </div>
           ${detailBlock}
+          ${licenseBlock}
         </div>`;
       // Inicializa handlers de edición inline (después de inyectar el HTML)
       setTimeout(() => _trafBindCellEditing(body), 0);
@@ -4572,6 +4777,9 @@ function openStats(initialSection){
       // 📋 Desglose profesional del mes (mismo bloque que en vista anual)
       const monthDetailRows = _trafBuildDetail(year, monthSel);
       const monthDetailBlock = _trafDetailBlockHtml(monthDetailRows, year, MESOS[monthSel-1], COLORS);
+      // 🪪 Matriz de carnets Conducción del mes
+      const licenseDataM = _trafBuildLicenseMatrix(year, monthSel);
+      const licenseBlockM = _trafLicenseMatrixHtml(licenseDataM, year, MESOS[monthSel-1]);
       body.innerHTML = `
         <div data-testid="traffic-stats-month" style="display:flex;flex-direction:column;gap:14px">
           <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
@@ -4613,6 +4821,7 @@ function openStats(initialSection){
             <tbody>${dailyTableRows}</tbody>
           </table>
           ${monthDetailBlock}
+          ${licenseBlockM}
         </div>`;
     }
   }
