@@ -16,6 +16,11 @@ Full-stack POS and management application for medical driver-license centers.
 - Separate prototype lab at `/app/tramitacion-lab/` (NOT deployed with MediCar).
 
 ## Changelog
+- **2026-11-18 (tarde) · Detector de tarifas**:
+  - **Auto-detección de variantes** en `_trafBuildDetail`: calcula `variantCount` por (tipo+grupo) y marca ⚠️ las filas que pertenecen a un servicio con 2+ precios distintos.
+  - **Banner inteligente** 🤖 arriba del desglose: "Hemos detectado X precios que podrían tener una tarifa especial". Solo aparece si realmente hay algo por etiquetar.
+  - **Nueva columna ETIQUETA** con botón `➕ Etiquetar` (fila sin etiqueta) o `✏️ Editar` (fila etiquetada) · mini-modal con tipo/grupo/precio precargados que crea/edita/elimina la regla en `caja.tarifas.rules.v1` con 1 clic. Match insensible a tildes para no duplicar reglas.
+  - **Plataforma 100% universal**: nunca hardcodea precios ni centros. Al importar su CSV, cualquier cliente ve sus propias combinaciones y las etiqueta en segundos.
 - **2026-11-18 · Estadísticas Tráfico + Desglose**:
   - Nueva **matriz de carnets de Conducción** al final de Estadísticas → Tráfico (vista anual y mensual). Filas = Clase (B, C1, D…) · Columnas = Expedición / Renovación / Recuperación · cada una subdividida en Normal / Profesional. Fila/columna de totales + KPIs. Solo cuenta entradas del grupo Conducción. Mientras el CSV de GIC no incluya las columnas nuevas de clase+profesional, muestra placeholder (fichas antiguas inalteradas).
   - Nuevo **badge 🏷️ en Desglose profesional** (`_trafBuildDetail`/`_trafDetailBlockHtml`): cuando una entrada hace match con una regla de tarifa personalizada (`caja.tarifas.rules.v1`) y el nombre resultado difiere del tipo base, se muestra la etiqueta de la regla debajo del tipo (p.ej. "+70 años", "Nocturno"). Elimina la sensación de duplicados cuando hay precios legítimamente distintos por edad/convenio.
